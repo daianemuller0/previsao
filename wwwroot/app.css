@@ -590,6 +590,17 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 .chart-body { flex: 1 1 auto; min-height: 240px; display: flex; }
 .chart-body svg { width: 100%; height: 100%; display: block; }
 
+/* ---- Gráfico de rosca (donut) + legenda ---- */
+.chart-body.donut { min-height: 0; display: block; }
+.donut-wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.donut-svg { width: 128px; height: 128px; flex: 0 0 128px; }
+.donut-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 150px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.donut-legend li { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 8px; font-size: 12.5px; }
+.donut-legend .dl-dot { width: 10px; height: 10px; border-radius: 3px; }
+.donut-legend .dl-name { color: var(--text-2, #4a5568); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.donut-legend .dl-val { color: var(--text-1, #1e2836); font-weight: 600; text-align: right; white-space: nowrap; }
+.donut-legend .dl-pct { grid-column: 2 / 4; font-size: 11px; color: var(--text-3, #93a1b5); text-align: right; margin-top: -3px; }
+
 /* ---- Caixa "Valor total" (gráfico de linha mensal) ---- */
 .total-box { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, #f7f9fc); white-space: nowrap; }
 .total-box .tb-l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #93a1b5); font-weight: 600; }

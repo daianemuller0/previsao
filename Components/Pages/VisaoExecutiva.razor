@@ -253,6 +253,46 @@
     </div>
 </div>
 
+@* ---- Distribuição da carteira: unidade · trimestre · país · GM ---- *@
+<div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">forecast ponderado elegível · @_year · @_currency</span><span class="st-line"></span></div>
+<div class="g12 top">
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Por unidade <span class="hint">BU do PV</span></div></div>
+            @if (_byBu.Count > 0) { <div class="chart-body donut">@RenderDonut(_byBu)</div> } else { <div class="empty">Sem dados no recorte.</div> }
+        </div>
+    </div>
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Valor por trimestre <span class="hint">1º a 4º tri</span></div></div>
+            @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
+            @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">Sem dados no recorte.</div> }
+        </div>
+    </div>
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Por país <span class="hint">participação</span></div></div>
+            @foreach (var c in _byCountry)
+            {
+                <div class="bar-row">
+                    <span class="bar-label">@c.Label</span>
+                    <span class="bar-track"><span class="bar-fill c-primary" style="width:@Share(c.Value, _maxCountry)%"></span></span>
+                    <span class="bar-value">@Money(c.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(c.Value / _countryTotal * 100)</span></span>
+                </div>
+            }
+            @if (_byCountry.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+        </div>
+    </div>
+</div>
+<div class="g12" style="margin-top:14px">
+    <div class="c12">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">GM médio mensal <span class="hint">margem bruta média das oportunidades por mês · meta 30%</span></div></div>
+            <div class="chart-body" style="min-height:200px">@RenderGmColumns()</div>
+        </div>
+    </div>
+</div>
+
 @* ===================== 4b · OPORTUNIDADES ===================== *@
 <div class="section-head">
     <span class="st-title">Oportunidades</span>
@@ -368,6 +408,12 @@
     private record CommRow(string Code, string Name, double Value);
     private List<CommRow> _byCommercial = new();
     private double _maxComm = 1;
+    private record SliceRow(string Label, double Value);
+    private List<SliceRow> _byBu = new();
+    private List<SliceRow> _byCountry = new();
+    private double[] _byQuarter = new double[4];
+    private double[] _gmMonthly = new double[12];
+    private double _maxCountry = 1, _countryTotal = 1;
     private List<CompRow> _comp = new();
     private List<MarketRow> _byMarket = new();
     private List<ProductRow> _byProduct = new();
@@ -500,6 +546,30 @@
         _byCommercial = CommercialCategory.All.Select(cc => new CommRow(cc.Code, cc.Name,
             opps.Where(o => o.CommercialCategory == cc.Code && InYear(o) && Eligible(o)).Sum(W))).ToList();
         _maxComm = Math.Max(_byCommercial.Count > 0 ? _byCommercial.Max(x => x.Value) : 1, 1);
+
+        // Distribuição da carteira: por unidade (BU), por trimestre, por país, GM mensal.
+        var eligYear = opps.Where(o => InYear(o) && Eligible(o)).ToList();
+        _byBu = Cat.BusinessUnits.Select(b => new SliceRow(b.Code,
+            eligYear.Where(o => o.PvBusinessUnitId == b.Id).Sum(W)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+
+        _byQuarter = new double[4];
+        foreach (var o in eligYear) _byQuarter[(o.ExpectedDateValue!.Value.Month - 1) / 3] += W(o);
+
+        _byCountry = Cat.Countries.Select(c => new SliceRow(c.Name,
+            eligYear.Where(o => o.CountryId == c.Id).Sum(W)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+        _maxCountry = Math.Max(_byCountry.Count > 0 ? _byCountry.Max(x => x.Value) : 1, 1);
+        _countryTotal = Math.Max(_byCountry.Sum(x => x.Value), 1);
+
+        var gmSum = new double[12]; var gmCnt = new int[12];
+        foreach (var o in eligYear)
+        {
+            var mi = o.ExpectedDateValue!.Value.Month - 1;
+            gmSum[mi] += o.GmPercentValue; gmCnt[mi]++;
+        }
+        _gmMonthly = new double[12];
+        for (var m = 0; m < 12; m++) _gmMonthly[m] = gmCnt[m] > 0 ? gmSum[m] / gmCnt[m] : 0;
 
         // Mercado / produto.
         _byMarket = Cat.Markets.Select(m => new MarketRow(m.Name,
@@ -840,6 +910,86 @@
             sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 8).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{mWeight}' fill='{mColor}'>{Fmt.MonthName(m + 1)}</text>");
         }
 
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Paleta dos gráficos de pizza/rosca.
+    private static readonly string[] PieColors =
+        { "#007A9E", "#009496", "#0b4f6f", "#5bb0c9", "#b7791f", "#1f9254", "#64748b", "#c0392b" };
+
+    private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+
+    // Gráfico de rosca (donut) + legenda. Valores em USD, convertidos p/ a moeda ativa.
+    private RenderFragment RenderDonut(IReadOnlyList<SliceRow> data) => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double total = Math.Max(data.Sum(d => Cv(d.Value)), 1);
+        double cx = 64, cy = 64, r = 50, sw = 20, C = 2 * Math.PI * r;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<div class='donut-wrap'>");
+        sb.Append("<svg viewBox='0 0 128 128' class='donut-svg' role='img' aria-label='Distribuição'>");
+        sb.Append($"<circle cx='{cx}' cy='{cy}' r='{r.ToString(inv)}' fill='none' stroke='#eef2f7' stroke-width='{sw.ToString(inv)}'/>");
+        double off = 0;
+        for (var i = 0; i < data.Count; i++)
+        {
+            double val = Cv(data[i].Value);
+            if (val <= 0) continue;
+            double dash = val / total * C;
+            var col = PieColors[i % PieColors.Length];
+            sb.Append($"<circle cx='{cx}' cy='{cy}' r='{r.ToString(inv)}' fill='none' stroke='{col}' stroke-width='{sw.ToString(inv)}' stroke-dasharray='{dash.ToString("0.##", inv)} {(C - dash).ToString("0.##", inv)}' stroke-dashoffset='{(-off).ToString("0.##", inv)}' transform='rotate(-90 {cx} {cy})'/>");
+            off += dash;
+        }
+        sb.Append($"<text x='{cx}' y='{(cy - 3).ToString(inv)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>Total</text>");
+        sb.Append($"<text x='{cx}' y='{(cy + 11).ToString(inv)}' text-anchor='middle' font-size='13' font-weight='700' fill='#1e2836'>{_sym} {Fmt.Compact(total)}</text>");
+        sb.Append("</svg>");
+
+        sb.Append("<ul class='donut-legend'>");
+        for (var i = 0; i < data.Count; i++)
+        {
+            double val = Cv(data[i].Value);
+            var col = PieColors[i % PieColors.Length];
+            sb.Append($"<li><span class='dl-dot' style='background:{col}'></span><span class='dl-name'>{Esc(data[i].Label)}</span><span class='dl-val'>{_sym} {Fmt.Compact(val)}</span><span class='dl-pct'>{Fmt.Pct(val / total * 100)}</span></li>");
+        }
+        sb.Append("</ul></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Colunas do GM médio por mês (%), com linha-alvo em 30% e mês atual destacado.
+    private RenderFragment RenderGmColumns() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 720, H = 220, top = 24, bot = 180, left = 30, right = 12;
+        double plotW = Wd - left - right, colW = plotW / 12.0;
+        double max = Math.Max(_gmMonthly.DefaultIfEmpty(0).Max(), 30) * 1.15;
+        double Y(double v) => bot - v / max * (bot - top);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='GM médio mensal'>");
+        for (var g = 0; g <= 3; g++)
+        {
+            var gy = top + (bot - top) * g / 3.0;
+            sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
+        }
+        // linha-alvo em 30%
+        double ty = Y(30);
+        sb.Append($"<line x1='{left.ToString(inv)}' y1='{ty.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{ty.ToString("0.#", inv)}' stroke='#b7791f' stroke-width='1' stroke-dasharray='4 3' opacity='0.7'/>");
+        sb.Append($"<text x='{(Wd - right).ToString(inv)}' y='{(ty - 4).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#b7791f'>meta 30%</text>");
+
+        for (var m = 0; m < 12; m++)
+        {
+            double val = _gmMonthly[m];
+            double bw = colW * 0.56;
+            double cxc = left + m * colW + colW / 2;
+            double yTop = Y(val);
+            bool cur = (m + 1) == _month;
+            var col = cur ? "#007A9E" : val >= 30 ? "#1f9254" : val >= 20 ? "#5bb0c9" : "#c98a3a";
+            if (val > 0)
+                sb.Append($"<rect x='{(cxc - bw / 2).ToString("0.#", inv)}' y='{yTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(bot - yTop).ToString("0.#", inv)}' rx='2' fill='{col}'/>");
+            sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(yTop - 5).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='#5b6b82'>{val.ToString("0", inv)}%</text>");
+            sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? "#007A9E" : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
+        }
         sb.Append("</svg>");
         builder.AddMarkupContent(0, sb.ToString());
     };

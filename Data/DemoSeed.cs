@@ -139,6 +139,12 @@ public static class DemoSeed
         };
         var pvBu = Pick(cat.BusinessUnits).Id;
 
+        // ~1 em cada 4 é negócio de exportação — o país difere do cliente (BR).
+        var exportCountries = cat.Countries.Where(c => c.Id != "br").ToList();
+        var country = rnd.Next(0, 4) == 0 && exportCountries.Count > 0
+            ? Pick(exportCountries).Id
+            : customer.CountryId;
+
         var n = 1001 + i;
         return new Opportunity
         {
@@ -146,7 +152,7 @@ public static class DemoSeed
             Name = $"{product.Name} — {plant.Name}",
             ProposalNumber = $"PRP-2026-{n}",
             PvNumber = $"PV-{2600 + i}",
-            CountryId = customer.CountryId,
+            CountryId = country,
             MarketId = marketId,
             SubMarketId = sub?.Id ?? "",
             ProductId = product.Id,
