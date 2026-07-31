@@ -109,12 +109,6 @@
     <StatCard Label="Realizado acumulado no ano" Value="@Money(_realizedYtd)" DeltaText="@($"{Fmt.Pct(_attainYtd)} da meta no ano")" Context="Fechados (ganhos)" AccentLeft="true" />
     <StatCard Label="Previsão em risco" Value="@Money(_atRisk)" DeltaText="@($"{_atRiskCount} oportunidades de alto risco")" Context="exige decisão" AccentLeft="true" />
 </div>
-<div class="exec-grid cols-4 kpi-tier2" style="margin-top:2px">
-    <StatCard Label="Pipeline total" Value="@Money(_pipelineTotal)" SmallValue="true" Context="@($"{_openCount} oportunidades abertas")" />
-    <StatCard Label="Pipeline ponderado" Value="@Money(_pipelineWeighted)" SmallValue="true" Context="probabilidades aplicadas" />
-    <StatCard Label="Margem prevista" Value="@Money(_marginForecast)" SmallValue="true" Context="@($"GM média {Fmt.Pct(_gmAvg)}")" />
-    <StatCard Label="Cobertura de pipeline" Value="@_coverageLabel" SmallValue="true" DeltaText="@(_coverage >= 3.5 ? "no ideal" : "abaixo do ideal (3,5x)")" />
-</div>
 
 @* ===================== 3 · INSIGHTS EXECUTIVOS ===================== *@
 <div class="section-head">
