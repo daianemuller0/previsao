@@ -102,9 +102,11 @@ public static class DemoSeed
         // Demonstração em BRL e USD (a taxa é sempre a cotação BRL/USD).
         var currency = i % 3 == 0 ? "USD" : "BRL";
         var brlPerUsd = cat.RateToUsd("USD");
+        // Arredonda ao milhar (Math.Round não aceita dígitos negativos).
+        double ToThousand(double v) => Math.Round(v / 1000.0) * 1000.0;
         var amountOriginal = currency == "USD"
-            ? Inv(Math.Round(baseUsd, -3))
-            : Inv(Math.Round(baseUsd * brlPerUsd, -3));
+            ? Inv(ToThousand(baseUsd))
+            : Inv(ToThousand(baseUsd * brlPerUsd));
         var exchange = Inv(brlPerUsd);
 
         var gm = rnd.Next(16, 43);
