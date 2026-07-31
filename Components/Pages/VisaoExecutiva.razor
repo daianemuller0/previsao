@@ -33,7 +33,9 @@
 @* ---- Filtros globais ---- *@
 <div class="filterbar" style="position:static;margin:0 0 16px;border:1px solid var(--border);border-radius:var(--radius);">
     <div class="flt"><span class="flt-label">Ano</span><select><option>@_year</option></select></div>
-    <div class="flt"><span class="flt-label">Trimestre</span><select><option>@(_quarter)º</option><option>Todos</option></select></div>
+    <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
+    <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
+    <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
     <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select></div>
     <div class="flt"><span class="flt-label">KAM</span><select @bind="_kam"><option value="">Todos</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select></div>
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
@@ -74,10 +76,24 @@
         <div class="hero-spark"><Sparkline Values="@_evoMonth" Stroke="#8fe3c4" /></div>
     </div>
     <div class="hero-side">
-        <div class="panel-title" style="margin-bottom:16px">Saúde da Previsão de Vendas
-            <span class="stat-info" title="Este indicador consolida precisão histórica, qualidade dos dados, cobertura de pipeline, margem, risco e frequência de atualização.">@Icons.Svg("info")</span>
+        <div class="panel-head" style="margin-bottom:8px">
+            <div class="panel-title">Top 10 oportunidades mais quentes <span class="hint">maior confiança</span></div>
+            <a class="btn-link" href="/oportunidades">Ver todas</a>
         </div>
-        <HealthScore Score="@_health" Label="@_healthLabel" Metrics="@_healthMetrics" />
+        <div class="hot-list">
+            @foreach (var h in _top10)
+            {
+                <a class="hot-item" href="@($"/oportunidades/{h.OppId}")">
+                    <span class="hot-conf @ForecastCalc.ConfidenceBandCss(h.Confidence)">@h.Confidence.ToString("0")%</span>
+                    <span class="hot-body">
+                        <span class="hot-name" title="@h.Name">@h.Name</span>
+                        <span class="hot-meta">@h.Customer · @h.Kam</span>
+                    </span>
+                    <span class="hot-val">@Money(h.ValueUsd)</span>
+                </a>
+            }
+            @if (_top10.Count == 0) { <div class="empty">Sem oportunidades abertas.</div> }
+        </div>
     </div>
 </div>
 
@@ -153,19 +169,19 @@
 <div class="g12">
     <div class="c5">
         <div class="panel">
-            <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por nível de confiança</span></div></div>
+            <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por confiança · (% ganho + % período) ÷ 2</span></div></div>
             <div class="comp-bar">
                 @foreach (var c in _comp.Where(x => x.Value > 0))
                 {
-                    <div class="comp-seg" style="width:@Share(c.Value, _compTotal)%;background:@CatColor(c.Cat)" title="@ForecastCategories.Label(c.Cat) · @Money(c.Value)">@(c.Share >= 16 ? ForecastCategories.Label(c.Cat) : "")</div>
+                    <div class="comp-seg" style="width:@Share(c.Value, _compTotal)%;background:@c.Color" title="@c.Band · @Money(c.Value)">@(c.Share >= 16 ? c.Band : "")</div>
                 }
             </div>
             <div class="comp-list">
                 @foreach (var c in _comp)
                 {
                     <div class="comp-row">
-                        <span class="comp-dot" style="background:@CatColor(c.Cat)"></span>
-                        <span><span class="comp-name">@ForecastCategories.Label(c.Cat)</span> <span class="comp-sub">· @c.Count op.</span></span>
+                        <span class="comp-dot" style="background:@c.Color"></span>
+                        <span><span class="comp-name">@c.Band</span> <span class="comp-sub">· @c.Count op.</span></span>
                         <span class="comp-share">@Fmt.Pct(c.Share)</span>
                         <span class="comp-num">@Money(c.Value)</span>
                         <span class="delta @(c.Trend >= 0 ? "up" : "down")" style="font-size:11px">@Fmt.Signed(c.Trend)</span>
@@ -236,6 +252,40 @@
     </div>
 </div>
 
+@* ---- Comparativo AFM × NB + Previsão mensal ---- *@
+<div class="g12" style="margin-top:14px">
+    <div class="c5">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Aftermarket × New Business <span class="hint">por categoria comercial</span></div></div>
+            @foreach (var cc in _byCommercial)
+            {
+                var destaque = cc.Code is "AFM" or "NB" ? "strong" : "";
+                <div class="bar-row">
+                    <span class="bar-label @destaque">@cc.Name <span class="muted" style="font-weight:400">· @cc.Code</span></span>
+                    <span class="bar-track"><span class="bar-fill @(cc.Code == "AFM" ? "afm" : "c-primary")" style="width:@Share(cc.Value, _maxComm)%"></span></span>
+                    <span class="bar-value">@Money(cc.Value)</span>
+                </div>
+            }
+            <div class="muted" style="font-size:11px;margin-top:8px">Comparativo do forecast ponderado por categoria comercial (NB · RT · AFM · SV).</div>
+        </div>
+    </div>
+    <div class="c7">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Previsão mensal <span class="hint">realizado + forecast ponderado por mês · @_currency</span></div></div>
+            @{ var maxMon = Enumerable.Range(0, 12).Select(m => _mReal[m] + _mForecast[m]).DefaultIfEmpty(0).Max(); if (maxMon <= 0) { maxMon = 1; } }
+            @for (var m = 0; m < 12; m++)
+            {
+                var val = _mReal[m] + _mForecast[m];
+                <div class="bar-row" style="grid-template-columns:56px 1fr auto">
+                    <span class="bar-label @((m + 1) == _month ? "strong" : "")" style="@((m + 1) == _month ? "color:var(--primary)" : "")">@Fmt.MonthName(m + 1)</span>
+                    <span class="bar-track"><span class="bar-fill c-primary" style="width:@Share(val, maxMon)%"></span></span>
+                    <span class="bar-value">@Money(val)</span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
 @* ===================== 4b · FORECAST MOVEMENT ===================== *@
 <div class="panel" style="margin-top:14px">
     <div class="panel-head">
@@ -292,7 +342,9 @@
     private DateTime _updated = DateTime.Now;
     private int _year, _month, _quarter;
     private string _market = "", _kam = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "";
-    private string _currency = "USD", _chartMode = "monthly";
+    private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
+    private int _monthFilter;              // 0 = todos
+    private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
     private bool _showMore, _savedMsg;
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
@@ -309,12 +361,17 @@
     private int _activeFilters;
 
     private List<HealthScore.Metric> _healthMetrics = new();
-    private record CompRow(ForecastCategory Cat, double Value, int Count, double Share, double Trend);
+    private record CompRow(string Band, string Color, double Value, int Count, double Share, double Trend);
     private record MarketRow(string Name, double Value, double Trend);
     private record ProductRow(string Name, double Value, double Margin, double Trend);
     private record KamRow(string Name, double Forecast, double Target, double Gap, double Coverage, string Status, string StatusCss);
     private record Insight(string Category, string Sev, string Title, string Detail, string Value, string Action, string Link);
     private record Attn(string Category, string Sev, string Icon, string Title, string Meta, string Value, string Reason, string Rec, string OppId);
+    private record HotOpp(string Name, string Customer, string Kam, double ValueUsd, double Confidence, string OppId);
+    private List<HotOpp> _top10 = new();
+    private record CommRow(string Code, string Name, double Value);
+    private List<CommRow> _byCommercial = new();
+    private double _maxComm = 1;
     private List<CompRow> _comp = new();
     private List<MarketRow> _byMarket = new();
     private List<ProductRow> _byProduct = new();
@@ -346,17 +403,25 @@
         if (_product != "") q = q.Where(o => o.ProductId == _product);
         if (_customer != "") q = q.Where(o => o.CustomerId == _customer);
         if (_bu != "") q = q.Where(o => o.PvBusinessUnitId == _bu);
+        if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
+        if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
+        if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
         return q;
     }
 
-    private void ClearFilters() { _market = _kam = _catFilter = _country = _product = _customer = _bu = ""; }
+    private void ClearFilters()
+    {
+        _market = _kam = _catFilter = _country = _product = _customer = _bu = "";
+        _monthFilter = 0; _dateFrom = _dateTo = null;
+    }
     private void SaveView() { _savedMsg = true; }
 
     private void Build()
     {
         _sym = _currency == "BRL" ? "R$" : "US$";
         _year = _today.Year; _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
-        _activeFilters = new[] { _market, _kam, _catFilter, _country, _product, _customer, _bu }.Count(s => s != "");
+        _activeFilters = new[] { _market, _kam, _catFilter, _country, _product, _customer, _bu }.Count(s => s != "")
+            + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0);
 
         var opps = Filtered().ToList();
         bool InYear(Opportunity o) => (o.ExpectedDateValue?.Year ?? 0) == _year;
@@ -386,6 +451,13 @@
         _openCount = open.Count;
         _pipelineTotal = open.Sum(o => o.AmountUsd);
         _pipelineWeighted = open.Sum(W);
+
+        // Top 10 oportunidades mais quentes (maior confiança, depois maior valor).
+        _top10 = open
+            .OrderByDescending(ForecastCalc.Confidence).ThenByDescending(o => o.AmountUsd).Take(10)
+            .Select(o => new HotOpp(o.Name, Cat.CustomerName(o.CustomerId), Cat.KamName(o.KamId),
+                o.AmountUsd, ForecastCalc.Confidence(o), o.Id))
+            .ToList();
         var eligibleForecast = opps.Where(o => InYear(o) && Eligible(o)).ToList();
         _marginForecast = eligibleForecast.Sum(ForecastCalc.MarginUsd);
         _gmAvg = eligibleForecast.Count > 0 ? eligibleForecast.Average(o => o.GmPercentValue) : 0;
@@ -411,15 +483,26 @@
 
         BuildHealth(open);
 
-        // Composição por categoria (com contagem e participação).
-        var catList = new[] { ForecastCategory.Commit, ForecastCategory.BestCase, ForecastCategory.Pipeline, ForecastCategory.Upside, ForecastCategory.Risk };
-        var compRaw = catList.Select(c =>
+        // Composição por FAIXA DE CONFIANÇA = (% ganho + % período) / 2.
+        var bands = new (string Band, string Color, double Lo, double Hi)[]
         {
-            var items = open.Where(o => o.Category == c).ToList();
-            return (Cat: c, Value: items.Sum(W), Count: items.Count);
+            ("Muito alta", "#1f9254", 85, 101),
+            ("Alta", "#1665a8", 70, 85),
+            ("Média", "#b7791f", 45, 70),
+            ("Baixa", "#64748b", 0, 45),
+        };
+        var compRaw = bands.Select(b =>
+        {
+            var items = open.Where(o => { var c = ForecastCalc.Confidence(o); return c >= b.Lo && c < b.Hi; }).ToList();
+            return (b.Band, b.Color, Value: items.Sum(W), Count: items.Count);
         }).ToList();
         _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
-        _comp = compRaw.Select(x => new CompRow(x.Cat, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Cat.ToString(), 9))).ToList();
+        _comp = compRaw.Select(x => new CompRow(x.Band, x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
+
+        // Comparativo por categoria comercial (NB / RT / AFM / SV).
+        _byCommercial = CommercialCategory.All.Select(cc => new CommRow(cc.Code, cc.Name,
+            opps.Where(o => o.CommercialCategory == cc.Code && InYear(o) && Eligible(o)).Sum(W))).ToList();
+        _maxComm = Math.Max(_byCommercial.Count > 0 ? _byCommercial.Max(x => x.Value) : 1, 1);
 
         // Mercado / produto.
         _byMarket = Cat.Markets.Select(m => new MarketRow(m.Name,

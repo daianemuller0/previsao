@@ -8,12 +8,28 @@ namespace HowdenSalesForecast.Data;
 // ---------------------------------------------------------------------------
 public static class ForecastCalc
 {
-    // Forecast ponderado = valor × prob. de ganho × prob. de fechar no período.
+    // Forecast ponderado = valor × ((% de ganho + % de sair no mês) / 2).
     public static double WeightedUsd(Opportunity o) =>
-        o.AmountUsd * (o.WinProbabilityValue / 100.0) * (o.CloseProbabilityValue / 100.0);
+        o.AmountUsd * (Confidence(o) / 100.0);
+
+    // Confiança da oportunidade = média das duas probabilidades (0–100).
+    public static double Confidence(Opportunity o) =>
+        (o.WinProbabilityValue + o.CloseProbabilityValue) / 2.0;
+
+    // Faixa de confiança (Muito alta / Alta / Média / Baixa).
+    public static string ConfidenceBand(double confidence) =>
+        confidence >= 85 ? "Muito alta" : confidence >= 70 ? "Alta" : confidence >= 45 ? "Média" : "Baixa";
+
+    public static string ConfidenceBandCss(double confidence) =>
+        confidence >= 85 ? "st-pos" : confidence >= 70 ? "st-info" : confidence >= 45 ? "st-warn" : "st-neutral";
+
+    // Ponderado em BRL (moeda padrão da plataforma).
+    public static double WeightedBrl(Opportunity o) =>
+        o.AmountBrl * (Confidence(o) / 100.0);
 
     // Margem bruta prevista = valor × GM%.
     public static double MarginUsd(Opportunity o) => o.AmountUsd * (o.GmPercentValue / 100.0);
+    public static double MarginBrl(Opportunity o) => o.AmountBrl * (o.GmPercentValue / 100.0);
 
     public static int DaysSinceUpdate(Opportunity o, DateTime today)
     {

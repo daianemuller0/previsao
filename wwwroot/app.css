@@ -252,6 +252,7 @@ h1 { font-size: 22px; color: var(--primary); }
 .bar-track { background: #eef2f7; border-radius: 999px; height: 9px; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--secondary), var(--accent)); }
 .bar-fill.c-primary { background: linear-gradient(90deg, #0b4f8a, #1769b0); }
+.bar-fill.afm { background: linear-gradient(90deg, #0f766e, #12a594); }
 .bar-value { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* Legenda de gráficos */
@@ -564,6 +565,19 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 .hm-bar { background: #edf1f7; border-radius: 999px; height: 8px; overflow: hidden; }
 .hm-fill { height: 100%; border-radius: 999px; }
 .hm-val { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* ---- Filtro de data ---- */
+.filterbar .flt-date { border: none; background: none; outline: none; font-family: inherit; font-size: 12px; color: var(--text); font-weight: 600; cursor: pointer; padding: 0; }
+
+/* ---- Top 10 oportunidades mais quentes ---- */
+.hot-list { display: flex; flex-direction: column; gap: 1px; max-height: 320px; overflow-y: auto; }
+.hot-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: var(--radius-sm); border: 1px solid transparent; transition: background .12s, border-color .12s; }
+.hot-item:hover { background: var(--panel-2); border-color: var(--border); text-decoration: none; }
+.hot-conf { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; min-width: 42px; text-align: center; }
+.hot-body { min-width: 0; display: flex; flex-direction: column; }
+.hot-name { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hot-meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hot-val { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-2); }
 
 /* ---- KPIs em dois níveis ---- */
 .kpi-tier2 .stat { background: var(--panel-2); box-shadow: none; min-height: 96px; }

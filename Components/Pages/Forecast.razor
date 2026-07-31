@@ -10,7 +10,7 @@
 <div class="page-head">
     <div>
         <h1>Forecast</h1>
-        <p class="subtitle">Construção e análise da previsão · @Rows.Count oportunidade(s) no recorte · forecast ponderado @Fmt.UsdShort(TotalWeighted)</p>
+        <p class="subtitle">Construção e análise da previsão · @Rows.Count oportunidade(s) no recorte · forecast ponderado @Fmt.Brl(TotalWeighted) <span class="muted">(fechados fora da soma)</span></p>
     </div>
     <div class="page-actions">
         @if (_saved) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
@@ -48,12 +48,15 @@
                 <th @onclick='() => SetSort("date")'>Data prev.<span class="sort-ind">@SortInd("date")</span></th>
                 <th class="no-sort">Mercado</th>
                 <th class="no-sort">Produto</th>
+                <th class="no-sort">Descrição</th>
                 <th class="no-sort">KAM</th>
                 <th class="no-sort">Cliente</th>
-                <th class="right" @onclick='() => SetSort("usd")'>Valor USD<span class="sort-ind">@SortInd("usd")</span></th>
+                <th class="right" @onclick='() => SetSort("val")'>Valor R$<span class="sort-ind">@SortInd("val")</span></th>
                 <th class="right" @onclick='() => SetSort("gm")'>GM%<span class="sort-ind">@SortInd("gm")</span></th>
                 <th class="right" @onclick='() => SetSort("win")'>Ganho<span class="sort-ind">@SortInd("win")</span></th>
+                <th class="right no-sort">Período</th>
                 <th class="right" @onclick='() => SetSort("wf")'>Ponderado<span class="sort-ind">@SortInd("wf")</span></th>
+                <th class="right no-sort">Valor US$</th>
                 <th class="no-sort center">Risco</th>
                 <th class="no-sort"></th>
             </tr>
@@ -64,39 +67,44 @@
             {
                 @if (_groupBy != "none")
                 {
-                    <tr class="grp-row"><td colspan="8">@grp.Key</td><td class="right num">@Fmt.UsdShort(grp.Sum(o => o.AmountUsd))</td><td colspan="2"></td><td class="right num">@Fmt.UsdShort(grp.Sum(ForecastCalc.WeightedUsd))</td><td colspan="2"></td></tr>
+                    <tr class="grp-row"><td colspan="16">@grp.Key — @grp.Count() op. · ponderado @Fmt.Brl(grp.Where(x => ForecastCategories.CountsToForecast(x.Category)).Sum(ForecastCalc.WeightedBrl))</td></tr>
                 }
                 @foreach (var o in grp)
                 {
                     var lvl = ForecastCalc.Level(o, _today);
+                    var closed = !ForecastCategories.CountsToForecast(o.Category);
                     <tr class="clickable" @onclick="() => Goto(o.Id)">
                         <td class="col-strong">@o.ProposalNumber</td>
                         <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
                         <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
                         <td>@Cat.MarketName(o.MarketId)</td>
                         <td>@Cat.ProductName(o.ProductId)</td>
+                        <td class="truncate" style="max-width:220px" title="@o.Name">@o.Name</td>
                         <td>@Cat.KamName(o.KamId)</td>
                         <td>@Cat.CustomerName(o.CustomerId)</td>
-                        <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
+                        <td class="right num">@Fmt.Brl(o.AmountBrl)</td>
                         <td class="right num">@Fmt.Pct(o.GmPercentValue)</td>
                         <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
-                        <td class="right num">@Fmt.Usd(ForecastCalc.WeightedUsd(o))</td>
+                        <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
+                        <td class="right num">@(closed ? "—" : Fmt.Brl(ForecastCalc.WeightedBrl(o)))</td>
+                        <td class="right num muted">@Fmt.Usd(o.AmountUsd)</td>
                         <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
-                        <td class="center"><button class="btn-ghost sm btn-icon" title="Edição rápida" @onclick:stopPropagation="true" @onclick="() => Edit(o)">@Icons.Svg("edit")</button></td>
+                        <td class="center"><button class="btn-ghost sm btn-icon" title="Editar" @onclick:stopPropagation="true" @onclick="() => Edit(o)">@Icons.Svg("edit")</button></td>
                     </tr>
                 }
             }
             @if (Rows.Count == 0)
             {
-                <tr><td colspan="13" class="empty">Nenhuma oportunidade no recorte selecionado.</td></tr>
+                <tr><td colspan="16" class="empty">Nenhuma oportunidade no recorte selecionado.</td></tr>
             }
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="7">Total · @Rows.Count oportunidade(s)</td>
+                <td colspan="8">Total · @Rows.Count oportunidade(s)</td>
+                <td class="right">@Fmt.Brl(Rows.Sum(o => o.AmountBrl))</td>
+                <td colspan="3"></td>
+                <td class="right">@Fmt.Brl(TotalWeighted)</td>
                 <td class="right">@Fmt.Usd(Rows.Sum(o => o.AmountUsd))</td>
-                <td colspan="2"></td>
-                <td class="right">@Fmt.Usd(TotalWeighted)</td>
                 <td colspan="2"></td>
             </tr>
         </tfoot>
@@ -112,15 +120,56 @@
             <button class="icon-btn" @onclick="() => _editing = null">@Icons.Svg("x")</button>
         </div>
         <div class="form-grid">
+            <label class="fld full">Descrição da oportunidade
+                <input class="field" @bind="_editing.Name" />
+            </label>
+            <label class="fld">Proposta
+                <input class="field" @bind="_editing.ProposalNumber" />
+            </label>
+            <label class="fld">PV
+                <input class="field" @bind="_editing.PvNumber" />
+            </label>
+            <label class="fld">Cliente
+                <select class="field" @bind="_editing.CustomerId"><option value="">—</option>@foreach (var c in Cat.Customers){<option value="@c.Id">@c.Name</option>}</select>
+            </label>
+            <label class="fld">Planta
+                <select class="field" @bind="_editing.PlantId"><option value="">—</option>@foreach (var p in Cat.Plants){<option value="@p.Id">@p.Name</option>}</select>
+            </label>
+            <label class="fld">País
+                <select class="field" @bind="_editing.CountryId"><option value="">—</option>@foreach (var c in Cat.Countries){<option value="@c.Id">@c.Name</option>}</select>
+            </label>
+            <label class="fld">Mercado
+                <select class="field" @bind="_editing.MarketId"><option value="">—</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select>
+            </label>
+            <label class="fld">Produto
+                <select class="field" @bind="_editing.ProductId"><option value="">—</option>@foreach (var p in Cat.Products){<option value="@p.Id">@p.Name</option>}</select>
+            </label>
+            <label class="fld">KAM
+                <select class="field" @bind="_editing.KamId"><option value="">—</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select>
+            </label>
+            <label class="fld">Categoria comercial
+                <select class="field" @bind="_editing.CommercialCategory">@foreach (var cc in CommercialCategory.All){<option value="@cc.Code">@cc.Name</option>}</select>
+            </label>
+            <label class="fld">Unidade de negócio (PV)
+                <select class="field" @bind="_editing.PvBusinessUnitId"><option value="">—</option>@foreach (var b in Cat.BusinessUnits){<option value="@b.Id">@b.Name</option>}</select>
+            </label>
+            <label class="fld">Moeda
+                <select class="field" @bind="_editing.CurrencyCode">@foreach (var c in Cat.Currencies){<option value="@c.Code">@c.Code</option>}</select>
+            </label>
+            <label class="fld">Valor (moeda)
+                <input class="field num" @bind="_editing.AmountOriginal" />
+            </label>
+            <label class="fld">Câmbio (BRL/USD)
+                <input class="field num" @bind="_editing.ExchangeRate" />
+            </label>
+            <label class="fld">GM%
+                <input class="field num" @bind="_editing.GmPercent" />
+            </label>
             <label class="fld">Forecast Category
-                <select class="field" @bind="_editing.ForecastCategory">
-                    @foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}
-                </select>
+                <select class="field" @bind="_editing.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select>
             </label>
             <label class="fld">Etapa do pipeline
-                <select class="field" @bind="_editing.PipelineStageId">
-                    @foreach (var s in Cat.Stages){<option value="@s.Id">@s.Name</option>}
-                </select>
+                <select class="field" @bind="_editing.PipelineStageId">@foreach (var s in Cat.Stages){<option value="@s.Id">@s.Name</option>}</select>
             </label>
             <label class="fld">Data prevista
                 <input class="field" type="date" @bind="_editDate" />
@@ -128,22 +177,34 @@
             <label class="fld">Prob. de ganho (%)
                 <input class="field num" @bind="_editing.WinProbability" />
             </label>
-            <label class="fld">Prob. no período (%)
+            <label class="fld">Prob. de sair no mês (%)
                 <input class="field num" @bind="_editing.CloseInPeriodProbability" />
             </label>
             <label class="fld">Prob. do gestor (%)
                 <input class="field num" @bind="_editing.ManagerProbability" />
             </label>
+            <label class="fld">Data da próxima ação
+                <input class="field" type="date" @bind="_editActionDate" />
+            </label>
             <label class="fld full">Próxima ação
                 <input class="field" @bind="_editing.NextAction" />
+            </label>
+            <label class="fld full">Riscos
+                <input class="field" @bind="_editing.Risks" />
             </label>
             <label class="fld full">Justificativa
                 <input class="field" @bind="_editing.Justification" />
             </label>
+            <label class="fld full">Observações
+                <input class="field" @bind="_editing.Notes" />
+            </label>
         </div>
-        <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _editing = null">Cancelar</button>
-            <button class="btn-primary" @onclick="Save">@Icons.Svg("check")Salvar</button>
+        <div class="modal-actions" style="justify-content:space-between">
+            <button class="btn-ghost" style="border-color:#f0c4c0;color:var(--neg)" @onclick="Delete">@Icons.Svg("x")Excluir</button>
+            <span>
+                <button class="btn-ghost" @onclick="() => _editing = null">Cancelar</button>
+                <button class="btn-primary" @onclick="Save">@Icons.Svg("check")Salvar</button>
+            </span>
         </div>
     </div>
 }
@@ -159,6 +220,7 @@
     private bool _saved;
     private Opportunity? _editing;
     private DateTime? _editDate;
+    private DateTime? _editActionDate;
     private string _user = "Equipe Howden";
 
     private record GroupMode(string Key, string Label);
@@ -201,7 +263,8 @@
     // Lista filtrada e ordenada, recomputada a cada render.
     private List<Opportunity> Rows => Sort(Filter()).ToList();
 
-    private double TotalWeighted => Rows.Sum(ForecastCalc.WeightedUsd);
+    // Soma da previsão (R$): exclui fechados ganho/perdido.
+    private double TotalWeighted => Rows.Where(o => ForecastCategories.CountsToForecast(o.Category)).Sum(ForecastCalc.WeightedBrl);
 
     private List<IGrouping<string, Opportunity>> Grouped()
     {
@@ -225,10 +288,10 @@
         Func<Opportunity, IComparable> sel = _sort switch
         {
             "proposal" => o => o.ProposalNumber,
-            "usd" => o => o.AmountUsd,
+            "val" => o => o.AmountBrl,
             "gm" => o => o.GmPercentValue,
             "win" => o => o.WinProbabilityValue,
-            "wf" => o => ForecastCalc.WeightedUsd(o),
+            "wf" => o => ForecastCalc.WeightedBrl(o),
             _ => o => o.ExpectedDate,
         };
         return _sortAsc ? q.OrderBy(sel) : q.OrderByDescending(sel);
@@ -248,6 +311,8 @@
         // edita uma cópia para permitir cancelar sem afetar a lista
         _editing = Clone(o);
         _editDate = _editing.ExpectedDateValue;
+        _editActionDate = DateTime.TryParse(_editing.NextActionDate, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var ad) ? ad : null;
         _saved = false;
     }
 
@@ -255,9 +320,19 @@
     {
         if (_editing is null) return;
         if (_editDate is { } d) _editing.ExpectedDate = d.ToString("yyyy-MM-dd");
+        _editing.NextActionDate = _editActionDate is { } ad ? ad.ToString("yyyy-MM-dd") : "";
         _editing.UpdatedAt = _today.ToString("yyyy-MM-dd");
         _editing.UpdatedBy = _user;
         Repo.Save(_editing);
+        _all = Repo.All();
+        _editing = null;
+        _saved = true;
+    }
+
+    private void Delete()
+    {
+        if (_editing is null) return;
+        Repo.Delete(_editing.Id);
         _all = Repo.All();
         _editing = null;
         _saved = true;
