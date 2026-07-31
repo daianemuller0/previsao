@@ -75,26 +75,51 @@
         </div>
         <div class="hero-spark"><Sparkline Values="@_evoMonth" Stroke="#8fe3c4" /></div>
     </div>
-    <div class="hero-side">
-        <div class="panel-head" style="margin-bottom:8px">
-            <div class="panel-title">Top 10 oportunidades mais quentes <span class="hint">maior confiança</span></div>
-            <a class="btn-link" href="/oportunidades">Ver todas</a>
-        </div>
-        <div class="hot-list">
-            @foreach (var h in _top10)
+</div>
+
+@* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
+<div class="section-head">
+    <span class="st-title">Top 10 oportunidades mais quentes</span>
+    <span class="st-sub">maior confiança · (% ganho + % período) ÷ 2</span>
+    <span class="st-line"></span>
+    <a class="btn-link" href="/oportunidades">Ver todas</a>
+</div>
+<div class="table-wrap">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th class="center">Conf.</th>
+                <th>Oportunidade</th><th>Cliente / Planta</th><th>Categoria</th><th>Etapa</th>
+                <th class="right">Valor R$</th><th class="right">Ganho</th><th class="right">Período</th><th class="right">Ponderado</th>
+                <th class="nowrap">Data prev.</th><th class="center">Risco</th><th>Próx. ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in _top10Opps)
             {
-                <a class="hot-item" href="@($"/oportunidades/{h.OppId}")">
-                    <span class="hot-conf @ForecastCalc.ConfidenceBandCss(h.Confidence)">@h.Confidence.ToString("0")%</span>
-                    <span class="hot-body">
-                        <span class="hot-name" title="@h.Name">@h.Name</span>
-                        <span class="hot-meta">@h.Customer · @h.Kam</span>
-                    </span>
-                    <span class="hot-val">@Money(h.ValueUsd)</span>
-                </a>
+                var conf = ForecastCalc.Confidence(o);
+                var lvl = ForecastCalc.Level(o, _today);
+                <tr class="clickable" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
+                    <td class="center"><span class="hot-conf @ForecastCalc.ConfidenceBandCss(conf)">@conf.ToString("0")%</span></td>
+                    <td class="col-strong">@o.Name<div class="muted" style="font-size:11px">@o.ProposalNumber</div></td>
+                    <td>@Cat.CustomerName(o.CustomerId)<div class="muted" style="font-size:11px">@Cat.PlantName(o.PlantId)</div></td>
+                    <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
+                    <td>@Cat.StageName(o.PipelineStageId)</td>
+                    <td class="right num">@Money(o.AmountUsd)</td>
+                    <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
+                    <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
+                    <td class="right num">@Money(ForecastCalc.WeightedUsd(o))</td>
+                    <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
+                    <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
+                    <td>@(string.IsNullOrWhiteSpace(o.NextAction) ? "—" : o.NextAction)</td>
+                </tr>
             }
-            @if (_top10.Count == 0) { <div class="empty">Sem oportunidades abertas.</div> }
-        </div>
-    </div>
+            @if (_top10Opps.Count == 0)
+            {
+                <tr><td colspan="12" class="empty">Sem oportunidades abertas.</td></tr>
+            }
+        </tbody>
+    </table>
 </div>
 
 @* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
@@ -403,8 +428,7 @@
     private record KamRow(string Name, double Forecast, double Target, double Gap, double Coverage, string Status, string StatusCss);
     private record Insight(string Category, string Sev, string Title, string Detail, string Value, string Action, string Link);
     private record Attn(string Category, string Sev, string Icon, string Title, string Meta, string Value, string Reason, string Rec, string OppId);
-    private record HotOpp(string Name, string Customer, string Kam, double ValueUsd, double Confidence, string OppId);
-    private List<HotOpp> _top10 = new();
+    private List<Opportunity> _top10Opps = new();
     private record CommRow(string Code, string Name, double Value);
     private List<CommRow> _byCommercial = new();
     private double _maxComm = 1;
@@ -496,11 +520,8 @@
         _pipelineWeighted = open.Sum(W);
 
         // Top 10 oportunidades mais quentes (maior confiança, depois maior valor).
-        _top10 = open
-            .OrderByDescending(ForecastCalc.Confidence).ThenByDescending(o => o.AmountUsd).Take(10)
-            .Select(o => new HotOpp(o.Name, Cat.CustomerName(o.CustomerId), Cat.KamName(o.KamId),
-                o.AmountUsd, ForecastCalc.Confidence(o), o.Id))
-            .ToList();
+        _top10Opps = open
+            .OrderByDescending(ForecastCalc.Confidence).ThenByDescending(o => o.AmountUsd).Take(10).ToList();
         var eligibleForecast = opps.Where(o => InYear(o) && Eligible(o)).ToList();
         _marginForecast = eligibleForecast.Sum(ForecastCalc.MarginUsd);
         _gmAvg = eligibleForecast.Count > 0 ? eligibleForecast.Average(o => o.GmPercentValue) : 0;
