@@ -590,6 +590,11 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 .chart-body { flex: 1 1 auto; min-height: 240px; display: flex; }
 .chart-body svg { width: 100%; height: 100%; display: block; }
 
+/* ---- Caixa "Valor total" (gráfico de linha mensal) ---- */
+.total-box { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, #f7f9fc); white-space: nowrap; }
+.total-box .tb-l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #93a1b5); font-weight: 600; }
+.total-box .tb-v { font-size: 17px; font-weight: 700; color: var(--primary, #007A9E); line-height: 1.1; }
+
 /* ---- Executive Insights ---- */
 .insights { display: flex; flex-direction: column; gap: 9px; }
 .insights.insights-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }

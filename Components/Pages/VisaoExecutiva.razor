@@ -247,17 +247,14 @@
     </div>
     <div class="c7">
         <div class="panel" style="height:100%">
-            <div class="panel-head"><div class="panel-title">Previsão mensal <span class="hint">realizado + forecast ponderado por mês · @_currency</span></div></div>
-            @{ var maxMon = Enumerable.Range(0, 12).Select(m => _mReal[m] + _mForecast[m]).DefaultIfEmpty(0).Max(); if (maxMon <= 0) { maxMon = 1; } }
-            @for (var m = 0; m < 12; m++)
-            {
-                var val = _mReal[m] + _mForecast[m];
-                <div class="bar-row" style="grid-template-columns:56px 1fr auto">
-                    <span class="bar-label @((m + 1) == _month ? "strong" : "")" style="@((m + 1) == _month ? "color:var(--primary)" : "")">@Fmt.MonthName(m + 1)</span>
-                    <span class="bar-track"><span class="bar-fill c-primary" style="width:@Share(val, maxMon)%"></span></span>
-                    <span class="bar-value">@Money(val)</span>
+            <div class="panel-head">
+                <div class="panel-title">Previsão mensal <span class="hint">realizado + forecast ponderado por mês · @_currency</span></div>
+                <div class="total-box">
+                    <span class="tb-l">Valor total</span>
+                    <span class="tb-v">@Money(Enumerable.Range(0, 12).Sum(m => _mReal[m] + _mForecast[m]))</span>
                 </div>
-            }
+            </div>
+            <div class="chart-body">@RenderMonthlyLine()</div>
         </div>
     </div>
 </div>
@@ -782,6 +779,73 @@
         var future = cumPts.Skip(Math.Max(_month - 1, 0)).ToList();
         sb.Append($"<polyline points='{string.Join(' ', past)}' fill='none' stroke='#c0392b' stroke-width='1.7' opacity='0.85'/>");
         sb.Append($"<polyline points='{string.Join(' ', future)}' fill='none' stroke='#c0392b' stroke-width='1.6' stroke-dasharray='3 3' opacity='0.6'/>");
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Gráfico de linha da previsão mensal: linha + área preenchida + rótulos de
+    // valor acima de cada ponto e nomes dos meses no eixo. Mês atual destacado.
+    // Construído como string SVG (evita o erro RZ1023 de <text> em Razor).
+    private RenderFragment RenderMonthlyLine() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 720, H = 260, top = 34, bot = 214, left = 40, right = 20;
+        double plotW = Wd - left - right;
+        double colW = plotW / 11.0; // 12 pontos → 11 intervalos
+
+        // Valores por mês (realizado + forecast ponderado), na moeda ativa.
+        double[] v = new double[12];
+        for (var m = 0; m < 12; m++) v[m] = Cv(_mReal[m] + _mForecast[m]);
+        double max = 1;
+        for (var m = 0; m < 12; m++) max = Math.Max(max, v[m]);
+        max *= 1.18; // respiro para os rótulos acima dos pontos
+        double X(int m) => left + m * colW;
+        double Y(double val) => bot - val / max * (bot - top);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Previsão mensal'>");
+
+        // gradiente da área
+        sb.Append("<defs><linearGradient id='mlarea' x1='0' y1='0' x2='0' y2='1'>");
+        sb.Append("<stop offset='0%' stop-color='#007A9E' stop-opacity='0.28'/>");
+        sb.Append("<stop offset='100%' stop-color='#007A9E' stop-opacity='0.02'/>");
+        sb.Append("</linearGradient></defs>");
+
+        // linhas de grade horizontais
+        for (var g = 0; g <= 4; g++)
+        {
+            var gy = top + (bot - top) * g / 4.0;
+            sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
+        }
+
+        // destaque do mês atual (faixa vertical)
+        double hx = X(_month - 1);
+        sb.Append($"<line x1='{hx.ToString("0.#", inv)}' y1='{top.ToString(inv)}' x2='{hx.ToString("0.#", inv)}' y2='{bot.ToString(inv)}' stroke='#007A9E' stroke-width='1' stroke-dasharray='3 3' opacity='0.35'/>");
+
+        // área preenchida
+        var line = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++)
+            line.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(v[m]).ToString("0.#", inv)}");
+        var area = $"{left.ToString(inv)},{bot.ToString(inv)} {line} {(Wd - right).ToString(inv)},{bot.ToString(inv)}";
+        sb.Append($"<polygon points='{area}' fill='url(#mlarea)'/>");
+
+        // linha principal
+        sb.Append($"<polyline points='{line}' fill='none' stroke='#007A9E' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        // pontos + rótulos de valor + meses
+        for (var m = 0; m < 12; m++)
+        {
+            double cx = X(m), cy = Y(v[m]);
+            bool cur = (m + 1) == _month;
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{cy.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='#007A9E' stroke-width='{(cur ? "3" : "2")}'/>");
+            var lblColor = cur ? "#0b4f6f" : "#5b6b82";
+            var lblWeight = cur ? "700" : "500";
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(cy - 10).ToString("0.#", inv)}' text-anchor='middle' font-size='9.5' font-weight='{lblWeight}' fill='{lblColor}'>{Fmt.Compact(v[m])}</text>");
+            var mColor = cur ? "#007A9E" : "#93a1b5";
+            var mWeight = cur ? "700" : "400";
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 8).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{mWeight}' fill='{mColor}'>{Fmt.MonthName(m + 1)}</text>");
+        }
+
         sb.Append("</svg>");
         builder.AddMarkupContent(0, sb.ToString());
     };
