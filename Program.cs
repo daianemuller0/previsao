@@ -49,12 +49,20 @@ using (var scope = app.Services.CreateScope())
 {
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
     DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
-    // Compacta na inicialização (colapsa os arquivos do seed / acumulados).
-    try { store.Compact("opportunities"); } catch { /* pasta indisponível: segue */ }
-    // Aquece o cache no boot: carrega a lib nativa do DuckDB e lê a base AGORA,
-    // tirando esse custo do primeiro login (o dashboard abre com o cache pronto).
-    try { scope.ServiceProvider.GetRequiredService<OpportunityRepository>().Refresh(); } catch { /* segue */ }
 }
+
+// Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida
+// do app — mesmo com a pasta de rede lenta, a tela de login abre imediatamente.
+_ = Task.Run(() =>
+{
+    try
+    {
+        var store = app.Services.GetRequiredService<ParquetStore>();
+        store.Compact("opportunities");
+        app.Services.GetRequiredService<OpportunityRepository>().Refresh();
+    }
+    catch { /* pasta indisponível ou lenta: o app segue no ar */ }
+});
 
 if (!app.Environment.IsDevelopment())
 {

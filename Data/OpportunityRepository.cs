@@ -106,9 +106,30 @@ public class OpportunityRepository
         lock (_lock) return EnsureCache().Where(o => o.Id == id).Select(Clone).FirstOrDefault();
     }
 
+    // Grava várias oportunidades num único arquivo Parquet (usado no seed).
+    public void SaveMany(IEnumerable<Opportunity> opps)
+    {
+        var rows = opps.Select(o => (IReadOnlyList<KeyValuePair<string, object?>>)Row(o)).ToList();
+        if (rows.Count == 0) return;
+        _store.WriteBatch(Entity, rows);
+        lock (_lock) { _cache = null; } // recarrega na próxima leitura
+    }
+
     public void Save(Opportunity o)
     {
-        _store.WriteRow(Entity, new KeyValuePair<string, object?>[]
+        _store.WriteRow(Entity, Row(o));
+
+        // Write-through: reflete no cache imediatamente (sem reler a rede).
+        lock (_lock)
+        {
+            var cache = EnsureCache();
+            cache.RemoveAll(x => x.Id == o.Id);
+            cache.Add(Clone(o));
+        }
+    }
+
+    private static KeyValuePair<string, object?>[] Row(Opportunity o) =>
+        new KeyValuePair<string, object?>[]
         {
             new("id", o.Id),
             new("name", o.Name),
@@ -146,16 +167,7 @@ public class OpportunityRepository
             new("updated_by", o.UpdatedBy),
             new("value_changed_at", o.ValueChangedAt),
             new("date_changed_at", o.DateChangedAt),
-        });
-
-        // Write-through: reflete no cache imediatamente (sem reler a rede).
-        lock (_lock)
-        {
-            var cache = EnsureCache();
-            cache.RemoveAll(x => x.Id == o.Id);
-            cache.Add(Clone(o));
-        }
-    }
+        };
 
     public void Delete(string id)
     {

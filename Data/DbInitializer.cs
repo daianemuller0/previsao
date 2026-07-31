@@ -8,9 +8,8 @@ public static class DbInitializer
     {
         if (store.IsEmpty("opportunities"))
         {
-            var repo = new OpportunityRepository(store);
-            foreach (var o in DemoSeed.Opportunities(catalog))
-                repo.Save(o);
+            // Gravação em lote: um único Parquet (evita 40 escritas na rede).
+            new OpportunityRepository(store).SaveMany(DemoSeed.Opportunities(catalog));
         }
     }
 }

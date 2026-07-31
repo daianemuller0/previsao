@@ -94,6 +94,45 @@ public sealed class ParquetStore
     }
 
     /// <summary>
+    /// Grava VÁRIAS linhas num ÚNICO arquivo Parquet (uma escrita de rede em vez
+    /// de N). Todas as linhas devem ter as mesmas colunas, na mesma ordem.
+    /// Usado no seed/importação para evitar dezenas de arquivos pequenos.
+    /// </summary>
+    public void WriteBatch(string entity, IReadOnlyList<IReadOnlyList<KeyValuePair<string, object?>>> rows)
+    {
+        if (rows.Count == 0) return;
+        using var conn = Open();
+        var first = rows[0];
+
+        var colDefs = string.Join(", ", first.Select(kv => $"\"{kv.Key}\" VARCHAR")) + ", _ts BIGINT, _deleted BOOLEAN";
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = $"CREATE TABLE t ({colDefs});";
+            cmd.ExecuteNonQuery();
+        }
+
+        var placeholders = string.Join(", ", first.Select(_ => "?")) + ", ?, ?";
+        foreach (var row in rows)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"INSERT INTO t VALUES ({placeholders});";
+            foreach (var kv in row) AddParam(cmd, kv.Value);
+            AddParam(cmd, DateTime.UtcNow.Ticks);
+            AddParam(cmd, false);
+            cmd.ExecuteNonQuery();
+        }
+
+        var dir = EntityDir(entity);
+        var fileName = $"{DateTime.UtcNow.Ticks:D19}_{Guid.NewGuid():N}.parquet";
+        var full = Duck(Path.Combine(dir, fileName));
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = $"COPY t TO '{full}' (FORMAT PARQUET);";
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
     /// Lê a entidade já consolidada: versão mais recente por id, sem os apagados.
     /// Retorna vazio se ainda não houver nenhum arquivo (primeira execução).
     /// </summary>
