@@ -592,6 +592,9 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 
 /* ---- Executive Insights ---- */
 .insights { display: flex; flex-direction: column; gap: 9px; }
+.insights.insights-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 1150px) { .insights.insights-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px) { .insights.insights-grid { grid-template-columns: 1fr; } }
 .insight { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 13px; transition: border-color .14s, box-shadow .14s; position: relative; }
 .insight:hover { border-color: var(--border-strong); box-shadow: var(--shadow-xs); }
 .insight::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; }

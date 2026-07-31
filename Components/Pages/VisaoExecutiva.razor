@@ -116,51 +116,27 @@
     <StatCard Label="Cobertura de pipeline" Value="@_coverageLabel" SmallValue="true" DeltaText="@(_coverage >= 3.5 ? "no ideal" : "abaixo do ideal (3,5x)")" />
 </div>
 
-@* ===================== 3 · TENDÊNCIA + INSIGHTS ===================== *@
-<div class="section-head"><span class="st-title">Tendências e insights</span><span class="st-sub">Ano fiscal de @_year</span><span class="st-line"></span></div>
-<div class="g12">
-    <div class="c8">
-        <div class="panel chart-panel">
-            <div class="panel-head">
-                <div class="panel-title">Previsão x Meta x Realizado <span class="hint">desempenho mensal · Ano fiscal de @_year · @_currency</span></div>
-                <div class="chart-controls">
-                    <div class="segmented">
-                        <button class="@(_chartMode == "monthly" ? "active" : "")" @onclick='() => _chartMode = "monthly"'>Mensal</button>
-                        <button class="@(_chartMode == "cumulative" ? "active" : "")" @onclick='() => _chartMode = "cumulative"'>Acumulado</button>
-                    </div>
+@* ===================== 3 · INSIGHTS EXECUTIVOS ===================== *@
+<div class="section-head">
+    <span class="st-title">@Icons.Svg("trend", "nav-ico") Insights executivos</span>
+    <span class="st-sub">principais sinais</span>
+    <span class="st-line"></span>
+    <a class="btn-link" href="/analises">Ver todos</a>
+</div>
+<div class="panel">
+    <div class="insights insights-grid">
+        @foreach (var i in _insights.Take(6))
+        {
+            <div class="insight sev-@i.Sev">
+                <div class="insight-head"><span class="insight-cat">@i.Category</span><span class="insight-val" style="color:@SevColor(i.Sev)">@i.Value</span></div>
+                <div class="insight-title">@i.Title</div>
+                <div class="insight-detail">@i.Detail</div>
+                <div class="insight-foot">
+                    <span class="insight-action">@Icons.Svg("arrow-right")@i.Action</span>
+                    <a class="insight-link" href="@i.Link">Detalhes</a>
                 </div>
             </div>
-            <div class="chart-body">@RenderComboChart()</div>
-            <div class="legend">
-                <span class="lg"><span class="sw" style="background:#0b4f8a"></span>Realizado</span>
-                <span class="lg"><span class="sw" style="background:#6ba7d6"></span>Previsão ponderada</span>
-                <span class="lg"><span class="sw" style="background:#009496"></span>Meta</span>
-                <span class="lg"><span class="sw" style="background:#c0392b"></span>Acumulado / projeção</span>
-                <span class="lg" style="margin-left:auto;color:var(--muted)">Mês atual em destaque</span>
-            </div>
-        </div>
-    </div>
-    <div class="c4">
-        <div class="panel">
-            <div class="panel-head">
-                <div class="panel-title">@Icons.Svg("trend", "nav-ico") Insights executivos</div>
-                <a class="btn-link" href="/analises">Ver todos</a>
-            </div>
-            <div class="insights">
-                @foreach (var i in _insights.Take(4))
-                {
-                    <div class="insight sev-@i.Sev">
-                        <div class="insight-head"><span class="insight-cat">@i.Category</span><span class="insight-val" style="color:@SevColor(i.Sev)">@i.Value</span></div>
-                        <div class="insight-title">@i.Title</div>
-                        <div class="insight-detail">@i.Detail</div>
-                        <div class="insight-foot">
-                            <span class="insight-action">@Icons.Svg("arrow-right")@i.Action</span>
-                            <a class="insight-link" href="@i.Link">Detalhes</a>
-                        </div>
-                    </div>
-                }
-            </div>
-        </div>
+        }
     </div>
 </div>
 
