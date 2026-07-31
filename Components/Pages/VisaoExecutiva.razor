@@ -286,18 +286,46 @@
     </div>
 </div>
 
-@* ===================== 4b · FORECAST MOVEMENT ===================== *@
-<div class="panel" style="margin-top:14px">
-    <div class="panel-head">
-        <div class="panel-title">Variação da previsão <span class="hint">alterações desde a última revisão comercial · @_currency</span></div>
-    </div>
-    <div class="move-summary">
-        <div><div class="ms-l">Variação líquida</div><div class="ms-v" style="color:@(_moveNet >= 0 ? "var(--pos)" : "var(--neg)")">@(_moveNet >= 0 ? "+" : "")@Money(_moveNet)</div></div>
-        <div><div class="ms-l">Maior impacto positivo</div><div class="ms-v" style="color:var(--pos)">@_movePosName</div></div>
-        <div><div class="ms-l">Maior impacto negativo</div><div class="ms-v" style="color:var(--neg)">@_moveNegName</div></div>
-    </div>
-    <div class="move-wrap"><Waterfall Items="@_waterfall" /></div>
-    <div class="muted" style="font-size:11px;margin-top:4px">Use “Abrir Previsão” para inspecionar as oportunidades por trás de cada variação.</div>
+@* ===================== 4b · OPORTUNIDADES ===================== *@
+<div class="section-head">
+    <span class="st-title">Oportunidades</span>
+    <span class="st-sub">@_filtered.Count no recorte · @Money(_filtered.Sum(o => o.AmountUsd)) em valor</span>
+    <span class="st-line"></span>
+    <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
+</div>
+<div class="table-wrap">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th>Oportunidade</th><th>Cliente / Planta</th><th>Categoria</th><th>Etapa</th>
+                <th class="right">Valor R$</th><th class="right">Ganho</th><th class="right">Período</th><th class="right">Ponderado</th>
+                <th class="nowrap">Data prev.</th><th class="center">Risco</th><th>Próx. ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in _filtered.OrderByDescending(x => x.AmountUsd))
+            {
+                var lvl = ForecastCalc.Level(o, _today);
+                <tr class="clickable" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
+                    <td class="col-strong">@o.Name<div class="muted" style="font-size:11px">@o.ProposalNumber</div></td>
+                    <td>@Cat.CustomerName(o.CustomerId)<div class="muted" style="font-size:11px">@Cat.PlantName(o.PlantId)</div></td>
+                    <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
+                    <td>@Cat.StageName(o.PipelineStageId)</td>
+                    <td class="right num">@Money(o.AmountUsd)</td>
+                    <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
+                    <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
+                    <td class="right num">@Money(ForecastCalc.WeightedUsd(o))</td>
+                    <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
+                    <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
+                    <td>@(string.IsNullOrWhiteSpace(o.NextAction) ? "—" : o.NextAction)</td>
+                </tr>
+            }
+            @if (_filtered.Count == 0)
+            {
+                <tr><td colspan="11" class="empty">Nenhuma oportunidade no recorte.</td></tr>
+            }
+        </tbody>
+    </table>
 </div>
 
 @* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
@@ -338,6 +366,7 @@
 @code {
     // ---- estado / filtros ----
     private List<Opportunity> _opps = new();
+    private List<Opportunity> _filtered = new();
     private DateTime _today = DateTime.Today;
     private DateTime _updated = DateTime.Now;
     private int _year, _month, _quarter;
@@ -424,6 +453,7 @@
             + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0);
 
         var opps = Filtered().ToList();
+        _filtered = opps;
         bool InYear(Opportunity o) => (o.ExpectedDateValue?.Year ?? 0) == _year;
         bool InMonth(Opportunity o) => InYear(o) && o.ExpectedDateValue!.Value.Month == _month;
         bool InQuarter(Opportunity o) => InYear(o) && Fmt.QuarterOf(o.ExpectedDateValue!.Value.Month) == _quarter;
