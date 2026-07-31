@@ -51,6 +51,9 @@ using (var scope = app.Services.CreateScope())
     DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
     // Compacta na inicialização (colapsa os arquivos do seed / acumulados).
     try { store.Compact("opportunities"); } catch { /* pasta indisponível: segue */ }
+    // Aquece o cache no boot: carrega a lib nativa do DuckDB e lê a base AGORA,
+    // tirando esse custo do primeiro login (o dashboard abre com o cache pronto).
+    try { scope.ServiceProvider.GetRequiredService<OpportunityRepository>().Refresh(); } catch { /* segue */ }
 }
 
 if (!app.Environment.IsDevelopment())
