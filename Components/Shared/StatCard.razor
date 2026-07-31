@@ -1,0 +1,44 @@
+@* Card executivo (KPI): valor, comparação com período anterior, tendência e
+   microvisualização opcional (sparkline/medidor passado como ChildContent). *@
+
+<div class="stat @(AccentLeft ? "accent-left" : "")">
+    <div class="stat-head">
+        <div class="stat-label">@Label</div>
+        @if (!string.IsNullOrEmpty(Info))
+        {
+            <span class="stat-info" title="@Info">@Icons.Svg("info")</span>
+        }
+    </div>
+    <div class="stat-value @(SmallValue ? "sm" : "")">@Value</div>
+
+    @ChildContent
+
+    <div class="stat-foot">
+        @if (Delta.HasValue)
+        {
+            var dir = Delta.Value > 0.05 ? "up" : Delta.Value < -0.05 ? "down" : "flat";
+            var arrow = dir == "up" ? "up" : dir == "down" ? "down" : "arrow-right";
+            <span class="delta @dir">@Icons.Svg(arrow)@Fmt.Signed(Delta.Value)</span>
+        }
+        else if (!string.IsNullOrEmpty(DeltaText))
+        {
+            <span class="delta flat">@DeltaText</span>
+        }
+        @if (!string.IsNullOrEmpty(Context))
+        {
+            <span class="stat-context">@Context</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public double? Delta { get; set; }       // variação % vs período anterior
+    [Parameter] public string? DeltaText { get; set; }
+    [Parameter] public string? Context { get; set; }
+    [Parameter] public string? Info { get; set; }
+    [Parameter] public bool AccentLeft { get; set; }
+    [Parameter] public bool SmallValue { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

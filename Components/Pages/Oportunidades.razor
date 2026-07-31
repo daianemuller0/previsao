@@ -1,0 +1,182 @@
+@page "/oportunidades"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+@inject NavigationManager Nav
+
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Oportunidades</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Oportunidades</h1>
+        <p class="subtitle">Carteira comercial · @Rows.Count de @_all.Count oportunidade(s) · valor @Fmt.UsdShort(Rows.Sum(o => o.AmountUsd))</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
+    </div>
+</div>
+
+<div class="exec-grid cols-4">
+    <StatCard Label="Abertas" Value="@_openCount.ToString()" Context="no funil" />
+    <StatCard Label="Valor em risco" Value="@Fmt.UsdShort(_riskValue)" Context="alto/crítico" />
+    <StatCard Label="Sem próxima ação" Value="@_noAction.ToString()" Context="requerem follow-up" />
+    <StatCard Label="Sem atualização 30d+" Value="@_stale.ToString()" Context="cobrar KAM" />
+</div>
+
+<div class="toolbar">
+    <input class="cell" style="min-width:240px" placeholder="Buscar…" @bind="_search" @bind:event="oninput" />
+    <select class="cell" @bind="_cat"><option value="">Categoria</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select>
+    <select class="cell" @bind="_kam"><option value="">KAM</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select>
+    <select class="cell" @bind="_market"><option value="">Mercado</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select>
+    <select class="cell" @bind="_risk"><option value="">Risco</option>@foreach (var r in Enum.GetValues<RiskLevel>()){<option value="@r.ToString()">@RiskLevels.Label(r)</option>}</select>
+</div>
+
+<div class="table-wrap">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th>Oportunidade</th><th>Cliente / Planta</th><th>Categoria</th><th>Etapa</th>
+                <th class="right">Valor USD</th><th class="right">Ganho</th><th class="right">Ponderado</th>
+                <th class="nowrap">Data prev.</th><th class="center">Risco</th><th>Próx. ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in Rows)
+            {
+                var lvl = ForecastCalc.Level(o, _today);
+                <tr class="clickable" @onclick="() => Goto(o.Id)">
+                    <td class="col-strong">@o.Name<div class="muted" style="font-size:11px">@o.ProposalNumber</div></td>
+                    <td>@Cat.CustomerName(o.CustomerId)<div class="muted" style="font-size:11px">@Cat.PlantName(o.PlantId)</div></td>
+                    <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
+                    <td>@Cat.StageName(o.PipelineStageId)</td>
+                    <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
+                    <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
+                    <td class="right num">@Fmt.Usd(ForecastCalc.WeightedUsd(o))</td>
+                    <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
+                    <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
+                    <td>@(string.IsNullOrWhiteSpace(o.NextAction) ? "—" : o.NextAction)</td>
+                </tr>
+            }
+            @if (Rows.Count == 0)
+            {
+                <tr><td colspan="10" class="empty">Nenhuma oportunidade encontrada.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (_new is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _new = null"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div><h2 style="color:var(--primary)">Nova oportunidade</h2><p class="subtitle">Cadastro comercial</p></div>
+            <button class="icon-btn" @onclick="() => _new = null">@Icons.Svg("x")</button>
+        </div>
+        <div class="form-grid">
+            <label class="fld full">Nome da oportunidade<input class="field" @bind="_new.Name" /></label>
+            <label class="fld">Cliente
+                <select class="field" @bind="_new.CustomerId"><option value="">—</option>@foreach (var c in Cat.Customers){<option value="@c.Id">@c.Name</option>}</select>
+            </label>
+            <label class="fld">Planta
+                <select class="field" @bind="_new.PlantId"><option value="">—</option>@foreach (var p in Cat.Plants){<option value="@p.Id">@p.Name</option>}</select>
+            </label>
+            <label class="fld">Mercado
+                <select class="field" @bind="_new.MarketId"><option value="">—</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select>
+            </label>
+            <label class="fld">Produto
+                <select class="field" @bind="_new.ProductId"><option value="">—</option>@foreach (var p in Cat.Products){<option value="@p.Id">@p.Name</option>}</select>
+            </label>
+            <label class="fld">KAM
+                <select class="field" @bind="_new.KamId"><option value="">—</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select>
+            </label>
+            <label class="fld">Moeda
+                <select class="field" @bind="_new.CurrencyCode">@foreach (var c in Cat.Currencies){<option value="@c.Code">@c.Code</option>}</select>
+            </label>
+            <label class="fld">Valor (moeda)<input class="field num" @bind="_new.AmountOriginal" /></label>
+            <label class="fld">Câmbio (BRL/USD)<input class="field num" @bind="_new.ExchangeRate" /></label>
+            <label class="fld">GM%<input class="field num" @bind="_new.GmPercent" /></label>
+            <label class="fld">Prob. ganho (%)<input class="field num" @bind="_new.WinProbability" /></label>
+            <label class="fld">Prob. período (%)<input class="field num" @bind="_new.CloseInPeriodProbability" /></label>
+            <label class="fld">Forecast Category
+                <select class="field" @bind="_new.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select>
+            </label>
+            <label class="fld">Data prevista<input class="field" type="date" @bind="_newDate" /></label>
+            <label class="fld full">Próxima ação<input class="field" @bind="_new.NextAction" /></label>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _new = null">Cancelar</button>
+            <button class="btn-primary" @onclick="SaveNew">@Icons.Svg("check")Criar</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Opportunity> _all = new();
+    private DateTime _today = DateTime.Today;
+    private string _search = "", _cat = "", _kam = "", _market = "", _risk = "";
+    private int _openCount, _noAction, _stale;
+    private double _riskValue;
+    private Opportunity? _new;
+    private DateTime? _newDate;
+
+    protected override void OnInitialized() { _all = Repo.All(); Recompute(); }
+
+    private void Recompute()
+    {
+        var open = _all.Where(o => ForecastCategories.IsOpen(o.Category)).ToList();
+        _openCount = open.Count;
+        _noAction = open.Count(o => string.IsNullOrWhiteSpace(o.NextAction));
+        _stale = open.Count(o => ForecastCalc.DaysSinceUpdate(o, _today) >= 30);
+        _riskValue = open.Where(o => ForecastCalc.Level(o, _today) is RiskLevel.Alto or RiskLevel.Critico).Sum(o => o.AmountUsd);
+    }
+
+    // Lista filtrada recomputada a cada render (padrão do projeto de Licenças).
+    private List<Opportunity> Rows
+    {
+        get
+        {
+            IEnumerable<Opportunity> q = _all;
+            if (!string.IsNullOrWhiteSpace(_cat)) q = q.Where(o => o.ForecastCategory == _cat);
+            if (!string.IsNullOrWhiteSpace(_kam)) q = q.Where(o => o.KamId == _kam);
+            if (!string.IsNullOrWhiteSpace(_market)) q = q.Where(o => o.MarketId == _market);
+            if (!string.IsNullOrWhiteSpace(_risk)) q = q.Where(o => ForecastCalc.Level(o, _today).ToString() == _risk);
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var b = _search.Trim().ToLowerInvariant();
+                q = q.Where(o => (o.Name + o.ProposalNumber + Cat.CustomerName(o.CustomerId)).ToLowerInvariant().Contains(b));
+            }
+            return q.OrderByDescending(o => o.AmountUsd).ToList();
+        }
+    }
+
+    private void Goto(string id) => Nav.NavigateTo($"/oportunidades/{id}");
+
+    private void NewOpp()
+    {
+        var n = _all.Count + 1001;
+        _new = new Opportunity
+        {
+            Id = $"opp-{Guid.NewGuid():N}", Name = "", ProposalNumber = $"PRP-2026-{n}", PvNumber = $"PV-{2600 + n}",
+            CurrencyCode = "BRL", ExchangeRate = Cat.RateToUsd("USD").ToString(System.Globalization.CultureInfo.InvariantCulture),
+            GmPercent = "25", WinProbability = "40", CloseInPeriodProbability = "40", ForecastCategory = "Pipeline",
+            PipelineStageId = "st-qual", CreatedAt = _today.ToString("yyyy-MM-dd"),
+        };
+        _newDate = _today.AddMonths(2);
+    }
+
+    private void SaveNew()
+    {
+        if (_new is null) return;
+        if (_newDate is { } d) _new.ExpectedDate = d.ToString("yyyy-MM-dd");
+        _new.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        _new.UpdatedBy = Cat.KamName(_new.KamId);
+        // deriva país a partir do cliente
+        if (Cat.GetCustomer(_new.CustomerId) is { } cust) _new.CountryId = cust.CountryId;
+        Repo.Save(_new);
+        _all = Repo.All();
+        Recompute();
+        _new = null;
+    }
+}

@@ -1,0 +1,280 @@
+@page "/forecast"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+@inject IJSRuntime JS
+
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Forecast</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Forecast</h1>
+        <p class="subtitle">Construção e análise da previsão · @Rows.Count oportunidade(s) no recorte · forecast ponderado @Fmt.UsdShort(TotalWeighted)</p>
+    </div>
+    <div class="page-actions">
+        @if (_saved) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
+        <a class="btn-ghost" href="/forecast/export" target="_blank">@Icons.Svg("download")Exportar CSV</a>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="segmented">
+        @foreach (var g in _groupModes)
+        {
+            <button class="@(_groupBy == g.Key ? "active" : "")" @onclick="() => _groupBy = g.Key">@g.Label</button>
+        }
+    </div>
+    <div class="grow"></div>
+    <input class="cell" style="min-width:230px" placeholder="Buscar cliente, proposta, oportunidade…" @bind="_search" @bind:event="oninput" />
+    <select class="cell" @bind="_market"><option value="">Todos os mercados</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select>
+    <select class="cell" @bind="_kam"><option value="">Todos os KAMs</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select>
+</div>
+
+<div class="chips" style="margin-bottom:14px">
+    <button class="chip @(_cat == "" ? "active" : "")" @onclick='() => _cat = ""'>Todas categorias</button>
+    @foreach (var c in _catFilter)
+    {
+        <button class="chip @(_cat == c.ToString() ? "active" : "")" @onclick="() => _cat = c.ToString()">@ForecastCategories.Label(c)</button>
+    }
+</div>
+
+<div class="table-wrap">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th @onclick='() => SetSort("proposal")'>Proposta<span class="sort-ind">@SortInd("proposal")</span></th>
+                <th class="no-sort">Categoria</th>
+                <th @onclick='() => SetSort("date")'>Data prev.<span class="sort-ind">@SortInd("date")</span></th>
+                <th class="no-sort">Mercado</th>
+                <th class="no-sort">Produto</th>
+                <th class="no-sort">KAM</th>
+                <th class="no-sort">Cliente</th>
+                <th class="right" @onclick='() => SetSort("usd")'>Valor USD<span class="sort-ind">@SortInd("usd")</span></th>
+                <th class="right" @onclick='() => SetSort("gm")'>GM%<span class="sort-ind">@SortInd("gm")</span></th>
+                <th class="right" @onclick='() => SetSort("win")'>Ganho<span class="sort-ind">@SortInd("win")</span></th>
+                <th class="right" @onclick='() => SetSort("wf")'>Ponderado<span class="sort-ind">@SortInd("wf")</span></th>
+                <th class="no-sort center">Risco</th>
+                <th class="no-sort"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @{ var groups = Grouped(); }
+            @foreach (var grp in groups)
+            {
+                @if (_groupBy != "none")
+                {
+                    <tr class="grp-row"><td colspan="8">@grp.Key</td><td class="right num">@Fmt.UsdShort(grp.Sum(o => o.AmountUsd))</td><td colspan="2"></td><td class="right num">@Fmt.UsdShort(grp.Sum(ForecastCalc.WeightedUsd))</td><td colspan="2"></td></tr>
+                }
+                @foreach (var o in grp)
+                {
+                    var lvl = ForecastCalc.Level(o, _today);
+                    <tr class="clickable" @onclick="() => Goto(o.Id)">
+                        <td class="col-strong">@o.ProposalNumber</td>
+                        <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
+                        <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
+                        <td>@Cat.MarketName(o.MarketId)</td>
+                        <td>@Cat.ProductName(o.ProductId)</td>
+                        <td>@Cat.KamName(o.KamId)</td>
+                        <td>@Cat.CustomerName(o.CustomerId)</td>
+                        <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
+                        <td class="right num">@Fmt.Pct(o.GmPercentValue)</td>
+                        <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
+                        <td class="right num">@Fmt.Usd(ForecastCalc.WeightedUsd(o))</td>
+                        <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
+                        <td class="center"><button class="btn-ghost sm btn-icon" title="Edição rápida" @onclick:stopPropagation="true" @onclick="() => Edit(o)">@Icons.Svg("edit")</button></td>
+                    </tr>
+                }
+            }
+            @if (Rows.Count == 0)
+            {
+                <tr><td colspan="13" class="empty">Nenhuma oportunidade no recorte selecionado.</td></tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="7">Total · @Rows.Count oportunidade(s)</td>
+                <td class="right">@Fmt.Usd(Rows.Sum(o => o.AmountUsd))</td>
+                <td colspan="2"></td>
+                <td class="right">@Fmt.Usd(TotalWeighted)</td>
+                <td colspan="2"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+@if (_editing is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _editing = null"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div><h2 style="color:var(--primary)">Edição rápida</h2><p class="subtitle">@_editing.Name</p></div>
+            <button class="icon-btn" @onclick="() => _editing = null">@Icons.Svg("x")</button>
+        </div>
+        <div class="form-grid">
+            <label class="fld">Forecast Category
+                <select class="field" @bind="_editing.ForecastCategory">
+                    @foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}
+                </select>
+            </label>
+            <label class="fld">Etapa do pipeline
+                <select class="field" @bind="_editing.PipelineStageId">
+                    @foreach (var s in Cat.Stages){<option value="@s.Id">@s.Name</option>}
+                </select>
+            </label>
+            <label class="fld">Data prevista
+                <input class="field" type="date" @bind="_editDate" />
+            </label>
+            <label class="fld">Prob. de ganho (%)
+                <input class="field num" @bind="_editing.WinProbability" />
+            </label>
+            <label class="fld">Prob. no período (%)
+                <input class="field num" @bind="_editing.CloseInPeriodProbability" />
+            </label>
+            <label class="fld">Prob. do gestor (%)
+                <input class="field num" @bind="_editing.ManagerProbability" />
+            </label>
+            <label class="fld full">Próxima ação
+                <input class="field" @bind="_editing.NextAction" />
+            </label>
+            <label class="fld full">Justificativa
+                <input class="field" @bind="_editing.Justification" />
+            </label>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _editing = null">Cancelar</button>
+            <button class="btn-primary" @onclick="Save">@Icons.Svg("check")Salvar</button>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private List<Opportunity> _all = new();
+    private DateTime _today = DateTime.Today;
+    private string _search = "", _market = "", _kam = "", _cat = "", _groupBy = "none";
+    private string _sort = "date"; private bool _sortAsc = true;
+    private bool _saved;
+    private Opportunity? _editing;
+    private DateTime? _editDate;
+    private string _user = "Equipe Howden";
+
+    private record GroupMode(string Key, string Label);
+    private readonly GroupMode[] _groupModes =
+    {
+        new("none", "Lista"), new("month", "Mês"), new("quarter", "Trimestre"),
+        new("market", "Mercado"), new("kam", "KAM"), new("product", "Produto"),
+        new("customer", "Cliente"), new("category", "Categoria"),
+    };
+    private readonly ForecastCategory[] _catFilter =
+    {
+        ForecastCategory.Commit, ForecastCategory.BestCase, ForecastCategory.Pipeline,
+        ForecastCategory.Upside, ForecastCategory.Risk, ForecastCategory.Postponed,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _all = Repo.All();
+        if (AuthState is not null)
+        {
+            var s = await AuthState;
+            _user = s.User.Identity?.Name ?? _user;
+        }
+    }
+
+    private IEnumerable<Opportunity> Filter()
+    {
+        IEnumerable<Opportunity> q = _all;
+        if (!string.IsNullOrWhiteSpace(_market)) q = q.Where(o => o.MarketId == _market);
+        if (!string.IsNullOrWhiteSpace(_kam)) q = q.Where(o => o.KamId == _kam);
+        if (!string.IsNullOrWhiteSpace(_cat)) q = q.Where(o => o.ForecastCategory == _cat);
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            var b = _search.Trim().ToLowerInvariant();
+            q = q.Where(o => (o.Name + o.ProposalNumber + Cat.CustomerName(o.CustomerId)).ToLowerInvariant().Contains(b));
+        }
+        return q;
+    }
+
+    // Lista filtrada e ordenada, recomputada a cada render.
+    private List<Opportunity> Rows => Sort(Filter()).ToList();
+
+    private double TotalWeighted => Rows.Sum(ForecastCalc.WeightedUsd);
+
+    private List<IGrouping<string, Opportunity>> Grouped()
+    {
+        var rows = Rows;
+        Func<Opportunity, string> key = _groupBy switch
+        {
+            "month" => o => o.ExpectedDateValue is { } d ? d.ToString("yyyy-MM") + " · " + Fmt.MonthName(d.Month) : "Sem data",
+            "quarter" => o => o.ExpectedDateValue is { } d ? Fmt.Quarter(d) : "Sem data",
+            "market" => o => Cat.MarketName(o.MarketId),
+            "kam" => o => Cat.KamName(o.KamId),
+            "product" => o => Cat.ProductName(o.ProductId),
+            "customer" => o => Cat.CustomerName(o.CustomerId),
+            "category" => o => ForecastCategories.Label(o.Category),
+            _ => _ => "",
+        };
+        return rows.GroupBy(key).OrderBy(g => g.Key).ToList();
+    }
+
+    private IEnumerable<Opportunity> Sort(IEnumerable<Opportunity> q)
+    {
+        Func<Opportunity, IComparable> sel = _sort switch
+        {
+            "proposal" => o => o.ProposalNumber,
+            "usd" => o => o.AmountUsd,
+            "gm" => o => o.GmPercentValue,
+            "win" => o => o.WinProbabilityValue,
+            "wf" => o => ForecastCalc.WeightedUsd(o),
+            _ => o => o.ExpectedDate,
+        };
+        return _sortAsc ? q.OrderBy(sel) : q.OrderByDescending(sel);
+    }
+
+    private string SortInd(string key) => _sort == key ? (_sortAsc ? " ▲" : " ▼") : "";
+
+    private void SetSort(string key)
+    {
+        if (_sort == key) _sortAsc = !_sortAsc; else { _sort = key; _sortAsc = true; }
+    }
+
+    private void Goto(string id) => Nav.NavigateTo($"/oportunidades/{id}");
+
+    private void Edit(Opportunity o)
+    {
+        // edita uma cópia para permitir cancelar sem afetar a lista
+        _editing = Clone(o);
+        _editDate = _editing.ExpectedDateValue;
+        _saved = false;
+    }
+
+    private void Save()
+    {
+        if (_editing is null) return;
+        if (_editDate is { } d) _editing.ExpectedDate = d.ToString("yyyy-MM-dd");
+        _editing.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        _editing.UpdatedBy = _user;
+        Repo.Save(_editing);
+        _all = Repo.All();
+        _editing = null;
+        _saved = true;
+    }
+
+    private static Opportunity Clone(Opportunity o) => new()
+    {
+        Id = o.Id, Name = o.Name, ProposalNumber = o.ProposalNumber, PvNumber = o.PvNumber,
+        CountryId = o.CountryId, MarketId = o.MarketId, SubMarketId = o.SubMarketId, ProductId = o.ProductId,
+        EquipmentTypeId = o.EquipmentTypeId, KamId = o.KamId, CustomerId = o.CustomerId, PlantId = o.PlantId,
+        CommercialCategory = o.CommercialCategory, IntercompanyBu = o.IntercompanyBu, PvBusinessUnitId = o.PvBusinessUnitId,
+        CurrencyCode = o.CurrencyCode, AmountOriginal = o.AmountOriginal, ExchangeRate = o.ExchangeRate, GmPercent = o.GmPercent,
+        ForecastCategory = o.ForecastCategory, PipelineStageId = o.PipelineStageId, ExpectedDate = o.ExpectedDate,
+        WinProbability = o.WinProbability, CloseInPeriodProbability = o.CloseInPeriodProbability,
+        ManagerProbability = o.ManagerProbability, Justification = o.Justification, NextAction = o.NextAction,
+        NextActionDate = o.NextActionDate, Risks = o.Risks, Notes = o.Notes, PostponeCount = o.PostponeCount,
+        CreatedAt = o.CreatedAt, UpdatedAt = o.UpdatedAt, UpdatedBy = o.UpdatedBy,
+        ValueChangedAt = o.ValueChangedAt, DateChangedAt = o.DateChangedAt,
+    };
+}

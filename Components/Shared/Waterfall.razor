@@ -1,0 +1,64 @@
+@* Waterfall de variação do forecast: base, deltas (+/-) e total. SVG puro. *@
+
+<div style="overflow-x:auto;">
+    <svg viewBox="0 0 @W 210" width="100%" height="230" preserveAspectRatio="xMinYMin meet" role="img" style="min-width:@(W)px;">
+        <line x1="0" y1="@BaseY.ToString(Inv)" x2="@W" y2="@BaseY.ToString(Inv)" stroke="#e3e9f2" stroke-width="1" />
+        @{ double run = 0; }
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var it = Items[i];
+            double top, bot;
+            string fill;
+            if (it.Total)
+            {
+                top = ScaleY(it.Value); bot = BaseY; fill = "#0b4f8a"; run = it.Value;
+            }
+            else
+            {
+                var from = run; var to = run + it.Value; run = to;
+                top = ScaleY(Math.Max(from, to)); bot = ScaleY(Math.Min(from, to));
+                fill = it.Value >= 0 ? "#1f9254" : "#c0392b";
+            }
+            var x = i * Col + Gap / 2;
+            var h = Math.Max(2, bot - top);
+            <rect x="@x.ToString(Inv)" y="@top.ToString(Inv)" width="@BarW.ToString(Inv)" height="@h.ToString(Inv)" rx="2" fill="@fill" />
+            <text x="@((x + BarW / 2).ToString(Inv))" y="@((top - 5).ToString(Inv))" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text-2)">@Label(it.Value, it.Total)</text>
+            <text x="@((x + BarW / 2).ToString(Inv))" y="200" text-anchor="middle" font-size="10" fill="var(--muted)">@Trim(it.Label)</text>
+        }
+    </svg>
+</div>
+
+@code {
+    public record WaterItem(string Label, double Value, bool Total);
+
+    [Parameter] public List<WaterItem> Items { get; set; } = new();
+
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private const double Col = 96, Gap = 22, PlotTop = 24, PlotBot = 180;
+    private double BarW => Col - Gap;
+    private double W => Math.Max(Items.Count * Col, 300);
+    private double BaseY => PlotBot;
+
+    private double Max
+    {
+        get
+        {
+            double run = 0, max = 1;
+            foreach (var it in Items)
+            {
+                run = it.Total ? it.Value : run + it.Value;
+                max = Math.Max(max, Math.Max(run, it.Total ? it.Value : run));
+            }
+            return max * 1.12;
+        }
+    }
+
+    private double ScaleY(double v) => PlotBot - v / Max * (PlotBot - PlotTop);
+
+    private string Label(double v, bool total)
+    {
+        var s = Data.Fmt.UsdShort(Math.Abs(v)).Replace("US$ ", "");
+        return total ? s : (v >= 0 ? "+" : "−") + s;
+    }
+    private static string Trim(string s) => s.Length > 12 ? s[..11] + "…" : s;
+}

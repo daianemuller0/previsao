@@ -1,0 +1,87 @@
+@page "/historico"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+
+<div class="breadcrumbs"><span>Inteligência</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Histórico</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Histórico &amp; Snapshots</h1>
+        <p class="subtitle">Fotografias periódicas do forecast · o que mudou, quem alterou e o impacto no total</p>
+    </div>
+    <div class="page-actions"><button class="btn-primary">@Icons.Svg("layers")Novo snapshot manual</button></div>
+</div>
+
+<div class="info-banner">
+    Os snapshots registram o forecast em pontos no tempo (semanal, fechamento do mês, antes de reuniões).
+    A comparação abaixo é <strong>indicativa</strong> nesta demonstração — a persistência de snapshots é o próximo passo do módulo.
+</div>
+
+<div class="grid-1-2">
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title">Snapshots</div></div>
+        <div class="timeline">
+            @foreach (var s in _snapshots)
+            {
+                <div class="tl-item">
+                    <div class="tl-time">@s.When</div>
+                    <div class="tl-title">@s.Label · @Fmt.UsdShort(s.Total)</div>
+                    <div class="tl-desc">@s.Note</div>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title">Comparação entre snapshots <span class="hint">atual vs. semana anterior</span></div></div>
+        <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+            <table class="grid-tbl">
+                <thead><tr><th>Movimento</th><th class="right">Qtd</th><th class="right">Impacto USD</th></tr></thead>
+                <tbody>
+                    @foreach (var m in _moves)
+                    {
+                        <tr><td class="col-strong">@m.Label</td><td class="right num">@m.Count</td><td class="right num" style="color:@(m.Value >= 0 ? "var(--pos)" : "var(--neg)")">@(m.Value >= 0 ? "+" : "")@Fmt.UsdShort(m.Value)</td></tr>
+                    }
+                </tbody>
+                <tfoot><tr><td>Variação líquida</td><td class="right"></td><td class="right">@(_net >= 0 ? "+" : "")@Fmt.UsdShort(_net)</td></tr></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private record Snap(string When, string Label, double Total, string Note);
+    private record Move(string Label, int Count, double Value);
+    private List<Snap> _snapshots = new();
+    private List<Move> _moves = new();
+    private double _net;
+
+    protected override void OnInitialized()
+    {
+        var opps = Repo.All();
+        var total = opps.Where(o => ForecastCategories.CountsToForecast(o.Category)).Sum(ForecastCalc.WeightedUsd);
+        var today = DateTime.Today;
+        string D(int daysAgo) => today.AddDays(-daysAgo).ToString("dd/MM/yyyy");
+
+        _snapshots = new()
+        {
+            new(D(0), "Atual", total, "Foto em tempo real do forecast ponderado"),
+            new(D(7), "Semana anterior", total * 0.94, "Snapshot semanal automático"),
+            new(D(14), "Há 2 semanas", total * 0.90, "Snapshot semanal automático"),
+            new(D(30), "Fechamento do mês", total * 0.82, "Snapshot de fechamento"),
+        };
+
+        var b = total;
+        _moves = new()
+        {
+            new("Novas oportunidades", 3, b * 0.10),
+            new("Aumento de valor", 2, b * 0.05),
+            new("Aumento de probabilidade", 4, b * 0.04),
+            new("Redução de probabilidade", 3, -b * 0.04),
+            new("Oportunidades postergadas", 1, -b * 0.05),
+            new("Oportunidades perdidas", 2, -b * 0.04),
+        };
+        _net = _moves.Sum(m => m.Value);
+    }
+}

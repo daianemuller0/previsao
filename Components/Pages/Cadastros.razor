@@ -1,0 +1,78 @@
+@page "/cadastros"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject Catalog Cat
+
+<div class="breadcrumbs"><span>Dados</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Cadastros</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Cadastros mestres</h1>
+        <p class="subtitle">Dados de referência padronizados · evita texto livre e garante consistência analítica</p>
+    </div>
+</div>
+
+<div class="tabs">
+    @foreach (var t in _tabs)
+    {
+        <button class="tab @(_tab == t ? "active" : "")" @onclick="() => _tab = t">@t</button>
+    }
+</div>
+
+<div class="table-wrap">
+    <table class="grid-tbl">
+        @switch (_tab)
+        {
+            case "Mercados":
+                <thead><tr><th>Mercado</th><th>Submercados</th></tr></thead>
+                <tbody>
+                    @foreach (var m in Cat.Markets)
+                    {
+                        <tr><td class="col-strong">@m.Name</td><td>@string.Join(", ", Cat.SubMarkets.Where(s => s.MarketId == m.Id).Select(s => s.Name))</td></tr>
+                    }
+                </tbody>
+                break;
+            case "Produtos":
+                <thead><tr><th>Produto</th><th>Família</th></tr></thead>
+                <tbody>@foreach (var p in Cat.Products){<tr><td class="col-strong">@p.Name</td><td>@p.Family</td></tr>}</tbody>
+                break;
+            case "KAMs":
+                <thead><tr><th>KAM</th><th>E-mail</th><th>Região</th></tr></thead>
+                <tbody>@foreach (var k in Cat.Kams){<tr><td class="col-strong">@k.Name</td><td>@k.Email</td><td>@k.Region</td></tr>}</tbody>
+                break;
+            case "Clientes":
+                <thead><tr><th>Cliente</th><th>Mercado</th><th>País</th></tr></thead>
+                <tbody>@foreach (var c in Cat.Customers){<tr><td class="col-strong">@c.Name</td><td>@Cat.MarketName(c.MarketId)</td><td>@Cat.CountryName(c.CountryId)</td></tr>}</tbody>
+                break;
+            case "Plantas":
+                <thead><tr><th>Planta</th><th>Cliente</th><th>Localização</th></tr></thead>
+                <tbody>@foreach (var p in Cat.Plants){<tr><td class="col-strong">@p.Name</td><td>@Cat.CustomerName(p.CustomerId)</td><td>@p.Location</td></tr>}</tbody>
+                break;
+            case "Unidades de Negócio":
+                <thead><tr><th>Código</th><th>Unidade</th></tr></thead>
+                <tbody>@foreach (var b in Cat.BusinessUnits){<tr><td class="col-strong">@b.Code</td><td>@b.Name</td></tr>}</tbody>
+                break;
+            case "Moedas & Câmbio":
+                <thead><tr><th>Moeda</th><th>Nome</th><th class="right">BRL por unidade</th></tr></thead>
+                <tbody>@foreach (var c in Cat.Currencies){<tr><td class="col-strong">@c.Code</td><td>@c.Name</td><td class="right num">@Cat.RateToUsd(c.Code).ToString("0.00")</td></tr>}</tbody>
+                break;
+            case "Etapas do Pipeline":
+                <thead><tr><th class="right">Ordem</th><th>Etapa</th><th class="right">Prob. padrão</th></tr></thead>
+                <tbody>@foreach (var s in Cat.Stages){<tr><td class="right num">@s.Order</td><td class="col-strong">@s.Name</td><td class="right num">@Fmt.Pct(s.DefaultProbability)</td></tr>}</tbody>
+                break;
+            default:
+                <thead><tr><th>País</th><th>ISO</th></tr></thead>
+                <tbody>@foreach (var c in Cat.Countries){<tr><td class="col-strong">@c.Name</td><td>@c.Iso</td></tr>}</tbody>
+                break;
+        }
+    </table>
+</div>
+
+@code {
+    private readonly string[] _tabs =
+    {
+        "Países", "Mercados", "Produtos", "KAMs", "Clientes", "Plantas",
+        "Unidades de Negócio", "Moedas & Câmbio", "Etapas do Pipeline",
+    };
+    private string _tab = "Países";
+}

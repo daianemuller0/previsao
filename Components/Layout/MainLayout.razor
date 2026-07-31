@@ -1,0 +1,52 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <NavMenu />
+    <div class="main-col">
+        <header class="topbar no-print">
+            <div>
+                <div class="topbar-title">@Icons.Svg("trend", "nav-ico")Howden Sales Forecast</div>
+                <div class="topbar-sub">Sales &amp; Revenue Intelligence · Howden Brasil</div>
+            </div>
+            <div class="topbar-right">
+                <div class="search-global">
+                    @Icons.Svg("search")
+                    <input placeholder="Buscar oportunidade, cliente, proposta…" />
+                </div>
+                <button class="icon-btn" title="Notificações">
+                    @Icons.Svg("bell")<span class="dot"></span>
+                </button>
+                <div class="lang" style="display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;">
+                    @Icons.Svg("globe")<span>PT-BR · USD</span>
+                </div>
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="user">
+                            <div class="user-name">@context.User.Identity?.Name</div>
+                            <div class="user-role">@RoleLabel(context)</div>
+                        </div>
+                        <div class="avatar">@Iniciais(context.User.Identity?.Name)</div>
+                        <form method="post" action="/auth/logout">
+                            <button class="icon-btn" type="submit" title="Sair">@Icons.Svg("logout")</button>
+                        </form>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </header>
+        <main class="content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private static string RoleLabel(AuthenticationState ctx) =>
+        Roles.DisplayName(ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Admin);
+
+    private static string Iniciais(string? nome)
+    {
+        if (string.IsNullOrWhiteSpace(nome)) return "?";
+        var partes = nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(partes.Take(2).Select(p => char.ToUpperInvariant(p[0])));
+    }
+}

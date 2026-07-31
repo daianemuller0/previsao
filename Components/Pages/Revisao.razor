@@ -1,0 +1,139 @@
+@page "/revisao"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Revisão Comercial</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Revisão Comercial</h1>
+        <p class="subtitle">Reunião de forecast · revise as oportunidades de cada KAM e registre a avaliação gerencial</p>
+    </div>
+    <div class="page-actions">
+        @if (_saved) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
+        <button class="btn-primary" @onclick="() => _meeting = !_meeting">@Icons.Svg("play")@(_meeting ? "Sair do modo reunião" : "Modo reunião")</button>
+    </div>
+</div>
+
+<div class="toolbar">
+    <label class="fld" style="min-width:280px">KAM em revisão
+        <select class="field" @bind="_kamId">
+            @foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name — @k.Region</option>}
+        </select>
+    </label>
+</div>
+
+<div class="exec-grid cols-4">
+    <StatCard Label="Forecast do KAM" Value="@Fmt.UsdShort(_forecast)" AccentLeft="true" Context="ponderado elegível" />
+    <StatCard Label="Meta anual" Value="@Fmt.UsdShort(_target)" Context='@(Fmt.Pct(_target > 0 ? _forecast / _target * 100 : 0) + " da meta")' />
+    <StatCard Label="Realizado" Value="@Fmt.UsdShort(_realized)" Context="Closed Won" />
+    <StatCard Label="Gap" Value="@Fmt.UsdShort(_gap)" Context="@(_gap > 0 ? "a cobrir" : "coberto")" />
+</div>
+
+@if (_meeting)
+{
+    <div class="callout">
+        <div>
+            <div class="callout-title">Modo reunião — @Cat.KamName(_kamId) <span class="pill">@_items.Count oportunidades</span></div>
+            <div class="callout-text">Conduza a reunião de forecast direto pelo sistema. Principais negócios e riscos abaixo.</div>
+            <div class="callout-chips">
+                <span class="callout-chip">Forecast @Fmt.UsdShort(_forecast)</span>
+                <span class="callout-chip">Gap @Fmt.UsdShort(_gap)</span>
+                <span class="callout-chip">@_atRisk em risco</span>
+                <span class="callout-chip">@_pending ações pendentes</span>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="panel">
+    <div class="panel-head"><div class="panel-title">Oportunidades — @Cat.KamName(_kamId)</div></div>
+    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+        <table class="grid-tbl">
+            <thead>
+                <tr><th>Oportunidade</th><th>Categoria</th><th class="right">Valor USD</th><th class="right">Vendedor</th><th class="right">Gestor</th><th class="center">Risco</th><th class="center">Ação</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var o in _items)
+                {
+                    var lvl = ForecastCalc.Level(o, _today);
+                    <tr>
+                        <td class="col-strong">@o.Name<div class="muted" style="font-size:11px">@o.ProposalNumber · @Cat.CustomerName(o.CustomerId)</div></td>
+                        <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
+                        <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
+                        <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
+                        <td class="right"><input class="cell num" style="width:70px" value="@o.ManagerProbability" @onchange="e => SetMgr(o, e.Value?.ToString())" /></td>
+                        <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
+                        <td class="center nowrap">
+                            <button class="btn-ghost sm" title="Aprovar (gestor = vendedor)" @onclick="() => Approve(o)">@Icons.Svg("check")</button>
+                            <button class="btn-ghost sm" title="Marcar em risco" @onclick="() => FlagRisk(o)">@Icons.Svg("alert")</button>
+                        </td>
+                    </tr>
+                }
+                @if (_items.Count == 0) { <tr><td colspan="7" class="empty">Sem oportunidades para este KAM.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private DateTime _today = DateTime.Today;
+    private List<Opportunity> _all = new();
+    private string _kamId = "";
+    private bool _meeting, _saved;
+
+    private List<Opportunity> _items => _all.Where(o => o.KamId == _kamId).OrderByDescending(o => o.AmountUsd).ToList();
+    private double _forecast, _target, _realized, _gap;
+    private int _atRisk, _pending;
+
+    protected override void OnInitialized()
+    {
+        _all = Repo.All();
+        _kamId = Cat.Kams.FirstOrDefault()?.Id ?? "";
+        Recompute();
+    }
+
+    private void Recompute()
+    {
+        var mine = _all.Where(o => o.KamId == _kamId).ToList();
+        _forecast = mine.Where(o => ForecastCategories.CountsToForecast(o.Category)).Sum(ForecastCalc.WeightedUsd);
+        _target = Cat.TargetYear(_today.Year, "kam", _kamId);
+        _realized = mine.Where(o => o.Category == ForecastCategory.ClosedWon).Sum(o => o.AmountUsd);
+        _gap = _target - _realized - _forecast;
+        _atRisk = mine.Count(o => ForecastCategories.IsOpen(o.Category) && ForecastCalc.Level(o, _today) is RiskLevel.Alto or RiskLevel.Critico);
+        _pending = mine.Count(o => ForecastCategories.IsOpen(o.Category) && string.IsNullOrWhiteSpace(o.NextAction));
+    }
+
+    // bind do select dispara re-render; recomputa cards quando muda o KAM.
+    protected override bool ShouldRender() { Recompute(); return true; }
+
+    private void SetMgr(Opportunity o, string? val)
+    {
+        var real = _all.First(x => x.Id == o.Id);
+        real.ManagerProbability = (val ?? "").Trim();
+        real.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        Repo.Save(real);
+        _saved = true;
+    }
+
+    private void Approve(Opportunity o)
+    {
+        var real = _all.First(x => x.Id == o.Id);
+        real.ManagerProbability = real.WinProbability;
+        real.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        Repo.Save(real);
+        _saved = true;
+    }
+
+    private void FlagRisk(Opportunity o)
+    {
+        var real = _all.First(x => x.Id == o.Id);
+        real.ForecastCategory = ForecastCategory.Risk.ToString();
+        real.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        Repo.Save(real);
+        _all = Repo.All();
+        _saved = true;
+    }
+}
