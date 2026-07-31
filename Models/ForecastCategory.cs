@@ -15,17 +15,17 @@ public enum ForecastCategory
 
 public static class ForecastCategories
 {
-    // Rótulo de exibição (mantém o vocabulário corporativo em inglês).
+    // Rótulo de exibição em português (Howden Brasil).
     public static string Label(ForecastCategory c) => c switch
     {
-        ForecastCategory.Commit => "Commit",
-        ForecastCategory.BestCase => "Best Case",
+        ForecastCategory.Commit => "Comprometido",
+        ForecastCategory.BestCase => "Melhor cenário",
         ForecastCategory.Pipeline => "Pipeline",
-        ForecastCategory.Upside => "Upside",
-        ForecastCategory.Risk => "Risk",
-        ForecastCategory.ClosedWon => "Closed Won",
-        ForecastCategory.ClosedLost => "Closed Lost",
-        ForecastCategory.Postponed => "Postponed",
+        ForecastCategory.Upside => "Potencial adicional",
+        ForecastCategory.Risk => "Em risco",
+        ForecastCategory.ClosedWon => "Fechado (ganho)",
+        ForecastCategory.ClosedLost => "Fechado (perdido)",
+        ForecastCategory.Postponed => "Postergada",
         _ => c.ToString(),
     };
 

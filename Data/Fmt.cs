@@ -21,12 +21,12 @@ public static class Fmt
         return "US$ " + v.ToString("#,##0", Br);
     }
 
-    // Número compacto sem símbolo (2,4M · 850k · 500) — base para o toggle de moeda.
+    // Número compacto pt-BR sem símbolo (2,4 mi · 850 mil · 500) — base do toggle de moeda.
     public static string Compact(double v)
     {
         var a = Math.Abs(v);
-        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", Br) + "M";
-        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", Br) + "k";
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", Br) + " mi";
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", Br) + " mil";
         return v.ToString("#,##0", Br);
     }
 
@@ -48,6 +48,14 @@ public static class Fmt
     public static string MonthName(int m) => m is >= 1 and <= 12
         ? Br.DateTimeFormat.GetAbbreviatedMonthName(m).ToUpperInvariant().TrimEnd('.')
         : "—";
+
+    // Mês por extenso, capitalizado (ex.: "Julho").
+    public static string MonthLong(int m)
+    {
+        if (m is < 1 or > 12) return "—";
+        var n = Br.DateTimeFormat.GetMonthName(m);
+        return char.ToUpper(n[0]) + n[1..];
+    }
 
     public static string Quarter(DateTime d) => $"Q{(d.Month - 1) / 3 + 1} {d.Year}";
 

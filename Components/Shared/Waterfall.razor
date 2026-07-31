@@ -57,7 +57,7 @@
 
     private string Label(double v, bool total)
     {
-        var s = Data.Fmt.UsdShort(Math.Abs(v)).Replace("US$ ", "");
+        var s = Data.Fmt.Compact(Math.Abs(v));
         return total ? s : (v >= 0 ? "+" : "−") + s;
     }
     private static string Trim(string s) => s.Length > 12 ? s[..11] + "…" : s;
