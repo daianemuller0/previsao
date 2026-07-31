@@ -144,6 +144,60 @@ WHERE _rn = 1 AND NOT _deleted{order};";
         return !Directory.EnumerateFiles(dir, "*.parquet").Any();
     }
 
+    /// <summary>Quantidade de arquivos Parquet da entidade (para decidir compactação).</summary>
+    public int FileCount(string entity)
+    {
+        var dir = EntityDir(entity);
+        return Directory.EnumerateFiles(dir, "*.parquet").Count();
+    }
+
+    /// <summary>
+    /// Compacta a entidade: consolida a versão mais recente de cada id (sem os
+    /// apagados) num ÚNICO Parquet novo e remove os arquivos antigos.
+    ///
+    /// Seguro para leituras concorrentes: grava primeiro um arquivo temporário
+    /// (fora do padrão *.parquet), promove-o a Parquet final e só então apaga os
+    /// arquivos capturados no início. Durante a janela em que ambos existem, a
+    /// consolidação por id/_ts descarta as duplicatas idênticas — nada se perde.
+    /// Retorna o nº de arquivos após a operação (0 se não havia nada a compactar).
+    /// </summary>
+    public int Compact(string entity)
+    {
+        var dir = EntityDir(entity);
+        var oldFiles = Directory.EnumerateFiles(dir, "*.parquet").ToList();
+        if (oldFiles.Count <= 1) return oldFiles.Count;
+
+        var glob = Duck(Path.Combine(dir, "*.parquet"));
+        var tmpPath = Path.Combine(dir, $"_compact_{DateTime.UtcNow.Ticks:D19}_{Guid.NewGuid():N}.tmp");
+        var tmpDuck = Duck(tmpPath);
+
+        using (var conn = Open())
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = $@"
+COPY (
+    SELECT * EXCLUDE (_rn)
+    FROM (
+        SELECT *, row_number() OVER (PARTITION BY id ORDER BY _ts DESC) AS _rn
+        FROM read_parquet('{glob}', union_by_name=true)
+    )
+    WHERE _rn = 1 AND NOT _deleted
+) TO '{tmpDuck}' (FORMAT PARQUET);";
+            cmd.ExecuteNonQuery();
+        }
+
+        // Promove o temporário a Parquet final (passa a valer para os leitores).
+        var finalName = Path.Combine(dir, $"{DateTime.UtcNow.Ticks:D19}_{Guid.NewGuid():N}.parquet");
+        File.Move(tmpPath, finalName);
+
+        // Remove apenas os arquivos existentes no início (preserva escritas novas).
+        foreach (var f in oldFiles)
+        {
+            try { File.Delete(f); } catch { /* em uso por outro leitor: ignora, próxima rodada limpa */ }
+        }
+        return 1;
+    }
+
     /// <summary>
     /// Apaga todos os Parquet da entidade (usado pela importação em modo "substituir").
     /// </summary>

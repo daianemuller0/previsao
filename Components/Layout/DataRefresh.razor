@@ -1,0 +1,27 @@
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject NavigationManager Nav
+
+<div style="display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px;white-space:nowrap;">
+    <button class="icon-btn" title="Atualizar dados da base (releitura dos Parquet)" @onclick="Refresh">
+        @Icons.Svg("history")
+    </button>
+    @if (Repo.LoadedAt != default)
+    {
+        <span>Dados @Repo.LoadedAt.ToString("HH:mm")</span>
+    }
+</div>
+
+@code {
+    // Garante o cache aquecido já na abertura (define LoadedAt para exibição).
+    protected override void OnInitialized()
+    {
+        if (Repo.LoadedAt == default) { _ = Repo.All(); }
+    }
+
+    private void Refresh()
+    {
+        Repo.Refresh();
+        Nav.NavigateTo(Nav.Uri, forceLoad: true); // recarrega a página com os dados atualizados
+    }
+}

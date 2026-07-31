@@ -4,7 +4,12 @@ using HowdenSalesForecast.Models;
 namespace HowdenSalesForecast.Data;
 
 // Repositório da entidade central (opportunities) sobre o ParquetStore.
-// Mesmo padrão do projeto de Licenças: colunas VARCHAR, consolidação na leitura.
+// Mesmo padrão do projeto de Licenças (colunas VARCHAR, consolidação na leitura),
+// com CACHE em memória: a base é lida uma vez e reutilizada entre as páginas.
+// Registrado como singleton — o cache é compartilhado por toda a sessão do app.
+//   • All()      → devolve cópias do cache (carrega na 1ª vez).
+//   • Refresh()  → relê os Parquet da rede (botão "Atualizar").
+//   • Save/Delete→ grava no Parquet e atualiza o cache na hora (write-through).
 public class OpportunityRepository
 {
     private const string Entity = "opportunities";
@@ -17,11 +22,18 @@ public class OpportunityRepository
         "value_changed_at, date_changed_at";
 
     private readonly ParquetStore _store;
+    private readonly object _lock = new();
+    private List<Opportunity>? _cache;
+
     public OpportunityRepository(ParquetStore store) => _store = store;
+
+    /// <summary>Momento da última leitura completa da base (para exibir na UI).</summary>
+    public DateTime LoadedAt { get; private set; }
 
     private static string S(IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
 
-    public List<Opportunity> All() =>
+    // Leitura crua do ParquetStore (consolidada por id, sem apagados).
+    private List<Opportunity> LoadFromStore() =>
         _store.ReadLatest(Entity, Cols, r => new Opportunity
         {
             Id = S(r, 0),
@@ -62,9 +74,40 @@ public class OpportunityRepository
             DateChangedAt = S(r, 35),
         }, orderBy: "expected_date");
 
-    public Opportunity? Get(string id) => All().FirstOrDefault(o => o.Id == id);
+    // Garante o cache carregado (dentro do lock).
+    private List<Opportunity> EnsureCache()
+    {
+        if (_cache is null)
+        {
+            _cache = LoadFromStore();
+            LoadedAt = DateTime.Now;
+        }
+        return _cache;
+    }
 
-    public void Save(Opportunity o) =>
+    /// <summary>Devolve cópias do cache (não afeta o cache se o chamador editar).</summary>
+    public List<Opportunity> All()
+    {
+        lock (_lock) return EnsureCache().Select(Clone).ToList();
+    }
+
+    /// <summary>Relê a base dos Parquet (descarta o cache atual).</summary>
+    public void Refresh()
+    {
+        lock (_lock)
+        {
+            _cache = LoadFromStore();
+            LoadedAt = DateTime.Now;
+        }
+    }
+
+    public Opportunity? Get(string id)
+    {
+        lock (_lock) return EnsureCache().Where(o => o.Id == id).Select(Clone).FirstOrDefault();
+    }
+
+    public void Save(Opportunity o)
+    {
         _store.WriteRow(Entity, new KeyValuePair<string, object?>[]
         {
             new("id", o.Id),
@@ -105,6 +148,33 @@ public class OpportunityRepository
             new("date_changed_at", o.DateChangedAt),
         });
 
-    public void Delete(string id) =>
+        // Write-through: reflete no cache imediatamente (sem reler a rede).
+        lock (_lock)
+        {
+            var cache = EnsureCache();
+            cache.RemoveAll(x => x.Id == o.Id);
+            cache.Add(Clone(o));
+        }
+    }
+
+    public void Delete(string id)
+    {
         _store.WriteRow(Entity, new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
+        lock (_lock) { EnsureCache().RemoveAll(x => x.Id == id); }
+    }
+
+    private static Opportunity Clone(Opportunity o) => new()
+    {
+        Id = o.Id, Name = o.Name, ProposalNumber = o.ProposalNumber, PvNumber = o.PvNumber,
+        CountryId = o.CountryId, MarketId = o.MarketId, SubMarketId = o.SubMarketId, ProductId = o.ProductId,
+        EquipmentTypeId = o.EquipmentTypeId, KamId = o.KamId, CustomerId = o.CustomerId, PlantId = o.PlantId,
+        CommercialCategory = o.CommercialCategory, IntercompanyBu = o.IntercompanyBu, PvBusinessUnitId = o.PvBusinessUnitId,
+        CurrencyCode = o.CurrencyCode, AmountOriginal = o.AmountOriginal, ExchangeRate = o.ExchangeRate, GmPercent = o.GmPercent,
+        ForecastCategory = o.ForecastCategory, PipelineStageId = o.PipelineStageId, ExpectedDate = o.ExpectedDate,
+        WinProbability = o.WinProbability, CloseInPeriodProbability = o.CloseInPeriodProbability,
+        ManagerProbability = o.ManagerProbability, Justification = o.Justification, NextAction = o.NextAction,
+        NextActionDate = o.NextActionDate, Risks = o.Risks, Notes = o.Notes, PostponeCount = o.PostponeCount,
+        CreatedAt = o.CreatedAt, UpdatedAt = o.UpdatedAt, UpdatedBy = o.UpdatedBy,
+        ValueChangedAt = o.ValueChangedAt, DateChangedAt = o.DateChangedAt,
+    };
 }

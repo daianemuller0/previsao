@@ -37,16 +37,20 @@ builder.Services.AddAuthorization();
 var dataFolder = builder.Configuration["Data:Folder"] ?? "data";
 builder.Services.AddSingleton(new ParquetStore(dataFolder));
 builder.Services.AddSingleton<Catalog>();
-builder.Services.AddScoped<OpportunityRepository>();
+// Singleton: mantém o cache das oportunidades compartilhado entre as páginas.
+builder.Services.AddSingleton<OpportunityRepository>();
+// Compactação periódica dos Parquet em segundo plano.
+builder.Services.AddHostedService<CompactionService>();
 
 var app = builder.Build();
 
 // Semente dos dados demonstrativos na primeira execução (pasta vazia).
 using (var scope = app.Services.CreateScope())
 {
-    DbInitializer.Initialize(
-        scope.ServiceProvider.GetRequiredService<ParquetStore>(),
-        scope.ServiceProvider.GetRequiredService<Catalog>());
+    var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
+    DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
+    // Compacta na inicialização (colapsa os arquivos do seed / acumulados).
+    try { store.Compact("opportunities"); } catch { /* pasta indisponível: segue */ }
 }
 
 if (!app.Environment.IsDevelopment())
