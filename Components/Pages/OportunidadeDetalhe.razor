@@ -131,7 +131,7 @@ else
                     <div class="dl"><dt>Prob. de ganho</dt><dd>@Fmt.Pct(_o.WinProbabilityValue)</dd></div>
                     <div class="dl"><dt>Prob. de fechamento no período</dt><dd>@Fmt.Pct(_o.CloseProbabilityValue)</dd></div>
                     <div class="dl"><dt>Previsão do vendedor</dt><dd>@Fmt.Pct(_o.WinProbabilityValue)</dd></div>
-                    <div class="dl"><dt>Previsão do gestor</dt><dd>@(_o.ManagerProbabilityValue is {} mp ? Fmt.Pct(mp) : "—")</dd></div>
+                    <div class="dl"><dt>Previsão do gestor</dt><dd>@(_o.ManagerProbabilityValue is {} mpFore ? Fmt.Pct(mpFore) : "—")</dd></div>
                     <div class="dl"><dt>Justificativa</dt><dd>@(string.IsNullOrWhiteSpace(_o.Justification) ? "—" : _o.Justification)</dd></div>
                 </dl>
             </div>
@@ -164,7 +164,7 @@ else
                     <div class="dl"><dt>Postergações</dt><dd>@_o.PostponeCountValue</dd></div>
                     <div class="dl"><dt>Dias sem atualização</dt><dd>@ForecastCalc.DaysSinceUpdate(_o, _today)</dd></div>
                     <div class="dl"><dt>Margem</dt><dd>@Fmt.Pct(_o.GmPercentValue)</dd></div>
-                    <div class="dl"><dt>Divergência vendedor × gestor</dt><dd>@(_o.ManagerProbabilityValue is {} mp ? Fmt.Pct(Math.Abs(_o.WinProbabilityValue - mp)) : "—")</dd></div>
+                    <div class="dl"><dt>Divergência vendedor × gestor</dt><dd>@(_o.ManagerProbabilityValue is {} mpDiv ? Fmt.Pct(Math.Abs(_o.WinProbabilityValue - mpDiv)) : "—")</dd></div>
                 </dl>
             </div>
             break;
