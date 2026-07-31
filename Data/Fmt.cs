@@ -21,6 +21,15 @@ public static class Fmt
         return "US$ " + v.ToString("#,##0", Br);
     }
 
+    // Número compacto sem símbolo (2,4M · 850k · 500) — base para o toggle de moeda.
+    public static string Compact(double v)
+    {
+        var a = Math.Abs(v);
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", Br) + "M";
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", Br) + "k";
+        return v.ToString("#,##0", Br);
+    }
+
     public static string Pct(double v, int dec = 0) => v.ToString("0." + new string('0', dec), Br) + "%";
 
     public static string Signed(double v)
