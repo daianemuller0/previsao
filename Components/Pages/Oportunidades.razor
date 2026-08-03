@@ -14,7 +14,7 @@
         <p class="subtitle">Carteira comercial · @Rows.Count de @_all.Count oportunidade(s) · valor @Fmt.UsdShort(Rows.Sum(o => o.AmountUsd))</p>
     </div>
     <div class="page-actions">
-        <button class="btn-danger-ghost" @onclick="() => _wipe = true">@Icons.Svg("trash")Excluir base</button>
+        <button class="icon-btn danger" title="Excluir base inteira" @onclick="() => _wipe = true">@Icons.Svg("trash")</button>
         <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
@@ -74,10 +74,11 @@
                 var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
                 <tr class="clickable" @onclick="() => Goto(o.Id)">
                     <td class="center actions-col">
-                        <button class="icon-btn danger" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
+                        <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
+                        <button class="row-act del" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
                     </td>
                     <td class="nowrap">@q</td>
-                    <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
+                    <td class="nowrap">@MonthLabel(o)</td>
                     <td>@Cat.CountryName(o.CountryId)</td>
                     <td>@Cat.SubMarketName(o.SubMarketId)</td>
                     <td>@Cat.MarketName(o.MarketId)</td>
@@ -234,6 +235,133 @@
     </div>
 }
 
+@* ---- Editar oportunidade (todos os campos) ---- *@
+@if (_edit is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _edit = null"></div>
+    <div class="drawer drawer-wide">
+        <div class="page-head">
+            <div><h2 style="color:var(--primary)">Editar oportunidade</h2><p class="subtitle">@(_edit.ProposalNumber) · altere qualquer campo</p></div>
+            <button class="icon-btn" @onclick="() => _edit = null">@Icons.Svg("x")</button>
+        </div>
+        <div class="form-grid">
+            <label class="fld full">Nome da oportunidade<input class="field" @bind="_edit.Name" /></label>
+
+            <label class="fld">Mês da previsão<input class="field" type="month" @bind="_editMonth" /></label>
+            <label class="fld">Proposta<input class="field" @bind="_edit.ProposalNumber" /></label>
+            <label class="fld">PV<input class="field" @bind="_edit.PvNumber" /></label>
+
+            <label class="fld">País
+                <select class="field" @bind="_edit.CountryId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.CountryId, Cat.Countries.Select(x => x.Id))) { <option value="@_edit.CountryId" selected>@_edit.CountryId (importado)</option> }
+                    @foreach (var c in Cat.Countries) { <option value="@c.Id">@c.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Market
+                <select class="field" @bind="_edit.MarketId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.MarketId, Cat.Markets.Select(x => x.Id))) { <option value="@_edit.MarketId" selected>@_edit.MarketId (importado)</option> }
+                    @foreach (var m in Cat.Markets) { <option value="@m.Id">@m.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Market Variável
+                <select class="field" @bind="_edit.SubMarketId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.SubMarketId, Cat.SubMarkets.Select(x => x.Id))) { <option value="@_edit.SubMarketId" selected>@_edit.SubMarketId (importado)</option> }
+                    @foreach (var s in Cat.SubMarkets) { <option value="@s.Id">@s.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Product
+                <select class="field" @bind="_edit.ProductId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.ProductId, Cat.Products.Select(x => x.Id))) { <option value="@_edit.ProductId" selected>@_edit.ProductId (importado)</option> }
+                    @foreach (var p in Cat.Products) { <option value="@p.Id">@p.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Tipo de Equipamento
+                <select class="field" @bind="_edit.EquipmentTypeId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.EquipmentTypeId, Cat.EquipmentTypes.Select(x => x.Id))) { <option value="@_edit.EquipmentTypeId" selected>@_edit.EquipmentTypeId (importado)</option> }
+                    @foreach (var e in Cat.EquipmentTypes) { <option value="@e.Id">@e.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Key Account (KAM)
+                <select class="field" @bind="_edit.KamId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.KamId, Cat.Kams.Select(x => x.Id))) { <option value="@_edit.KamId" selected>@_edit.KamId (importado)</option> }
+                    @foreach (var k in Cat.Kams) { <option value="@k.Id">@k.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Customer
+                <select class="field" @bind="_edit.CustomerId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.CustomerId, Cat.Customers.Select(x => x.Id))) { <option value="@_edit.CustomerId" selected>@_edit.CustomerId (importado)</option> }
+                    @foreach (var c in Cat.Customers) { <option value="@c.Id">@c.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Planta
+                <select class="field" @bind="_edit.PlantId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.PlantId, Cat.Plants.Select(x => x.Id))) { <option value="@_edit.PlantId" selected>@_edit.PlantId (importado)</option> }
+                    @foreach (var p in Cat.Plants) { <option value="@p.Id">@p.Name</option> }
+                </select>
+            </label>
+
+            <label class="fld">Categoria (NB/AFM)
+                <select class="field" @bind="_edit.CommercialCategory">
+                    <option value="">—</option>
+                    @foreach (var cc in CommercialCategory.All) { <option value="@cc.Code">@cc.Code · @cc.Name</option> }
+                </select>
+            </label>
+            <label class="fld">Forecast Category
+                <select class="field" @bind="_edit.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()) { <option value="@c.ToString()">@ForecastCategories.Label(c)</option> }</select>
+            </label>
+            <label class="fld">Etapa
+                <select class="field" @bind="_edit.PipelineStageId">
+                    <option value="">—</option>
+                    @foreach (var s in Cat.Stages) { <option value="@s.Id">@s.Name</option> }
+                </select>
+            </label>
+
+            <label class="fld">Moeda
+                <select class="field" @bind="_edit.CurrencyCode">@foreach (var c in Cat.Currencies) { <option value="@c.Code">@c.Code</option> }</select>
+            </label>
+            <label class="fld">Net Value (valor)<input class="field num" @bind="_edit.AmountOriginal" /></label>
+            <label class="fld">Taxa (BRL/USD)<input class="field num" @bind="_edit.ExchangeRate" /></label>
+            <label class="fld">Valor USD (calculado)<input class="field num" value="@Fmt.Usd(_edit.AmountUsd)" readonly /></label>
+
+            <label class="fld">PM % (GM)<input class="field num" @bind="_edit.GmPercent" /></label>
+            <label class="fld">% de Ganho<input class="field num" @bind="_edit.WinProbability" /></label>
+            <label class="fld">% de Sair no Mês<input class="field num" @bind="_edit.CloseInPeriodProbability" /></label>
+
+            <label class="fld">Unidade de Venda (BU do PV)
+                <select class="field" @bind="_edit.PvBusinessUnitId">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.PvBusinessUnitId, Cat.BusinessUnits.Select(x => x.Id))) { <option value="@_edit.PvBusinessUnitId" selected>@_edit.PvBusinessUnitId (importado)</option> }
+                    @foreach (var b in Cat.BusinessUnits) { <option value="@b.Id">@b.Code · @b.Name</option> }
+                </select>
+            </label>
+            <label class="fld">BU Intercompany
+                <select class="field" @bind="_edit.IntercompanyBu">
+                    <option value="">—</option>
+                    @if (Unknown(_edit.IntercompanyBu, Cat.BusinessUnits.Select(x => x.Id))) { <option value="@_edit.IntercompanyBu" selected>@_edit.IntercompanyBu (importado)</option> }
+                    @foreach (var b in Cat.BusinessUnits) { <option value="@b.Id">@b.Code · @b.Name</option> }
+                </select>
+            </label>
+
+            <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
+            <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")Excluir</button>
+            <div class="filterbar-spacer"></div>
+            <button class="btn-ghost" @onclick="() => _edit = null">Cancelar</button>
+            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")Salvar alterações</button>
+        </div>
+    </div>
+}
+
 @code {
     private List<Opportunity> _all = new();
     private DateTime _today = DateTime.Today;
@@ -242,6 +370,10 @@
     private double _riskValue;
     private Opportunity? _new;
     private DateTime? _newDate;
+
+    // Edição
+    private Opportunity? _edit;
+    private string _editMonth = ""; // yyyy-MM (input type=month)
 
     // Exclusão
     private Opportunity? _delTarget;
@@ -256,6 +388,14 @@
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
+
+    // Rótulo do mês da previsão (a "Date" é uma referência de mês, não um dia).
+    private static string MonthLabel(Opportunity o) =>
+        o.ExpectedDateValue is { } d ? $"{Fmt.MonthName(d.Month)}/{d.Year}" : "—";
+
+    // Valor guardado que não corresponde a nenhum Id do catálogo (dado importado).
+    private static bool Unknown(string id, IEnumerable<string> knownIds) =>
+        !string.IsNullOrEmpty(id) && !knownIds.Contains(id);
 
     protected override void OnInitialized() { _all = Repo.All(); Recompute(); }
 
@@ -288,6 +428,36 @@
     }
 
     private void Goto(string id) => Nav.NavigateTo($"/oportunidades/{id}");
+
+    // ---- edição completa ----
+    private void OpenEdit(Opportunity o)
+    {
+        _edit = Repo.Get(o.Id) ?? o;                       // cópia isolada do cache
+        _editMonth = _edit.ExpectedDateValue is { } d ? d.ToString("yyyy-MM") : "";
+    }
+
+    private void SaveEdit()
+    {
+        if (_edit is null) return;
+        // O mês da previsão vira uma data real no 1º dia do mês escolhido.
+        if (!string.IsNullOrWhiteSpace(_editMonth)
+            && DateTime.TryParse(_editMonth + "-01", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d))
+            _edit.ExpectedDate = d.ToString("yyyy-MM-dd");
+        _edit.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        _edit.UpdatedBy = Cat.KamName(_edit.KamId);
+        Repo.Save(_edit);
+        _all = Repo.All();
+        Recompute();
+        _edit = null;
+    }
+
+    private void DeleteFromEdit()
+    {
+        if (_edit is null) return;
+        _delTarget = _edit;
+        _edit = null;
+    }
 
     // ---- exclusão de uma oportunidade ----
     private void AskDelete(Opportunity o) => _delTarget = o;

@@ -147,7 +147,7 @@ public sealed class OpportunityImporter
         if (proposta == "" && customerRaw == "" && valueRaw == "") return;
         r.Read++;
 
-        var dateIso = IsoDate(get(new[] { "Date", "Data", "Data prevista" }));
+        var dateIso = ResolveDate(get(new[] { "Date", "Data", "Data prevista" }), get(new[] { "Quarter" }));
         var country = Match(_cat.Countries, c => c.Name, c => c.Id, get(new[] { "País", "Pais", "Country" }));
         var market = Match(_cat.Markets, m => m.Name, m => m.Id, get(new[] { "Market" }));
         var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "Market Variável", "Market Variavel", "Sub_Market", "Submercado" }));
@@ -250,10 +250,52 @@ public sealed class OpportunityImporter
         return Math.Clamp(n, 0, 100);
     }
 
+    // A coluna "Date" da planilha é uma REFERÊNCIA DE MÊS (número 1–12), não um
+    // dia específico. Resolvemos para o 1º dia do mês; o ano vem da coluna
+    // Quarter (ex.: "Q3 2026") ou, na falta dele, do ano corrente.
+    private static string ResolveDate(string raw, string quarterRaw)
+    {
+        raw = raw.Trim();
+        if (raw == "") return "";
+
+        // Data completa (dd/mm/aaaa, ISO ou serial do Excel).
+        var full = IsoDate(raw);
+        if (full != "") return full;
+
+        // Número do mês (1–12) → 1º dia do mês, com o ano da coluna Quarter.
+        if (double.TryParse(raw, NumberStyles.Any, Inv, out var n) ||
+            double.TryParse(raw, NumberStyles.Any, Br, out n))
+        {
+            var month = (int)Math.Round(n);
+            if (month is >= 1 and <= 12)
+            {
+                var year = YearFrom(quarterRaw) ?? DateTime.Today.Year;
+                return new DateTime(year, month, 1).ToString("yyyy-MM-dd");
+            }
+        }
+        return "";
+    }
+
+    // Extrai um ano de quatro dígitos de um texto (ex.: "Q3 2026" → 2026).
+    private static int? YearFrom(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        var digits = new StringBuilder();
+        foreach (var c in s)
+        {
+            if (char.IsDigit(c)) { digits.Append(c); if (digits.Length == 4 && int.Parse(digits.ToString()) is >= 2000 and <= 2100) return int.Parse(digits.ToString()); }
+            else if (digits.Length is > 0 and < 4) digits.Clear();
+        }
+        return null;
+    }
+
     private static string IsoDate(string raw)
     {
         raw = raw.Trim();
         if (raw == "") return "";
+        // Um número curto (1–12) NÃO é uma data completa — deixa para ResolveDate.
+        if (double.TryParse(raw, NumberStyles.Any, Inv, out var small) && small is >= 1 and <= 12 && raw.Length <= 2)
+            return "";
         if (DateTime.TryParse(raw, Br, DateTimeStyles.None, out var d)) return d.ToString("yyyy-MM-dd");
         if (DateTime.TryParse(raw, Inv, DateTimeStyles.None, out d)) return d.ToString("yyyy-MM-dd");
         if (double.TryParse(raw, NumberStyles.Any, Inv, out var serial) && serial is > 20000 and < 80000)

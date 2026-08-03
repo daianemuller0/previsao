@@ -358,9 +358,13 @@ h1 { font-size: 22px; color: var(--primary); }
 .btn-danger-ghost svg { width: 15px; height: 15px; }
 .icon-btn.danger { color: var(--muted); }
 .icon-btn.danger:hover { color: var(--neg); border-color: var(--neg); background: var(--neg-bg); }
-.grid-tbl td.actions-col, .grid-tbl th.actions-col { width: 44px; padding-left: 8px; padding-right: 8px; }
-.grid-tbl td.actions-col .icon-btn { width: 28px; height: 28px; }
-.grid-tbl td.actions-col .icon-btn svg { width: 15px; height: 15px; }
+.grid-tbl td.actions-col, .grid-tbl th.actions-col { width: 62px; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
+/* Ações de linha discretas: sem borda, cinza, ganham cor só no hover. */
+.row-act { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: none; background: transparent; color: var(--muted); border-radius: 6px; cursor: pointer; opacity: .5; transition: opacity .12s, color .12s, background .12s; }
+tr:hover .row-act { opacity: .85; }
+.row-act:hover { opacity: 1; background: var(--panel-2); color: var(--text-2); }
+.row-act.del:hover { color: var(--neg); background: var(--neg-bg); }
+.row-act svg { width: 15px; height: 15px; }
 
 /* Caixa de confirmação (exclusão) */
 .confirm-box {
@@ -483,6 +487,10 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 .modal h2 { color: var(--primary); font-size: 17px; margin-bottom: 14px; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(9, 27, 50, .4); z-index: 60; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 560px; max-width: 96vw; background: #fff; box-shadow: var(--shadow-lg); z-index: 61; overflow-y: auto; padding: 22px 24px; }
+.drawer.drawer-wide { width: 720px; }
+.drawer.drawer-wide .form-grid { grid-template-columns: 1fr 1fr 1fr; }
+.drawer.drawer-wide .form-grid .full { grid-column: 1 / -1; }
+@media (max-width: 720px) { .drawer.drawer-wide .form-grid { grid-template-columns: 1fr 1fr; } }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-grid .full { grid-column: 1 / -1; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
