@@ -175,6 +175,13 @@ public class OpportunityRepository
         lock (_lock) { EnsureCache().RemoveAll(x => x.Id == id); }
     }
 
+    /// <summary>Apaga TODA a base de oportunidades (remove os Parquet e zera o cache).</summary>
+    public void DeleteAll()
+    {
+        _store.Clear(Entity);
+        lock (_lock) { _cache = new List<Opportunity>(); LoadedAt = DateTime.Now; }
+    }
+
     private static Opportunity Clone(Opportunity o) => new()
     {
         Id = o.Id, Name = o.Name, ProposalNumber = o.ProposalNumber, PvNumber = o.PvNumber,
