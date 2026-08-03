@@ -1,149 +1,635 @@
 @page "/controle"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject ControleRepository Repo
+@inject Catalog Cat
+@using HowdenSalesForecast.Models
+@using System.Globalization
 
-<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Controle</span></div>
+@{ Build(); }
 
-<div class="page-head">
+<div class="breadcrumbs"><span>Controladoria</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Controle Orçamentário</span></div>
+
+@* ===================== CABEÇALHO + FILTROS ===================== *@
+<div class="page-head ctrl-head">
     <div>
-        <h1>Controle</h1>
-        <p class="subtitle">REPORT HSA · realizado × budget por mês · valores em R$</p>
+        <h1>Controle Orçamentário</h1>
+        <p class="subtitle">Gestão de realizado, orçamento e forecast — Howden Brasil</p>
+    </div>
+    <div class="ctrl-head-actions">
+        <div class="ctrl-filters">
+            <div class="flt"><span class="flt-label">Ano</span><select @bind="_year" @bind:after="Reload">@foreach (var y in Years){<option value="@y">@y</option>}</select></div>
+            <div class="flt"><span class="flt-label">Moeda</span><select @bind="_cur"><option value="BRL">BRL</option><option value="USD">USD</option></select></div>
+            <div class="flt"><span class="flt-label">Empresa</span><select @bind="_empresa"><option value="HSA">HSA</option></select></div>
+            <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var g in Groups){<option value="@g.Key">@g.Label</option>}</select></div>
+            <div class="flt"><span class="flt-label">Status</span><select @bind="_statusFilter"><option>Todos</option><option>Preenchido</option><option>Pendente</option><option>Com divergência</option><option>Em revisão</option><option>Fechado</option></select></div>
+        </div>
+        <div class="ctrl-head-row2">
+            <span class="ctrl-upd">Atualizado @_updated · @_updatedBy</span>
+            <button class="btn-ghost sm" @onclick="Reload" title="Recarregar do banco">@Icons.Svg("history")Atualizar</button>
+            <button class="btn-ghost sm" @onclick="() => _showImport = true">@Icons.Svg("import")Importar</button>
+            <a class="btn-ghost sm" href="@($"/controle/export?ano={_year}")" target="_blank">@Icons.Svg("download")Exportar</a>
+            <button class="btn-ghost sm" @onclick="() => _showHist = true">@Icons.Svg("history")Histórico</button>
+            <button class="@(_editMode ? "btn-primary active-edit sm" : "btn-primary sm")" @onclick="ToggleEdit">@Icons.Svg("edit")@(_editMode ? "Concluir edição" : "Editar dados")</button>
+        </div>
     </div>
 </div>
 
-@* ---- Resumo por semestre ---- *@
-<div class="exec-grid cols-4" style="margin-bottom:18px">
-    <div class="stat accent-left">
-        <div class="stat-label">1º semestre · Meta</div>
-        <div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div>
-        <div class="stat-context">Realizado @Brl(Sum(_realizado, 0, 6))</div>
+@if (_loading)
+{
+    <div class="exec-grid cols-4">@for (var i = 0; i < 4; i++){<div class="card skel" style="height:96px"></div>}</div>
+    <div class="skel" style="height:420px;margin-top:16px;border-radius:12px"></div>
+}
+else if (_error is not null)
+{
+    <div class="state-box state-err">@Icons.Svg("alert")<div><strong>Não foi possível carregar o Controle.</strong><div class="muted">@_error</div></div><button class="btn-ghost" @onclick="Reload">Tentar novamente</button></div>
+}
+else
+{
+    @* ===================== CARDS OPERACIONAIS ===================== *@
+    <div class="exec-grid cols-4 ctrl-ops">
+        <div class="card op"><div class="op-k">Período selecionado</div><div class="op-v">Ano @_year</div><div class="op-x">Janeiro a dezembro · Moeda @_cur</div></div>
+        <div class="card op"><div class="op-k">Status do preenchimento</div><div class="op-v">@Pct(_fillPct) preenchido</div><div class="op-x">@_fechados de 12 meses concluídos</div></div>
+        <div class="card op @(_pendCount > 0 ? "op-alert" : "")"><div class="op-k">Pendências</div><div class="op-v">@_pendCount campo(s) pendente(s)</div><div class="op-x"><button class="btn-link" @onclick="() => _showPend = true">Ver pendências</button></div></div>
+        <div class="card op"><div class="op-k">Status do fechamento</div><div class="op-v">@_fechStatusMain</div><div class="op-x"><button class="btn-link" @onclick="() => _showFech = true">Gerenciar fechamento</button></div></div>
     </div>
-    <div class="stat accent-left">
-        <div class="stat-label">1º semestre · Atingimento</div>
-        <div class="stat-value sm" style="color:@AtCss(Attain(0, 6))">@Pct(Attain(0, 6))</div>
-        <div class="stat-context">Realizado ÷ Budget (Jan–Jun)</div>
-    </div>
-    <div class="stat accent-left">
-        <div class="stat-label">2º semestre · Meta</div>
-        <div class="stat-value sm">@Brl(Sum(_budget, 6, 12))</div>
-        <div class="stat-context">Realizado @Brl(Sum(_realizado, 6, 12))</div>
-    </div>
-    <div class="stat accent-left">
-        <div class="stat-label">2º semestre · Atingimento</div>
-        <div class="stat-value sm" style="color:@AtCss(Attain(6, 12))">@Pct(Attain(6, 12))</div>
-        <div class="stat-context">Realizado ÷ Budget (Jul–Dez)</div>
-    </div>
-</div>
 
-@* ---- REPORT HSA ---- *@
-<div class="panel">
-    <div class="panel-head"><div class="panel-title">REPORT HSA <span class="hint">valores em R$</span></div></div>
-    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+    @* ===================== FAIXA DE MESES ===================== *@
+    <div class="month-strip">
+        @for (var m = 1; m <= 12; m++)
+        {
+            var mm = m;
+            var st = MonthStatus(mm);
+            <button class="ms-chip st-@StatusCss(st) @(mm == _month ? "cur" : "")" @onclick="() => OpenFech(mm)" title="@st">
+                <span class="ms-dot"></span>@Fmt.MonthName(mm)
+                @if (st == "Fechado"){@Icons.Svg("lock")}
+            </button>
+        }
+    </div>
+
+    @* ===================== BARRA DE AÇÕES ===================== *@
+    <div class="table-actions">
+        <input class="ta-search" placeholder="Buscar categoria…" @bind="_search" @bind:event="oninput" />
+        <button class="ta-btn @(_onlyPend ? "on" : "")" @onclick="() => _onlyPend = !_onlyPend">Só pendências</button>
+        <button class="ta-btn @(_onlyDiv ? "on" : "")" @onclick="() => _onlyDiv = !_onlyDiv">Só divergências</button>
+        <button class="ta-btn" @onclick="ExpandAll">Expandir todos</button>
+        <button class="ta-btn" @onclick="CollapseAll">Recolher todos</button>
+        <button class="ta-btn" @onclick="ClearFilters">Limpar filtros</button>
+        <div class="filterbar-spacer"></div>
+        @if (_pending.Count > 0)
+        {
+            <span class="dirty-count">@_pending.Count alteração(ões) não salva(s)</span>
+            <button class="btn-ghost sm" @onclick="Discard">Descartar</button>
+            <button class="btn-primary sm" @onclick="() => _showReview = true">@Icons.Svg("check")Revisar e salvar</button>
+        }
+    </div>
+
+    @* ===================== TABELA PRINCIPAL ===================== *@
+    <div class="table-wrap ctrl-matrix">
         <table class="grid-tbl ctrl-tbl">
             <thead>
                 <tr>
-                    <th>Indicador</th>
-                    @foreach (var m in Meses) { <th class="right">@m</th> }
+                    <th class="mat-name">Indicador</th>
+                    @for (var m = 1; m <= 12; m++){<th class="center @(m == _month ? "curcol" : "")">@Fmt.MonthName(m) @if (MonthStatus(m) == "Fechado"){@Icons.Svg("lock")}</th>}
+                    <th class="right">Acum.</th><th class="right">Anual</th><th class="center">Status</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="col-strong">Intercompany HCHL e HPU</td>
-                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_interco[i])</td> }
-                </tr>
-                <tr>
-                    <td class="col-strong">Vendas NB+AFM (Realizado)</td>
-                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_realizado[i])</td> }
-                </tr>
-                <tr>
-                    <td class="col-strong">Meta NB+AFM (Budget)</td>
-                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_budget[i])</td> }
-                </tr>
-                <tr>
-                    <td class="col-strong">Atendimento ao Budget</td>
-                    @for (var i = 0; i < 12; i++)
-                    {
-                        var a = _budget[i] > 0 ? _realizado[i] / _budget[i] * 100 : 0;
-                        <td class="right num ctrl-att" style="background:@AtBg(a);color:@AtCss(a)">@Pct(a)</td>
-                    }
-                </tr>
-                <tr>
-                    <td class="col-strong">Meta</td>
-                    @for (var i = 0; i < 12; i++) { <td class="right num ctrl-meta">100%</td> }
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-@* ---- Composição mensal ---- *@
-<div class="panel" style="margin-top:14px">
-    <div class="panel-head"><div class="panel-title">Composição mensal <span class="hint">NB · AFM · SV · LTSA · em R$</span></div></div>
-    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
-        <table class="grid-tbl ctrl-tbl">
-            <thead>
-                <tr>
-                    <th>Categoria</th>
-                    @foreach (var m in Meses) { <th class="right">@m</th> }
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var (label, arr) in Comp)
+                @foreach (var g in VisibleGroups())
                 {
-                    <tr>
-                        <td class="col-strong">@label</td>
-                        @for (var i = 0; i < 12; i++) { <td class="right num">@Num(arr[i])</td> }
+                    var open = _expanded.Contains(g.Key);
+                    var gstatus = GroupStatus(g.Key);
+                    <tr class="mat-group" @onclick="() => Toggle(g.Key)">
+                        <td class="mat-name"><span class="mat-caret">@(open ? "▾" : "▸")</span><span class="mat-gname">@g.Label</span></td>
+                        @for (var m = 1; m <= 12; m++){var v = RealCur(g.Key, m); <td class="right @(m == _month ? "curcol" : "")" title="@Full(v)">@(HasReal(m) ? MiShort(v) : "–")</td>}
+                        <td class="right strong">@MiShort(AcumReal(g.Key))</td>
+                        <td class="right">@MiShort(AnnualBud(g.Key))</td>
+                        <td class="center"><span class="st-tag st-@StatusCss(gstatus)">@gstatus</span></td>
                     </tr>
+                    @if (open)
+                    {
+                        @foreach (var rt in RowTypes)
+                        {
+                            <tr class="mat-sub @(rt.Calc ? "calc" : "")">
+                                <td class="mat-name sub"><span class="sub-lbl" title="@rt.Tip">@rt.Label</span>@if (rt.Calc){<span class="calc-badge">calc</span>}</td>
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    var mm = m; var gk = g.Key; var fk = rt.Key;
+                                    var editable = _editMode && rt.Editable(gk) && !MonthClosedByStatus(mm);
+                                    if (editable)
+                                    {
+                                        <td class="cell-ed @(IsChanged(mm, gk, fk) ? "changed" : "") @(mm == _month ? "curcol" : "")">
+                                            <input class="cell-in" value="@InputVal(gk, mm, fk)" @onchange="@(e => SetPending(mm, gk, fk, e.Value?.ToString()))" />
+                                            @if (IsChanged(mm, gk, fk)){<span class="chg-dot"></span>}
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        var val = RowVal(gk, mm, fk);
+                                        var (disp, cls) = RowDisp(gk, mm, rt);
+                                        <td class="@cls @(mm == _month ? "curcol" : "") @(MonthClosedByStatus(mm) && !rt.Calc ? "locked" : "")" title="@(rt.Calc || val == 0 ? "" : Full(val))">@disp</td>
+                                    }
+                                }
+                                <td class="right">@RowSummary(g.Key, rt, false)</td>
+                                <td class="right">@RowSummary(g.Key, rt, true)</td>
+                                <td class="center mut">@(rt.Calc ? "—" : "")</td>
+                            </tr>
+                        }
+                    }
                 }
-                <tr class="ctrl-total">
-                    <td class="col-strong">Total</td>
-                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_nb[i] + _afm[i] + _sv[i] + _ltsa[i])</td> }
-                </tr>
             </tbody>
         </table>
     </div>
-</div>
+    <div class="mat-legend">
+        <span><span class="lg-box editable"></span>Editável</span>
+        <span><span class="lg-box calc"></span>Calculado (bloqueado)</span>
+        <span><span class="chg-dot" style="position:static"></span>Alterado</span>
+        <span>@Icons.Svg("lock")Mês fechado</span>
+    </div>
+}
+
+@* ===================== PAINEL DE REVISÃO (SALVAR) ===================== *@
+@if (_showReview)
+{
+    <div class="drawer-backdrop" @onclick="() => _showReview = false"></div>
+    <div class="drawer">
+        <div class="page-head"><div><h2 style="color:var(--primary)">Revisar alterações</h2><p class="subtitle">@_pending.Count alteração(ões) · confira antes de salvar</p></div><button class="icon-btn" @onclick="() => _showReview = false">@Icons.Svg("x")</button></div>
+        <div class="review-list">
+            @foreach (var ch in Changes())
+            {
+                <div class="review-item">
+                    <div class="ri-head">@CatLabel(ch.Cat) · @ch.Field · @Fmt.MonthLong(ch.Month)@if (ch.NeedsJust){<span class="ri-req">justificativa obrigatória</span>}</div>
+                    <div class="ri-vals"><span class="ri-old">@Full(ch.Old)</span><span class="ri-arrow">→</span><span class="ri-new">@Full(ch.New)</span><span class="ri-diff @(ch.New - ch.Old >= 0 ? "pos" : "neg")">@(ch.New - ch.Old >= 0 ? "+" : "−")@Abbr(Cv(Math.Abs(ch.New - ch.Old)))</span></div>
+                </div>
+            }
+        </div>
+        @if (Changes().Any(c => c.NeedsJust))
+        {
+            <label class="fld" style="margin-top:12px">Justificativa (obrigatória)<input class="field" @bind="_saveJust" placeholder="Motivo das alterações relevantes" /></label>
+        }
+        else
+        {
+            <label class="fld" style="margin-top:12px">Justificativa (opcional)<input class="field" @bind="_saveJust" /></label>
+        }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _showReview = false">Voltar</button>
+            <button class="btn-primary" disabled="@(Changes().Any(c => c.NeedsJust) && string.IsNullOrWhiteSpace(_saveJust))" @onclick="SaveAll">@Icons.Svg("check")Salvar @_pending.Count alteração(ões)</button>
+        </div>
+    </div>
+}
+
+@* ===================== PAINEL DE PENDÊNCIAS ===================== *@
+@if (_showPend)
+{
+    <div class="drawer-backdrop" @onclick="() => _showPend = false"></div>
+    <div class="drawer">
+        <div class="page-head"><div><h2 style="color:var(--primary)">Pendências e divergências</h2><p class="subtitle">@_pendencias.Count item(ns) em @_year</p></div><button class="icon-btn" @onclick="() => _showPend = false">@Icons.Svg("x")</button></div>
+        <div class="pend-list">
+            @foreach (var p in _pendencias)
+            {
+                <div class="pend-item sev-@p.Sev">
+                    <span class="pend-ico">@Icons.Svg(p.Sev == "neg" ? "alert" : "clock")</span>
+                    <div><div class="pend-t">@p.Title</div><div class="pend-m">@CatLabel(p.Cat) · @Fmt.MonthLong(p.Month)</div></div>
+                    <button class="btn-link" @onclick="() => GoTo(p.Cat)">Abrir</button>
+                </div>
+            }
+            @if (_pendencias.Count == 0){<div class="empty">Nenhuma pendência. Base consistente.</div>}
+        </div>
+    </div>
+}
+
+@* ===================== FECHAMENTO MENSAL ===================== *@
+@if (_showFech)
+{
+    <div class="drawer-backdrop" @onclick="() => _showFech = false"></div>
+    <div class="drawer">
+        <div class="page-head"><div><h2 style="color:var(--primary)">Fechamento mensal</h2><p class="subtitle">@_year · fluxo de revisão e fechamento</p></div><button class="icon-btn" @onclick="() => _showFech = false">@Icons.Svg("x")</button></div>
+        <div class="fech-grid">
+            @for (var m = 1; m <= 12; m++)
+            {
+                var mm = m;
+                var st = MonthStatus(mm);
+                <div class="fech-cell @(_fechMonth == mm ? "sel" : "")" @onclick="() => _fechMonth = mm">
+                    <div class="fech-mn">@Fmt.MonthLong(mm)</div>
+                    <span class="st-tag st-@StatusCss(st)">@st</span>
+                </div>
+            }
+        </div>
+        @if (_fechMonth >= 1)
+        {
+            <div class="fech-actions">
+                <div class="muted" style="font-size:12px">@Fmt.MonthLong(_fechMonth) está <strong>@MonthStatus(_fechMonth)</strong></div>
+                <label class="fld">Justificativa / observação<input class="field" @bind="_fechJust" /></label>
+                <div class="fech-btns">
+                    <button class="btn-ghost sm" @onclick='() => SetFech("Em revisão")'>Iniciar revisão</button>
+                    <button class="btn-ghost sm" @onclick='() => SetFech("Em preenchimento")'>Reabrir p/ preenchimento</button>
+                    <button class="btn-primary sm" @onclick='() => SetFech("Fechado")'>@Icons.Svg("lock")Fechar mês</button>
+                    @if (MonthStatus(_fechMonth) == "Fechado"){<button class="btn-danger-ghost sm" @onclick='() => SetFech("Aberto")'>Reabrir mês</button>}
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@* ===================== HISTÓRICO ===================== *@
+@if (_showHist)
+{
+    <div class="drawer-backdrop" @onclick="() => _showHist = false"></div>
+    <div class="drawer drawer-wide">
+        <div class="page-head"><div><h2 style="color:var(--primary)">Histórico de alterações</h2><p class="subtitle">@_year · auditoria completa</p></div><button class="icon-btn" @onclick="() => _showHist = false">@Icons.Svg("x")</button></div>
+        <div class="hist-filters">
+            <select class="field" @bind="_histUser"><option value="">Todos os usuários</option>@foreach (var u in _hist.Select(h => h.User).Distinct()){<option value="@u">@u</option>}</select>
+            <select class="field" @bind="_histField"><option value="">Todos os campos</option><option>Orçamento</option><option>Realizado</option><option>Forecast</option><option>Status</option></select>
+            <select class="field" @bind="_histOrigin"><option value="">Todas as origens</option><option>Manual</option><option>Importação</option><option>Fechamento</option><option>Reabertura</option></select>
+        </div>
+        <div class="table-wrap" style="border:1px solid var(--border)">
+            <table class="grid-tbl">
+                <thead><tr><th>Data/hora</th><th>Usuário</th><th>Mês</th><th>Categoria</th><th>Campo</th><th class="right">De</th><th class="right">Para</th><th>Justificativa</th><th>Origem</th></tr></thead>
+                <tbody>
+                    @foreach (var h in _hist.Where(h => (_histUser == "" || h.User == _histUser) && (_histField == "" || h.Field == _histField) && (_histOrigin == "" || h.Origin == _histOrigin)))
+                    {
+                        <tr>
+                            <td class="nowrap">@(h.TsValue?.ToString("dd/MM/yyyy HH:mm") ?? "")</td><td>@h.User</td>
+                            <td>@(int.TryParse(h.Month, out var mm) ? Fmt.MonthName(mm) : h.Month)</td>
+                            <td>@CatLabel(h.Category)</td><td>@h.Field</td>
+                            <td class="right num">@FmtHist(h.OldValue)</td><td class="right num strong">@FmtHist(h.NewValue)</td>
+                            <td>@(string.IsNullOrWhiteSpace(h.Justification) ? "—" : h.Justification)</td><td><span class="tag">@h.Origin</span></td>
+                        </tr>
+                    }
+                    @if (_hist.Count == 0){<tr><td colspan="9" class="empty">Nenhuma alteração registrada em @_year.</td></tr>}
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* ===================== IMPORTAÇÃO ===================== *@
+@if (_showImport)
+{
+    <div class="drawer-backdrop" @onclick="() => _showImport = false"></div>
+    <div class="confirm-box" style="width:min(540px,calc(100vw - 32px))">
+        <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("import")<span>Importar dados</span></div>
+        <p class="confirm-text">Arquivo <strong>.csv</strong> com colunas <code>mes;categoria;orcamento;realizado;forecast</code>. Categorias: NB, AFM, SV, LTSA, INTER, CONS. Valores em R$.</p>
+        <label class="fld">Tipo de importação
+            <select class="field" @bind="_importType"><option>Base completa</option><option>Orçamento</option><option>Realizado</option><option>Forecast</option></select>
+        </label>
+        <label class="fld">Arquivo (.csv)<InputFile class="field" OnChange="OnImportFile" accept=".csv" /></label>
+        @if (_importResult is not null)
+        {
+            <div class="import-summary mt-16"><strong>@_importResult.Read</strong> registro(s) · <strong>@_importResult.Valid.Count</strong> válido(s) · @_importResult.Updated a atualizar@if (_importResult.Errors.Count > 0){<span> · @_importResult.Errors.Count com erro</span>}</div>
+            @if (_importResult.Errors.Count > 0){<details class="import-warns"><summary>Ver erros (@_importResult.Errors.Count)</summary><ul>@foreach (var e in _importResult.Errors.Take(40)){<li>@e</li>}</ul></details>}
+        }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _showImport = false">Cancelar</button>
+            <button class="btn-primary" disabled="@(_importResult is null || _importResult.Valid.Count == 0 || _importResult.Errors.Count > 0)" @onclick="ConfirmImport">@Icons.Svg("check")Importar @(_importResult?.Valid.Count ?? 0)</button>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_toast)){<div class="ctrl-toast">@Icons.Svg("check")<div>@((MarkupString)_toast)</div><button class="icon-btn" @onclick="() => _toast = null">@Icons.Svg("x")</button></div>}
 
 @code {
-    private static readonly System.Globalization.CultureInfo Pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
-    private static readonly string[] Meses = { "JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ" };
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "p")] public string? Panel { get; set; }
+    private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly string[] Cats = { "NB", "AFM", "SV", "LTSA" };
 
-    // Valores da planilha (em milhares). Exibidos × 1.000 em R$.
-    private readonly double[] _interco   = { 372, 246, 1302, 17, 682, 23, 0, 0, 0, 0, 0, 0 };
-    private readonly double[] _realizado = { 31367, 30777, 21912, 43201, 41680, 44009, 0, 0, 0, 0, 0, 0 };
-    private readonly double[] _budget    = { 19909, 26143, 36008, 35047, 45613, 34055, 44602, 41376, 64145, 58015, 57418, 87670 };
-    private readonly double[] _nb        = { 2619, 5464, 5267, 7566, 5140, 37354, 0, 0, 0, 0, 0, 0 };
-    private readonly double[] _afm       = { 27646, 22600, 15883, 34058, 34615, 5193, 0, 0, 0, 0, 0, 0 };
-    private readonly double[] _sv        = { 1102, 2712, 762, 1576, 1925, 1462, 0, 0, 0, 0, 0, 0 };
-    private readonly double[] _ltsa      = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    // filtros / estado
+    private int _year = DateTime.Today.Year, _month = DateTime.Today.Month;
+    private string _cur = "BRL", _empresa = "HSA", _catFilter = "", _statusFilter = "Todos", _search = "";
+    private bool _editMode, _loading = true, _onlyPend, _onlyDiv;
+    private bool _showReview, _showPend, _showFech, _showHist, _showImport;
+    private string? _error, _toast, _user = "—";
+    private IEnumerable<int> Years => new[] { DateTime.Today.Year, DateTime.Today.Year - 1 };
 
-    private IEnumerable<(string, double[])> Comp => new[]
+    private record GroupDef(string Key, string Label);
+    private readonly GroupDef[] Groups =
     {
-        ("NB", _nb), ("AFM", _afm), ("SV", _sv), ("LTSA", _ltsa),
+        new("CONS", "Consolidado"), new("NB", "NB"), new("AFM", "AFM"), new("SV", "SV"), new("LTSA", "LTSA"), new("INTER", "Intercompany"),
+    };
+    private record RowType(string Key, string Label, string Tip, bool Calc, Func<string, bool> Editable);
+    private RowType[] RowTypes => new[]
+    {
+        new RowType("Budget", "Orçamento", "Orçamento aprovado do período (editável).", false, cat => true),
+        new RowType("Realizado", "Realizado", "Valor realizado — importado ou digitado (editável, exceto no consolidado, que é somado).", false, cat => cat != "CONS"),
+        new RowType("Forecast", "Forecast", "Projeção dos meses em aberto (editável).", false, cat => true),
+        new RowType("Desvio", "Desvio", "Realizado − Orçamento (calculado).", true, cat => false),
+        new RowType("Ating", "Atingimento", "Realizado ÷ Orçamento (calculado).", true, cat => false),
     };
 
-    // Valor em R$ (× 1.000). 0 vira "—" para os meses ainda sem realizado.
-    private static string Num(double milhares) =>
-        milhares == 0 ? "—" : (milhares * 1000).ToString("#,##0", Pt);
+    private List<ControleEntry> _entries = new();
+    private List<ControleHist> _hist = new();
+    private Dictionary<(int, string), ControleEntry> _map = new();
+    private Dictionary<int, string> _status = new();
+    private HashSet<string> _expanded = new() { "CONS", "NB", "AFM" };
+    private string _updated = "—", _updatedBy = "—";
 
-    private static string Brl(double milhares) =>
-        "R$ " + (milhares * 1000).ToString("#,##0.00", Pt);
+    // edição pendente
+    private Dictionary<string, string> _pending = new();  // "m|cat|field" -> raw
+    private string _saveJust = "";
 
+    // derivados
+    private int _fechados, _pendCount; private double _fillPct;
+    private string _fechStatusMain = "—";
+    private record Pend(string Cat, int Month, string Title, string Sev);
+    private List<Pend> _pendencias = new();
+
+    // painéis auxiliares
+    private string _histUser = "", _histField = "", _histOrigin = "";
+    private int _fechMonth; private string _fechJust = "";
+    private string _importType = "Base completa";
+    private ImportResult? _importResult;
+    private class ImportResult { public int Read, Updated; public List<string> Errors = new(); public List<(int Month, string Cat, double? B, double? R, double? F)> Valid = new(); }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null) { var st = await AuthState; _user = st.User.Identity?.Name ?? "—"; }
+        Reload();
+        if (Panel == "fechamento") _showFech = true;
+        else if (Panel == "hist") _showHist = true;
+    }
+
+    private void Reload()
+    {
+        _loading = true; _error = null; _pending.Clear();
+        try
+        {
+            _entries = Repo.Entries(_year);
+            _hist = Repo.History(_year);
+            _status = Repo.MonthStatus(_year);
+            var last = _entries.Select(e => e.UpdatedAtValue).Where(d => d is not null).DefaultIfEmpty(null).Max();
+            _updated = last?.ToString("dd/MM/yyyy HH:mm") ?? "—";
+            _updatedBy = _entries.OrderByDescending(e => e.UpdatedAtValue).FirstOrDefault()?.UpdatedBy ?? "—";
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        _loading = false;
+    }
+
+    private ControleEntry? Entry(int m, string cat) => _map.GetValueOrDefault((m, cat));
+    private string MonthStatus(int m)
+    {
+        if (_status.TryGetValue(m, out var s)) return s;
+        return Cats.Sum(c => RealBrl(c, m)) > 0 ? "Em preenchimento" : "Aberto";
+    }
+    private bool MonthClosedByStatus(int m) => MonthStatus(m) == "Fechado";
+    private double RealBrl(string cat, int m) => Entry(m, cat)?.RealizadoV ?? 0;
+    private bool HasReal(int m) => Cats.Sum(c => RealBrl(c, m)) > 0;
+
+    private void Build()
+    {
+        _map = new();
+        foreach (var e in _entries) _map[(e.MonthV, e.Category)] = e;
+
+        _fechados = Enumerable.Range(1, 12).Count(m => MonthStatus(m) == "Fechado");
+        // preenchimento: budget (CONS) + realizado por categoria informados nos meses encerrados
+        int need = 0, done = 0;
+        for (var m = 1; m <= 12; m++)
+        {
+            need++; if (BudCur("CONS", m) > 0) done++;                 // orçamento do mês
+            if (HasReal(m)) { need++; done++; }                        // realizado (meses encerrados)
+        }
+        _fillPct = need > 0 ? (double)done / need * 100 : 0;
+
+        var closedList = Enumerable.Range(1, 12).Where(m => MonthStatus(m) == "Fechado").ToList();
+        var revList = Enumerable.Range(1, 12).Where(m => MonthStatus(m) == "Em revisão").ToList();
+        _fechStatusMain = closedList.Count > 0 || revList.Count > 0
+            ? string.Join(" · ", new[] { closedList.Count > 0 ? $"{Fmt.MonthLong(closedList.Max())} fechado" : null, revList.Count > 0 ? $"{Fmt.MonthLong(revList.Min())} em revisão" : null }.Where(s => s != null))
+            : "Nenhum mês fechado";
+
+        BuildPend();
+    }
+
+    private void BuildPend()
+    {
+        _pendencias = new();
+        for (var m = 1; m <= 12; m++)
+        {
+            bool closed = HasReal(m);
+            if (closed && BudCur("CONS", m) <= 0) _pendencias.Add(new("CONS", m, "Orçamento do mês não informado", "warn"));
+            foreach (var c in Cats)
+            {
+                var r = RealCur(c, m); var b = BudCur(c, m); var f = FcstCur(c, m);
+                if (r > 0 && b <= 0 && BudCur("CONS", m) <= 0) { /* coberto pelo consolidado */ }
+                if (f > 0 && r > 0 && f < r) _pendencias.Add(new(c, m, "Forecast inferior ao realizado", "neg"));
+                if (r < 0 || b < 0) _pendencias.Add(new(c, m, "Valor negativo inesperado", "neg"));
+            }
+            // divergência total x composição do orçamento (quando categorias têm orçamento)
+            var sumCatBud = Cats.Sum(c => BudCur(c, m));
+            if (sumCatBud > 0 && BudCur("CONS", m) > 0 && Math.Abs(sumCatBud - BudCur("CONS", m)) > 1)
+                _pendencias.Add(new("CONS", m, "Soma das categorias diverge do orçamento consolidado", "neg"));
+        }
+        _pendCount = _pendencias.Count;
+    }
+
+    // ---- valores (com pendentes aplicados) ---------------------------------
+    private string Key(int m, string cat, string field) => $"{m}|{cat}|{field}";
+    private bool IsChanged(int m, string cat, string field) => _pending.ContainsKey(Key(m, cat, field));
+    private double? Pend(int m, string cat, string field) => _pending.TryGetValue(Key(m, cat, field), out var s) ? ParseVal(s) : null;
+
+    private double BudCur(string cat, int m) => Pend(m, cat, "Budget") ?? (Entry(m, cat)?.BudgetV ?? 0);
+    private double RealCur(string cat, int m) => cat == "CONS" ? Cats.Sum(c => RealCur(c, m)) : (Pend(m, cat, "Realizado") ?? (Entry(m, cat)?.RealizadoV ?? 0));
+    private double FcstCur(string cat, int m) { var p = Pend(m, cat, "Forecast"); if (p is not null) return p.Value; var e = Entry(m, cat); return e is { HasForecast: true } ? e.ForecastV : 0; }
+
+    private double RowVal(string cat, int m, string rt) => rt switch
+    {
+        "Budget" => BudCur(cat, m),
+        "Realizado" => RealCur(cat, m),
+        "Forecast" => FcstCur(cat, m),
+        "Desvio" => RealCur(cat, m) - BudCur(cat, m),
+        "Ating" => BudCur(cat, m) > 0 ? RealCur(cat, m) / BudCur(cat, m) * 100 : 0,
+        _ => 0,
+    };
+
+    private (string, string) RowDisp(string cat, int m, RowType rt)
+    {
+        var closed = HasReal(m);
+        if (rt.Key == "Ating")
+        {
+            if (BudCur(cat, m) <= 0 || RealCur(cat, m) <= 0) return ("–", "center mut");
+            var a = RealCur(cat, m) / BudCur(cat, m) * 100;
+            return ($"{Arrow(a)} {Pct(a)}", "center att " + AttCss(a));
+        }
+        if (rt.Key == "Desvio")
+        {
+            if (RealCur(cat, m) <= 0 && BudCur(cat, m) <= 0) return ("–", "right mut");
+            var d = RealCur(cat, m) - BudCur(cat, m);
+            return ($"{(d >= 0 ? "+" : "−")}{Abbr(Cv(Math.Abs(d)))}", "right " + (d >= 0 ? "pos-t" : "neg-t"));
+        }
+        if (rt.Key == "Realizado" && !closed) return ("–", "right mut");
+        var v = RowVal(cat, m, rt.Key);
+        return (v == 0 ? "—" : MiShort(v), "right" + (v == 0 ? " mut" : ""));
+    }
+
+    private string RowSummary(string cat, RowType rt, bool annual)
+    {
+        var months = Enumerable.Range(1, 12);
+        if (rt.Key == "Ating")
+        {
+            var b = months.Where(m => HasReal(m)).Sum(m => BudCur(cat, m));
+            var r = months.Where(m => HasReal(m)).Sum(m => RealCur(cat, m));
+            return b > 0 ? Pct(r / b * 100) : "—";
+        }
+        if (rt.Key == "Desvio")
+        {
+            var d = months.Where(m => HasReal(m)).Sum(m => RealCur(cat, m) - BudCur(cat, m));
+            return (d >= 0 ? "+" : "−") + Abbr(Cv(Math.Abs(d)));
+        }
+        if (rt.Key == "Budget") return MiShort(annual ? months.Sum(m => BudCur(cat, m)) : months.Where(m => HasReal(m)).Sum(m => BudCur(cat, m)));
+        if (rt.Key == "Forecast") return MiShort(months.Sum(m => FcstCur(cat, m)));
+        return MiShort(months.Where(m => HasReal(m)).Sum(m => RealCur(cat, m)));  // Realizado
+    }
+
+    private double AcumReal(string cat) => Enumerable.Range(1, 12).Where(HasReal).Sum(m => RealCur(cat, m));
+    private double AnnualBud(string cat) => Enumerable.Range(1, 12).Sum(m => BudCur(cat, m));
+
+    private string GroupStatus(string cat)
+    {
+        if (_pendencias.Any(p => p.Cat == cat && p.Sev == "neg")) return "Com divergência";
+        if (_pendencias.Any(p => p.Cat == cat)) return "Pendente";
+        return "Preenchido";
+    }
+
+    private string InputVal(string cat, int m, string field)
+    {
+        var v = field == "Budget" ? BudCur(cat, m) : field == "Forecast" ? FcstCur(cat, m) : RealCur(cat, m);
+        return v == 0 ? "" : v.ToString("0", CultureInfo.InvariantCulture);
+    }
+
+    private void SetPending(int m, string cat, string field, string? raw)
+    {
+        var k = Key(m, cat, field);
+        var parsed = ParseVal(raw);
+        var orig = field == "Budget" ? (Entry(m, cat)?.BudgetV ?? 0) : field == "Forecast" ? (Entry(m, cat) is { HasForecast: true } fe ? fe.ForecastV : 0) : (Entry(m, cat)?.RealizadoV ?? 0);
+        if ((parsed ?? 0) == orig) _pending.Remove(k);
+        else _pending[k] = raw ?? "";
+    }
+
+    private void Discard() { _pending.Clear(); }
+
+    private record Change(int Month, string Cat, string Field, double Old, double New, bool NeedsJust);
+    private IEnumerable<Change> Changes()
+    {
+        foreach (var kv in _pending)
+        {
+            var parts = kv.Key.Split('|');
+            int m = int.Parse(parts[0]); string cat = parts[1]; string field = parts[2];
+            double old = field == "Budget" ? (Entry(m, cat)?.BudgetV ?? 0) : field == "Forecast" ? (Entry(m, cat) is { HasForecast: true } fe ? fe.ForecastV : 0) : (Entry(m, cat)?.RealizadoV ?? 0);
+            double nv = ParseVal(kv.Value) ?? 0;
+            bool needs = MonthStatus(m) is "Em revisão" or "Fechado" || (old > 0 && Math.Abs(nv - old) / Math.Max(old, 1) > 0.20);
+            yield return new Change(m, cat, field == "Budget" ? "Orçamento" : field, old, nv, needs);
+        }
+    }
+
+    private void SaveAll()
+    {
+        var groups = _pending.Keys.Select(k => k.Split('|')).GroupBy(p => (int.Parse(p[0]), p[1]));
+        foreach (var g in groups)
+        {
+            var (m, cat) = g.Key;
+            double? b = Pend(m, cat, "Budget");
+            double? r = cat != "CONS" ? Pend(m, cat, "Realizado") : null;
+            double? f = Pend(m, cat, "Forecast");
+            Repo.Save(_year, m, cat, b, r, f, "", _user ?? "—", _saveJust);
+        }
+        var n = _pending.Count;
+        _pending.Clear(); _saveJust = ""; _showReview = false;
+        Reload();
+        _toast = $"<strong>{n} alteração(ões) salva(s) com sucesso.</strong> Registrado no histórico.";
+    }
+
+    // ---- fechamento --------------------------------------------------------
+    private void OpenFech(int m) { _fechMonth = m; _showFech = true; }
+    private void SetFech(string status)
+    {
+        if (_fechMonth < 1) return;
+        Repo.SetMonthStatus(_year, _fechMonth, status, _user ?? "—", _fechJust);
+        _fechJust = "";
+        _status = Repo.MonthStatus(_year); _hist = Repo.History(_year);
+        _toast = $"<strong>{Fmt.MonthLong(_fechMonth)}</strong> agora está <strong>{status}</strong>.";
+    }
+
+    // ---- interações --------------------------------------------------------
+    private void ToggleEdit() { _editMode = !_editMode; if (!_editMode && _pending.Count > 0) _showReview = true; }
+    private void Toggle(string k) { if (!_expanded.Add(k)) _expanded.Remove(k); }
+    private void ExpandAll() => _expanded = Groups.Select(g => g.Key).ToHashSet();
+    private void CollapseAll() => _expanded.Clear();
+    private void ClearFilters() { _search = ""; _catFilter = ""; _statusFilter = "Todos"; _onlyPend = false; _onlyDiv = false; }
+    private void GoTo(string cat) { _showPend = false; _catFilter = cat; _expanded.Add(cat); }
+
+    private IEnumerable<GroupDef> VisibleGroups()
+    {
+        var q = Groups.AsEnumerable();
+        if (_catFilter != "") q = q.Where(g => g.Key == _catFilter);
+        if (_search != "") q = q.Where(g => g.Label.Contains(_search, StringComparison.OrdinalIgnoreCase));
+        if (_onlyPend) q = q.Where(g => _pendencias.Any(p => p.Cat == g.Key));
+        if (_onlyDiv) q = q.Where(g => _pendencias.Any(p => p.Cat == g.Key && p.Sev == "neg"));
+        if (_statusFilter is "Preenchido" or "Pendente" or "Com divergência") q = q.Where(g => GroupStatus(g.Key) == _statusFilter);
+        return q;
+    }
+
+    // ---- importação --------------------------------------------------------
+    private async Task OnImportFile(InputFileChangeEventArgs e)
+    {
+        _importResult = new ImportResult();
+        try
+        {
+            using var sr = new StreamReader(e.File.OpenReadStream(5 * 1024 * 1024));
+            var text = await sr.ReadToEndAsync();
+            var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Where(l => l.Trim() != "").ToList();
+            var start = lines.Count > 0 && lines[0].ToLowerInvariant().Contains("categoria") ? 1 : 0;
+            for (var i = start; i < lines.Count; i++)
+            {
+                var delim = lines[i].Contains(';') ? ';' : ',';
+                var c = lines[i].Split(delim);
+                _importResult.Read++;
+                if (c.Length < 2) { _importResult.Errors.Add($"Linha {i + 1}: colunas insuficientes."); continue; }
+                if (!int.TryParse(c[0].Trim(), out var mes) || mes < 1 || mes > 12) { _importResult.Errors.Add($"Linha {i + 1}: mês inválido."); continue; }
+                var cat = c[1].Trim().ToUpperInvariant();
+                if (cat != "CONS" && !Cats.Contains(cat) && cat != "INTER") { _importResult.Errors.Add($"Linha {i + 1}: categoria inválida ({c[1]})."); continue; }
+                if (MonthStatus(mes) == "Fechado") { _importResult.Errors.Add($"Linha {i + 1}: {Fmt.MonthLong(mes)} está fechado (bloqueado)."); continue; }
+                double? b = c.Length > 2 ? ParseVal(c[2]) : null;
+                double? r = c.Length > 3 ? ParseVal(c[3]) : null;
+                double? f = c.Length > 4 ? ParseVal(c[4]) : null;
+                if (Entry(mes, cat) is not null) _importResult.Updated++;
+                _importResult.Valid.Add((mes, cat, b, r, f));
+            }
+        }
+        catch (Exception ex) { _importResult.Errors.Add("Falha ao ler: " + ex.Message); }
+    }
+
+    private void ConfirmImport()
+    {
+        if (_importResult is null || _importResult.Errors.Count > 0) return;
+        foreach (var (m, cat, b, r, f) in _importResult.Valid)
+            Repo.Save(_year, m, cat, cat == "CONS" ? b : null, cat != "CONS" ? r : null, cat == "CONS" ? f : null, "", _user ?? "—", "Importação de " + _importType);
+        var n = _importResult.Valid.Count;
+        _showImport = false; _importResult = null;
+        Reload();
+        _toast = $"<strong>Importação concluída.</strong> {n} registro(s) atualizado(s) e auditado(s).";
+    }
+
+    // ---- formatação --------------------------------------------------------
+    private double Rate => Cat.RateToUsd("USD");
+    private double Cv(double brl) => _cur == "USD" ? (Rate > 0 ? brl / Rate : brl) : brl;
+    private string Sym => _cur == "USD" ? "US$" : "R$";
+    private string Abbr(double v)
+    {
+        var a = Math.Abs(v);
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", Pt) + " mi";
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", Pt) + " mil";
+        return v.ToString("#,##0", Pt);
+    }
+    private string MiShort(double brl) { var v = Cv(brl); return v == 0 ? "—" : Abbr(v); }
+    private string Full(double brl) => Sym + " " + Cv(brl).ToString("#,##0", Pt);
     private static string Pct(double v) => v.ToString("0", Pt) + "%";
-
-    private static double Sum(double[] a, int from, int to)
+    private string FmtHist(string raw) => double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? Full(v) : (string.IsNullOrWhiteSpace(raw) ? "—" : raw);
+    private static double? ParseVal(string? s) => double.TryParse((s ?? "").Replace("R$", "").Replace("US$", "").Replace(".", "").Replace(",", ".").Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : (string.IsNullOrWhiteSpace(s) ? 0 : (double?)null);
+    private static string AttCss(double a) => a >= 105 ? "a-pos" : a >= 100 ? "a-neutral" : a >= 90 ? "a-warn" : "a-neg";
+    private static string Arrow(double a) => a >= 100 ? "▲" : a >= 90 ? "!" : "▼";
+    private string CatLabel(string c) => ControleSeed.Label(c);
+    private static string StatusCss(string s) => s switch
     {
-        double s = 0;
-        for (var i = from; i < to; i++) s += a[i];
-        return s;
-    }
-
-    private double Attain(int from, int to)
-    {
-        var meta = Sum(_budget, from, to);
-        return meta > 0 ? Sum(_realizado, from, to) / meta * 100 : 0;
-    }
-
-    private static string AtCss(double a) => a >= 100 ? "#1f9254" : a > 0 ? "#b4590a" : "#93a1b5";
-    private static string AtBg(double a) => a >= 100 ? "#eaf6ee" : a > 0 ? "#fdf1e3" : "transparent";
+        "Fechado" => "closed", "Em revisão" => "rev", "Preenchido" => "ok", "Em preenchimento" => "fill",
+        "Com divergência" => "div", "Pendente" => "pend", _ => "open",
+    };
 }

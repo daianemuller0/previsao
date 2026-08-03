@@ -43,6 +43,8 @@ builder.Services.AddSingleton<OpportunityRepository>();
 builder.Services.AddScoped<OpportunityImporter>();
 // Listas de preenchimento (dados-mestre editáveis).
 builder.Services.AddSingleton<ListRepository>();
+// Controle Orçamentário (valores, auditoria e observações).
+builder.Services.AddSingleton<ControleRepository>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
 
@@ -54,6 +56,7 @@ using (var scope = app.Services.CreateScope())
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
     DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
     scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty();
+    scope.ServiceProvider.GetRequiredService<ControleRepository>().SeedIfEmpty();
 }
 
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida
@@ -145,6 +148,25 @@ app.MapGet("/forecast/export", (OpportunityRepository repo, Catalog cat) =>
     }
     var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
     return Results.File(bytes, "text/csv; charset=utf-8", "forecast.csv");
+}).RequireAuthorization();
+
+// Exporta o Controle Orçamentário em CSV (separador ';' p/ Excel pt-BR).
+app.MapGet("/controle/export", (ControleRepository repo, HttpRequest req) =>
+{
+    var year = int.TryParse(req.Query["ano"], out var y) ? y : DateTime.Today.Year;
+    string Inv(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+    var status = repo.MonthStatus(year);
+    var sb = new StringBuilder();
+    sb.AppendLine("Ano;Mes;Categoria;Orcamento;Realizado;Forecast;StatusMes;AtualizadoPor;AtualizadoEm");
+    foreach (var e in repo.Entries(year).OrderBy(e => e.MonthV).ThenBy(e => e.Category))
+        sb.AppendLine(string.Join(';', new[]
+        {
+            e.Year, e.Month, e.Category, Inv(e.BudgetV), Inv(e.RealizadoV),
+            e.HasForecast ? Inv(e.ForecastV) : "", status.GetValueOrDefault(e.MonthV, "Aberto"),
+            e.UpdatedBy, e.UpdatedAt,
+        }));
+    var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+    return Results.File(bytes, "text/csv; charset=utf-8", $"controle_{year}.csv");
 }).RequireAuthorization();
 
 app.MapRazorComponents<App>()
