@@ -358,7 +358,7 @@ h1 { font-size: 22px; color: var(--primary); }
 .btn-danger-ghost svg { width: 15px; height: 15px; }
 .icon-btn.danger { color: var(--muted); }
 .icon-btn.danger:hover { color: var(--neg); border-color: var(--neg); background: var(--neg-bg); }
-.grid-tbl td.actions-col, .grid-tbl th.actions-col { width: 62px; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
+.grid-tbl td.actions-col, .grid-tbl th.actions-col { width: 90px; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
 /* Ações de linha discretas: sem borda, cinza, ganham cor só no hover. */
 .row-act { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: none; background: transparent; color: var(--muted); border-radius: 6px; cursor: pointer; opacity: .5; transition: opacity .12s, color .12s, background .12s; }
 tr:hover .row-act { opacity: .85; }

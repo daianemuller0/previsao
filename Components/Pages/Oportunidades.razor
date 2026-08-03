@@ -76,6 +76,7 @@
                 <tr class="clickable" @onclick="() => Goto(o.Id)">
                     <td class="center actions-col">
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
+                        <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
                         <button class="row-act del" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
                     </td>
                     <td class="nowrap">@q</td>
@@ -247,7 +248,10 @@
     <div class="drawer-backdrop" @onclick="() => _edit = null"></div>
     <div class="drawer drawer-wide">
         <div class="page-head">
-            <div><h2 style="color:var(--primary)">Editar oportunidade</h2><p class="subtitle">@(_edit.ProposalNumber) · altere qualquer campo</p></div>
+            <div>
+                <h2 style="color:var(--primary)">@(_editDup ? "Duplicar oportunidade" : "Editar oportunidade")</h2>
+                <p class="subtitle">@(_editDup ? "Cópia — ajuste só o que muda e salve como nova" : $"{_edit.ProposalNumber} · altere qualquer campo")</p>
+            </div>
             <button class="icon-btn" @onclick="() => _edit = null">@Icons.Svg("x")</button>
         </div>
         <div class="form-grid">
@@ -308,10 +312,10 @@
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
         </div>
         <div class="modal-actions">
-            <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")Excluir</button>
+            @if (!_editDup) { <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")Excluir</button> }
             <div class="filterbar-spacer"></div>
             <button class="btn-ghost" @onclick="() => _edit = null">Cancelar</button>
-            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")Salvar alterações</button>
+            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")@(_editDup ? "Criar cópia" : "Salvar alterações")</button>
         </div>
     </div>
 }
@@ -327,6 +331,7 @@
 
     // Edição
     private Opportunity? _edit;
+    private bool _editDup; // true quando o drawer está duplicando (cria um novo registro)
     private int _editMonthNum = 1, _editYear = DateTime.Today.Year; // mês/ano da previsão
 
     // Exclusão
@@ -395,6 +400,7 @@
     // ---- edição completa ----
     private void OpenEdit(Opportunity o)
     {
+        _editDup = false;
         _edit = Repo.Get(o.Id) ?? o;                       // cópia isolada do cache
         var d = _edit.ExpectedDateValue ?? _today;
         _editMonthNum = d.Month;
@@ -411,6 +417,18 @@
         _edit.CustomerId = Cat.Customers.FirstOrDefault(x => x.Id == _edit.CustomerId)?.Name ?? _edit.CustomerId;
         _edit.PvBusinessUnitId = Cat.BusinessUnits.FirstOrDefault(x => x.Id == _edit.PvBusinessUnitId)?.Code ?? _edit.PvBusinessUnitId;
         _edit.IntercompanyBu = Cat.BusinessUnits.FirstOrDefault(x => x.Id == _edit.IntercompanyBu)?.Code ?? _edit.IntercompanyBu;
+    }
+
+    // Duplica: abre o mesmo formulário já preenchido, mas como um NOVO registro.
+    private void Duplicate(Opportunity o)
+    {
+        OpenEdit(o);                                   // reusa tradução + mês/ano
+        if (_edit is null) return;
+        _edit.Id = "opp-" + Guid.NewGuid().ToString("N");
+        _edit.ProposalNumber = string.IsNullOrWhiteSpace(_edit.ProposalNumber) ? "" : _edit.ProposalNumber + " (cópia)";
+        _edit.PvNumber = "";
+        _edit.CreatedAt = _today.ToString("yyyy-MM-dd");
+        _editDup = true;
     }
 
     private void SaveEdit()
