@@ -39,6 +39,8 @@ builder.Services.AddSingleton(new ParquetStore(dataFolder));
 builder.Services.AddSingleton<Catalog>();
 // Singleton: mantém o cache das oportunidades compartilhado entre as páginas.
 builder.Services.AddSingleton<OpportunityRepository>();
+// Importador de planilha (.xlsx/.csv) da base de oportunidades.
+builder.Services.AddScoped<OpportunityImporter>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
 

@@ -192,17 +192,21 @@ public sealed class Catalog
         _rate = ExchangeRates.ToDictionary(x => x.CurrencyCode, x => x.RateToUsd);
     }
 
-    // ---- lookups (nome por Id, tolerantes a Id ausente) --------------------
-    public string CountryName(string id) => _country.TryGetValue(id, out var v) ? v.Name : "—";
-    public string MarketName(string id) => _market.TryGetValue(id, out var v) ? v.Name : "—";
-    public string SubMarketName(string id) => _submarket.TryGetValue(id, out var v) ? v.Name : "—";
-    public string ProductName(string id) => _product.TryGetValue(id, out var v) ? v.Name : "—";
-    public string EquipmentName(string id) => _equip.TryGetValue(id, out var v) ? v.Name : "—";
-    public string BuCode(string id) => _bu.TryGetValue(id, out var v) ? v.Code : "—";
-    public string BuName(string id) => _bu.TryGetValue(id, out var v) ? v.Name : "—";
-    public string KamName(string id) => _kam.TryGetValue(id, out var v) ? v.Name : "—";
-    public string CustomerName(string id) => _customer.TryGetValue(id, out var v) ? v.Name : "—";
-    public string PlantName(string id) => _plant.TryGetValue(id, out var v) ? v.Name : "—";
+    // ---- lookups (nome por Id) ---------------------------------------------
+    // Id conhecido → nome do catálogo. Id vazio → "—". Caso contrário, devolve o
+    // próprio valor: assim dados importados (que guardam o texto quando o nome
+    // não casa com o catálogo) continuam aparecendo na tela em vez de "—".
+    private static string Raw(string id) => string.IsNullOrWhiteSpace(id) ? "—" : id;
+    public string CountryName(string id) => _country.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string MarketName(string id) => _market.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string SubMarketName(string id) => _submarket.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string ProductName(string id) => _product.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string EquipmentName(string id) => _equip.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string BuCode(string id) => _bu.TryGetValue(id, out var v) ? v.Code : Raw(id);
+    public string BuName(string id) => _bu.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string KamName(string id) => _kam.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string CustomerName(string id) => _customer.TryGetValue(id, out var v) ? v.Name : Raw(id);
+    public string PlantName(string id) => _plant.TryGetValue(id, out var v) ? v.Name : Raw(id);
     public string StageName(string id) => _stage.TryGetValue(id, out var v) ? v.Name : "—";
     public int StageOrder(string id) => _stage.TryGetValue(id, out var v) ? v.Order : 0;
 

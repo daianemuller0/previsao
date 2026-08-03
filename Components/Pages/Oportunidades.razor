@@ -4,6 +4,7 @@
 @inject OpportunityRepository Repo
 @inject Catalog Cat
 @inject NavigationManager Nav
+@inject OpportunityImporter Importer
 
 <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Oportunidades</span></div>
 
@@ -14,6 +15,7 @@
     </div>
     <div class="page-actions">
         <button class="btn-danger-ghost" @onclick="() => _wipe = true">@Icons.Svg("trash")Excluir base</button>
+        <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
 </div>
@@ -143,6 +145,49 @@
     </div>
 }
 
+@* ---- Importar base a partir de planilha (.xlsx / .csv) ---- *@
+@if (_import)
+{
+    <div class="drawer-backdrop" @onclick="CancelImport"></div>
+    <div class="confirm-box" style="width:min(540px,calc(100vw - 32px))">
+        <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("import")<span>Importar base</span></div>
+        <p class="confirm-text">
+            Envie a planilha do forecast (<strong>.xlsx</strong> ou <strong>.csv</strong>) com as colunas padrão.
+            País, mercado, produto, cliente e KAM são casados automaticamente com o catálogo; valores sem correspondência são preservados como texto.
+        </p>
+        <label class="fld">Arquivo (.xlsx ou .csv)
+            <InputFile class="field" OnChange="OnImportFile" accept=".xlsx,.csv" />
+        </label>
+        @if (_importing) { <div class="info-banner mt-16">Lendo o arquivo…</div> }
+        @if (!string.IsNullOrEmpty(_importErr)) { <div class="confirm-err">@_importErr</div> }
+        @if (_importResult is not null)
+        {
+            <div class="import-summary mt-16">
+                <strong>@_importResult.Read</strong> linha(s) lida(s) ·
+                <strong>@_importResult.Rows.Count</strong> pronta(s) para importar
+                @if (_importResult.Warnings.Count > 0) { <span> · @_importResult.Warnings.Count aviso(s)</span> }
+            </div>
+            @if (_importResult.Warnings.Count > 0)
+            {
+                <details class="import-warns">
+                    <summary>Ver avisos (@_importResult.Warnings.Count)</summary>
+                    <ul>@foreach (var w in _importResult.Warnings.Take(60)) { <li>@w</li> }</ul>
+                </details>
+            }
+            <div class="fld mt-16">Modo de importação
+                <div class="seg-radio">
+                    <label><input type="radio" name="impmode" checked="@(_importMode == "add")" @onchange='() => _importMode = "add"' /> Adicionar à base</label>
+                    <label><input type="radio" name="impmode" checked="@(_importMode == "replace")" @onchange='() => _importMode = "replace"' /> Substituir base inteira</label>
+                </div>
+            </div>
+        }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="CancelImport">Cancelar</button>
+            <button class="btn-primary" disabled="@(_importResult is null || _importResult.Rows.Count == 0)" @onclick="ConfirmImport">@Icons.Svg("check")Importar @(_importResult?.Rows.Count ?? 0)</button>
+        </div>
+    </div>
+}
+
 @if (_new is not null)
 {
     <div class="drawer-backdrop" @onclick="() => _new = null"></div>
@@ -203,6 +248,11 @@
     private bool _wipe, _wipeError;
     private string _wipePwd = "";
     private const string WipePassword = "Excluir";
+
+    // Importação
+    private bool _import, _importing;
+    private string _importFileName = "", _importErr = "", _importMode = "add"; // add | replace
+    private OpportunityImporter.Result? _importResult;
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
@@ -266,6 +316,52 @@
         _all = Repo.All();
         Recompute();
         CancelWipe();
+    }
+
+    // ---- importação de planilha (.xlsx / .csv) ----
+    private void OpenImport()
+    {
+        _import = true; _importResult = null; _importFileName = ""; _importErr = ""; _importMode = "add";
+    }
+
+    private void CancelImport()
+    {
+        _import = false; _importResult = null; _importFileName = ""; _importErr = "";
+    }
+
+    private async Task OnImportFile(InputFileChangeEventArgs e)
+    {
+        _importFileName = e.File.Name;
+        _importErr = "";
+        _importResult = null;
+        _importing = true;
+        try
+        {
+            using var ms = new MemoryStream();
+            await e.File.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024).CopyToAsync(ms);
+            ms.Position = 0;
+            _importResult = Importer.Parse(e.File.Name, ms);
+            if (_importResult.Rows.Count == 0 && _importResult.Warnings.Count == 0)
+                _importErr = "Nenhuma oportunidade reconhecida no arquivo. Confira o cabeçalho das colunas.";
+        }
+        catch (Exception ex)
+        {
+            _importErr = "Falha ao ler o arquivo: " + ex.Message;
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private void ConfirmImport()
+    {
+        if (_importResult is null || _importResult.Rows.Count == 0) return;
+        if (_importMode == "replace") Repo.DeleteAll();
+        Repo.SaveMany(_importResult.Rows);
+        _all = Repo.All();
+        Recompute();
+        CancelImport();
     }
 
     private void NewOpp()
