@@ -1,0 +1,149 @@
+@page "/controle"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Controle</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Controle</h1>
+        <p class="subtitle">REPORT HSA · realizado × budget por mês · valores em R$</p>
+    </div>
+</div>
+
+@* ---- Resumo por semestre ---- *@
+<div class="exec-grid cols-4" style="margin-bottom:18px">
+    <div class="stat accent-left">
+        <div class="stat-label">1º semestre · Meta</div>
+        <div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div>
+        <div class="stat-context">Realizado @Brl(Sum(_realizado, 0, 6))</div>
+    </div>
+    <div class="stat accent-left">
+        <div class="stat-label">1º semestre · Atingimento</div>
+        <div class="stat-value sm" style="color:@AtCss(Attain(0, 6))">@Pct(Attain(0, 6))</div>
+        <div class="stat-context">Realizado ÷ Budget (Jan–Jun)</div>
+    </div>
+    <div class="stat accent-left">
+        <div class="stat-label">2º semestre · Meta</div>
+        <div class="stat-value sm">@Brl(Sum(_budget, 6, 12))</div>
+        <div class="stat-context">Realizado @Brl(Sum(_realizado, 6, 12))</div>
+    </div>
+    <div class="stat accent-left">
+        <div class="stat-label">2º semestre · Atingimento</div>
+        <div class="stat-value sm" style="color:@AtCss(Attain(6, 12))">@Pct(Attain(6, 12))</div>
+        <div class="stat-context">Realizado ÷ Budget (Jul–Dez)</div>
+    </div>
+</div>
+
+@* ---- REPORT HSA ---- *@
+<div class="panel">
+    <div class="panel-head"><div class="panel-title">REPORT HSA <span class="hint">valores em R$</span></div></div>
+    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+        <table class="grid-tbl ctrl-tbl">
+            <thead>
+                <tr>
+                    <th>Indicador</th>
+                    @foreach (var m in Meses) { <th class="right">@m</th> }
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="col-strong">Intercompany HCHL e HPU</td>
+                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_interco[i])</td> }
+                </tr>
+                <tr>
+                    <td class="col-strong">Vendas NB+AFM (Realizado)</td>
+                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_realizado[i])</td> }
+                </tr>
+                <tr>
+                    <td class="col-strong">Meta NB+AFM (Budget)</td>
+                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_budget[i])</td> }
+                </tr>
+                <tr>
+                    <td class="col-strong">Atendimento ao Budget</td>
+                    @for (var i = 0; i < 12; i++)
+                    {
+                        var a = _budget[i] > 0 ? _realizado[i] / _budget[i] * 100 : 0;
+                        <td class="right num ctrl-att" style="background:@AtBg(a);color:@AtCss(a)">@Pct(a)</td>
+                    }
+                </tr>
+                <tr>
+                    <td class="col-strong">Meta</td>
+                    @for (var i = 0; i < 12; i++) { <td class="right num ctrl-meta">100%</td> }
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* ---- Composição mensal ---- *@
+<div class="panel" style="margin-top:14px">
+    <div class="panel-head"><div class="panel-title">Composição mensal <span class="hint">NB · AFM · SV · LTSA · em R$</span></div></div>
+    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+        <table class="grid-tbl ctrl-tbl">
+            <thead>
+                <tr>
+                    <th>Categoria</th>
+                    @foreach (var m in Meses) { <th class="right">@m</th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (label, arr) in Comp)
+                {
+                    <tr>
+                        <td class="col-strong">@label</td>
+                        @for (var i = 0; i < 12; i++) { <td class="right num">@Num(arr[i])</td> }
+                    </tr>
+                }
+                <tr class="ctrl-total">
+                    <td class="col-strong">Total</td>
+                    @for (var i = 0; i < 12; i++) { <td class="right num">@Num(_nb[i] + _afm[i] + _sv[i] + _ltsa[i])</td> }
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly string[] Meses = { "JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ" };
+
+    // Valores da planilha (em milhares). Exibidos × 1.000 em R$.
+    private readonly double[] _interco   = { 372, 246, 1302, 17, 682, 23, 0, 0, 0, 0, 0, 0 };
+    private readonly double[] _realizado = { 31367, 30777, 21912, 43201, 41680, 44009, 0, 0, 0, 0, 0, 0 };
+    private readonly double[] _budget    = { 19909, 26143, 36008, 35047, 45613, 34055, 44602, 41376, 64145, 58015, 57418, 87670 };
+    private readonly double[] _nb        = { 2619, 5464, 5267, 7566, 5140, 37354, 0, 0, 0, 0, 0, 0 };
+    private readonly double[] _afm       = { 27646, 22600, 15883, 34058, 34615, 5193, 0, 0, 0, 0, 0, 0 };
+    private readonly double[] _sv        = { 1102, 2712, 762, 1576, 1925, 1462, 0, 0, 0, 0, 0, 0 };
+    private readonly double[] _ltsa      = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    private IEnumerable<(string, double[])> Comp => new[]
+    {
+        ("NB", _nb), ("AFM", _afm), ("SV", _sv), ("LTSA", _ltsa),
+    };
+
+    // Valor em R$ (× 1.000). 0 vira "—" para os meses ainda sem realizado.
+    private static string Num(double milhares) =>
+        milhares == 0 ? "—" : (milhares * 1000).ToString("#,##0", Pt);
+
+    private static string Brl(double milhares) =>
+        "R$ " + (milhares * 1000).ToString("#,##0.00", Pt);
+
+    private static string Pct(double v) => v.ToString("0", Pt) + "%";
+
+    private static double Sum(double[] a, int from, int to)
+    {
+        double s = 0;
+        for (var i = from; i < to; i++) s += a[i];
+        return s;
+    }
+
+    private double Attain(int from, int to)
+    {
+        var meta = Sum(_budget, from, to);
+        return meta > 0 ? Sum(_realizado, from, to) / meta * 100 : 0;
+    }
+
+    private static string AtCss(double a) => a >= 100 ? "#1f9254" : a > 0 ? "#b4590a" : "#93a1b5";
+    private static string AtBg(double a) => a >= 100 ? "#eaf6ee" : a > 0 ? "#fdf1e3" : "transparent";
+}

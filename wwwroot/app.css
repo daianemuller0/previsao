@@ -387,6 +387,14 @@ tr:hover .row-act { opacity: .85; }
 .confirm-text { font-size: 13px; color: var(--text-2); margin: 12px 0 14px; line-height: 1.5; }
 .confirm-err { font-size: 12px; color: var(--neg); margin-top: 8px; }
 
+/* ---- Aba Controle (REPORT HSA) ---- */
+.ctrl-tbl th, .ctrl-tbl td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ctrl-tbl tbody td:first-child, .ctrl-tbl thead th:first-child { position: sticky; left: 0; background: var(--panel); z-index: 1; box-shadow: 1px 0 0 var(--border); }
+.ctrl-tbl .ctrl-meta { background: #fdf7cf; color: #6b5e12; font-weight: 700; }
+.ctrl-tbl .ctrl-att { font-weight: 700; }
+.ctrl-tbl tr.ctrl-total { background: var(--panel-2); }
+.ctrl-tbl tr.ctrl-total td { font-weight: 700; border-top: 2px solid var(--border-strong); }
+
 /* ---- Aba Listas (manutenção de dados-mestre) ---- */
 .list-menu { display: flex; flex-direction: column; gap: 2px; max-height: 620px; overflow-y: auto; }
 .list-menu-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; padding: 9px 11px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; cursor: pointer; font-family: inherit; font-size: 12.5px; color: var(--text-2); transition: background .12s, border-color .12s; }
