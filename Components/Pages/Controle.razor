@@ -331,8 +331,8 @@ else
     // derivados
     private int _fechados, _pendCount; private double _fillPct;
     private string _fechStatusMain = "—";
-    private record Pend(string Cat, int Month, string Title, string Sev);
-    private List<Pend> _pendencias = new();
+    private record PendItem(string Cat, int Month, string Title, string Sev);
+    private List<PendItem> _pendencias = new();
 
     // painéis auxiliares
     private string _histUser = "", _histField = "", _histOrigin = "";
