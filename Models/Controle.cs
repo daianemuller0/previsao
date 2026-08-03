@@ -47,6 +47,26 @@ public class ControleHist
         DateTime.TryParse(Ts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 }
 
+// Registro de oferta/pedido (tabela livre no Controle).
+public class ControleRegistro
+{
+    public string Id { get; set; } = "";
+    public string Oferta { get; set; } = "";
+    public string Pedido { get; set; } = "";
+    public string Cliente { get; set; } = "";
+    public string Mercado { get; set; } = "";
+    public string Kam { get; set; } = "";
+    public string ValorLiquido { get; set; } = "";   // R$
+    public string Semana { get; set; } = "";
+    public string Mes { get; set; } = "";
+    public string Poc { get; set; } = "";
+    public string UpdatedBy { get; set; } = "";
+    public string UpdatedAt { get; set; } = "";
+
+    public double ValorLiquidoV =>
+        double.TryParse(ValorLiquido, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+}
+
 // Observação de fechamento.
 public class ControleObs
 {

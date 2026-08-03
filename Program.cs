@@ -56,7 +56,9 @@ using (var scope = app.Services.CreateScope())
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
     DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
     scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty();
-    scope.ServiceProvider.GetRequiredService<ControleRepository>().SeedIfEmpty();
+    var controleRepo = scope.ServiceProvider.GetRequiredService<ControleRepository>();
+    controleRepo.SeedIfEmpty();
+    controleRepo.SeedRegistrosIfEmpty();
 }
 
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida

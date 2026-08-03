@@ -177,6 +177,48 @@ public class ControleRepository
         }));
     }
 
+    // ---- registros de ofertas/pedidos (tabela livre) -----------------------
+    private const string EntReg = "controle_registros";
+    private const string RegCols = "id, oferta, pedido, cliente, mercado, kam, valor_liquido, semana, mes, poc, updated_by, updated_at";
+
+    public List<ControleRegistro> Registros() =>
+        _store.ReadLatest(EntReg, RegCols, r => new ControleRegistro
+        {
+            Id = S(r, 0), Oferta = S(r, 1), Pedido = S(r, 2), Cliente = S(r, 3), Mercado = S(r, 4),
+            Kam = S(r, 5), ValorLiquido = S(r, 6), Semana = S(r, 7), Mes = S(r, 8), Poc = S(r, 9),
+            UpdatedBy = S(r, 10), UpdatedAt = S(r, 11),
+        });
+
+    private static KeyValuePair<string, object?>[] RowReg(ControleRegistro g) => new KeyValuePair<string, object?>[]
+    {
+        new("id", g.Id), new("oferta", g.Oferta), new("pedido", g.Pedido), new("cliente", g.Cliente),
+        new("mercado", g.Mercado), new("kam", g.Kam), new("valor_liquido", g.ValorLiquido),
+        new("semana", g.Semana), new("mes", g.Mes), new("poc", g.Poc),
+        new("updated_by", g.UpdatedBy), new("updated_at", g.UpdatedAt),
+    };
+
+    public void SaveRegistro(ControleRegistro g, string user)
+    {
+        if (string.IsNullOrWhiteSpace(g.Id)) g.Id = "cr-" + Guid.NewGuid().ToString("N");
+        g.UpdatedBy = user; g.UpdatedAt = Iso(DateTime.Now);
+        _store.WriteRow(EntReg, RowReg(g));
+    }
+
+    public void SaveRegistros(IEnumerable<ControleRegistro> list, string user)
+    {
+        var rows = new List<IReadOnlyList<KeyValuePair<string, object?>>>();
+        foreach (var g in list)
+        {
+            if (string.IsNullOrWhiteSpace(g.Id)) g.Id = "cr-" + Guid.NewGuid().ToString("N");
+            g.UpdatedBy = user; g.UpdatedAt = Iso(DateTime.Now);
+            rows.Add(RowReg(g));
+        }
+        if (rows.Count > 0) _store.WriteBatch(EntReg, rows);
+    }
+
+    public void DeleteRegistro(string id) =>
+        _store.WriteRow(EntReg, new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
+
     // ---- seed --------------------------------------------------------------
     public void SeedIfEmpty()
     {
@@ -197,6 +239,22 @@ public class ControleRepository
         }
         if (rows.Count > 0) _store.WriteBatch(EntEntries, rows);
         lock (_lock) { _entries = null; }
+        SeedRegistrosIfEmpty();
+    }
+
+    // Ofertas/pedidos de exemplo — carga inicial da tabela do Controle.
+    public void SeedRegistrosIfEmpty()
+    {
+        if (!_store.IsEmpty(EntReg)) return;
+        var y = DateTime.Today.Year;
+        var seed = new[]
+        {
+            new ControleRegistro { Oferta = $"OF-{y}-018", Pedido = "PV-2607", Cliente = "Votorantim Cimentos", Mercado = "Cimento",          Kam = "Ricardo Mendes",    ValorLiquido = "15745000", Semana = "32", Mes = "Agosto",    Poc = "75%" },
+            new ControleRegistro { Oferta = $"OF-{y}-021", Pedido = "PV-2620", Cliente = "Vale",                Mercado = "Mineração",        Kam = "Ana Beatriz Rocha", ValorLiquido = "8320000",  Semana = "33", Mes = "Agosto",    Poc = "60%" },
+            new ControleRegistro { Oferta = $"OF-{y}-009", Pedido = "PV-2615", Cliente = "Suzano",              Mercado = "Papel e Celulose", Kam = "Thiago Nogueira",   ValorLiquido = "5935000",  Semana = "34", Mes = "Setembro",  Poc = "45%" },
+            new ControleRegistro { Oferta = $"OF-{y}-031", Pedido = "",        Cliente = "Gerdau",              Mercado = "Siderurgia",       Kam = "Camila Prado",      ValorLiquido = "4500000",  Semana = "31", Mes = "Julho",     Poc = "90%" },
+        };
+        SaveRegistros(seed, "Carga inicial");
     }
 
     // ---- helpers -----------------------------------------------------------

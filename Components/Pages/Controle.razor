@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject ControleRepository Repo
 @inject Catalog Cat
+@inject ListRepository Lists
 @using HowdenSalesForecast.Models
 @using System.Globalization
 
@@ -117,6 +118,110 @@ else
             </table>
         </div>
     </div>
+
+    @* ---- Ofertas / Pedidos (tabela livre com CRUD + importação) ---- *@
+    <div class="panel" style="margin-top:16px">
+        <div class="panel-head">
+            <div class="panel-title">Ofertas e pedidos <span class="hint">@_regFiltered.Count registro(s)@(_regValor > 0 ? $" · {Brl(_regValor)}" : "")</span></div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input class="ta-search" placeholder="Buscar oferta, cliente, KAM…" @bind="_regSearch" @bind:event="oninput" />
+                <button class="btn-ghost sm" @onclick="() => _showRegImport = true">@Icons.Svg("import")Importar</button>
+                <button class="btn-primary sm" @onclick="NewReg">@Icons.Svg("edit")Adicionar</button>
+            </div>
+        </div>
+        <div class="table-wrap rep-wrap">
+            <table class="grid-tbl reg-tbl">
+                <thead>
+                    <tr>
+                        <th class="center" style="width:70px"></th>
+                        <th>Oferta</th><th>Pedido</th><th>Cliente</th><th>Mercado</th><th>KAM</th>
+                        <th class="right">Valor Líquido</th><th class="center">Semana</th><th class="center">Mês</th><th class="center">POC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var g in _regFiltered)
+                    {
+                        var gid = g.Id;
+                        <tr>
+                            <td class="center actions-col">
+                                <button class="row-act" title="Editar" @onclick="() => EditReg(g)">@Icons.Svg("edit")</button>
+                                <button class="row-act del" title="Excluir" @onclick="() => _regDel = g">@Icons.Svg("trash")</button>
+                            </td>
+                            <td class="col-strong">@Dash(g.Oferta)</td><td>@Dash(g.Pedido)</td><td>@Dash(g.Cliente)</td>
+                            <td>@Dash(g.Mercado)</td><td>@Dash(g.Kam)</td>
+                            <td class="right num">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td>
+                            <td class="center">@Dash(g.Semana)</td>
+                            <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td>
+                            <td class="center">@Dash(g.Poc)</td>
+                        </tr>
+                    }
+                    @if (_regFiltered.Count == 0){<tr><td colspan="10" class="empty">Nenhum registro. Use "Adicionar" ou "Importar".</td></tr>}
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* ---- Adicionar / editar registro ---- *@
+@if (_regEdit is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _regEdit = null"></div>
+    <div class="drawer">
+        <div class="page-head"><div><h2 style="color:var(--primary)">@(_regIsNew ? "Nova oferta" : "Editar oferta")</h2><p class="subtitle">Registro de oferta/pedido</p></div><button class="icon-btn" @onclick="() => _regEdit = null">@Icons.Svg("x")</button></div>
+        <div class="form-grid">
+            <label class="fld">Oferta<input class="field" @bind="_regEdit.Oferta" /></label>
+            <label class="fld">Pedido<input class="field" @bind="_regEdit.Pedido" /></label>
+            <label class="fld full">Cliente<input class="field" @bind="_regEdit.Cliente" /></label>
+            <label class="fld">Mercado<input class="field" list="dl-market" @bind="_regEdit.Mercado" /></label>
+            <label class="fld">KAM<input class="field" list="dl-key_account" @bind="_regEdit.Kam" /></label>
+            <label class="fld">Valor Líquido (R$)<input class="field num" @bind="_regEdit.ValorLiquido" /></label>
+            <label class="fld">POC<input class="field" @bind="_regEdit.Poc" /></label>
+            <label class="fld">Semana<input class="field num" @bind="_regEdit.Semana" /></label>
+            <label class="fld">Mês
+                <select class="field" @bind="_regEdit.Mes"><option value="">—</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
+            </label>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _regEdit = null">Cancelar</button>
+            <button class="btn-primary" @onclick="SaveReg">@Icons.Svg("check")Salvar</button>
+        </div>
+    </div>
+    <datalist id="dl-market">@foreach (var v in Lists?.Items("market") ?? new()){<option value="@v" />}</datalist>
+    <datalist id="dl-key_account">@foreach (var v in Lists?.Items("key_account") ?? new()){<option value="@v" />}</datalist>
+}
+
+@* ---- Confirmar exclusão ---- *@
+@if (_regDel is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _regDel = null"></div>
+    <div class="confirm-box">
+        <div class="confirm-head" style="color:var(--neg)">@Icons.Svg("alert")<span>Excluir registro</span></div>
+        <p class="confirm-text">Excluir a oferta <strong>@Dash(_regDel.Oferta)</strong> (@Dash(_regDel.Cliente))? Esta ação não pode ser desfeita.</p>
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _regDel = null">Cancelar</button>
+            <button class="btn-danger" @onclick="ConfirmDelReg">@Icons.Svg("trash")Excluir</button>
+        </div>
+    </div>
+}
+
+@* ---- Importação em massa ---- *@
+@if (_showRegImport)
+{
+    <div class="drawer-backdrop" @onclick="() => _showRegImport = false"></div>
+    <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
+        <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("import")<span>Importar ofertas em massa</span></div>
+        <p class="confirm-text">Arquivo <strong>.csv</strong> com as colunas <code>oferta;pedido;cliente;mercado;kam;valor_liquido;semana;mes;poc</code>. A primeira linha pode ser o cabeçalho.</p>
+        <label class="fld">Arquivo (.csv)<InputFile class="field" OnChange="OnRegImport" accept=".csv" /></label>
+        @if (_regImp is not null)
+        {
+            <div class="import-summary mt-16"><strong>@_regImp.Read</strong> linha(s) · <strong>@_regImp.Rows.Count</strong> pronta(s)@if (_regImp.Errors.Count > 0){<span> · @_regImp.Errors.Count com erro</span>}</div>
+            @if (_regImp.Errors.Count > 0){<details class="import-warns"><summary>Ver erros (@_regImp.Errors.Count)</summary><ul>@foreach (var e in _regImp.Errors.Take(40)){<li>@e</li>}</ul></details>}
+        }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _showRegImport = false">Cancelar</button>
+            <button class="btn-primary" disabled="@(_regImp is null || _regImp.Rows.Count == 0)" @onclick="ConfirmRegImport">@Icons.Svg("check")Importar @(_regImp?.Rows.Count ?? 0)</button>
+        </div>
+    </div>
 }
 
 @if (!string.IsNullOrEmpty(_toast)){<div class="ctrl-toast">@Icons.Svg("check")<div>@((MarkupString)_toast)</div><button class="icon-btn" @onclick="() => _toast = null">@Icons.Svg("x")</button></div>}
@@ -143,6 +248,18 @@ else
     private Dictionary<string, string> _pending = new();  // "m|cat|field" -> raw
     private double[] _real = new double[13], _budget = new double[13];
 
+    // Ofertas / pedidos (tabela livre)
+    private List<ControleRegistro> _registros = new();
+    private string _regSearch = "";
+    private ControleRegistro? _regEdit, _regDel;
+    private bool _regIsNew, _showRegImport;
+    private RegImport? _regImp;
+    private class RegImport { public int Read; public List<string> Errors = new(); public List<ControleRegistro> Rows = new(); }
+
+    private List<ControleRegistro> _regFiltered = new();
+    private double _regValor;
+    private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s!;
+
     protected override async Task OnInitializedAsync()
     {
         if (AuthState is not null) { var st = await AuthState; _user = st.User.Identity?.Name ?? "—"; }
@@ -156,6 +273,7 @@ else
         var last = _entries.Select(e => e.UpdatedAtValue).Where(d => d is not null).DefaultIfEmpty(null).Max();
         _updated = last?.ToString("dd/MM/yyyy HH:mm") ?? "—";
         _updatedBy = _entries.OrderByDescending(e => e.UpdatedAtValue).FirstOrDefault()?.UpdatedBy ?? "—";
+        _registros = Repo.Registros();
         _pending.Clear();
         _loading = false;
     }
@@ -165,6 +283,81 @@ else
         _map = new();
         foreach (var e in _entries) _map[(e.MonthV, e.Category)] = e;
         for (var m = 1; m <= 12; m++) { _real[m] = ConsReal(m); _budget[m] = Budget(m); }
+
+        var q = _registros.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(_regSearch))
+        {
+            var s = _regSearch.Trim().ToLowerInvariant();
+            q = q.Where(g => (g.Oferta + g.Pedido + g.Cliente + g.Mercado + g.Kam + g.Poc).ToLowerInvariant().Contains(s));
+        }
+        _regFiltered = q.OrderByDescending(g => g.ValorLiquidoV).ToList();
+        _regValor = _regFiltered.Sum(g => g.ValorLiquidoV);
+    }
+
+    private void NewReg() { _regEdit = new ControleRegistro(); _regIsNew = true; }
+    private void EditReg(ControleRegistro g)
+    {
+        _regIsNew = false;
+        _regEdit = new ControleRegistro
+        {
+            Id = g.Id, Oferta = g.Oferta, Pedido = g.Pedido, Cliente = g.Cliente, Mercado = g.Mercado,
+            Kam = g.Kam, ValorLiquido = g.ValorLiquido, Semana = g.Semana, Mes = g.Mes, Poc = g.Poc,
+        };
+    }
+    private void SaveReg()
+    {
+        if (_regEdit is null) return;
+        // normaliza o valor digitado (pt-BR) para invariante
+        if (ParseVal(_regEdit.ValorLiquido) is { } v) _regEdit.ValorLiquido = v.ToString("0.##", CultureInfo.InvariantCulture);
+        Repo.SaveRegistro(_regEdit, _user ?? "—");
+        _regEdit = null;
+        _registros = Repo.Registros();
+        _toast = "<strong>Registro salvo com sucesso.</strong>";
+    }
+    private void ConfirmDelReg()
+    {
+        if (_regDel is null) return;
+        Repo.DeleteRegistro(_regDel.Id);
+        _regDel = null;
+        _registros = Repo.Registros();
+    }
+
+    private async Task OnRegImport(InputFileChangeEventArgs e)
+    {
+        _regImp = new RegImport();
+        try
+        {
+            using var sr = new StreamReader(e.File.OpenReadStream(8 * 1024 * 1024));
+            var text = await sr.ReadToEndAsync();
+            var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Where(l => l.Trim() != "").ToList();
+            var start = lines.Count > 0 && lines[0].ToLowerInvariant().Contains("oferta") ? 1 : 0;
+            for (var i = start; i < lines.Count; i++)
+            {
+                var delim = lines[i].Contains(';') ? ';' : ',';
+                var c = lines[i].Split(delim);
+                _regImp.Read++;
+                if (c.All(string.IsNullOrWhiteSpace)) continue;
+                string Col(int idx) => idx < c.Length ? c[idx].Trim().Trim('"') : "";
+                var vRaw = Col(5);
+                var vNorm = ParseVal(vRaw) is { } vv ? vv.ToString("0.##", CultureInfo.InvariantCulture) : "";
+                if (vRaw != "" && vNorm == "") { _regImp.Errors.Add($"Linha {i + 1}: valor líquido inválido ({vRaw})."); continue; }
+                _regImp.Rows.Add(new ControleRegistro
+                {
+                    Oferta = Col(0), Pedido = Col(1), Cliente = Col(2), Mercado = Col(3), Kam = Col(4),
+                    ValorLiquido = vNorm, Semana = Col(6), Mes = Col(7), Poc = Col(8),
+                });
+            }
+        }
+        catch (Exception ex) { _regImp.Errors.Add("Falha ao ler: " + ex.Message); }
+    }
+    private void ConfirmRegImport()
+    {
+        if (_regImp is null || _regImp.Rows.Count == 0) return;
+        var n = _regImp.Rows.Count;
+        Repo.SaveRegistros(_regImp.Rows, _user ?? "—");
+        _showRegImport = false; _regImp = null;
+        _registros = Repo.Registros();
+        _toast = $"<strong>Importação concluída.</strong> {n} oferta(s) adicionada(s).";
     }
 
     private ControleEntry? Entry(int m, string cat) => _map.GetValueOrDefault((m, cat));
