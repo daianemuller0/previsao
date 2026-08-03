@@ -63,10 +63,9 @@
         {
             new NavItem("oportunidades", "/oportunidades", "opportunity", "Oportunidades"),
         }),
-        new("Dados & Cadastros", new[]
+        new("Dados", new[]
         {
             new NavItem("listas", "/listas", "layers", "Listas"),
-            new NavItem("cadastros", "/cadastros", "master", "Cadastros"),
         }),
         new("Sistema", new[]
         {
@@ -78,7 +77,7 @@
     private static readonly Dictionary<string, string[]> RoleMenus = new()
     {
         [Roles.Kam] = new[] { "oportunidades" },
-        [Roles.Financeiro] = new[] { "executivo", "cadastros" },
+        [Roles.Financeiro] = new[] { "executivo", "listas" },
         [Roles.Viewer] = new[] { "executivo" },
     };
 
