@@ -1,0 +1,90 @@
+@inject Catalog Cat
+@inject NavigationManager Nav
+
+@* Tabela de oportunidades somente-leitura. Reaproveita EXATAMENTE as mesmas
+   colunas da guia Oportunidades, para que as listagens da Visão Executiva
+   apresentem os mesmos campos, sem inventar. *@
+<div class="table-wrap @CssClass" style="@Style">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th class="nowrap">Quarter</th>
+                <th class="nowrap">Date</th>
+                <th>País</th>
+                <th>Market Variável</th>
+                <th>Market</th>
+                <th>Product</th>
+                <th>Tipo de Equipamento</th>
+                <th>Key Account</th>
+                <th>Customer</th>
+                <th>Proposta</th>
+                <th class="right">Net Value</th>
+                <th class="right">PM %</th>
+                <th class="right">% de Ganho</th>
+                <th class="right">% de Sair no Mês</th>
+                <th class="right">Chance Conversão</th>
+                <th class="center">NB/AFM</th>
+                <th>Serviço previsto</th>
+                <th>Market onestream</th>
+                <th>Unidade de Venda</th>
+                <th>BU Intercompany</th>
+                <th>Observação</th>
+                <th>PV</th>
+                <th>RAMP</th>
+                <th class="right">VALOR USD</th>
+                <th class="right">Taxa</th>
+                <th>Coluna1</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in Rows)
+            {
+                var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
+                <tr class="clickable" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
+                    <td class="nowrap">@q</td>
+                    <td class="nowrap">@MonthLabel(o)</td>
+                    <td>@Cat.CountryName(o.CountryId)</td>
+                    <td>@Cat.SubMarketName(o.SubMarketId)</td>
+                    <td>@Cat.MarketName(o.MarketId)</td>
+                    <td>@Cat.ProductName(o.ProductId)</td>
+                    <td>@Cat.EquipmentName(o.EquipmentTypeId)</td>
+                    <td>@Cat.KamName(o.KamId)</td>
+                    <td class="col-strong">@Cat.CustomerName(o.CustomerId)</td>
+                    <td>@o.ProposalNumber</td>
+                    <td class="right num">@Fmt.Brl(o.AmountBrl)</td>
+                    <td class="right num">@Fmt.Pct(o.GmPercentValue)</td>
+                    <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
+                    <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
+                    <td class="right num">@Fmt.Pct(ForecastCalc.Confidence(o))</td>
+                    <td class="center">@Dash(o.CommercialCategory)</td>
+                    <td>@Dash(o.ServicoPrevisto)</td>
+                    <td>@Dash(o.MarketOnestream)</td>
+                    <td>@Dash(Cat.BuCode(o.PvBusinessUnitId))</td>
+                    <td>@Dash(Cat.BuCode(o.IntercompanyBu))</td>
+                    <td>@Dash(o.Notes)</td>
+                    <td>@Dash(o.PvNumber)</td>
+                    <td>@Dash(o.Ramp)</td>
+                    <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
+                    <td class="right num">@o.ExchangeRateValue.ToString("0.00", _pt)</td>
+                    <td>@Dash(o.Coluna1)</td>
+                </tr>
+            }
+            @if (Rows.Count == 0)
+            {
+                <tr><td colspan="26" class="empty">@EmptyText</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter] public List<Opportunity> Rows { get; set; } = new();
+    [Parameter] public string EmptyText { get; set; } = "Nenhuma oportunidade no recorte.";
+    [Parameter] public string CssClass { get; set; } = "";
+    [Parameter] public string Style { get; set; } = "";
+
+    private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+    private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
+    private static string MonthLabel(Opportunity o) =>
+        o.ExpectedDateValue is { } d ? $"{Fmt.MonthName(d.Month)}/{d.Year}" : "—";
+}

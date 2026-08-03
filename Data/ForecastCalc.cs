@@ -16,6 +16,22 @@ public static class ForecastCalc
     public static double Confidence(Opportunity o) =>
         (o.WinProbabilityValue + o.CloseProbabilityValue) / 2.0;
 
+    // Valor mínimo (R$) para uma oportunidade concorrer ao Top 10 "mais quentes".
+    public const double HotMinAmountBrl = 1_000_000;
+
+    // Score de "calor" (0–100) das oportunidades mais quentes: combina a
+    // confiança (% de ganho + % de sair no mês) com o peso do valor. O valor
+    // entra normalizado pelo maior valor do recorte, com raiz para suavizar o
+    // domínio de um único negócio muito grande. Pesos: 55% confiança, 45% valor.
+    public static double HeatScore(Opportunity o, double maxAmountBrl)
+    {
+        var conf = Confidence(o);                                  // 0–100
+        var valueScore = maxAmountBrl <= 0
+            ? 0
+            : 100.0 * Math.Sqrt(Math.Clamp(o.AmountBrl / maxAmountBrl, 0, 1));
+        return conf * 0.55 + valueScore * 0.45;
+    }
+
     // Faixa de confiança (Muito alta / Alta / Média / Baixa).
     public static string ConfidenceBand(double confidence) =>
         confidence >= 85 ? "Muito alta" : confidence >= 70 ? "Alta" : confidence >= 45 ? "Média" : "Baixa";

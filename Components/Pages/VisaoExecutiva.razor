@@ -80,47 +80,12 @@
 @* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
 <div class="section-head">
     <span class="st-title">Top 10 oportunidades mais quentes</span>
-    <span class="st-sub">maior confiança · (% ganho + % período) ÷ 2</span>
+    <span class="st-sub">confiança + peso do valor · acima de R$ 1 mi</span>
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Ver todas</a>
 </div>
-<div class="table-wrap tbl-compact" style="max-height:340px;overflow:auto">
-    <table class="grid-tbl">
-        <thead>
-            <tr>
-                <th class="center">Conf.</th>
-                <th>Oportunidade</th><th>Cliente / Planta</th><th>Categoria</th><th>Etapa</th>
-                <th class="right">Valor R$</th><th class="right">Ganho</th><th class="right">Período</th><th class="right">Ponderado</th>
-                <th class="nowrap">Data prev.</th><th class="center">Risco</th><th>Próx. ação</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var o in _top10Opps)
-            {
-                var conf = ForecastCalc.Confidence(o);
-                var lvl = ForecastCalc.Level(o, _today);
-                <tr class="clickable" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
-                    <td class="center"><span class="hot-conf @ForecastCalc.ConfidenceBandCss(conf)">@conf.ToString("0")%</span></td>
-                    <td class="col-strong">@o.Name<div class="muted" style="font-size:11px">@o.ProposalNumber</div></td>
-                    <td>@Cat.CustomerName(o.CustomerId)<div class="muted" style="font-size:11px">@Cat.PlantName(o.PlantId)</div></td>
-                    <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
-                    <td>@Cat.StageName(o.PipelineStageId)</td>
-                    <td class="right num">@Money(o.AmountUsd)</td>
-                    <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
-                    <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
-                    <td class="right num">@Money(ForecastCalc.WeightedUsd(o))</td>
-                    <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
-                    <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
-                    <td>@(string.IsNullOrWhiteSpace(o.NextAction) ? "—" : o.NextAction)</td>
-                </tr>
-            }
-            @if (_top10Opps.Count == 0)
-            {
-                <tr><td colspan="12" class="empty">Sem oportunidades abertas.</td></tr>
-            }
-        </tbody>
-    </table>
-</div>
+<OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
+                  EmptyText="Sem oportunidades acima de R$ 1 mi no recorte." />
 
 @* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
 <div class="section-head"><span class="st-title">Indicadores estratégicos</span><span class="st-line"></span></div>
@@ -325,40 +290,7 @@
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
 </div>
-<div class="table-wrap">
-    <table class="grid-tbl">
-        <thead>
-            <tr>
-                <th>Oportunidade</th><th>Cliente / Planta</th><th>Categoria</th><th>Etapa</th>
-                <th class="right">Valor R$</th><th class="right">Ganho</th><th class="right">Período</th><th class="right">Ponderado</th>
-                <th class="nowrap">Data prev.</th><th class="center">Risco</th><th>Próx. ação</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var o in _filtered.OrderByDescending(x => x.AmountUsd))
-            {
-                var lvl = ForecastCalc.Level(o, _today);
-                <tr class="clickable" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
-                    <td class="col-strong">@o.Name<div class="muted" style="font-size:11px">@o.ProposalNumber</div></td>
-                    <td>@Cat.CustomerName(o.CustomerId)<div class="muted" style="font-size:11px">@Cat.PlantName(o.PlantId)</div></td>
-                    <td><span class="badge @ForecastCategories.Css(o.Category)">@ForecastCategories.Label(o.Category)</span></td>
-                    <td>@Cat.StageName(o.PipelineStageId)</td>
-                    <td class="right num">@Money(o.AmountUsd)</td>
-                    <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
-                    <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
-                    <td class="right num">@Money(ForecastCalc.WeightedUsd(o))</td>
-                    <td class="nowrap">@Fmt.Date(o.ExpectedDate)</td>
-                    <td class="center"><span class="badge @RiskLevels.Css(lvl)">@RiskLevels.Label(lvl)</span></td>
-                    <td>@(string.IsNullOrWhiteSpace(o.NextAction) ? "—" : o.NextAction)</td>
-                </tr>
-            }
-            @if (_filtered.Count == 0)
-            {
-                <tr><td colspan="11" class="empty">Nenhuma oportunidade no recorte.</td></tr>
-            }
-        </tbody>
-    </table>
-</div>
+<OpportunityTable Rows="_filteredSorted" />
 
 @* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
 <div class="section-head"><span class="st-title">@Icons.Svg("alert", "nav-ico") Atenção executiva</span><span class="st-sub">sinais que exigem decisão da liderança</span><span class="st-line"></span></div>
@@ -398,6 +330,7 @@
     // ---- estado / filtros ----
     private List<Opportunity> _opps = new();
     private List<Opportunity> _filtered = new();
+    private List<Opportunity> _filteredSorted => _filtered.OrderByDescending(o => o.AmountBrl).ToList();
     private DateTime _today = DateTime.Today;
     private DateTime _updated = DateTime.Now;
     private int _year, _month, _quarter;
@@ -518,9 +451,14 @@
         _pipelineTotal = open.Sum(o => o.AmountUsd);
         _pipelineWeighted = open.Sum(W);
 
-        // Top 10 oportunidades mais quentes (maior confiança, depois maior valor).
-        _top10Opps = open
-            .OrderByDescending(ForecastCalc.Confidence).ThenByDescending(o => o.AmountUsd).Take(10).ToList();
+        // Top 10 oportunidades mais quentes: só entram valores ≥ R$ 1 mi; o
+        // ranking combina a confiança (%) com o peso do valor (HeatScore).
+        var hotElegiveis = open.Where(o => o.AmountBrl >= ForecastCalc.HotMinAmountBrl).ToList();
+        var maxHotBrl = hotElegiveis.Count > 0 ? hotElegiveis.Max(o => o.AmountBrl) : 0;
+        _top10Opps = hotElegiveis
+            .OrderByDescending(o => ForecastCalc.HeatScore(o, maxHotBrl))
+            .ThenByDescending(o => o.AmountBrl)
+            .Take(10).ToList();
         var eligibleForecast = opps.Where(o => InYear(o) && Eligible(o)).ToList();
         _marginForecast = eligibleForecast.Sum(ForecastCalc.MarginUsd);
         _gmAvg = eligibleForecast.Count > 0 ? eligibleForecast.Average(o => o.GmPercentValue) : 0;
