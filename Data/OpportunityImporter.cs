@@ -179,6 +179,8 @@ public sealed class OpportunityImporter
             CommercialCategory = NormalizeCat(get(new[] { "NB/AFM", "NB/RT/AFM/SV" })),
             IntercompanyBu = buInter,
             PvBusinessUnitId = puv,
+            ServicoPrevisto = get(new[] { "Serviço previsto", "Servico previsto" }),
+            MarketOnestream = get(new[] { "Market onestream", "Market Onestream" }),
             CurrencyCode = "BRL",
             AmountOriginal = netBrl.ToString(Inv),
             ExchangeRate = taxa.ToString(Inv),

@@ -377,6 +377,21 @@ tr:hover .row-act { opacity: .85; }
 .confirm-text { font-size: 13px; color: var(--text-2); margin: 12px 0 14px; line-height: 1.5; }
 .confirm-err { font-size: 12px; color: var(--neg); margin-top: 8px; }
 
+/* ---- Aba Listas (manutenção de dados-mestre) ---- */
+.list-menu { display: flex; flex-direction: column; gap: 2px; max-height: 620px; overflow-y: auto; }
+.list-menu-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; padding: 9px 11px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; cursor: pointer; font-family: inherit; font-size: 12.5px; color: var(--text-2); transition: background .12s, border-color .12s; }
+.list-menu-item:hover { background: var(--panel-2); }
+.list-menu-item.active { background: var(--panel-2); border-color: var(--border); color: var(--text); font-weight: 600; }
+.list-menu-item .lm-count { font-size: 11px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; min-width: 26px; text-align: center; }
+.list-menu-item.active .lm-count { background: #fff; }
+.add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.add-row .field { flex: 1; }
+.list-items { display: flex; flex-direction: column; gap: 2px; max-height: 560px; overflow-y: auto; }
+.list-item { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; border-radius: var(--radius-sm); border: 1px solid transparent; }
+.list-item:hover { background: var(--panel-2); border-color: var(--border); }
+.list-item .li-value { flex: 1; font-size: 12.5px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item .field { flex: 1; }
+
 /* Importação de planilha */
 .import-summary { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12.5px; color: var(--text-2); }
 .import-warns { margin-top: 10px; font-size: 12px; }

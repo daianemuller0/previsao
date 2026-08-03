@@ -5,6 +5,7 @@
 @inject Catalog Cat
 @inject NavigationManager Nav
 @inject OpportunityImporter Importer
+@inject ListRepository Lists
 
 <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Oportunidades</span></div>
 
@@ -93,8 +94,8 @@
                     <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
                     <td class="right num">@Fmt.Pct(ForecastCalc.Confidence(o))</td>
                     <td class="center">@Dash(o.CommercialCategory)</td>
-                    <td>—</td>
-                    <td>—</td>
+                    <td>@Dash(o.ServicoPrevisto)</td>
+                    <td>@Dash(o.MarketOnestream)</td>
                     <td>@Dash(Cat.BuCode(o.PvBusinessUnitId))</td>
                     <td>@Dash(Cat.BuCode(o.IntercompanyBu))</td>
                     <td>@Dash(o.Notes)</td>
@@ -112,6 +113,14 @@
         </tbody>
     </table>
 </div>
+
+@* ---- Datalists das listas de preenchimento (sugestões + texto livre) ---- *@
+@foreach (var (id, key) in FormLists)
+{
+    <datalist id="@id">
+        @foreach (var v in Lists.Items(key)) { <option value="@v" /> }
+    </datalist>
+}
 
 @* ---- Confirmar exclusão de uma oportunidade ---- *@
 @if (_delTarget is not null)
@@ -199,29 +208,26 @@
         </div>
         <div class="form-grid">
             <label class="fld full">Nome da oportunidade<input class="field" @bind="_new.Name" /></label>
-            <label class="fld">Cliente
-                <select class="field" @bind="_new.CustomerId"><option value="">—</option>@foreach (var c in Cat.Customers){<option value="@c.Id">@c.Name</option>}</select>
-            </label>
-            <label class="fld">Planta
-                <select class="field" @bind="_new.PlantId"><option value="">—</option>@foreach (var p in Cat.Plants){<option value="@p.Id">@p.Name</option>}</select>
-            </label>
-            <label class="fld">Mercado
-                <select class="field" @bind="_new.MarketId"><option value="">—</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select>
-            </label>
-            <label class="fld">Produto
-                <select class="field" @bind="_new.ProductId"><option value="">—</option>@foreach (var p in Cat.Products){<option value="@p.Id">@p.Name</option>}</select>
-            </label>
-            <label class="fld">KAM
-                <select class="field" @bind="_new.KamId"><option value="">—</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select>
-            </label>
+            <label class="fld">Customer<input class="field" list="dl-customer" @bind="_new.CustomerId" /></label>
+            <label class="fld">País<input class="field" list="dl-pais" @bind="_new.CountryId" /></label>
+            <label class="fld">Market<input class="field" list="dl-market" @bind="_new.MarketId" /></label>
+            <label class="fld">Market Variável<input class="field" list="dl-market_var" @bind="_new.SubMarketId" /></label>
+            <label class="fld">Product<input class="field" list="dl-product" @bind="_new.ProductId" /></label>
+            <label class="fld">Tipo de Equipamento<input class="field" list="dl-tipo_equip" @bind="_new.EquipmentTypeId" /></label>
+            <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_new.KamId" /></label>
+            <label class="fld">Categoria (NB/AFM)<input class="field" list="dl-nb_afm" @bind="_new.CommercialCategory" /></label>
+            <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_new.ServicoPrevisto" /></label>
+            <label class="fld">Market onestream<input class="field" list="dl-onestream" @bind="_new.MarketOnestream" /></label>
+            <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_new.PvBusinessUnitId" /></label>
+            <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_new.IntercompanyBu" /></label>
             <label class="fld">Moeda
                 <select class="field" @bind="_new.CurrencyCode">@foreach (var c in Cat.Currencies){<option value="@c.Code">@c.Code</option>}</select>
             </label>
-            <label class="fld">Valor (moeda)<input class="field num" @bind="_new.AmountOriginal" /></label>
-            <label class="fld">Câmbio (BRL/USD)<input class="field num" @bind="_new.ExchangeRate" /></label>
-            <label class="fld">GM%<input class="field num" @bind="_new.GmPercent" /></label>
-            <label class="fld">Prob. ganho (%)<input class="field num" @bind="_new.WinProbability" /></label>
-            <label class="fld">Prob. período (%)<input class="field num" @bind="_new.CloseInPeriodProbability" /></label>
+            <label class="fld">Net Value (valor)<input class="field num" @bind="_new.AmountOriginal" /></label>
+            <label class="fld">Taxa (BRL/USD)<input class="field num" @bind="_new.ExchangeRate" /></label>
+            <label class="fld">PM % (GM)<input class="field num" @bind="_new.GmPercent" /></label>
+            <label class="fld">% de Ganho<input class="field num" @bind="_new.WinProbability" /></label>
+            <label class="fld">% de Sair no Mês<input class="field num" @bind="_new.CloseInPeriodProbability" /></label>
             <label class="fld">Forecast Category
                 <select class="field" @bind="_new.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select>
             </label>
@@ -256,69 +262,24 @@
             <label class="fld">Proposta<input class="field" @bind="_edit.ProposalNumber" /></label>
             <label class="fld">PV<input class="field" @bind="_edit.PvNumber" /></label>
 
-            <label class="fld">País
-                <select class="field" @bind="_edit.CountryId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.CountryId, Cat.Countries.Select(x => x.Id))) { <option value="@_edit.CountryId" selected>@_edit.CountryId (importado)</option> }
-                    @foreach (var c in Cat.Countries) { <option value="@c.Id">@c.Name</option> }
-                </select>
-            </label>
-            <label class="fld">Market
-                <select class="field" @bind="_edit.MarketId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.MarketId, Cat.Markets.Select(x => x.Id))) { <option value="@_edit.MarketId" selected>@_edit.MarketId (importado)</option> }
-                    @foreach (var m in Cat.Markets) { <option value="@m.Id">@m.Name</option> }
-                </select>
-            </label>
-            <label class="fld">Market Variável
-                <select class="field" @bind="_edit.SubMarketId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.SubMarketId, Cat.SubMarkets.Select(x => x.Id))) { <option value="@_edit.SubMarketId" selected>@_edit.SubMarketId (importado)</option> }
-                    @foreach (var s in Cat.SubMarkets) { <option value="@s.Id">@s.Name</option> }
-                </select>
-            </label>
-            <label class="fld">Product
-                <select class="field" @bind="_edit.ProductId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.ProductId, Cat.Products.Select(x => x.Id))) { <option value="@_edit.ProductId" selected>@_edit.ProductId (importado)</option> }
-                    @foreach (var p in Cat.Products) { <option value="@p.Id">@p.Name</option> }
-                </select>
-            </label>
-            <label class="fld">Tipo de Equipamento
-                <select class="field" @bind="_edit.EquipmentTypeId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.EquipmentTypeId, Cat.EquipmentTypes.Select(x => x.Id))) { <option value="@_edit.EquipmentTypeId" selected>@_edit.EquipmentTypeId (importado)</option> }
-                    @foreach (var e in Cat.EquipmentTypes) { <option value="@e.Id">@e.Name</option> }
-                </select>
-            </label>
-            <label class="fld">Key Account (KAM)
-                <select class="field" @bind="_edit.KamId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.KamId, Cat.Kams.Select(x => x.Id))) { <option value="@_edit.KamId" selected>@_edit.KamId (importado)</option> }
-                    @foreach (var k in Cat.Kams) { <option value="@k.Id">@k.Name</option> }
-                </select>
-            </label>
-            <label class="fld">Customer
-                <select class="field" @bind="_edit.CustomerId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.CustomerId, Cat.Customers.Select(x => x.Id))) { <option value="@_edit.CustomerId" selected>@_edit.CustomerId (importado)</option> }
-                    @foreach (var c in Cat.Customers) { <option value="@c.Id">@c.Name</option> }
-                </select>
-            </label>
+            <label class="fld">País<input class="field" list="dl-pais" @bind="_edit.CountryId" /></label>
+            <label class="fld">Market<input class="field" list="dl-market" @bind="_edit.MarketId" /></label>
+            <label class="fld">Market Variável<input class="field" list="dl-market_var" @bind="_edit.SubMarketId" /></label>
+            <label class="fld">Product<input class="field" list="dl-product" @bind="_edit.ProductId" /></label>
+            <label class="fld">Tipo de Equipamento<input class="field" list="dl-tipo_equip" @bind="_edit.EquipmentTypeId" /></label>
+            <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_edit.KamId" /></label>
+            <label class="fld">Customer<input class="field" list="dl-customer" @bind="_edit.CustomerId" /></label>
             <label class="fld">Planta
                 <select class="field" @bind="_edit.PlantId">
                     <option value="">—</option>
-                    @if (Unknown(_edit.PlantId, Cat.Plants.Select(x => x.Id))) { <option value="@_edit.PlantId" selected>@_edit.PlantId (importado)</option> }
+                    @if (Unknown(_edit.PlantId, Cat.Plants.Select(x => x.Id))) { <option value="@_edit.PlantId" selected>@_edit.PlantId</option> }
                     @foreach (var p in Cat.Plants) { <option value="@p.Id">@p.Name</option> }
                 </select>
             </label>
 
-            <label class="fld">Categoria (NB/AFM)
-                <select class="field" @bind="_edit.CommercialCategory">
-                    <option value="">—</option>
-                    @foreach (var cc in CommercialCategory.All) { <option value="@cc.Code">@cc.Code · @cc.Name</option> }
-                </select>
-            </label>
+            <label class="fld">Categoria (NB/AFM)<input class="field" list="dl-nb_afm" @bind="_edit.CommercialCategory" /></label>
+            <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_edit.ServicoPrevisto" /></label>
+            <label class="fld">Market onestream<input class="field" list="dl-onestream" @bind="_edit.MarketOnestream" /></label>
             <label class="fld">Forecast Category
                 <select class="field" @bind="_edit.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()) { <option value="@c.ToString()">@ForecastCategories.Label(c)</option> }</select>
             </label>
@@ -340,20 +301,8 @@
             <label class="fld">% de Ganho<input class="field num" @bind="_edit.WinProbability" /></label>
             <label class="fld">% de Sair no Mês<input class="field num" @bind="_edit.CloseInPeriodProbability" /></label>
 
-            <label class="fld">Unidade de Venda (BU do PV)
-                <select class="field" @bind="_edit.PvBusinessUnitId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.PvBusinessUnitId, Cat.BusinessUnits.Select(x => x.Id))) { <option value="@_edit.PvBusinessUnitId" selected>@_edit.PvBusinessUnitId (importado)</option> }
-                    @foreach (var b in Cat.BusinessUnits) { <option value="@b.Id">@b.Code · @b.Name</option> }
-                </select>
-            </label>
-            <label class="fld">BU Intercompany
-                <select class="field" @bind="_edit.IntercompanyBu">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.IntercompanyBu, Cat.BusinessUnits.Select(x => x.Id))) { <option value="@_edit.IntercompanyBu" selected>@_edit.IntercompanyBu (importado)</option> }
-                    @foreach (var b in Cat.BusinessUnits) { <option value="@b.Id">@b.Code · @b.Name</option> }
-                </select>
-            </label>
+            <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_edit.PvBusinessUnitId" /></label>
+            <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_edit.IntercompanyBu" /></label>
 
             <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
@@ -402,6 +351,15 @@
     private static bool Unknown(string id, IEnumerable<string> knownIds) =>
         !string.IsNullOrEmpty(id) && !knownIds.Contains(id);
 
+    // Datalists (id do <datalist> → chave da lista) usados no preenchimento.
+    private static readonly (string Id, string Key)[] FormLists =
+    {
+        ("dl-pais", "pais"), ("dl-market_var", "market_var"), ("dl-market", "market"),
+        ("dl-product", "product"), ("dl-tipo_equip", "tipo_equip"), ("dl-key_account", "key_account"),
+        ("dl-customer", "customer"), ("dl-nb_afm", "nb_afm"), ("dl-servico", "servico_previsto"),
+        ("dl-onestream", "market_onestream"), ("dl-unidade", "unidade_venda"), ("dl-bu_inter", "bu_intercompany"),
+    };
+
     protected override void OnInitialized() { _all = Repo.All(); Recompute(); }
 
     private void Recompute()
@@ -441,6 +399,18 @@
         var d = _edit.ExpectedDateValue ?? _today;
         _editMonthNum = d.Month;
         _editYear = d.Year;
+
+        // Dados de demonstração guardam Ids do catálogo; para os campos agora
+        // baseados em listas de texto, exibe o nome legível em vez do Id.
+        _edit.CountryId = Cat.Countries.FirstOrDefault(x => x.Id == _edit.CountryId)?.Name ?? _edit.CountryId;
+        _edit.MarketId = Cat.Markets.FirstOrDefault(x => x.Id == _edit.MarketId)?.Name ?? _edit.MarketId;
+        _edit.SubMarketId = Cat.SubMarkets.FirstOrDefault(x => x.Id == _edit.SubMarketId)?.Name ?? _edit.SubMarketId;
+        _edit.ProductId = Cat.Products.FirstOrDefault(x => x.Id == _edit.ProductId)?.Name ?? _edit.ProductId;
+        _edit.EquipmentTypeId = Cat.EquipmentTypes.FirstOrDefault(x => x.Id == _edit.EquipmentTypeId)?.Name ?? _edit.EquipmentTypeId;
+        _edit.KamId = Cat.Kams.FirstOrDefault(x => x.Id == _edit.KamId)?.Name ?? _edit.KamId;
+        _edit.CustomerId = Cat.Customers.FirstOrDefault(x => x.Id == _edit.CustomerId)?.Name ?? _edit.CustomerId;
+        _edit.PvBusinessUnitId = Cat.BusinessUnits.FirstOrDefault(x => x.Id == _edit.PvBusinessUnitId)?.Code ?? _edit.PvBusinessUnitId;
+        _edit.IntercompanyBu = Cat.BusinessUnits.FirstOrDefault(x => x.Id == _edit.IntercompanyBu)?.Code ?? _edit.IntercompanyBu;
     }
 
     private void SaveEdit()

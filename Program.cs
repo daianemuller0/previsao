@@ -41,6 +41,8 @@ builder.Services.AddSingleton<Catalog>();
 builder.Services.AddSingleton<OpportunityRepository>();
 // Importador de planilha (.xlsx/.csv) da base de oportunidades.
 builder.Services.AddScoped<OpportunityImporter>();
+// Listas de preenchimento (dados-mestre editáveis).
+builder.Services.AddSingleton<ListRepository>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
 
@@ -51,6 +53,7 @@ using (var scope = app.Services.CreateScope())
 {
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
     DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
+    scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty();
 }
 
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida

@@ -26,7 +26,9 @@ public class Opportunity
     public string PlantId { get; set; } = "";
     public string CommercialCategory { get; set; } = "NB"; // NB/RT/AFM/SV
     public string IntercompanyBu { get; set; } = "";        // BU Intercompany
-    public string PvBusinessUnitId { get; set; } = "";      // BU do PV
+    public string PvBusinessUnitId { get; set; } = "";      // BU do PV / Unidade de Venda
+    public string ServicoPrevisto { get; set; } = "";       // Serviço previsto (SIM/NÃO)
+    public string MarketOnestream { get; set; } = "";       // Market onestream
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
