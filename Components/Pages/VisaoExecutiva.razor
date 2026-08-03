@@ -140,7 +140,7 @@
     <span class="st-title">@Icons.Svg("trend", "nav-ico") Insights executivos</span>
     <span class="st-sub">principais sinais</span>
     <span class="st-line"></span>
-    <a class="btn-link" href="/analises">Ver todos</a>
+    <a class="btn-link" href="/oportunidades">Ver todas</a>
 </div>
 <div class="panel">
     <div class="insights insights-grid">
@@ -192,14 +192,14 @@
     </div>
     <div class="c7">
         <div class="panel">
-            <div class="panel-head"><div class="panel-title">Previsão x Meta por KAM</div><a class="btn-link" href="/analises">Análise detalhada</a></div>
+            <div class="panel-head"><div class="panel-title">Previsão x Meta por KAM</div><a class="btn-link" href="/oportunidades">Ver oportunidades</a></div>
             <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
                 <table class="grid-tbl">
                     <thead><tr><th>KAM</th><th class="right">Previsão</th><th class="right">Meta</th><th class="right">Gap</th><th class="right">Cobertura</th><th class="center">Status</th></tr></thead>
                     <tbody>
                         @foreach (var k in _byKam)
                         {
-                            <tr class="clickable" @onclick='() => Nav.NavigateTo("/analises")'>
+                            <tr class="clickable" @onclick='() => Nav.NavigateTo("/oportunidades")'>
                                 <td class="col-strong">@k.Name</td>
                                 <td class="right num">@Money(k.Forecast)</td>
                                 <td class="right num">@Money(k.Target)</td>
@@ -372,8 +372,7 @@
                     <summary title="Mais ações">@Icons.Svg("more")</summary>
                     <div class="ctx-menu">
                         @if (!string.IsNullOrEmpty(a.OppId)) { <a href="@($"/oportunidades/{a.OppId}")">Ver oportunidade</a> }
-                        <a href="/revisao">Abrir revisão comercial</a>
-                        <a href="/revisao">Atribuir ação</a>
+                        <a href="/oportunidades">Abrir oportunidades</a>
                     </div>
                 </details>
             </div>
@@ -388,7 +387,7 @@
                 }
                 else
                 {
-                    <a class="btn-ghost" href="/revisao">Revisão comercial</a>
+                    <a class="btn-ghost" href="/oportunidades">Ver oportunidades</a>
                 }
             </div>
         </div>
@@ -717,21 +716,21 @@
             _insights.Add(new("Desempenho", worstMarket.Trend < 0 ? "neg" : "info",
                 $"{(worstMarket.Trend < 0 ? "Queda" : "Alta")} na previsão de {worstMarket.Name}",
                 $"A previsão do mercado de {worstMarket.Name} variou {Fmt.Signed(worstMarket.Trend)} desde a última revisão comercial.",
-                Fmt.Signed(worstMarket.Trend), "Revisar o pipeline do mercado", "/analises"));
+                Fmt.Signed(worstMarket.Trend), "Revisar o pipeline do mercado", "/oportunidades"));
 
         var topKam = _byKam.FirstOrDefault();
         if (topKam != null)
             _insights.Add(new("Oportunidade", "pos",
                 "Aumento da previsão nesta semana",
                 $"{topKam.Name} elevou sua previsão em {Money(topKam.Forecast * 0.14)} nesta semana.",
-                "+" + Money(topKam.Forecast * 0.14), "Validar as oportunidades incluídas", "/revisao"));
+                "+" + Money(topKam.Forecast * 0.14), "Validar as oportunidades incluídas", "/oportunidades"));
 
         var marginGap = 30 - _gmAvg;
         if (marginGap > 0)
             _insights.Add(new("Margem", "warn",
                 "Margem prevista abaixo da meta",
                 $"A margem estimada está {marginGap.ToString("0.0", _pt)} p.p. abaixo do objetivo de 30%.",
-                $"-{marginGap.ToString("0.0", _pt)} p.p.", "Revisar preços e condições comerciais", "/analises"));
+                $"-{marginGap.ToString("0.0", _pt)} p.p.", "Revisar preços e condições comerciais", "/oportunidades"));
 
         var withAction = open.Count > 0 ? (double)open.Count(o => !string.IsNullOrWhiteSpace(o.NextAction)) / open.Count * 100 : 0;
         _insights.Add(new("Qualidade dos dados", withAction >= 70 ? "pos" : "warn",
@@ -744,13 +743,13 @@
             _insights.Add(new("Risco", "neg",
                 "Comprometido sem atualização recente",
                 $"{staleCommit} oportunidade(s) em Comprometido sem atualização há mais de 30 dias.",
-                staleCommit.ToString(), "Validar na revisão comercial", "/revisao"));
+                staleCommit.ToString(), "Validar na revisão comercial", "/oportunidades"));
 
         if (_coverage < 3.5)
             _insights.Add(new("Pipeline", "warn",
                 "Cobertura de pipeline abaixo do ideal",
                 $"A cobertura ({_coverageLabel}) está abaixo do nível ideal de 3,5x para o próximo trimestre.",
-                _coverageLabel, "Gerar novo pipeline", "/pipeline"));
+                _coverageLabel, "Gerar novo pipeline", "/oportunidades"));
     }
 
     private void BuildAttention(List<Opportunity> opps, List<Opportunity> open, List<Opportunity> risky)
