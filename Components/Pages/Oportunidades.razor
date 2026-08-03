@@ -436,7 +436,7 @@
         OpenEdit(o);                                   // reusa tradução + mês/ano
         if (_edit is null) return;
         _edit.Id = "opp-" + Guid.NewGuid().ToString("N");
-        _edit.ProposalNumber = string.IsNullOrWhiteSpace(_edit.ProposalNumber) ? "" : _edit.ProposalNumber + " (cópia)";
+        _edit.ProposalNumber = "";   // Proposta e PV vêm do Salesforce: preencher manual na cópia
         _edit.PvNumber = "";
         _edit.CreatedAt = _today.ToString("yyyy-MM-dd");
         _editDup = true;
@@ -540,10 +540,10 @@
 
     private void NewOpp()
     {
-        var n = _all.Count + 1001;
+        // Proposta e PV vêm do Salesforce — preenchidos manualmente, não gerados.
         _new = new Opportunity
         {
-            Id = $"opp-{Guid.NewGuid():N}", Name = "", ProposalNumber = $"PRP-2026-{n}", PvNumber = "",
+            Id = $"opp-{Guid.NewGuid():N}", Name = "", ProposalNumber = "", PvNumber = "",
             CurrencyCode = "BRL", ExchangeRate = Cat.RateToUsd("USD").ToString(System.Globalization.CultureInfo.InvariantCulture),
             AmountOriginal = "0", GmPercent = "25", WinProbability = "40", CloseInPeriodProbability = "40",
             ForecastCategory = "Pipeline", PipelineStageId = "st-qual", CreatedAt = _today.ToString("yyyy-MM-dd"),
@@ -560,7 +560,8 @@
         // Nome (para dashboards): usa Product — Customer quando não informado.
         if (string.IsNullOrWhiteSpace(_new.Name))
             _new.Name = string.Join(" — ", new[] { _new.ProductId, _new.CustomerId }.Where(s => !string.IsNullOrWhiteSpace(s)));
-        if (string.IsNullOrWhiteSpace(_new.Name)) _new.Name = _new.ProposalNumber;
+        if (string.IsNullOrWhiteSpace(_new.Name))
+            _new.Name = string.IsNullOrWhiteSpace(_new.ProposalNumber) ? "Oportunidade" : _new.ProposalNumber;
         _new.UpdatedAt = _today.ToString("yyyy-MM-dd");
         _new.UpdatedBy = _new.KamId;
         Repo.Save(_new);
