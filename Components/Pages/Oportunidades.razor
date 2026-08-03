@@ -28,12 +28,18 @@
     <StatCard Label="Sem atualização 30d+" Value="@_stale.ToString()" Context="cobrar KAM" />
 </div>
 
-<div class="toolbar">
-    <input class="cell" style="min-width:240px" placeholder="Buscar…" @bind="_search" @bind:event="oninput" />
-    <select class="cell" @bind="_cat"><option value="">Categoria</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select>
-    <select class="cell" @bind="_kam"><option value="">KAM</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select>
-    <select class="cell" @bind="_market"><option value="">Mercado</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select>
-    <select class="cell" @bind="_risk"><option value="">Risco</option>@foreach (var r in Enum.GetValues<RiskLevel>()){<option value="@r.ToString()">@RiskLevels.Label(r)</option>}</select>
+<div class="filterbar" style="margin:0 0 16px;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);">
+    <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" @bind="_search" @bind:event="oninput" /></div>
+    <div class="flt"><span class="flt-label">Ano</span><select @bind="_year"><option value="0">Todos</option>@foreach (var y in Years){<option value="@y">@y</option>}</select></div>
+    <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
+    <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
+    <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
+    <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var m in MarketOptions){<option value="@m">@Cat.MarketName(m)</option>}</select></div>
+    <div class="flt"><span class="flt-label">KAM</span><select @bind="_kam"><option value="">Todos</option>@foreach (var k in KamOptions){<option value="@k">@Cat.KamName(k)</option>}</select></div>
+    <div class="flt"><span class="flt-label">Categoria</span><select @bind="_cat"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
+    <div class="flt"><span class="flt-label">Risco</span><select @bind="_risk"><option value="">Todos</option>@foreach (var r in Enum.GetValues<RiskLevel>()){<option value="@r.ToString()">@RiskLevels.Label(r)</option>}</select></div>
+    <div class="filterbar-spacer"></div>
+    @if (_activeFilters > 0) { <span class="tag">@_activeFilters ativo(s)</span> <button class="btn-link" @onclick="ClearFilters">Limpar</button> }
 </div>
 
 <div class="table-wrap">
@@ -331,7 +337,22 @@
     private List<Opportunity> _all = new();
     private DateTime _today = DateTime.Today;
     private string _search = "", _cat = "", _kam = "", _market = "", _risk = "";
+    private int _year, _monthFilter;                 // 0 = todos
+    private DateTime? _dateFrom, _dateTo;
     private int _openCount, _noAction, _stale;
+
+    // Opções dos filtros vindas dos próprios dados (funciona com listas de texto).
+    private IEnumerable<int> Years => _all.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
+    private IEnumerable<string> MarketOptions => _all.Select(o => o.MarketId).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(Cat.MarketName);
+    private IEnumerable<string> KamOptions => _all.Select(o => o.KamId).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(Cat.KamName);
+    private int _activeFilters => new[] { _search, _cat, _kam, _market, _risk }.Count(s => s != "")
+        + (_year > 0 ? 1 : 0) + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0);
+
+    private void ClearFilters()
+    {
+        _search = _cat = _kam = _market = _risk = "";
+        _year = _monthFilter = 0; _dateFrom = _dateTo = null;
+    }
     private double _riskValue;
     private Opportunity? _new;
     private int _newMonthNum = DateTime.Today.Month, _newYear = DateTime.Today.Year;
@@ -397,6 +418,10 @@
             if (!string.IsNullOrWhiteSpace(_kam)) q = q.Where(o => o.KamId == _kam);
             if (!string.IsNullOrWhiteSpace(_market)) q = q.Where(o => o.MarketId == _market);
             if (!string.IsNullOrWhiteSpace(_risk)) q = q.Where(o => ForecastCalc.Level(o, _today).ToString() == _risk);
+            if (_year > 0) q = q.Where(o => o.ExpectedDateValue?.Year == _year);
+            if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
+            if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
+            if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
             if (!string.IsNullOrWhiteSpace(_search))
             {
                 var b = _search.Trim().ToLowerInvariant();

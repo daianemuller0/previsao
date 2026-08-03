@@ -634,6 +634,8 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 
 /* ---- Filtro de data ---- */
 .filterbar .flt-date { border: none; background: none; outline: none; font-family: inherit; font-size: 12px; color: var(--text); font-weight: 600; cursor: pointer; padding: 0; }
+.filterbar .flt-search { border: none; background: none; outline: none; font-family: inherit; font-size: 12px; color: var(--text); font-weight: 600; padding: 0; min-width: 190px; }
+.filterbar .flt-search::placeholder { color: var(--muted); font-weight: 400; }
 
 /* ---- Top 10 oportunidades mais quentes ---- */
 .hot-list { display: flex; flex-direction: column; gap: 1px; max-height: 320px; overflow-y: auto; }
