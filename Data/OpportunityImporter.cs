@@ -181,6 +181,8 @@ public sealed class OpportunityImporter
             PvBusinessUnitId = puv,
             ServicoPrevisto = get(new[] { "Serviço previsto", "Servico previsto" }),
             MarketOnestream = get(new[] { "Market onestream", "Market Onestream" }),
+            Ramp = get(new[] { "RAMP", "Ramp" }),
+            Coluna1 = get(new[] { "Coluna1" }),
             CurrencyCode = "BRL",
             AmountOriginal = netBrl.ToString(Inv),
             ExchangeRate = taxa.ToString(Inv),

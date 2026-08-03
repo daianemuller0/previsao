@@ -19,7 +19,7 @@ public class OpportunityRepository
         "currency_code, amount_original, exchange_rate, gm_percent, forecast_category, pipeline_stage_id, " +
         "expected_date, win_probability, close_probability, manager_probability, justification, next_action, " +
         "next_action_date, risks, notes, postpone_count, created_at, updated_at, updated_by, " +
-        "value_changed_at, date_changed_at, servico_previsto, market_onestream";
+        "value_changed_at, date_changed_at, servico_previsto, market_onestream, ramp, coluna1";
 
     private readonly ParquetStore _store;
     private readonly object _lock = new();
@@ -74,6 +74,8 @@ public class OpportunityRepository
             DateChangedAt = S(r, 35),
             ServicoPrevisto = S(r, 36),
             MarketOnestream = S(r, 37),
+            Ramp = S(r, 38),
+            Coluna1 = S(r, 39),
         }, orderBy: "expected_date");
 
     // Garante o cache carregado (dentro do lock).
@@ -171,6 +173,8 @@ public class OpportunityRepository
             new("date_changed_at", o.DateChangedAt),
             new("servico_previsto", o.ServicoPrevisto),
             new("market_onestream", o.MarketOnestream),
+            new("ramp", o.Ramp),
+            new("coluna1", o.Coluna1),
         };
 
     public void Delete(string id)
@@ -200,5 +204,6 @@ public class OpportunityRepository
         CreatedAt = o.CreatedAt, UpdatedAt = o.UpdatedAt, UpdatedBy = o.UpdatedBy,
         ValueChangedAt = o.ValueChangedAt, DateChangedAt = o.DateChangedAt,
         ServicoPrevisto = o.ServicoPrevisto, MarketOnestream = o.MarketOnestream,
+        Ramp = o.Ramp, Coluna1 = o.Coluna1,
     };
 }

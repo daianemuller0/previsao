@@ -101,10 +101,10 @@
                     <td>@Dash(Cat.BuCode(o.IntercompanyBu))</td>
                     <td>@Dash(o.Notes)</td>
                     <td>@Dash(o.PvNumber)</td>
-                    <td>—</td>
+                    <td>@Dash(o.Ramp)</td>
                     <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
                     <td class="right num">@o.ExchangeRateValue.ToString("0.00", _pt)</td>
-                    <td>—</td>
+                    <td>@Dash(o.Coluna1)</td>
                 </tr>
             }
             @if (Rows.Count == 0)
@@ -202,38 +202,43 @@
 @if (_new is not null)
 {
     <div class="drawer-backdrop" @onclick="() => _new = null"></div>
-    <div class="drawer">
+    <div class="drawer drawer-wide">
         <div class="page-head">
-            <div><h2 style="color:var(--primary)">Nova oportunidade</h2><p class="subtitle">Cadastro comercial</p></div>
+            <div><h2 style="color:var(--primary)">Nova oportunidade</h2><p class="subtitle">Mesmos campos da listagem</p></div>
             <button class="icon-btn" @onclick="() => _new = null">@Icons.Svg("x")</button>
         </div>
         <div class="form-grid">
-            <label class="fld full">Nome da oportunidade<input class="field" @bind="_new.Name" /></label>
-            <label class="fld">Customer<input class="field" list="dl-customer" @bind="_new.CustomerId" /></label>
+            <label class="fld">Quarter<input class="field" value="@NewQuarter()" readonly /></label>
+            <label class="fld">Date (mês)
+                <select class="field" @bind="_newMonthNum">@for (var m = 1; m <= 12; m++){<option value="@m">@m · @Fmt.MonthLong(m)</option>}</select>
+            </label>
+            <label class="fld">Ano
+                <select class="field" @bind="_newYear">@for (var y = DateTime.Today.Year - 2; y <= DateTime.Today.Year + 3; y++){<option value="@y">@y</option>}</select>
+            </label>
             <label class="fld">País<input class="field" list="dl-pais" @bind="_new.CountryId" /></label>
-            <label class="fld">Market<input class="field" list="dl-market" @bind="_new.MarketId" /></label>
             <label class="fld">Market Variável<input class="field" list="dl-market_var" @bind="_new.SubMarketId" /></label>
+            <label class="fld">Market<input class="field" list="dl-market" @bind="_new.MarketId" /></label>
             <label class="fld">Product<input class="field" list="dl-product" @bind="_new.ProductId" /></label>
             <label class="fld">Tipo de Equipamento<input class="field" list="dl-tipo_equip" @bind="_new.EquipmentTypeId" /></label>
             <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_new.KamId" /></label>
-            <label class="fld">Categoria (NB/AFM)<input class="field" list="dl-nb_afm" @bind="_new.CommercialCategory" /></label>
+            <label class="fld">Customer<input class="field" list="dl-customer" @bind="_new.CustomerId" /></label>
+            <label class="fld">Proposta<input class="field" @bind="_new.ProposalNumber" /></label>
+            <label class="fld">Net Value<input class="field num" @bind="_new.AmountOriginal" /></label>
+            <label class="fld">PM %<input class="field num" @bind="_new.GmPercent" /></label>
+            <label class="fld">% de Ganho<input class="field num" @bind="_new.WinProbability" /></label>
+            <label class="fld">% de Sair no Mês<input class="field num" @bind="_new.CloseInPeriodProbability" /></label>
+            <label class="fld">Chance Conversão<input class="field num" value="@Conf(_new)" readonly /></label>
+            <label class="fld">NB/AFM<input class="field" list="dl-nb_afm" @bind="_new.CommercialCategory" /></label>
             <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_new.ServicoPrevisto" /></label>
             <label class="fld">Market onestream<input class="field" list="dl-onestream" @bind="_new.MarketOnestream" /></label>
             <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_new.PvBusinessUnitId" /></label>
             <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_new.IntercompanyBu" /></label>
-            <label class="fld">Moeda
-                <select class="field" @bind="_new.CurrencyCode">@foreach (var c in Cat.Currencies){<option value="@c.Code">@c.Code</option>}</select>
-            </label>
-            <label class="fld">Net Value (valor)<input class="field num" @bind="_new.AmountOriginal" /></label>
-            <label class="fld">Taxa (BRL/USD)<input class="field num" @bind="_new.ExchangeRate" /></label>
-            <label class="fld">PM % (GM)<input class="field num" @bind="_new.GmPercent" /></label>
-            <label class="fld">% de Ganho<input class="field num" @bind="_new.WinProbability" /></label>
-            <label class="fld">% de Sair no Mês<input class="field num" @bind="_new.CloseInPeriodProbability" /></label>
-            <label class="fld">Forecast Category
-                <select class="field" @bind="_new.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select>
-            </label>
-            <label class="fld">Data prevista<input class="field" type="date" @bind="_newDate" /></label>
-            <label class="fld full">Próxima ação<input class="field" @bind="_new.NextAction" /></label>
+            <label class="fld">Observação<input class="field" @bind="_new.Notes" /></label>
+            <label class="fld">PV<input class="field" @bind="_new.PvNumber" /></label>
+            <label class="fld">RAMP<input class="field" @bind="_new.Ramp" /></label>
+            <label class="fld">VALOR USD<input class="field num" value="@Fmt.Usd(_new.AmountUsd)" readonly /></label>
+            <label class="fld">Taxa<input class="field num" @bind="_new.ExchangeRate" /></label>
+            <label class="fld">Coluna1<input class="field" @bind="_new.Coluna1" /></label>
         </div>
         <div class="modal-actions">
             <button class="btn-ghost" @onclick="() => _new = null">Cancelar</button>
@@ -308,6 +313,8 @@
             <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_edit.PvBusinessUnitId" /></label>
             <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_edit.IntercompanyBu" /></label>
 
+            <label class="fld">RAMP<input class="field" @bind="_edit.Ramp" /></label>
+            <label class="fld">Coluna1<input class="field" @bind="_edit.Coluna1" /></label>
             <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
         </div>
@@ -327,7 +334,7 @@
     private int _openCount, _noAction, _stale;
     private double _riskValue;
     private Opportunity? _new;
-    private DateTime? _newDate;
+    private int _newMonthNum = DateTime.Today.Month, _newYear = DateTime.Today.Year;
 
     // Edição
     private Opportunity? _edit;
@@ -347,6 +354,10 @@
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
+
+    // Rótulos derivados do formulário de nova oportunidade.
+    private string NewQuarter() => $"Q{Fmt.QuarterOf(_newMonthNum)} {_newYear}";
+    private static string Conf(Opportunity o) => ForecastCalc.Confidence(o).ToString("0") + "%";
 
     // Rótulo do mês da previsão (a "Date" é uma referência de mês, não um dia).
     private static string MonthLabel(Opportunity o) =>
@@ -532,22 +543,26 @@
         var n = _all.Count + 1001;
         _new = new Opportunity
         {
-            Id = $"opp-{Guid.NewGuid():N}", Name = "", ProposalNumber = $"PRP-2026-{n}", PvNumber = $"PV-{2600 + n}",
+            Id = $"opp-{Guid.NewGuid():N}", Name = "", ProposalNumber = $"PRP-2026-{n}", PvNumber = "",
             CurrencyCode = "BRL", ExchangeRate = Cat.RateToUsd("USD").ToString(System.Globalization.CultureInfo.InvariantCulture),
-            GmPercent = "25", WinProbability = "40", CloseInPeriodProbability = "40", ForecastCategory = "Pipeline",
-            PipelineStageId = "st-qual", CreatedAt = _today.ToString("yyyy-MM-dd"),
+            AmountOriginal = "0", GmPercent = "25", WinProbability = "40", CloseInPeriodProbability = "40",
+            ForecastCategory = "Pipeline", PipelineStageId = "st-qual", CreatedAt = _today.ToString("yyyy-MM-dd"),
         };
-        _newDate = _today.AddMonths(2);
+        _newMonthNum = _today.AddMonths(2).Month;
+        _newYear = _today.AddMonths(2).Year;
     }
 
     private void SaveNew()
     {
         if (_new is null) return;
-        if (_newDate is { } d) _new.ExpectedDate = d.ToString("yyyy-MM-dd");
+        if (_newMonthNum is >= 1 and <= 12 && _newYear >= 2000)
+            _new.ExpectedDate = new DateTime(_newYear, _newMonthNum, 1).ToString("yyyy-MM-dd");
+        // Nome (para dashboards): usa Product — Customer quando não informado.
+        if (string.IsNullOrWhiteSpace(_new.Name))
+            _new.Name = string.Join(" — ", new[] { _new.ProductId, _new.CustomerId }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (string.IsNullOrWhiteSpace(_new.Name)) _new.Name = _new.ProposalNumber;
         _new.UpdatedAt = _today.ToString("yyyy-MM-dd");
-        _new.UpdatedBy = Cat.KamName(_new.KamId);
-        // deriva país a partir do cliente
-        if (Cat.GetCustomer(_new.CustomerId) is { } cust) _new.CountryId = cust.CountryId;
+        _new.UpdatedBy = _new.KamId;
         Repo.Save(_new);
         _all = Repo.All();
         Recompute();

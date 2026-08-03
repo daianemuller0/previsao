@@ -29,6 +29,8 @@ public class Opportunity
     public string PvBusinessUnitId { get; set; } = "";      // BU do PV / Unidade de Venda
     public string ServicoPrevisto { get; set; } = "";       // Serviço previsto (SIM/NÃO)
     public string MarketOnestream { get; set; } = "";       // Market onestream
+    public string Ramp { get; set; } = "";                  // RAMP
+    public string Coluna1 { get; set; } = "";               // Coluna1 (livre)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
