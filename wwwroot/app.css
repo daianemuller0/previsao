@@ -182,10 +182,13 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
 /* Barra de filtros como faixa cheia (full-bleed) que congela sob o topbar,
    sem cantos arredondados soltos — evita o efeito de "cortado" ao rolar. */
 .filterbar-sticky {
-    margin: 0 -28px 16px;                /* full-bleed: cancela o padding lateral do .content */
-    border-top: 1px solid var(--border);
-    box-shadow: 0 6px 10px -8px rgba(9, 27, 50, .18);
+    margin: 0 0 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 14px -8px rgba(9, 27, 50, .2);
 }
+/* Garante que os filtros quebrem de linha em telas estreitas (nunca cortam). */
+.filterbar-sticky .flt { flex: 0 0 auto; }
 
 /* ==========================================================================
    Conteúdo
