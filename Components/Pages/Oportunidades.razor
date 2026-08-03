@@ -247,7 +247,12 @@
         <div class="form-grid">
             <label class="fld full">Nome da oportunidade<input class="field" @bind="_edit.Name" /></label>
 
-            <label class="fld">Mês da previsão<input class="field" type="month" @bind="_editMonth" /></label>
+            <label class="fld">Mês da previsão
+                <select class="field" @bind="_editMonthNum">@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
+            </label>
+            <label class="fld">Ano da previsão
+                <select class="field" @bind="_editYear">@for (var y = DateTime.Today.Year - 2; y <= DateTime.Today.Year + 3; y++){<option value="@y">@y</option>}</select>
+            </label>
             <label class="fld">Proposta<input class="field" @bind="_edit.ProposalNumber" /></label>
             <label class="fld">PV<input class="field" @bind="_edit.PvNumber" /></label>
 
@@ -373,7 +378,7 @@
 
     // Edição
     private Opportunity? _edit;
-    private string _editMonth = ""; // yyyy-MM (input type=month)
+    private int _editMonthNum = 1, _editYear = DateTime.Today.Year; // mês/ano da previsão
 
     // Exclusão
     private Opportunity? _delTarget;
@@ -433,17 +438,17 @@
     private void OpenEdit(Opportunity o)
     {
         _edit = Repo.Get(o.Id) ?? o;                       // cópia isolada do cache
-        _editMonth = _edit.ExpectedDateValue is { } d ? d.ToString("yyyy-MM") : "";
+        var d = _edit.ExpectedDateValue ?? _today;
+        _editMonthNum = d.Month;
+        _editYear = d.Year;
     }
 
     private void SaveEdit()
     {
         if (_edit is null) return;
-        // O mês da previsão vira uma data real no 1º dia do mês escolhido.
-        if (!string.IsNullOrWhiteSpace(_editMonth)
-            && DateTime.TryParse(_editMonth + "-01", System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var d))
-            _edit.ExpectedDate = d.ToString("yyyy-MM-dd");
+        // O mês/ano da previsão viram uma data real no 1º dia do mês escolhido.
+        if (_editMonthNum is >= 1 and <= 12 && _editYear >= 2000)
+            _edit.ExpectedDate = new DateTime(_editYear, _editMonthNum, 1).ToString("yyyy-MM-dd");
         _edit.UpdatedAt = _today.ToString("yyyy-MM-dd");
         _edit.UpdatedBy = Cat.KamName(_edit.KamId);
         Repo.Save(_edit);
