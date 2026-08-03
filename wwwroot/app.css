@@ -179,6 +179,13 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
 }
 .filterbar .flt-label { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
 .filterbar-spacer { flex: 1; }
+/* Barra de filtros como faixa cheia (full-bleed) que congela sob o topbar,
+   sem cantos arredondados soltos — evita o efeito de "cortado" ao rolar. */
+.filterbar-sticky {
+    margin: 0 -28px 16px;                /* full-bleed: cancela o padding lateral do .content */
+    border-top: 1px solid var(--border);
+    box-shadow: 0 6px 10px -8px rgba(9, 27, 50, .18);
+}
 
 /* ==========================================================================
    Conteúdo

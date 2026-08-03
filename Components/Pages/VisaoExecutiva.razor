@@ -31,7 +31,7 @@
 </div>
 
 @* ---- Filtros globais ---- *@
-<div class="filterbar" style="margin:0 0 16px;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);">
+<div class="filterbar filterbar-sticky">
     <div class="flt"><span class="flt-label">Ano</span><select><option>@_year</option></select></div>
     <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
     <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
