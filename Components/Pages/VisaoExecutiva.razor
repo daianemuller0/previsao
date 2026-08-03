@@ -26,7 +26,7 @@
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
         <a class="btn-ghost" href="/forecast/export" target="_blank" title="Exportar CSV">@Icons.Svg("download")Exportar</a>
-        <a class="btn-primary" href="/forecast">@Icons.Svg("forecast")Abrir Previsão</a>
+        <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
     </div>
 </div>
 
@@ -709,7 +709,7 @@
         _insights.Add(new("Concentração", "warn",
             "Concentração elevada na previsão do mês",
             $"As quatro maiores oportunidades representam {Fmt.Pct(top4 / monthTotal * 100)} da previsão mensal.",
-            Fmt.Pct(top4 / monthTotal * 100), "Diversificar a carteira", "/forecast"));
+            Fmt.Pct(top4 / monthTotal * 100), "Diversificar a carteira", "/oportunidades"));
 
         var worstMarket = _byMarket.OrderBy(m => m.Trend).FirstOrDefault();
         if (worstMarket != null)
