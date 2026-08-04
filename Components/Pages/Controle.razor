@@ -70,8 +70,8 @@ else
                     </tr>
                     <tr>
                         <td class="rname">Vendas NB+AFM (Realizado)</td>
-                        @for (var m = 1; m <= 12; m++){<td class="right @(m == _month ? "cur" : "")" title="calculado">@Num(ConsReal(m))</td>}
-                        <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(ConsReal))</td>
+                        @for (var m = 1; m <= 12; m++){var mm = m;<td class="right @(mm == _month ? "cur" : "")">@CellVendas(mm)</td>}
+                        <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(VendasReal))</td>
                     </tr>
                     <tr>
                         <td class="rname">Meta NB+AFM (Budget)</td>
@@ -85,7 +85,7 @@ else
                     </tr>
                     <tr class="rep-att">
                         <td class="rname">Atendimento ao Budget</td>
-                        @for (var m = 1; m <= 12; m++){var a = Budget(m) > 0 && ConsReal(m) > 0 ? ConsReal(m) / Budget(m) * 100 : (double?)null;<td class="right att @(m == _month ? "cur" : "")" style="@AttStyle(a)">@(a is { } av ? Pct(av) : "—")</td>}
+                        @for (var m = 1; m <= 12; m++){var a = Budget(m) > 0 && VendasReal(m) > 0 ? VendasReal(m) / Budget(m) * 100 : (double?)null;<td class="right att @(m == _month ? "cur" : "")" style="@AttStyle(a)">@(a is { } av ? Pct(av) : "—")</td>}
                         <td class="right strong">@(Sum(_budget, 0, 12) > 0 ? Pct(Sum(_real, 0, 12) / Sum(_budget, 0, 12) * 100) : "—")</td>
                     </tr>
                     <tr class="rep-meta">
@@ -287,7 +287,7 @@ else
     {
         _map = new();
         foreach (var e in _entries) _map[(e.MonthV, e.Category)] = e;
-        for (var m = 1; m <= 12; m++) { _real[m] = ConsReal(m); _budget[m] = Budget(m); _metaHsa[m] = BudgetOf("MHSA", m); }
+        for (var m = 1; m <= 12; m++) { _real[m] = VendasReal(m); _budget[m] = Budget(m); _metaHsa[m] = BudgetOf("MHSA", m); }
 
         var q = _registros.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(_regSearch))
@@ -373,6 +373,29 @@ else
     private double BudgetOf(string cat, int m) => Pend(m, cat, "Budget") ?? (Entry(m, cat)?.BudgetV ?? 0);
     private double Budget(int m) => BudgetOf("CONS", m);
     private double ConsReal(int m) => Cats.Sum(c => Real(c, m));
+
+    // Vendas NB+AFM (Realizado) editável: usa o valor digitado direto (categoria
+    // VNBAFM) quando informado; senão, cai para a soma da composição (ConsReal).
+    private const string VendasCat = "VNBAFM";
+    private double VendasReal(int m) =>
+        Pend(m, VendasCat, "Realizado") ?? (Entry(m, VendasCat)?.RealizadoV ?? ConsReal(m));
+
+    private RenderFragment CellVendas(int m) => builder =>
+    {
+        var val = VendasReal(m);
+        if (_edit)
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "class", "cell-in" + (_pending.ContainsKey(PKey(m, VendasCat, "Realizado")) ? " changed" : ""));
+            builder.AddAttribute(2, "value", val == 0 ? "" : val.ToString("0", CultureInfo.InvariantCulture));
+            builder.AddAttribute(3, "onchange", Microsoft.AspNetCore.Components.EventCallback.Factory.Create<ChangeEventArgs>(this, e => SetPending(m, VendasCat, "Realizado", e.Value?.ToString())));
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.AddContent(4, val == 0 ? "—" : Num(val));
+        }
+    };
 
     private static double Sum(double[] a, int from, int to) { double s = 0; for (var i = from; i < to; i++) s += a[i + 1]; return s; }
     private double Attain(int from, int to) { var b = Sum(_budget, from, to); return b > 0 ? Sum(_real, from, to) / b * 100 : 0; }
