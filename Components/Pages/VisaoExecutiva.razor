@@ -61,20 +61,19 @@
 @* ===================== 2 · HERO EXECUTIVO ===================== *@
 <div class="hero">
     <div class="hero-main">
-        <div class="hero-eyebrow">Previsão do mês · @Fmt.MonthLong(_month) @_year</div>
-        <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(Cv(_fcMonth))</div>
-        <div class="hero-target-line">Meta @Money(_tgtMonth) · @Fmt.Pct(_attainMonth) atingida · gap @Money(Math.Max(_tgtMonth - _fcMonth, 0))</div>
+        <div class="hero-eyebrow">Realizado × Meta · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? Fmt.MonthLong(_monthFilter) + " " + _repYear : "Ano " + _repYear)</div>
+        <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(_heroReal))</div>
+        <div class="hero-target-line">Meta @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))</div>
         <div class="hero-chips">
-            <div class="hero-chip"><div class="k">vs previsão anterior</div><div class="v @(_fcMonthDelta >= 0 ? "pos" : "neg")">@Icons.Svg(_fcMonthDelta >= 0 ? "up" : "down")@Fmt.Signed(_fcMonthDelta)</div></div>
-            <div class="hero-chip"><div class="k">vs mês anterior</div><div class="v @(_fcMonthMoM >= 0 ? "pos" : "neg")">@Fmt.Signed(_fcMonthMoM)</div></div>
-            <div class="hero-chip"><div class="k">Comprometido</div><div class="v">@Money(_committedMonth)</div></div>
-            <div class="hero-chip"><div class="k">Ponderado</div><div class="v">@Money(_fcMonth)</div></div>
+            <div class="hero-chip"><div class="k">Meta do período</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
+            <div class="hero-chip"><div class="k">Realizado</div><div class="v">@MoneyBrl(_heroReal)</div></div>
+            <div class="hero-chip"><div class="k">Gap para a meta</div><div class="v @(_heroReal >= _heroMeta ? "pos" : "neg")">@MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))</div></div>
+            <div class="hero-chip"><div class="k">Atingimento</div><div class="v @(_heroAttain >= 100 ? "pos" : "neg")">@Fmt.Pct(_heroAttain)</div></div>
         </div>
         <div class="hero-gauge">
-            <div class="gt"><div class="gf" style="width:@Clamp(_attainMonth)%"></div></div>
-            <div class="gl"><span>Atingimento da meta mensal</span><span>@Fmt.Pct(_attainMonth)</span></div>
+            <div class="gt"><div class="gf" style="width:@Clamp(_heroAttain)%"></div></div>
+            <div class="gl"><span>Atingimento da meta @(_monthFilter is >= 1 and <= 12 ? "mensal" : "do ano")</span><span>@Fmt.Pct(_heroAttain)</span></div>
         </div>
-        <div class="hero-spark"><Sparkline Values="@_evoMonth" Stroke="#8fe3c4" /></div>
     </div>
 </div>
 
@@ -111,15 +110,13 @@
 
 @* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
 <div class="section-head"><span class="st-title">Indicadores estratégicos</span><span class="st-line"></span></div>
-<div class="exec-grid cols-4">
+<div class="exec-grid cols-2">
     <StatCard Label="Previsão do trimestre" Value="@Money(_fcQuarter)" Delta="@_fcQuarterDelta" Context="@($"Meta {Money(_tgtQuarter)}")" AccentLeft="true">
         <div class="spark"><Sparkline Values="@_evoQuarter" Stroke="#007A9E" /></div>
     </StatCard>
     <StatCard Label="Previsão anual" Value="@Money(_fcYear)" Delta="@_fcYearDelta" Context="@($"Meta {Money(_tgtYear)}")" AccentLeft="true">
         <div class="spark"><Sparkline Values="@_evoYear" Stroke="#009496" /></div>
     </StatCard>
-    <StatCard Label="Realizado acumulado no ano" Value="@Money(_realizedYtd)" DeltaText="@($"{Fmt.Pct(_attainYtd)} da meta no ano")" Context="Fechados (ganhos)" AccentLeft="true" />
-    <StatCard Label="Previsão em risco" Value="@Money(_atRisk)" DeltaText="@($"{_atRiskCount} oportunidades de alto risco")" Context="exige decisão" AccentLeft="true" />
 </div>
 
 @* ===================== 3 · INSIGHTS EXECUTIVOS ===================== *@
@@ -419,6 +416,22 @@
     private double _repAttain;
     private int _repYear = DateTime.Today.Year;
 
+    // Hero (Meta × Realizado do REPORT HSA), sensível ao filtro de mês.
+    private double _heroReal, _heroMeta, _heroAttain;
+
+    // Conversão de valores em R$ (REPORT HSA é nativo em R$) respeitando o toggle.
+    private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
+    private string MoneyBrl(double brl) => _sym + " " + Fmt.Compact(CvBrl(brl));
+
+    // Agrupa oportunidades pelo VALOR real de um campo (não pelo catálogo),
+    // somando o ponderado; rótulo via função de nome (com fallback ao texto cru).
+    private static List<SliceRow> GroupSlices(IEnumerable<Opportunity> src, Func<Opportunity, string> key, Func<string, string> name) =>
+        src.GroupBy(o => key(o) ?? "")
+           .Select(g => new SliceRow(g.Key == "" ? "—" : name(g.Key), g.Sum(ForecastCalc.WeightedUsd)))
+           .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+
+    private static string CommName(string code) => CommercialCategory.Name(code);
+
     protected override void OnInitialized()
     {
         _opps = Repo.All();
@@ -471,10 +484,28 @@
 
         var opps = Filtered().ToList();
         _filtered = opps;
+
+        // Hero: Meta × Realizado do REPORT HSA (guia Controle). Sem filtro de mês
+        // mostra o total do ano; com filtro de mês mostra o mês selecionado.
+        if (_monthFilter is >= 1 and <= 12)
+        {
+            _heroReal = _repReal[_monthFilter - 1];
+            _heroMeta = _repMeta[_monthFilter - 1];
+        }
+        else
+        {
+            _heroReal = _repReal.Sum();
+            _heroMeta = _repMeta.Sum();
+        }
+        _heroAttain = _heroMeta > 0 ? _heroReal / _heroMeta * 100 : 0;
+
         bool InYear(Opportunity o) => (o.ExpectedDateValue?.Year ?? 0) == _year;
         bool InMonth(Opportunity o) => InYear(o) && o.ExpectedDateValue!.Value.Month == _month;
         bool InQuarter(Opportunity o) => InYear(o) && Fmt.QuarterOf(o.ExpectedDateValue!.Value.Month) == _quarter;
-        bool Eligible(Opportunity o) => ForecastCategories.CountsToForecast(o.Category);
+        // Elegível ao forecast = toda oportunidade ABERTA (inclui Pipeline, que é
+        // como a base importada chega). Antes só contava Commit/BestCase/Risk, o
+        // que zerava os gráficos com dados reais.
+        bool Eligible(Opportunity o) => ForecastCategories.IsOpen(o.Category);
         bool Open(Opportunity o) => ForecastCategories.IsOpen(o.Category);
         bool Won(Opportunity o) => o.Category == ForecastCategory.ClosedWon;
         double W(Opportunity o) => ForecastCalc.WeightedUsd(o);
@@ -548,23 +579,23 @@
         _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
         _comp = compRaw.Select(x => new CompRow(x.Band, x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
 
-        // Comparativo por categoria comercial (NB / RT / AFM / SV).
-        _byCommercial = CommercialCategory.All.Select(cc => new CommRow(cc.Code, cc.Name,
-            opps.Where(o => o.CommercialCategory == cc.Code && InYear(o) && Eligible(o)).Sum(W))).ToList();
+        // Aftermarket × New Business — agrupa pela categoria comercial real (NB/AFM/…).
+        _byCommercial = opps.Where(o => InYear(o) && Eligible(o))
+            .GroupBy(o => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim())
+            .Select(g => new CommRow(g.Key, CommName(g.Key), g.Sum(W)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _maxComm = Math.Max(_byCommercial.Count > 0 ? _byCommercial.Max(x => x.Value) : 1, 1);
 
-        // Distribuição da carteira: por unidade (BU), por trimestre, por país, GM mensal.
+        // Distribuição da carteira — agrupa pelos VALORES reais dos campos das
+        // oportunidades (com nome do catálogo quando houver), não iterando o
+        // catálogo demo por Id. Assim funciona com a base importada.
         var eligYear = opps.Where(o => InYear(o) && Eligible(o)).ToList();
-        _byBu = Cat.BusinessUnits.Select(b => new SliceRow(b.Code,
-            eligYear.Where(o => o.PvBusinessUnitId == b.Id).Sum(W)))
-            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+        _byBu = GroupSlices(eligYear, o => o.PvBusinessUnitId, Cat.BuCode);
 
         _byQuarter = new double[4];
         foreach (var o in eligYear) _byQuarter[(o.ExpectedDateValue!.Value.Month - 1) / 3] += W(o);
 
-        _byCountry = Cat.Countries.Select(c => new SliceRow(c.Name,
-            eligYear.Where(o => o.CountryId == c.Id).Sum(W)))
-            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+        _byCountry = GroupSlices(eligYear, o => o.CountryId, Cat.CountryName);
         _maxCountry = Math.Max(_byCountry.Count > 0 ? _byCountry.Max(x => x.Value) : 1, 1);
         _countryTotal = Math.Max(_byCountry.Sum(x => x.Value), 1);
 
@@ -577,35 +608,41 @@
         _gmMonthly = new double[12];
         for (var m = 0; m < 12; m++) _gmMonthly[m] = gmCnt[m] > 0 ? gmSum[m] / gmCnt[m] : 0;
 
-        // Mercado / produto.
-        _byMarket = Cat.Markets.Select(m => new MarketRow(m.Name,
-            opps.Where(o => o.MarketId == m.Id && InYear(o) && Eligible(o)).Sum(W), PseudoTrend(m.Name, 14)))
-            .OrderByDescending(x => x.Value).ToList();
+        // Mercado / produto — agrupados pelos valores reais.
+        _byMarket = eligYear.GroupBy(o => o.MarketId ?? "")
+            .Select(g => new MarketRow(g.Key == "" ? "—" : Cat.MarketName(g.Key), g.Sum(W), PseudoTrend(g.Key, 14)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _marketTotal = Math.Max(_byMarket.Sum(x => x.Value), 1);
         _maxMarket = Math.Max(_byMarket.Count > 0 ? _byMarket.Max(x => x.Value) : 1, 1);
         _marketTopRise = _byMarket.Count > 0 ? _byMarket.OrderByDescending(x => x.Trend).First().Name : "";
         _marketTopFall = _byMarket.Count > 0 ? _byMarket.OrderBy(x => x.Trend).First().Name : "";
 
-        _byProduct = Cat.Products.Select(p =>
-        {
-            var items = opps.Where(o => o.ProductId == p.Id && InYear(o) && Eligible(o)).ToList();
-            return new ProductRow(p.Name, items.Sum(W), items.Count > 0 ? items.Average(o => o.GmPercentValue) : 0, PseudoTrend(p.Name, 12));
-        }).Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(6).ToList();
+        _byProduct = eligYear.GroupBy(o => o.ProductId ?? "")
+            .Select(g =>
+            {
+                var items = g.ToList();
+                return new ProductRow(g.Key == "" ? "—" : Cat.ProductName(g.Key), items.Sum(W),
+                    items.Average(o => o.GmPercentValue), PseudoTrend(g.Key, 12));
+            })
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(6).ToList();
         _maxProduct = Math.Max(_byProduct.Count > 0 ? _byProduct.Max(x => x.Value) : 1, 1);
         _productTotal = Math.Max(_byProduct.Sum(x => x.Value), 1);
 
-        // KAM com coverage e status.
-        _byKam = Cat.Kams.Select(k =>
-        {
-            var f = opps.Where(o => o.KamId == k.Id && InYear(o) && Eligible(o)).Sum(W);
-            var t = Cat.TargetYear(_year, "kam", k.Id);
-            var cov = t > 0 ? f / t : 0;
-            var (st, css) = cov >= 1.1 ? ("Acima da meta", "st-pos")
-                : cov >= 1 ? ("Dentro da meta", "st-pos")
-                : cov >= 0.75 ? ("Atenção", "st-warn")
-                : ("Abaixo da meta", "st-neg");
-            return new KamRow(k.Name, f, t, t - f, cov, st, css);
-        }).OrderByDescending(x => x.Forecast).ToList();
+        // KAM com coverage e status — agrupado pelos KAMs reais das oportunidades.
+        _byKam = eligYear.GroupBy(o => o.KamId ?? "")
+            .Select(g =>
+            {
+                var name = g.Key == "" ? "—" : Cat.KamName(g.Key);
+                var f = g.Sum(W);
+                var t = Cat.TargetYear(_year, "kam", g.Key);
+                var cov = t > 0 ? f / t : 0;
+                var (st, css) = t <= 0 ? ("Sem meta", "st-neutral")
+                    : cov >= 1 ? ("Dentro da meta", "st-pos")
+                    : cov >= 0.75 ? ("Atenção", "st-warn")
+                    : ("Abaixo da meta", "st-neg");
+                return new KamRow(name, f, t, t - f, cov, st, css);
+            })
+            .Where(x => x.Forecast > 0).OrderByDescending(x => x.Forecast).ToList();
 
         BuildWaterfall();
         BuildInsights(opps, open, eligibleForecast);
@@ -688,28 +725,6 @@
     private void BuildInsights(List<Opportunity> opps, List<Opportunity> open, List<Opportunity> eligible)
     {
         _insights = new();
-        var monthElig = opps.Where(o => (o.ExpectedDateValue?.Year ?? 0) == _year && o.ExpectedDateValue!.Value.Month == _month && ForecastCategories.CountsToForecast(o.Category))
-            .OrderByDescending(ForecastCalc.WeightedUsd).ToList();
-        var monthTotal = Math.Max(monthElig.Sum(ForecastCalc.WeightedUsd), 1);
-        var top4 = monthElig.Take(4).Sum(ForecastCalc.WeightedUsd);
-        _insights.Add(new("Concentração", "warn",
-            "Concentração elevada na previsão do mês",
-            $"As quatro maiores oportunidades representam {Fmt.Pct(top4 / monthTotal * 100)} da previsão mensal.",
-            Fmt.Pct(top4 / monthTotal * 100), "Diversificar a carteira", "/oportunidades"));
-
-        var worstMarket = _byMarket.OrderBy(m => m.Trend).FirstOrDefault();
-        if (worstMarket != null)
-            _insights.Add(new("Desempenho", worstMarket.Trend < 0 ? "neg" : "info",
-                $"{(worstMarket.Trend < 0 ? "Queda" : "Alta")} na previsão de {worstMarket.Name}",
-                $"A previsão do mercado de {worstMarket.Name} variou {Fmt.Signed(worstMarket.Trend)} desde a última revisão comercial.",
-                Fmt.Signed(worstMarket.Trend), "Revisar o pipeline do mercado", "/oportunidades"));
-
-        var topKam = _byKam.FirstOrDefault();
-        if (topKam != null)
-            _insights.Add(new("Oportunidade", "pos",
-                "Aumento da previsão nesta semana",
-                $"{topKam.Name} elevou sua previsão em {Money(topKam.Forecast * 0.14)} nesta semana.",
-                "+" + Money(topKam.Forecast * 0.14), "Validar as oportunidades incluídas", "/oportunidades"));
 
         var marginGap = 30 - _gmAvg;
         if (marginGap > 0)
@@ -717,12 +732,6 @@
                 "Margem prevista abaixo da meta",
                 $"A margem estimada está {marginGap.ToString("0.0", _pt)} p.p. abaixo do objetivo de 30%.",
                 $"-{marginGap.ToString("0.0", _pt)} p.p.", "Revisar preços e condições comerciais", "/oportunidades"));
-
-        var withAction = open.Count > 0 ? (double)open.Count(o => !string.IsNullOrWhiteSpace(o.NextAction)) / open.Count * 100 : 0;
-        _insights.Add(new("Qualidade dos dados", withAction >= 70 ? "pos" : "warn",
-            "Disciplina de próxima ação",
-            $"{Fmt.Pct(withAction)} das oportunidades abertas têm próxima ação agendada.",
-            Fmt.Pct(withAction), "Cobrar os KAMs pendentes", "/oportunidades"));
 
         var staleCommit = opps.Count(o => o.Category == ForecastCategory.Commit && ForecastCalc.DaysSinceUpdate(o, _today) > 30);
         if (staleCommit > 0)
