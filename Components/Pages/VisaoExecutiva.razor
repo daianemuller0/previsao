@@ -301,23 +301,45 @@
 @* ---- Distribuição da carteira: unidade · trimestre · país · GM ---- *@
 <div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
 <div class="g12 top">
-    <div class="c4">
+    <div class="c6">
         <div class="panel">
             <div class="panel-head"><div class="panel-title">Por unidade <span class="hint">BU do PV</span></div></div>
             @if (_byBu.Count > 0) { <div class="chart-body donut">@RenderDonut(_byBu)</div> } else { <div class="empty">Sem dados no recorte.</div> }
         </div>
     </div>
-    <div class="c4">
+    <div class="c6">
         <div class="panel">
             <div class="panel-head"><div class="panel-title">Valor por trimestre <span class="hint">1º a 4º tri</span></div></div>
             @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
             @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">Sem dados no recorte.</div> }
         </div>
     </div>
-    <div class="c4">
+</div>
+<div class="g12" style="margin-top:14px">
+    <div class="c12">
         <div class="panel">
-            <div class="panel-head"><div class="panel-title">Por país <span class="hint">mapa · participação</span></div></div>
-            @if (_byCountry.Count > 0) { <div class="chart-body" style="min-height:0">@RenderCountryMap()</div> } else { <div class="empty">Sem dados no recorte.</div> }
+            <div class="panel-head">
+                <div class="panel-title">Por país <span class="hint">mapa-múndi · participação · @MetricLabel</span></div>
+                <div class="map-zoom">
+                    <button class="icon-btn" title="Diminuir" @onclick="() => MapZoom(1/1.4)">@Icons.Svg("down")</button>
+                    <span class="map-zoom-lbl">@(_mapZoom.ToString("0", System.Globalization.CultureInfo.InvariantCulture))%</span>
+                    <button class="icon-btn" title="Aumentar" @onclick="() => MapZoom(1.4)">@Icons.Svg("up")</button>
+                    <button class="icon-btn" title="Redefinir" @onclick="() => _mapZoom = 100">@Icons.Svg("target")</button>
+                </div>
+            </div>
+            @if (_byCountry.Count > 0)
+            {
+                <div class="worldmap-scroll">
+                    <div class="worldmap-inner" style="width:@(_mapZoom.ToString("0", System.Globalization.CultureInfo.InvariantCulture))%">@RenderWorldMap()</div>
+                </div>
+                <div class="map-legend cols">
+                    @foreach (var c in _byCountry.OrderByDescending(x => x.Value))
+                    {
+                        <div class="ml-row"><span class="ml-dot"></span><span class="ml-name">@c.Label</span><span class="ml-val">@Money(c.Value)</span><span class="ml-pct">@Fmt.Pct(c.Value / _countryTotal * 100)</span></div>
+                    }
+                </div>
+            }
+            else { <div class="empty">Sem dados no recorte.</div> }
         </div>
     </div>
 </div>
@@ -1070,23 +1092,27 @@
         builder.AddMarkupContent(0, sb.ToString());
     };
 
-    // Nome do país (PT / variações) -> nome no mapa (inglês, chave de SouthAmericaMap).
+    // Nome do país nos dados (PT / variações) -> nome no mapa-múndi (inglês).
     private static readonly Dictionary<string, string> CountryToMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["brasil"] = "Brazil", ["brazil"] = "Brazil", ["chile"] = "Chile",
-        ["peru"] = "Peru", ["perú"] = "Peru", ["argentina"] = "Argentina",
-        ["colombia"] = "Colombia", ["colômbia"] = "Colombia", ["bolivia"] = "Bolivia", ["bolívia"] = "Bolivia",
-        ["venezuela"] = "Venezuela", ["ecuador"] = "Ecuador", ["equador"] = "Ecuador",
-        ["paraguai"] = "Paraguay", ["paraguay"] = "Paraguay", ["uruguai"] = "Uruguay", ["uruguay"] = "Uruguay",
-        ["guiana"] = "Guyana", ["guyana"] = "Guyana", ["suriname"] = "Suriname",
+        ["brasil"] = "Brazil", ["chile"] = "Chile", ["peru"] = "Peru", ["perú"] = "Peru",
+        ["argentina"] = "Argentina", ["colombia"] = "Colombia", ["colômbia"] = "Colombia",
+        ["bolivia"] = "Bolivia", ["bolívia"] = "Bolivia", ["venezuela"] = "Venezuela",
+        ["equador"] = "Ecuador", ["paraguai"] = "Paraguay", ["uruguai"] = "Uruguay",
+        ["guiana"] = "Guyana", ["méxico"] = "Mexico", ["mexico"] = "Mexico",
+        ["estados unidos"] = "United States of America", ["eua"] = "United States of America",
+        ["espanha"] = "Spain", ["alemanha"] = "Germany", ["frança"] = "France", ["itália"] = "Italy",
+        ["reino unido"] = "United Kingdom", ["china"] = "China", ["índia"] = "India", ["japão"] = "Japan",
+        ["áfrica do sul"] = "South Africa", ["austrália"] = "Australia", ["canadá"] = "Canada",
     };
-    // Centroides aproximados (lon, lat) para o rótulo de valor sobre o país.
-    private static readonly Dictionary<string, (double Lon, double Lat)> MapCentroid = new(StringComparer.OrdinalIgnoreCase)
+
+    // Resolve o rótulo do país dos dados para a chave do mapa (com fallback ao nome em inglês).
+    private static string? MapKey(string label)
     {
-        ["Brazil"] = (-51, -10), ["Chile"] = (-71, -38), ["Peru"] = (-75, -10), ["Argentina"] = (-65, -37),
-        ["Colombia"] = (-73, 4), ["Bolivia"] = (-64, -17), ["Venezuela"] = (-66, 7), ["Ecuador"] = (-78, -1.5),
-        ["Paraguay"] = (-58, -23), ["Uruguay"] = (-56, -33), ["Guyana"] = (-59, 5), ["Suriname"] = (-56, 4),
-    };
+        var l = label.Trim();
+        if (CountryToMap.TryGetValue(l, out var en) && WorldMap.Paths.ContainsKey(en)) return en;
+        return WorldMap.Paths.ContainsKey(l) ? l : null;
+    }
 
     // Interpolação de cor (claro -> teal) para o choropleth, t em [0,1].
     private static string Shade(double t)
@@ -1096,46 +1122,38 @@
         return $"rgb({r},{g},{b})";
     }
 
-    // Mapa por país (choropleth) com fronteiras reais da América do Sul.
-    private RenderFragment RenderCountryMap() => builder =>
+    private double _mapZoom = 100;
+    private void MapZoom(double factor) => _mapZoom = Math.Clamp(Math.Round(_mapZoom * factor), 100, 800);
+
+    // Mapa-múndi (choropleth) com fronteiras reais dos países.
+    private RenderFragment RenderWorldMap() => builder =>
     {
         // valor por país no nome do mapa (soma variações)
         var byName = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         foreach (var c in _byCountry)
-            if (CountryToMap.TryGetValue(c.Label.Trim(), out var en))
-                byName[en] = byName.GetValueOrDefault(en) + c.Value;
+            if (MapKey(c.Label) is { } key)
+                byName[key] = byName.GetValueOrDefault(key) + c.Value;
         double maxV = byName.Count > 0 ? byName.Values.Max() : 1;
 
-        // projeção usada na geração dos contornos (plate carrée)
-        double lonMin = -81.41, latMax = 12.44, pad = 6, scale = 308.0 / 46.68;
-        double PX(double lon) => pad + (lon - lonMin) * scale;
-        double PY(double lat) => pad + (latMax - lat) * scale;
-
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {F(SouthAmericaMap.ViewW)} {F(SouthAmericaMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Distribuição por país'>");
-        foreach (var (name, d) in SouthAmericaMap.Paths)
+        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Distribuição por país'>");
+        sb.Append($"<rect x='0' y='0' width='{F(WorldMap.ViewW)}' height='{F(WorldMap.ViewH)}' fill='#f7fafc'/>");
+        foreach (var (name, d) in WorldMap.Paths)
         {
             var has = byName.TryGetValue(name, out var v);
-            var fill = has ? Shade(maxV > 0 ? v / maxV : 0) : "#eef4f8";
+            var fill = has ? Shade(maxV > 0 ? v / maxV : 0) : "#e7edf3";
             var tip = has ? $"{name} · {Money(v)}" : name;
-            sb.Append($"<path d='{d}' fill='{fill}' stroke='#c4d2e2' stroke-width='0.7'><title>{Esc(tip)}</title></path>");
+            sb.Append($"<path d='{d}' fill='{fill}' stroke='#cdd8e4' stroke-width='0.4'><title>{Esc(tip)}</title></path>");
         }
-        // rótulo de valor no país (cor de contraste conforme o tom)
+        // rótulo de valor no país (centroide gerado) com contraste conforme o tom
         foreach (var kv in byName)
         {
-            if (!MapCentroid.TryGetValue(kv.Key, out var pos)) continue;
+            if (!WorldMap.Centroids.TryGetValue(kv.Key, out var pos)) continue;
             bool dark = (maxV > 0 ? kv.Value / maxV : 0) > 0.5;
-            sb.Append($"<text x='{F(PX(pos.Lon))}' y='{F(PY(pos.Lat))}' text-anchor='middle' font-size='10' font-weight='700' fill='{(dark ? "#fff" : "#1e2836")}'>{Esc(Fmt.Compact(Cv(kv.Value)))}</text>");
+            sb.Append($"<text x='{F(pos.X)}' y='{F(pos.Y + 3)}' text-anchor='middle' font-size='9' font-weight='700' fill='{(dark ? "#fff" : "#1e2836")}'>{Esc(Fmt.Compact(Cv(kv.Value)))}</text>");
         }
         sb.Append("</svg>");
-
-        // legenda compacta (inclui países fora da América do Sul, se houver)
-        sb.Append("<div class='map-legend'>");
-        foreach (var c in _byCountry.OrderByDescending(c => c.Value))
-            sb.Append($"<div class='ml-row'><span class='ml-dot'></span><span class='ml-name'>{Esc(c.Label)}</span><span class='ml-val'>{Esc(Money(c.Value))}</span><span class='ml-pct'>{Esc(Fmt.Pct(c.Value / _countryTotal * 100))}</span></div>");
-        sb.Append("</div>");
-
-        builder.AddMarkupContent(0, "<div class='country-map'>" + sb.ToString() + "</div>");
+        builder.AddMarkupContent(0, sb.ToString());
     };
 
     private static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
