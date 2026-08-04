@@ -64,19 +64,21 @@ public class ControleRepository
     // Séries mensais do REPORT HSA (índice 0 = janeiro … 11 = dezembro) para uso
     // em dashboards externos (ex.: Visão Executiva). Reproduz exatamente as linhas
     // da planilha: Realizado = soma de NB+AFM+SV+LTSA; Meta = orçamento consolidado.
-    public (double[] Realizado, double[] Meta) ReportSeries(int year)
+    public (double[] Realizado, double[] Meta, double[] MetaHsa) ReportSeries(int year)
     {
         var entries = Entries(year);
         double Real(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.RealizadoV ?? 0;
-        double Meta(int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == "CONS")?.BudgetV ?? 0;
+        double Budget(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.BudgetV ?? 0;
         var real = new double[12];
         var meta = new double[12];
+        var metaHsa = new double[12];
         for (var m = 1; m <= 12; m++)
         {
             real[m - 1] = ReportCats.Sum(c => Real(c, m));
-            meta[m - 1] = Meta(m);
+            meta[m - 1] = Budget("CONS", m);
+            metaHsa[m - 1] = Budget("MHSA", m);
         }
-        return (real, meta);
+        return (real, meta, metaHsa);
     }
 
     public void Refresh()

@@ -109,7 +109,7 @@
             <span class="ra-value" style="color:@AtColor(_repAttain)">@Fmt.Pct(_repAttain)</span>
         </div>
     </div>
-    @if (_repReal.Any(v => v > 0) || _repMeta.Any(v => v > 0))
+    @if (_repReal.Any(v => v > 0) || _repMeta.Any(v => v > 0) || _repMetaHsa.Any(v => v > 0))
     {
         <div class="chart-body">@RenderReportLine()</div>
     }
@@ -436,7 +436,7 @@
     private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     // Série do REPORT HSA (Controle): realizado x meta mensal + atendimento anual.
-    private double[] _repReal = new double[12], _repMeta = new double[12];
+    private double[] _repReal = new double[12], _repMeta = new double[12], _repMetaHsa = new double[12];
     private double _repAttain;
     private int _repYear = DateTime.Today.Year;
 
@@ -464,8 +464,8 @@
 
     private void LoadReport()
     {
-        var (real, meta) = ControleRepo.ReportSeries(_repYear);
-        _repReal = real; _repMeta = meta;
+        var (real, meta, metaHsa) = ControleRepo.ReportSeries(_repYear);
+        _repReal = real; _repMeta = meta; _repMetaHsa = metaHsa;
         double tr = real.Sum(), tm = meta.Sum();
         _repAttain = tm > 0 ? tr / tm * 100 : 0;
     }
@@ -976,11 +976,11 @@
         double Wd = 760, H = 280, top = 46, bot = 236, left = 46, right = 18;
         double plotW = Wd - left - right, colW = plotW / 11.0;
         double max = 1;
-        for (var m = 0; m < 12; m++) max = Math.Max(max, Math.Max(_repReal[m], _repMeta[m]));
+        for (var m = 0; m < 12; m++) max = Math.Max(max, Math.Max(Math.Max(_repReal[m], _repMeta[m]), _repMetaHsa[m]));
         max *= 1.20;
         double X(int m) => left + m * colW;
         double Y(double val) => bot - val / max * (bot - top);
-        const string cReal = "#007A9E", cMeta = "#b7791f";
+        const string cReal = "#007A9E", cMeta = "#b7791f", cMhsa = "#1f9254";
 
         var sb = new System.Text.StringBuilder();
         sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas x Meta NB+AFM'>");
@@ -994,6 +994,8 @@
         sb.Append($"<text x='{(left + 28).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Vendas NB+AFM (Realizado)</text>");
         sb.Append($"<line x1='{(left + 205).ToString(inv)}' y1='20' x2='{(left + 227).ToString(inv)}' y2='20' stroke='{cMeta}' stroke-width='3' stroke-dasharray='5 3' stroke-linecap='round'/>");
         sb.Append($"<text x='{(left + 233).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Meta NB+AFM (Budget)</text>");
+        sb.Append($"<line x1='{(left + 400).ToString(inv)}' y1='20' x2='{(left + 422).ToString(inv)}' y2='20' stroke='{cMhsa}' stroke-width='3' stroke-dasharray='2 3' stroke-linecap='round'/>");
+        sb.Append($"<text x='{(left + 428).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Meta Vendas HSA</text>");
 
         // grade + rótulos do eixo Y
         for (var g = 0; g <= 4; g++)
@@ -1018,14 +1020,20 @@
         for (var m = 0; m < 12; m++) lm.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repMeta[m]).ToString("0.#", inv)}");
         sb.Append($"<polyline points='{lm}' fill='none' stroke='{cMeta}' stroke-width='2' stroke-dasharray='5 3' stroke-linejoin='round' stroke-linecap='round'/>");
 
+        // linha Meta Vendas HSA (pontilhada)
+        var lh = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++) lh.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repMetaHsa[m]).ToString("0.#", inv)}");
+        sb.Append($"<polyline points='{lh}' fill='none' stroke='{cMhsa}' stroke-width='2' stroke-dasharray='2 3' stroke-linejoin='round' stroke-linecap='round'/>");
+
         // pontos + rótulos + meses
         for (var m = 0; m < 12; m++)
         {
-            double cx = X(m), yr = Y(_repReal[m]), ym = Y(_repMeta[m]);
+            double cx = X(m), yr = Y(_repReal[m]), ym = Y(_repMeta[m]), yh = Y(_repMetaHsa[m]);
             bool cur = (m + 1) == _month;
             double att = _repMeta[m] > 0 && _repReal[m] > 0 ? _repReal[m] / _repMeta[m] * 100 : 0;
-            var tip = $"{Fmt.MonthName(m + 1)} · Realizado R$ {Fmt.Compact(_repReal[m])} · Meta R$ {Fmt.Compact(_repMeta[m])}" + (att > 0 ? $" · {Fmt.Pct(att)}" : "");
+            var tip = $"{Fmt.MonthName(m + 1)} · Realizado R$ {Fmt.Compact(_repReal[m])} · Meta R$ {Fmt.Compact(_repMeta[m])} · Meta HSA R$ {Fmt.Compact(_repMetaHsa[m])}" + (att > 0 ? $" · {Fmt.Pct(att)}" : "");
 
+            if (_repMetaHsa[m] > 0) sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yh.ToString("0.#", inv)}' r='2.5' fill='{cMhsa}'><title>{Esc(tip)}</title></circle>");
             sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{ym.ToString("0.#", inv)}' r='2.5' fill='{cMeta}'><title>{Esc(tip)}</title></circle>");
             sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yr.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cReal}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
             if (_repReal[m] > 0)
