@@ -973,7 +973,7 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .cover-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .cover-brand-text strong { font-size: 18px; color: #fff; }
 .cover-brand-text span { font-size: 11px; color: rgba(255,255,255,.7); }
-.cover-logo-img { max-height: 46px; max-width: 220px; object-fit: contain; }
+.cover-logo-img { max-height: 76px; max-width: 300px; object-fit: contain; }
 .cover-tags-top { text-align: right; font-size: 10px; letter-spacing: .08em; color: rgba(255,255,255,.72); font-weight: 700; text-transform: uppercase; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .cover-tags-top .dot { opacity: .5; }
 .cover-hero { z-index: 1; margin-top: auto; margin-bottom: auto; max-width: 560px; }
@@ -1002,8 +1002,8 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 }
 
 /* ===================== Identidade visual ===================== */
-.brand-logo-img { max-height: 40px; max-width: 190px; object-fit: contain; display: block; }
-.sidebar.collapsed .brand-logo-img { max-width: 40px; }
+.brand-logo-img { width: 100%; max-width: 200px; max-height: 84px; object-fit: contain; display: block; margin: 2px auto; }
+.sidebar.collapsed .brand-logo-img { width: auto; max-width: 44px; max-height: 44px; }
 .logo-slot { display: flex; flex-direction: column; gap: 16px; }
 .logo-preview { display: grid; place-items: center; min-height: 130px; border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 20px; background: var(--panel-2); }
 .logo-preview.on-dark { background: linear-gradient(150deg, var(--sidebar-top, #0a5f56), var(--primary, #004785)); border-color: transparent; }
