@@ -183,6 +183,21 @@ public class OpportunityRepository
         lock (_lock) { EnsureCache().RemoveAll(x => x.Id == id); }
     }
 
+    // Oportunidades DEMONSTRATIVAS têm Id "opp-<número>". As reais são "imp-*"
+    // (importadas) ou "opp-<guid>" (criadas manualmente), que não casam aqui.
+    private static readonly System.Text.RegularExpressions.Regex DemoIdRx =
+        new("^opp-[0-9]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Remove as oportunidades demonstrativas, preservando as reais.
+    /// Idempotente: só grava se houver demos. Devolve quantas removeu.</summary>
+    public int RemoveDemo()
+    {
+        List<string> ids;
+        lock (_lock) ids = EnsureCache().Where(o => DemoIdRx.IsMatch(o.Id)).Select(o => o.Id).ToList();
+        foreach (var id in ids) Delete(id);
+        return ids.Count;
+    }
+
     /// <summary>Apaga TODA a base de oportunidades (remove os Parquet e zera o cache).</summary>
     public void DeleteAll()
     {
