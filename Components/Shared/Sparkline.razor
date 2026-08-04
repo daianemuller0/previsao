@@ -1,0 +1,44 @@
+@* Mini gráfico de linha (sparkline) em SVG puro, sem dependências. *@
+
+@if (Values is { Length: > 1 })
+{
+    <svg viewBox="0 0 100 30" preserveAspectRatio="none" role="img">
+        @if (Area)
+        {
+            <polygon points="@AreaPoints" fill="@Stroke" opacity="0.10" />
+        }
+        <polyline points="@LinePoints" fill="none" stroke="@Stroke" stroke-width="1.8"
+                  vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+        <circle cx="@LastX.ToString(Inv)" cy="@LastY.ToString(Inv)" r="1.9" fill="@Stroke" />
+    </svg>
+}
+
+@code {
+    [Parameter] public double[] Values { get; set; } = Array.Empty<double>();
+    [Parameter] public string Stroke { get; set; } = "#007A9E";
+    [Parameter] public bool Area { get; set; } = true;
+
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private double LastX, LastY;
+
+    private string LinePoints => Build(out LastX, out LastY);
+    private string AreaPoints => LinePoints + $" 100,30 0,30";
+
+    private string Build(out double lx, out double ly)
+    {
+        var min = Values.Min();
+        var max = Values.Max();
+        var range = Math.Abs(max - min) < 1e-9 ? 1 : max - min;
+        var n = Values.Length;
+        var pts = new string[n];
+        lx = ly = 0;
+        for (var i = 0; i < n; i++)
+        {
+            var x = i / (double)(n - 1) * 100;
+            var y = 28 - (Values[i] - min) / range * 26; // margem topo/base
+            lx = x; ly = y;
+            pts[i] = $"{x.ToString("0.##", Inv)},{y.ToString("0.##", Inv)}";
+        }
+        return string.Join(' ', pts);
+    }
+}

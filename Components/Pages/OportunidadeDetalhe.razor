@@ -1,0 +1,236 @@
+@page "/oportunidades/{Id}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+@inject NavigationManager Nav
+
+<div class="breadcrumbs">
+    <a href="/oportunidades">Oportunidades</a><span class="sep">/</span>
+    <span class="strong" style="color:var(--text-2)">@(_o?.ProposalNumber ?? "—")</span>
+</div>
+
+@if (_o is null)
+{
+    <div class="empty-state">
+        <div class="ico">@Icons.Svg("opportunity")</div>
+        <h3>Oportunidade não encontrada</h3>
+        <p>O registro pode ter sido removido. <a href="/oportunidades">Voltar à lista</a>.</p>
+    </div>
+}
+else
+{
+    var lvl = ForecastCalc.Level(_o, _today);
+    <div class="opp-header">
+        <div class="opp-top">
+            <div>
+                <div class="opp-name">@_o.Name</div>
+                <div class="opp-sub">@Cat.CustomerName(_o.CustomerId) · @Cat.PlantName(_o.PlantId) · @_o.ProposalNumber · PV @_o.PvNumber</div>
+                <div class="opp-badges">
+                    <span class="badge @ForecastCategories.Css(_o.Category)">@ForecastCategories.Label(_o.Category)</span>
+                    <span class="badge @RiskLevels.Css(lvl)">Risco @RiskLevels.Label(lvl)</span>
+                    <span class="tag">@Cat.StageName(_o.PipelineStageId)</span>
+                    <span class="tag">@CommercialCategory.Name(_o.CommercialCategory)</span>
+                    @if (ForecastCalc.DaysSinceUpdate(_o, _today) >= 30) { <span class="tag warn">sem atualização @ForecastCalc.DaysSinceUpdate(_o, _today)d</span> }
+                    @if (ForecastCalc.DaysToExpected(_o, _today) < 0 && ForecastCategories.IsOpen(_o.Category)) { <span class="tag neg">data vencida</span> }
+                </div>
+            </div>
+            <div class="page-actions">
+                <a class="btn-ghost" href="/oportunidades">@Icons.Svg("chevron-left")Voltar</a>
+                <a class="btn-primary" href="/oportunidades">@Icons.Svg("edit")Editar</a>
+            </div>
+        </div>
+        <div class="opp-facts">
+            <div class="fact"><div class="fact-label">Valor USD</div><div class="fact-value">@Fmt.Usd(_o.AmountUsd)</div></div>
+            <div class="fact"><div class="fact-label">Valor BRL</div><div class="fact-value">@Fmt.Brl(_o.AmountBrl)</div></div>
+            <div class="fact"><div class="fact-label">Ponderado</div><div class="fact-value">@Fmt.Usd(ForecastCalc.WeightedUsd(_o))</div></div>
+            <div class="fact"><div class="fact-label">Prob. ganho</div><div class="fact-value">@Fmt.Pct(_o.WinProbabilityValue)</div></div>
+            <div class="fact"><div class="fact-label">Data prevista</div><div class="fact-value">@Fmt.Date(_o.ExpectedDate)</div></div>
+            <div class="fact"><div class="fact-label">GM%</div><div class="fact-value">@Fmt.Pct(_o.GmPercentValue)</div></div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        @foreach (var t in _tabs)
+        {
+            <button class="tab @(_tab == t.Key ? "active" : "")" @onclick="() => _tab = t.Key">@t.Label</button>
+        }
+    </div>
+
+    @switch (_tab)
+    {
+        case "resumo":
+            <div class="grid-2">
+                <div class="panel">
+                    <div class="panel-title mb-16">Resumo</div>
+                    <dl class="detail-grid">
+                        <div class="dl"><dt>Etapa</dt><dd>@Cat.StageName(_o.PipelineStageId)</dd></div>
+                        <div class="dl"><dt>Forecast Category</dt><dd>@ForecastCategories.Label(_o.Category)</dd></div>
+                        <div class="dl"><dt>Responsável (KAM)</dt><dd>@Cat.KamName(_o.KamId)</dd></div>
+                        <div class="dl"><dt>Próxima ação</dt><dd>@(string.IsNullOrWhiteSpace(_o.NextAction) ? "—" : _o.NextAction)</dd></div>
+                        <div class="dl"><dt>Data da próx. ação</dt><dd>@Fmt.Date(_o.NextActionDate)</dd></div>
+                        <div class="dl"><dt>Última atualização</dt><dd>@Fmt.Date(_o.UpdatedAt) · @_o.UpdatedBy</dd></div>
+                    </dl>
+                </div>
+                <div class="panel">
+                    <div class="panel-title mb-16">Score de risco</div>
+                    <div style="display:flex;align-items:center;gap:16px;">
+                        <Donut Percent="@ForecastCalc.RiskScore(_o, _today)" Color="@RiskColor(lvl)" CenterLabel="@ForecastCalc.RiskScore(_o, _today).ToString()"
+                               Caption="@($"Classificação <strong>{RiskLevels.Label(lvl)}</strong><br/>Postergações: {_o.PostponeCountValue}")" />
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_o.Risks))
+                    {
+                        <div class="info-banner" style="margin-top:14px">@_o.Risks</div>
+                    }
+                </div>
+            </div>
+            break;
+
+        case "comercial":
+            <div class="panel">
+                <div class="panel-title mb-16">Informações comerciais</div>
+                <dl class="detail-grid">
+                    <div class="dl"><dt>Cliente</dt><dd>@Cat.CustomerName(_o.CustomerId)</dd></div>
+                    <div class="dl"><dt>Planta</dt><dd>@Cat.PlantName(_o.PlantId)</dd></div>
+                    <div class="dl"><dt>País</dt><dd>@Cat.CountryName(_o.CountryId)</dd></div>
+                    <div class="dl"><dt>KAM</dt><dd>@Cat.KamName(_o.KamId)</dd></div>
+                    <div class="dl"><dt>Mercado</dt><dd>@Cat.MarketName(_o.MarketId)</dd></div>
+                    <div class="dl"><dt>Submercado</dt><dd>@Cat.SubMarketName(_o.SubMarketId)</dd></div>
+                    <div class="dl"><dt>Produto</dt><dd>@Cat.ProductName(_o.ProductId)</dd></div>
+                    <div class="dl"><dt>Tipo de equipamento</dt><dd>@Cat.EquipmentName(_o.EquipmentTypeId)</dd></div>
+                    <div class="dl"><dt>Categoria NB/RT/AFM/SV</dt><dd>@CommercialCategory.Name(_o.CommercialCategory)</dd></div>
+                    <div class="dl"><dt>BU do PV</dt><dd>@Cat.BuName(_o.PvBusinessUnitId)</dd></div>
+                    <div class="dl"><dt>BU Intercompany</dt><dd>@(string.IsNullOrWhiteSpace(_o.IntercompanyBu) ? "—" : Cat.BuName(_o.IntercompanyBu))</dd></div>
+                </dl>
+            </div>
+            break;
+
+        case "valores":
+            <div class="panel">
+                <div class="panel-title mb-16">Valores e margem</div>
+                <dl class="detail-grid">
+                    <div class="dl"><dt>Moeda de origem</dt><dd>@_o.CurrencyCode</dd></div>
+                    <div class="dl"><dt>Valor original</dt><dd>@_o.AmountOriginalValue.ToString("#,##0")</dd></div>
+                    <div class="dl"><dt>Câmbio (BRL/USD)</dt><dd>@_o.ExchangeRateValue.ToString("0.00")</dd></div>
+                    <div class="dl"><dt>Valor em BRL</dt><dd>@Fmt.Brl(_o.AmountBrl)</dd></div>
+                    <div class="dl"><dt>Valor em USD</dt><dd>@Fmt.Usd(_o.AmountUsd)</dd></div>
+                    <div class="dl"><dt>GM%</dt><dd>@Fmt.Pct(_o.GmPercentValue)</dd></div>
+                    <div class="dl"><dt>Margem estimada</dt><dd>@Fmt.Usd(ForecastCalc.MarginUsd(_o))</dd></div>
+                    <div class="dl"><dt>Valor ponderado</dt><dd>@Fmt.Usd(ForecastCalc.WeightedUsd(_o))</dd></div>
+                </dl>
+            </div>
+            break;
+
+        case "forecast":
+            <div class="panel">
+                <div class="panel-title mb-16">Forecast</div>
+                <dl class="detail-grid">
+                    <div class="dl"><dt>Data prevista</dt><dd>@Fmt.Date(_o.ExpectedDate)</dd></div>
+                    <div class="dl"><dt>Quarter</dt><dd>@(_o.ExpectedDateValue is {} d ? Fmt.Quarter(d) : "—")</dd></div>
+                    <div class="dl"><dt>Forecast Category</dt><dd>@ForecastCategories.Label(_o.Category)</dd></div>
+                    <div class="dl"><dt>Prob. de ganho</dt><dd>@Fmt.Pct(_o.WinProbabilityValue)</dd></div>
+                    <div class="dl"><dt>Prob. de fechamento no período</dt><dd>@Fmt.Pct(_o.CloseProbabilityValue)</dd></div>
+                    <div class="dl"><dt>Previsão do vendedor</dt><dd>@Fmt.Pct(_o.WinProbabilityValue)</dd></div>
+                    <div class="dl"><dt>Previsão do gestor</dt><dd>@(_o.ManagerProbabilityValue is {} mpFore ? Fmt.Pct(mpFore) : "—")</dd></div>
+                    <div class="dl"><dt>Justificativa</dt><dd>@(string.IsNullOrWhiteSpace(_o.Justification) ? "—" : _o.Justification)</dd></div>
+                </dl>
+            </div>
+            break;
+
+        case "atividades":
+            <div class="panel">
+                <div class="panel-title mb-16">Atividades</div>
+                @if (string.IsNullOrWhiteSpace(_o.NextAction))
+                {
+                    <div class="empty">Nenhuma próxima ação registrada.</div>
+                }
+                else
+                {
+                    <div class="info-banner">✦ Próxima ação — <strong>@_o.NextAction</strong> · @Fmt.Date(_o.NextActionDate)</div>
+                }
+                <div class="timeline mt-16">
+                    <div class="tl-item"><div class="tl-time">@Fmt.Date(_o.UpdatedAt)</div><div class="tl-title">Atualização de forecast</div><div class="tl-desc">por @_o.UpdatedBy</div></div>
+                    <div class="tl-item"><div class="tl-time">@Fmt.Date(_o.CreatedAt)</div><div class="tl-title">Oportunidade criada</div><div class="tl-desc">registro inicial no pipeline</div></div>
+                </div>
+            </div>
+            break;
+
+        case "riscos":
+            <div class="panel">
+                <div class="panel-title mb-16">Riscos e dependências</div>
+                <dl class="detail-grid">
+                    <div class="dl"><dt>Riscos comerciais</dt><dd>@(string.IsNullOrWhiteSpace(_o.Risks) ? "—" : _o.Risks)</dd></div>
+                    <div class="dl"><dt>Score de risco</dt><dd>@ForecastCalc.RiskScore(_o, _today) · @RiskLevels.Label(lvl)</dd></div>
+                    <div class="dl"><dt>Postergações</dt><dd>@_o.PostponeCountValue</dd></div>
+                    <div class="dl"><dt>Dias sem atualização</dt><dd>@ForecastCalc.DaysSinceUpdate(_o, _today)</dd></div>
+                    <div class="dl"><dt>Margem</dt><dd>@Fmt.Pct(_o.GmPercentValue)</dd></div>
+                    <div class="dl"><dt>Divergência vendedor × gestor</dt><dd>@(_o.ManagerProbabilityValue is {} mpDiv ? Fmt.Pct(Math.Abs(_o.WinProbabilityValue - mpDiv)) : "—")</dd></div>
+                </dl>
+            </div>
+            break;
+
+        case "historico":
+            <div class="panel">
+                <div class="panel-title mb-16">Histórico de alterações</div>
+                <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+                    <table class="grid-tbl">
+                        <thead><tr><th>Data</th><th>Campo</th><th>De</th><th>Para</th><th>Usuário</th></tr></thead>
+                        <tbody>
+                            @foreach (var h in History())
+                            {
+                                <tr><td class="nowrap">@h.When</td><td>@h.Field</td><td class="muted">@h.From</td><td class="col-strong">@h.To</td><td>@h.User</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            break;
+
+        case "documentos":
+            <div class="panel">
+                <div class="empty-state">
+                    <div class="ico">@Icons.Svg("import")</div>
+                    <h3>Nenhum documento anexado</h3>
+                    <p>Propostas, especificações e anexos comerciais aparecerão aqui.</p>
+                </div>
+            </div>
+            break;
+    }
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    private Opportunity? _o;
+    private DateTime _today = DateTime.Today;
+    private string _tab = "resumo";
+
+    private record TabDef(string Key, string Label);
+    private readonly TabDef[] _tabs =
+    {
+        new("resumo", "Resumo"), new("comercial", "Comercial"), new("valores", "Valores"),
+        new("forecast", "Forecast"), new("atividades", "Atividades"), new("riscos", "Riscos"),
+        new("historico", "Histórico"), new("documentos", "Documentos"),
+    };
+
+    protected override void OnParametersSet() => _o = Repo.Get(Id);
+
+    private record Hist(string When, string Field, string From, string To, string User);
+    private List<Hist> History()
+    {
+        var list = new List<Hist>();
+        if (_o is null) return list;
+        if (!string.IsNullOrWhiteSpace(_o.ValueChangedAt))
+            list.Add(new(Fmt.Date(_o.ValueChangedAt), "Valor", "—", Fmt.Usd(_o.AmountUsd), _o.UpdatedBy));
+        if (!string.IsNullOrWhiteSpace(_o.DateChangedAt))
+            list.Add(new(Fmt.Date(_o.DateChangedAt), "Data prevista", "—", Fmt.Date(_o.ExpectedDate), _o.UpdatedBy));
+        list.Add(new(Fmt.Date(_o.UpdatedAt), "Forecast Category", "—", ForecastCategories.Label(_o.Category), _o.UpdatedBy));
+        list.Add(new(Fmt.Date(_o.CreatedAt), "Criação", "—", "Oportunidade criada", _o.UpdatedBy));
+        return list;
+    }
+
+    private static string RiskColor(RiskLevel l) => l switch
+    {
+        RiskLevel.Baixo => "#1f9254", RiskLevel.Moderado => "#a97613",
+        RiskLevel.Alto => "#b4590a", _ => "#c0392b",
+    };
+}

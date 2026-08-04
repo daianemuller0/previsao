@@ -1,0 +1,110 @@
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<aside class="sidebar no-print @(Collapsed ? "collapsed" : "")">
+    <div class="brand @(Collapsed ? "center" : "")">
+        <div class="brand-mark">H</div>
+        @if (!Collapsed)
+        {
+            <div class="brand-text">
+                <div class="brand-name">Howden</div>
+                <div class="brand-sub">Sales Forecast</div>
+            </div>
+        }
+    </div>
+
+    <nav class="nav">
+        @foreach (var group in Groups)
+        {
+            var items = group.Items.Where(i => Allowed(i.Key)).ToList();
+            if (items.Count == 0) { continue; }
+            @if (!Collapsed)
+            {
+                <div class="nav-section">@group.Name</div>
+            }
+            @foreach (var it in items)
+            {
+                <a class="nav-item @(IsActive(it.Route) ? "active" : "")" href="@it.Route" title="@it.Label">
+                    @Icons.Svg(it.Icon, "nav-ico")
+                    <span>@it.Label</span>
+                </a>
+            }
+        }
+    </nav>
+
+    <div class="sidebar-footer">
+        @if (!Collapsed)
+        {
+            <div class="version">Howden Sales Forecast · v0.1</div>
+        }
+        <button class="collapse-btn" @onclick="Toggle" title="Recolher menu">
+            @Icons.Svg(Collapsed ? "chevron-right" : "chevron-left")
+        </button>
+    </div>
+</aside>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool Collapsed { get; set; }
+    private string _role = Roles.Admin;
+
+    private record NavItem(string Key, string Route, string Icon, string Label);
+    private record NavGroup(string Name, NavItem[] Items);
+
+    private static readonly NavGroup[] Groups =
+    {
+        new("Executivo", new[]
+        {
+            new NavItem("executivo", "/executivo", "executive", "Visão Executiva"),
+        }),
+        new("Comercial", new[]
+        {
+            new NavItem("oportunidades", "/oportunidades", "opportunity", "Oportunidades"),
+            new NavItem("controle", "/controle", "review", "Controle"),
+        }),
+        new("Dados", new[]
+        {
+            new NavItem("listas", "/listas", "layers", "Listas"),
+        }),
+        new("Sistema", new[]
+        {
+            new NavItem("administracao", "/administracao", "admin", "Administração"),
+        }),
+    };
+
+    // Visibilidade por perfil (Seção 17). Admin/Diretoria/Gestor veem tudo.
+    private static readonly Dictionary<string, string[]> RoleMenus = new()
+    {
+        [Roles.Kam] = new[] { "oportunidades", "controle" },
+        [Roles.Financeiro] = new[] { "executivo", "controle", "listas" },
+        [Roles.Viewer] = new[] { "executivo", "controle" },
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var state = await AuthState;
+            var role = state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (!string.IsNullOrEmpty(role)) { _role = role; }
+        }
+    }
+
+    private bool Allowed(string key) =>
+        !RoleMenus.TryGetValue(_role, out var keys) || keys.Contains(key);
+
+    private bool IsActive(string route)
+    {
+        var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
+        if (route == "/executivo" && (path == "/" || path == "")) { return true; }
+        return path.StartsWith(route, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task Toggle()
+    {
+        Collapsed = !Collapsed;
+        try { await JS.InvokeVoidAsync("appToggleSidebar", Collapsed); } catch { }
+    }
+}

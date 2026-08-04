@@ -1,0 +1,1072 @@
+@page "/executivo"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+@inject ControleRepository ControleRepo
+@inject NavigationManager Nav
+
+@{ Build(); }
+
+@* ===================== 1 · CABEÇALHO EXECUTIVO ===================== *@
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span>Previsão de Vendas</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Visão Executiva</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Previsão de Vendas</h1>
+        <p class="subtitle">
+            @Fmt.MonthLong(_month) de @_year · @(_quarter)º trimestre · Howden Brasil · @_currency<br />
+            Última consolidação @_updated.ToString("dd/MM/yyyy 'às' HH:mm") · Responsável: Ricardo Mendes
+            &nbsp;·&nbsp; <span class="badge @DqCss">Qualidade dos dados @_dq%</span>
+            &nbsp; <span class="badge @ConfCss">Confiança da previsão @_confidence%</span>
+        </p>
+    </div>
+    <div class="page-actions">
+        <div class="segmented" style="margin-right:2px">
+            <button class="@(_currency == "USD" ? "active" : "")" @onclick='() => _currency = "USD"'>USD</button>
+            <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
+        </div>
+        <a class="btn-ghost" href="/forecast/export" target="_blank" title="Exportar CSV">@Icons.Svg("download")Exportar</a>
+        <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
+    </div>
+</div>
+
+@* ---- Filtros globais ---- *@
+<div class="filterbar filterbar-sticky">
+    <div class="flt"><span class="flt-label">Ano</span><select><option>@_year</option></select></div>
+    <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
+    <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
+    <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
+    <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var m in Cat.Markets){<option value="@m.Id">@m.Name</option>}</select></div>
+    <div class="flt"><span class="flt-label">KAM</span><select @bind="_kam"><option value="">Todos</option>@foreach (var k in Cat.Kams){<option value="@k.Id">@k.Name</option>}</select></div>
+    <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
+    @if (_showMore)
+    {
+        <div class="flt"><span class="flt-label">País</span><select @bind="_country"><option value="">Todos</option>@foreach (var c in Cat.Countries){<option value="@c.Id">@c.Name</option>}</select></div>
+        <div class="flt"><span class="flt-label">Produto</span><select @bind="_product"><option value="">Todos</option>@foreach (var p in Cat.Products){<option value="@p.Id">@p.Name</option>}</select></div>
+        <div class="flt"><span class="flt-label">Cliente</span><select @bind="_customer"><option value="">Todos</option>@foreach (var c in Cat.Customers){<option value="@c.Id">@c.Name</option>}</select></div>
+        <div class="flt"><span class="flt-label">Unidade de negócio</span><select @bind="_bu"><option value="">Todas</option>@foreach (var b in Cat.BusinessUnits){<option value="@b.Id">@b.Code</option>}</select></div>
+    }
+    <button class="btn-link" @onclick="() => _showMore = !_showMore">@(_showMore ? "Menos filtros" : "Mais filtros")</button>
+    <div class="filterbar-spacer"></div>
+    @if (_activeFilters > 0)
+    {
+        <span class="tag">@_activeFilters ativo(s)</span>
+        <button class="btn-link" @onclick="ClearFilters">Limpar</button>
+    }
+    <button class="btn-link" @onclick="SaveView">Salvar visualização</button>
+    @if (_savedMsg) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
+</div>
+
+@* ===================== 2 · HERO EXECUTIVO ===================== *@
+<div class="hero">
+    <div class="hero-main">
+        <div class="hero-eyebrow">Previsão do mês · @Fmt.MonthLong(_month) @_year</div>
+        <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(Cv(_fcMonth))</div>
+        <div class="hero-target-line">Meta @Money(_tgtMonth) · @Fmt.Pct(_attainMonth) atingida · gap @Money(Math.Max(_tgtMonth - _fcMonth, 0))</div>
+        <div class="hero-chips">
+            <div class="hero-chip"><div class="k">vs previsão anterior</div><div class="v @(_fcMonthDelta >= 0 ? "pos" : "neg")">@Icons.Svg(_fcMonthDelta >= 0 ? "up" : "down")@Fmt.Signed(_fcMonthDelta)</div></div>
+            <div class="hero-chip"><div class="k">vs mês anterior</div><div class="v @(_fcMonthMoM >= 0 ? "pos" : "neg")">@Fmt.Signed(_fcMonthMoM)</div></div>
+            <div class="hero-chip"><div class="k">Comprometido</div><div class="v">@Money(_committedMonth)</div></div>
+            <div class="hero-chip"><div class="k">Ponderado</div><div class="v">@Money(_fcMonth)</div></div>
+        </div>
+        <div class="hero-gauge">
+            <div class="gt"><div class="gf" style="width:@Clamp(_attainMonth)%"></div></div>
+            <div class="gl"><span>Atingimento da meta mensal</span><span>@Fmt.Pct(_attainMonth)</span></div>
+        </div>
+        <div class="hero-spark"><Sparkline Values="@_evoMonth" Stroke="#8fe3c4" /></div>
+    </div>
+</div>
+
+@* ---- Vendas x Meta (NB+AFM) · fonte: Controle · REPORT HSA ---- *@
+<div class="panel" style="margin-top:16px">
+    <div class="panel-head">
+        <div class="panel-title">Vendas x Meta · NB+AFM
+            <span class="hint">realizado x budget mensal · fonte: Controle · REPORT HSA · R$ · @_repYear</span>
+        </div>
+        <div class="rep-attain-box">
+            <span class="ra-label">Atendimento ao Budget (ano)</span>
+            <span class="ra-value" style="color:@AtColor(_repAttain)">@Fmt.Pct(_repAttain)</span>
+        </div>
+    </div>
+    @if (_repReal.Any(v => v > 0) || _repMeta.Any(v => v > 0))
+    {
+        <div class="chart-body">@RenderReportLine()</div>
+    }
+    else
+    {
+        <div class="empty">Sem dados no Controle (REPORT HSA) para @_repYear. Preencha os valores na guia <a href="/controle">Controle</a>.</div>
+    }
+</div>
+
+@* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
+<div class="section-head">
+    <span class="st-title">Top 10 oportunidades mais quentes</span>
+    <span class="st-sub">confiança + peso do valor · acima de R$ 1 mi</span>
+    <span class="st-line"></span>
+    <a class="btn-link" href="/oportunidades">Ver todas</a>
+</div>
+<OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
+                  EmptyText="Sem oportunidades acima de R$ 1 mi no recorte." OnChanged="ReloadOpps" />
+
+@* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
+<div class="section-head"><span class="st-title">Indicadores estratégicos</span><span class="st-line"></span></div>
+<div class="exec-grid cols-4">
+    <StatCard Label="Previsão do trimestre" Value="@Money(_fcQuarter)" Delta="@_fcQuarterDelta" Context="@($"Meta {Money(_tgtQuarter)}")" AccentLeft="true">
+        <div class="spark"><Sparkline Values="@_evoQuarter" Stroke="#007A9E" /></div>
+    </StatCard>
+    <StatCard Label="Previsão anual" Value="@Money(_fcYear)" Delta="@_fcYearDelta" Context="@($"Meta {Money(_tgtYear)}")" AccentLeft="true">
+        <div class="spark"><Sparkline Values="@_evoYear" Stroke="#009496" /></div>
+    </StatCard>
+    <StatCard Label="Realizado acumulado no ano" Value="@Money(_realizedYtd)" DeltaText="@($"{Fmt.Pct(_attainYtd)} da meta no ano")" Context="Fechados (ganhos)" AccentLeft="true" />
+    <StatCard Label="Previsão em risco" Value="@Money(_atRisk)" DeltaText="@($"{_atRiskCount} oportunidades de alto risco")" Context="exige decisão" AccentLeft="true" />
+</div>
+
+@* ===================== 3 · INSIGHTS EXECUTIVOS ===================== *@
+<div class="section-head">
+    <span class="st-title">@Icons.Svg("trend", "nav-ico") Insights executivos</span>
+    <span class="st-sub">principais sinais</span>
+    <span class="st-line"></span>
+    <a class="btn-link" href="/oportunidades">Ver todas</a>
+</div>
+<div class="panel">
+    <div class="insights insights-grid">
+        @foreach (var i in _insights.Take(6))
+        {
+            <div class="insight sev-@i.Sev">
+                <div class="insight-head"><span class="insight-cat">@i.Category</span><span class="insight-val" style="color:@SevColor(i.Sev)">@i.Value</span></div>
+                <div class="insight-title">@i.Title</div>
+                <div class="insight-detail">@i.Detail</div>
+                <div class="insight-foot">
+                    <span class="insight-action">@Icons.Svg("arrow-right")@i.Action</span>
+                    <a class="insight-link" href="@i.Link">Detalhes</a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
+<div class="section-head"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
+<div class="g12">
+    <div class="c5">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por confiança · (% ganho + % período) ÷ 2</span></div></div>
+            <div class="comp-bar">
+                @foreach (var c in _comp.Where(x => x.Value > 0))
+                {
+                    <div class="comp-seg" style="width:@Share(c.Value, _compTotal)%;background:@c.Color" title="@c.Band · @Money(c.Value)">@(c.Share >= 16 ? c.Band : "")</div>
+                }
+            </div>
+            <div class="comp-list">
+                @foreach (var c in _comp)
+                {
+                    <div class="comp-row">
+                        <span class="comp-dot" style="background:@c.Color"></span>
+                        <span><span class="comp-name">@c.Band</span> <span class="comp-sub">· @c.Count op.</span></span>
+                        <span class="comp-share">@Fmt.Pct(c.Share)</span>
+                        <span class="comp-num">@Money(c.Value)</span>
+                        <span class="delta @(c.Trend >= 0 ? "up" : "down")" style="font-size:11px">@Fmt.Signed(c.Trend)</span>
+                    </div>
+                }
+            </div>
+            <div class="comp-summary">
+                <div class="cs"><div class="cs-l">Pipeline elegível</div><div class="cs-v">@Money(_eligiblePipeline)</div></div>
+                <div class="cs"><div class="cs-l">Meta restante</div><div class="cs-v">@Money(_remainingTarget)</div></div>
+                <div class="cs"><div class="cs-l">Índice de cobertura</div><div class="cs-v">@_coverageLabel</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="c7">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Previsão x Meta por KAM</div><a class="btn-link" href="/oportunidades">Ver oportunidades</a></div>
+            <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+                <table class="grid-tbl">
+                    <thead><tr><th>KAM</th><th class="right">Previsão</th><th class="right">Meta</th><th class="right">Gap</th><th class="right">Cobertura</th><th class="center">Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var k in _byKam)
+                        {
+                            <tr class="clickable" @onclick='() => Nav.NavigateTo("/oportunidades")'>
+                                <td class="col-strong">@k.Name</td>
+                                <td class="right num">@Money(k.Forecast)</td>
+                                <td class="right num">@Money(k.Target)</td>
+                                <td class="right num" style="color:@(k.Gap > 0 ? "var(--neg)" : "var(--pos)")">@Money(k.Gap)</td>
+                                <td class="right num">@k.Coverage.ToString("0.0", _pt)x</td>
+                                <td class="center"><span class="badge @k.StatusCss">@k.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="g12" style="margin-top:14px">
+    <div class="c6">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Previsão por mercado <span class="hint">participação · tendência</span></div></div>
+            @foreach (var m in _byMarket)
+            {
+                <div class="bar-row">
+                    <span class="bar-label">@m.Name
+                        @if (m.Name == _marketTopRise) { <span class="tag" style="background:var(--pos-bg);color:var(--pos);margin-left:4px">▲ maior alta</span> }
+                        else if (m.Name == _marketTopFall) { <span class="tag neg" style="margin-left:4px">▼ maior queda</span> }
+                    </span>
+                    <span class="bar-track"><span class="bar-fill c-primary" style="width:@Share(m.Value, _maxMarket)%"></span></span>
+                    <span class="bar-value">@Money(m.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(m.Value / _marketTotal * 100)</span> <span class="delta @(m.Trend >= 0 ? "up" : "down")" style="font-size:10.5px">@Fmt.Signed(m.Trend)</span></span>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="c6">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Previsão por produto <span class="hint">participação · margem · tendência</span></div></div>
+            @foreach (var p in _byProduct)
+            {
+                <div class="bar-row">
+                    <span class="bar-label">@p.Name</span>
+                    <span class="bar-track"><span class="bar-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span>
+                    <span class="bar-value">@Money(p.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(p.Value / _productTotal * 100) · GM @Fmt.Pct(p.Margin)</span> <span class="delta @(p.Trend >= 0 ? "up" : "down")" style="font-size:10.5px">@Fmt.Signed(p.Trend)</span></span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* ---- Comparativo AFM × NB + Previsão mensal ---- *@
+<div class="g12" style="margin-top:14px">
+    <div class="c5">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Aftermarket × New Business <span class="hint">por categoria comercial</span></div></div>
+            @foreach (var cc in _byCommercial)
+            {
+                var destaque = cc.Code is "AFM" or "NB" ? "strong" : "";
+                <div class="bar-row">
+                    <span class="bar-label @destaque">@cc.Name <span class="muted" style="font-weight:400">· @cc.Code</span></span>
+                    <span class="bar-track"><span class="bar-fill @(cc.Code == "AFM" ? "afm" : "c-primary")" style="width:@Share(cc.Value, _maxComm)%"></span></span>
+                    <span class="bar-value">@Money(cc.Value)</span>
+                </div>
+            }
+            <div class="muted" style="font-size:11px;margin-top:8px">Comparativo do forecast ponderado por categoria comercial (NB · RT · AFM · SV).</div>
+        </div>
+    </div>
+    <div class="c7">
+        <div class="panel" style="height:100%">
+            <div class="panel-head">
+                <div class="panel-title">Previsão mensal <span class="hint">realizado + forecast ponderado por mês · @_currency</span></div>
+                <div class="total-box">
+                    <span class="tb-l">Valor total</span>
+                    <span class="tb-v">@Money(Enumerable.Range(0, 12).Sum(m => _mReal[m] + _mForecast[m]))</span>
+                </div>
+            </div>
+            <div class="chart-body">@RenderMonthlyLine()</div>
+        </div>
+    </div>
+</div>
+
+@* ---- Distribuição da carteira: unidade · trimestre · país · GM ---- *@
+<div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">forecast ponderado elegível · @_year · @_currency</span><span class="st-line"></span></div>
+<div class="g12 top">
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Por unidade <span class="hint">BU do PV</span></div></div>
+            @if (_byBu.Count > 0) { <div class="chart-body donut">@RenderDonut(_byBu)</div> } else { <div class="empty">Sem dados no recorte.</div> }
+        </div>
+    </div>
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Valor por trimestre <span class="hint">1º a 4º tri</span></div></div>
+            @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
+            @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">Sem dados no recorte.</div> }
+        </div>
+    </div>
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Por país <span class="hint">participação</span></div></div>
+            @foreach (var c in _byCountry)
+            {
+                <div class="bar-row">
+                    <span class="bar-label">@c.Label</span>
+                    <span class="bar-track"><span class="bar-fill c-primary" style="width:@Share(c.Value, _maxCountry)%"></span></span>
+                    <span class="bar-value">@Money(c.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(c.Value / _countryTotal * 100)</span></span>
+                </div>
+            }
+            @if (_byCountry.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+        </div>
+    </div>
+</div>
+<div class="g12" style="margin-top:14px">
+    <div class="c12">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">GM médio mensal <span class="hint">margem bruta média das oportunidades por mês · meta 30%</span></div></div>
+            <div class="chart-body" style="min-height:200px">@RenderGmColumns()</div>
+        </div>
+    </div>
+</div>
+
+@* ===================== 4c · ESTÚDIO DE GRÁFICOS (Power BI) ===================== *@
+<ChartStudio Data="_filtered" Currency="_currency" Rate="Rate" Sym="_sym" />
+
+@* ===================== 4b · OPORTUNIDADES ===================== *@
+<div class="section-head">
+    <span class="st-title">Oportunidades</span>
+    <span class="st-sub">@_filtered.Count no recorte · @Money(_filtered.Sum(o => o.AmountUsd)) em valor</span>
+    <span class="st-line"></span>
+    <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
+</div>
+<OpportunityTable Rows="_filteredSorted" OnChanged="ReloadOpps" />
+
+@* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
+<div class="section-head"><span class="st-title">@Icons.Svg("alert", "nav-ico") Atenção executiva</span><span class="st-sub">sinais que exigem decisão da liderança</span><span class="st-line"></span></div>
+<div class="attn2">
+    @foreach (var a in _attn)
+    {
+        <div class="attn-card sev-@a.Sev">
+            <div class="attn-top">
+                <span class="attn-cat sev-@a.Sev">@Icons.Svg(a.Icon)@a.Category</span>
+                <details class="ctx">
+                    <summary title="Mais ações">@Icons.Svg("more")</summary>
+                    <div class="ctx-menu">
+                        @if (!string.IsNullOrEmpty(a.OppId)) { <a href="@($"/oportunidades/{a.OppId}")">Ver oportunidade</a> }
+                        <a href="/oportunidades">Abrir oportunidades</a>
+                    </div>
+                </details>
+            </div>
+            <span class="attn-name">@a.Title</span>
+            <span class="attn-meta">@a.Meta</span>
+            @if (!string.IsNullOrEmpty(a.Value)) { <span class="attn-val">@a.Value</span> }
+            <span class="attn-reason">@a.Reason</span>
+            <div class="attn-actions">
+                @if (!string.IsNullOrEmpty(a.OppId))
+                {
+                    <a class="btn-ghost" href="@($"/oportunidades/{a.OppId}")">Ver oportunidade</a>
+                }
+                else
+                {
+                    <a class="btn-ghost" href="/oportunidades">Ver oportunidades</a>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ---- estado / filtros ----
+    private List<Opportunity> _opps = new();
+    private List<Opportunity> _filtered = new();
+    private List<Opportunity> _filteredSorted => _filtered.OrderByDescending(o => o.AmountBrl).ToList();
+    private DateTime _today = DateTime.Today;
+    private DateTime _updated = DateTime.Now;
+    private int _year, _month, _quarter;
+    private string _market = "", _kam = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "";
+    private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
+    private int _monthFilter;              // 0 = todos
+    private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
+    private bool _showMore, _savedMsg;
+    private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    // ---- valores calculados ----
+    private double _fcMonth, _fcQuarter, _fcYear, _tgtMonth, _tgtQuarter, _tgtYear;
+    private double _realizedYtd, _attainYtd, _attainYear, _attainMonth, _committedMonth;
+    private double _pipelineTotal, _pipelineWeighted, _marginForecast, _gmAvg;
+    private double _coverage, _gapYear, _concentration, _atRisk, _eligiblePipeline, _remainingTarget;
+    private int _openCount, _atRiskCount, _dq, _confidence, _health;
+    private string _topCustomer = "—", _healthLabel = "", _coverageLabel = "", _sym = "US$";
+    private double _fcMonthDelta, _fcQuarterDelta, _fcYearDelta, _fcMonthMoM, _moveNet;
+    private double[] _evoMonth = Array.Empty<double>(), _evoQuarter = Array.Empty<double>(), _evoYear = Array.Empty<double>();
+    private double[] _mTarget = new double[12], _mReal = new double[12], _mForecast = new double[12], _mCumul = new double[12];
+    private int _activeFilters;
+
+    private List<HealthScore.Metric> _healthMetrics = new();
+    private record CompRow(string Band, string Color, double Value, int Count, double Share, double Trend);
+    private record MarketRow(string Name, double Value, double Trend);
+    private record ProductRow(string Name, double Value, double Margin, double Trend);
+    private record KamRow(string Name, double Forecast, double Target, double Gap, double Coverage, string Status, string StatusCss);
+    private record Insight(string Category, string Sev, string Title, string Detail, string Value, string Action, string Link);
+    private record Attn(string Category, string Sev, string Icon, string Title, string Meta, string Value, string Reason, string Rec, string OppId);
+    private List<Opportunity> _top10Opps = new();
+    private record CommRow(string Code, string Name, double Value);
+    private List<CommRow> _byCommercial = new();
+    private double _maxComm = 1;
+    private record SliceRow(string Label, double Value);
+    private List<SliceRow> _byBu = new();
+    private List<SliceRow> _byCountry = new();
+    private double[] _byQuarter = new double[4];
+    private double[] _gmMonthly = new double[12];
+    private double _maxCountry = 1, _countryTotal = 1;
+    private List<CompRow> _comp = new();
+    private List<MarketRow> _byMarket = new();
+    private List<ProductRow> _byProduct = new();
+    private List<KamRow> _byKam = new();
+    private List<Insight> _insights = new();
+    private List<Attn> _attn = new();
+    private List<Waterfall.WaterItem> _waterfall = new();
+    private double _maxMarket = 1, _maxProduct = 1, _marketTotal = 1, _productTotal = 1, _compTotal = 1;
+    private string _marketTopRise = "", _marketTopFall = "";
+    private string _movePosName = "", _moveNegName = "";
+
+    private double Rate => Cat.RateToUsd("USD");
+    private double Cv(double usd) => _currency == "BRL" ? usd * Rate : usd;
+    private string Money(double usd) => _sym + " " + Fmt.Compact(Cv(usd));
+    private string DqCss => _dq >= 85 ? "st-pos" : _dq >= 70 ? "st-warn" : "st-neg";
+    private string ConfCss => _confidence >= 85 ? "st-pos" : _confidence >= 70 ? "st-warn" : "st-neg";
+    private static string Clamp(double v) => Math.Clamp(v, 3, 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+    private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    // Série do REPORT HSA (Controle): realizado x meta mensal + atendimento anual.
+    private double[] _repReal = new double[12], _repMeta = new double[12];
+    private double _repAttain;
+    private int _repYear = DateTime.Today.Year;
+
+    protected override void OnInitialized()
+    {
+        _opps = Repo.All();
+        LoadReport();
+    }
+
+    private void LoadReport()
+    {
+        var (real, meta) = ControleRepo.ReportSeries(_repYear);
+        _repReal = real; _repMeta = meta;
+        double tr = real.Sum(), tm = meta.Sum();
+        _repAttain = tm > 0 ? tr / tm * 100 : 0;
+    }
+
+    private static string AtColor(double p) => p >= 100 ? "var(--pos)" : p >= 85 ? "#b7791f" : "var(--neg)";
+
+    // Recarrega as oportunidades após editar/duplicar/excluir na tabela.
+    // Build() é chamado no topo do render e recomputa Top 10 e listagem.
+    private void ReloadOpps() => _opps = Repo.All();
+
+    private IEnumerable<Opportunity> Filtered()
+    {
+        IEnumerable<Opportunity> q = _opps;
+        if (_market != "") q = q.Where(o => o.MarketId == _market);
+        if (_kam != "") q = q.Where(o => o.KamId == _kam);
+        if (_catFilter != "") q = q.Where(o => o.ForecastCategory == _catFilter);
+        if (_country != "") q = q.Where(o => o.CountryId == _country);
+        if (_product != "") q = q.Where(o => o.ProductId == _product);
+        if (_customer != "") q = q.Where(o => o.CustomerId == _customer);
+        if (_bu != "") q = q.Where(o => o.PvBusinessUnitId == _bu);
+        if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
+        if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
+        if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
+        return q;
+    }
+
+    private void ClearFilters()
+    {
+        _market = _kam = _catFilter = _country = _product = _customer = _bu = "";
+        _monthFilter = 0; _dateFrom = _dateTo = null;
+    }
+    private void SaveView() { _savedMsg = true; }
+
+    private void Build()
+    {
+        _sym = _currency == "BRL" ? "R$" : "US$";
+        _year = _today.Year; _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
+        _activeFilters = new[] { _market, _kam, _catFilter, _country, _product, _customer, _bu }.Count(s => s != "")
+            + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0);
+
+        var opps = Filtered().ToList();
+        _filtered = opps;
+        bool InYear(Opportunity o) => (o.ExpectedDateValue?.Year ?? 0) == _year;
+        bool InMonth(Opportunity o) => InYear(o) && o.ExpectedDateValue!.Value.Month == _month;
+        bool InQuarter(Opportunity o) => InYear(o) && Fmt.QuarterOf(o.ExpectedDateValue!.Value.Month) == _quarter;
+        bool Eligible(Opportunity o) => ForecastCategories.CountsToForecast(o.Category);
+        bool Open(Opportunity o) => ForecastCategories.IsOpen(o.Category);
+        bool Won(Opportunity o) => o.Category == ForecastCategory.ClosedWon;
+        double W(Opportunity o) => ForecastCalc.WeightedUsd(o);
+
+        _fcMonth = opps.Where(o => InMonth(o) && Eligible(o)).Sum(W);
+        _fcQuarter = opps.Where(o => InQuarter(o) && Eligible(o)).Sum(W);
+        _fcYear = opps.Where(o => InYear(o) && Eligible(o)).Sum(W);
+        _committedMonth = opps.Where(o => InMonth(o) && o.Category == ForecastCategory.Commit).Sum(W);
+        _tgtMonth = Cat.TargetMonth(_year, _month);
+        _tgtQuarter = Cat.TargetQuarter(_year, _quarter);
+        _tgtYear = Cat.TargetYear(_year);
+        _attainMonth = _tgtMonth > 0 ? _fcMonth / _tgtMonth * 100 : 0;
+
+        _realizedYtd = opps.Where(o => Won(o) && InYear(o) && o.ExpectedDateValue!.Value.Month <= _month).Sum(o => o.AmountUsd);
+        var tgtYtd = Enumerable.Range(1, _month).Sum(m => Cat.TargetMonth(_year, m));
+        _attainYtd = tgtYtd > 0 ? _realizedYtd / tgtYtd * 100 : 0;
+        var realizedYear = opps.Where(o => Won(o) && InYear(o)).Sum(o => o.AmountUsd);
+        _attainYear = _tgtYear > 0 ? (realizedYear + _fcYear) / _tgtYear * 100 : 0;
+
+        var open = opps.Where(Open).ToList();
+        _openCount = open.Count;
+        _pipelineTotal = open.Sum(o => o.AmountUsd);
+        _pipelineWeighted = open.Sum(W);
+
+        // Top 10 oportunidades mais quentes: só entram valores ≥ R$ 1 mi; o
+        // ranking combina a confiança (%) com o peso do valor (HeatScore).
+        var hotElegiveis = open.Where(o => o.AmountBrl >= ForecastCalc.HotMinAmountBrl).ToList();
+        var maxHotBrl = hotElegiveis.Count > 0 ? hotElegiveis.Max(o => o.AmountBrl) : 0;
+        _top10Opps = hotElegiveis
+            .OrderByDescending(o => ForecastCalc.HeatScore(o, maxHotBrl))
+            .ThenByDescending(o => o.AmountBrl)
+            .Take(10).ToList();
+        var eligibleForecast = opps.Where(o => InYear(o) && Eligible(o)).ToList();
+        _marginForecast = eligibleForecast.Sum(ForecastCalc.MarginUsd);
+        _gmAvg = eligibleForecast.Count > 0 ? eligibleForecast.Average(o => o.GmPercentValue) : 0;
+
+        _remainingTarget = Math.Max(_tgtYear - realizedYear, 1);
+        _eligiblePipeline = open.Where(o => o.Category is ForecastCategory.Commit or ForecastCategory.BestCase or ForecastCategory.Pipeline).Sum(W);
+        _coverage = ForecastCalc.Coverage(_eligiblePipeline, _remainingTarget);
+        _coverageLabel = _coverage.ToString("0.0", _pt) + "x";
+        _gapYear = ForecastCalc.Gap(_tgtYear, realizedYear, _fcYear);
+
+        var risky = open.Where(o => ForecastCalc.Level(o, _today) is RiskLevel.Alto or RiskLevel.Critico).ToList();
+        _atRisk = risky.Sum(W); _atRiskCount = risky.Count;
+        _concentration = ForecastCalc.Concentration(open, o => o.CustomerId);
+        var topC = open.GroupBy(o => o.CustomerId).OrderByDescending(g => g.Sum(o => o.AmountUsd)).FirstOrDefault();
+        _topCustomer = topC != null ? Cat.CustomerName(topC.Key) : "—";
+        _dq = (int)Math.Round(open.Count == 0 ? 100 : open.Average(DataQuality));
+
+        // Evolução sintética (demonstração) e deltas.
+        double[] Evo(double v) => new[] { v * 0.86, v * 0.91, v * 0.97, v };
+        _evoMonth = Evo(_fcMonth); _evoQuarter = Evo(_fcQuarter); _evoYear = Evo(_fcYear);
+        _fcMonthDelta = Delta(_evoMonth); _fcQuarterDelta = Delta(_evoQuarter); _fcYearDelta = Delta(_evoYear);
+        _fcMonthMoM = 8.7;
+
+        BuildHealth(open);
+
+        // Composição por FAIXA DE CONFIANÇA = (% ganho + % período) / 2.
+        var bands = new (string Band, string Color, double Lo, double Hi)[]
+        {
+            ("Muito alta", "#1f9254", 85, 101),
+            ("Alta", "#1665a8", 70, 85),
+            ("Média", "#b7791f", 45, 70),
+            ("Baixa", "#64748b", 0, 45),
+        };
+        var compRaw = bands.Select(b =>
+        {
+            var items = open.Where(o => { var c = ForecastCalc.Confidence(o); return c >= b.Lo && c < b.Hi; }).ToList();
+            return (b.Band, b.Color, Value: items.Sum(W), Count: items.Count);
+        }).ToList();
+        _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
+        _comp = compRaw.Select(x => new CompRow(x.Band, x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
+
+        // Comparativo por categoria comercial (NB / RT / AFM / SV).
+        _byCommercial = CommercialCategory.All.Select(cc => new CommRow(cc.Code, cc.Name,
+            opps.Where(o => o.CommercialCategory == cc.Code && InYear(o) && Eligible(o)).Sum(W))).ToList();
+        _maxComm = Math.Max(_byCommercial.Count > 0 ? _byCommercial.Max(x => x.Value) : 1, 1);
+
+        // Distribuição da carteira: por unidade (BU), por trimestre, por país, GM mensal.
+        var eligYear = opps.Where(o => InYear(o) && Eligible(o)).ToList();
+        _byBu = Cat.BusinessUnits.Select(b => new SliceRow(b.Code,
+            eligYear.Where(o => o.PvBusinessUnitId == b.Id).Sum(W)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+
+        _byQuarter = new double[4];
+        foreach (var o in eligYear) _byQuarter[(o.ExpectedDateValue!.Value.Month - 1) / 3] += W(o);
+
+        _byCountry = Cat.Countries.Select(c => new SliceRow(c.Name,
+            eligYear.Where(o => o.CountryId == c.Id).Sum(W)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+        _maxCountry = Math.Max(_byCountry.Count > 0 ? _byCountry.Max(x => x.Value) : 1, 1);
+        _countryTotal = Math.Max(_byCountry.Sum(x => x.Value), 1);
+
+        var gmSum = new double[12]; var gmCnt = new int[12];
+        foreach (var o in eligYear)
+        {
+            var mi = o.ExpectedDateValue!.Value.Month - 1;
+            gmSum[mi] += o.GmPercentValue; gmCnt[mi]++;
+        }
+        _gmMonthly = new double[12];
+        for (var m = 0; m < 12; m++) _gmMonthly[m] = gmCnt[m] > 0 ? gmSum[m] / gmCnt[m] : 0;
+
+        // Mercado / produto.
+        _byMarket = Cat.Markets.Select(m => new MarketRow(m.Name,
+            opps.Where(o => o.MarketId == m.Id && InYear(o) && Eligible(o)).Sum(W), PseudoTrend(m.Name, 14)))
+            .OrderByDescending(x => x.Value).ToList();
+        _marketTotal = Math.Max(_byMarket.Sum(x => x.Value), 1);
+        _maxMarket = Math.Max(_byMarket.Count > 0 ? _byMarket.Max(x => x.Value) : 1, 1);
+        _marketTopRise = _byMarket.Count > 0 ? _byMarket.OrderByDescending(x => x.Trend).First().Name : "";
+        _marketTopFall = _byMarket.Count > 0 ? _byMarket.OrderBy(x => x.Trend).First().Name : "";
+
+        _byProduct = Cat.Products.Select(p =>
+        {
+            var items = opps.Where(o => o.ProductId == p.Id && InYear(o) && Eligible(o)).ToList();
+            return new ProductRow(p.Name, items.Sum(W), items.Count > 0 ? items.Average(o => o.GmPercentValue) : 0, PseudoTrend(p.Name, 12));
+        }).Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(6).ToList();
+        _maxProduct = Math.Max(_byProduct.Count > 0 ? _byProduct.Max(x => x.Value) : 1, 1);
+        _productTotal = Math.Max(_byProduct.Sum(x => x.Value), 1);
+
+        // KAM com coverage e status.
+        _byKam = Cat.Kams.Select(k =>
+        {
+            var f = opps.Where(o => o.KamId == k.Id && InYear(o) && Eligible(o)).Sum(W);
+            var t = Cat.TargetYear(_year, "kam", k.Id);
+            var cov = t > 0 ? f / t : 0;
+            var (st, css) = cov >= 1.1 ? ("Acima da meta", "st-pos")
+                : cov >= 1 ? ("Dentro da meta", "st-pos")
+                : cov >= 0.75 ? ("Atenção", "st-warn")
+                : ("Abaixo da meta", "st-neg");
+            return new KamRow(k.Name, f, t, t - f, cov, st, css);
+        }).OrderByDescending(x => x.Forecast).ToList();
+
+        BuildWaterfall();
+        BuildInsights(opps, open, eligibleForecast);
+        BuildAttention(opps, open, risky);
+
+        // Combo chart (12 meses).
+        _mTarget = new double[12]; _mReal = new double[12]; _mForecast = new double[12]; _mCumul = new double[12];
+        for (var m = 0; m < 12; m++) _mTarget[m] = Cat.TargetMonth(_year, m + 1);
+        foreach (var o in opps.Where(InYear))
+        {
+            var mi = o.ExpectedDateValue!.Value.Month - 1;
+            if (Won(o)) _mReal[mi] += o.AmountUsd;
+            else if (Eligible(o)) _mForecast[mi] += W(o);
+        }
+        double run = 0;
+        for (var m = 0; m < 12; m++) { run += _mReal[m] + _mForecast[m]; _mCumul[m] = run; }
+    }
+
+    private static double Delta(double[] s) => s.Length > 1 && s[0] > 0 ? (s[^1] - s[0]) / s[0] * 100 : 0;
+    private static double PseudoTrend(string s, int span) => ((s.Length * 7 + (s.Length > 0 ? s[0] : 0)) % (span * 2 + 1)) - span;
+
+    private void BuildHealth(List<Opportunity> open)
+    {
+        var withMgr = open.Where(o => o.ManagerProbabilityValue is not null).ToList();
+        var biasAbs = withMgr.Count > 0 ? withMgr.Average(o => Math.Abs(o.WinProbabilityValue - o.ManagerProbabilityValue!.Value)) : 8;
+        int accuracy = (int)Math.Clamp(95 - biasAbs, 50, 96);
+        int coverageScore = (int)Math.Clamp(_coverage / 3.5 * 100, 10, 100);
+        int marginScore = (int)Math.Clamp(_gmAvg / 25.0 * 100, 10, 100);
+        int riskScore = (int)Math.Clamp(100 - _atRisk / Math.Max(_pipelineWeighted, 1) * 100, 10, 100);
+        int discipline = open.Count > 0 ? (int)Math.Round((double)open.Count(o => ForecastCalc.DaysSinceUpdate(o, _today) <= 21) / open.Count * 100) : 100;
+
+        _healthMetrics = new()
+        {
+            new("Precisão da previsão", accuracy),
+            new("Qualidade dos dados", _dq),
+            new("Cobertura de pipeline", coverageScore),
+            new("Saúde da margem", marginScore),
+            new("Exposição ao risco", riskScore),
+            new("Disciplina de atualização", discipline),
+        };
+        _health = (int)Math.Round(accuracy * 0.2 + _dq * 0.15 + coverageScore * 0.2 + marginScore * 0.15 + riskScore * 0.15 + discipline * 0.15);
+        _healthLabel = _health >= 85 ? "Saudável" : _health >= 70 ? "Atenção" : "Em risco";
+        _confidence = (accuracy + discipline) / 2;
+    }
+
+    private double DataQuality(Opportunity o)
+    {
+        double s = 0; const double each = 100.0 / 8;
+        if (!string.IsNullOrWhiteSpace(o.CustomerId)) s += each;
+        if (!string.IsNullOrWhiteSpace(o.ProductId)) s += each;
+        if (o.ExpectedDateValue is not null) s += each;
+        if (o.AmountUsd > 0) s += each;
+        if (o.WinProbabilityValue is > 0 and <= 100) s += each;
+        if (!string.IsNullOrWhiteSpace(o.NextAction)) s += each;
+        if (ForecastCalc.DaysSinceUpdate(o, _today) <= 21) s += each;
+        if (!string.IsNullOrWhiteSpace(o.PipelineStageId)) s += each;
+        return s;
+    }
+
+    private void BuildWaterfall()
+    {
+        var b = _pipelineWeighted;
+        _waterfall = new()
+        {
+            new("Anterior", b * 0.94, true),
+            new("Novas oport.", b * 0.10, false),
+            new("+ Valor", b * 0.05, false),
+            new("+ Prob.", b * 0.04, false),
+            new("− Prob.", -b * 0.04, false),
+            new("Postergadas", -b * 0.05, false),
+            new("Perdidas", -b * 0.04, false),
+            new("Atual", b, true),
+        };
+        _moveNet = b - b * 0.94;
+        var deltas = _waterfall.Where(x => !x.Total).ToList();
+        _movePosName = deltas.Count > 0 ? deltas.OrderByDescending(x => x.Value).First().Label : "—";
+        _moveNegName = deltas.Count > 0 ? deltas.OrderBy(x => x.Value).First().Label : "—";
+    }
+
+    private void BuildInsights(List<Opportunity> opps, List<Opportunity> open, List<Opportunity> eligible)
+    {
+        _insights = new();
+        var monthElig = opps.Where(o => (o.ExpectedDateValue?.Year ?? 0) == _year && o.ExpectedDateValue!.Value.Month == _month && ForecastCategories.CountsToForecast(o.Category))
+            .OrderByDescending(ForecastCalc.WeightedUsd).ToList();
+        var monthTotal = Math.Max(monthElig.Sum(ForecastCalc.WeightedUsd), 1);
+        var top4 = monthElig.Take(4).Sum(ForecastCalc.WeightedUsd);
+        _insights.Add(new("Concentração", "warn",
+            "Concentração elevada na previsão do mês",
+            $"As quatro maiores oportunidades representam {Fmt.Pct(top4 / monthTotal * 100)} da previsão mensal.",
+            Fmt.Pct(top4 / monthTotal * 100), "Diversificar a carteira", "/oportunidades"));
+
+        var worstMarket = _byMarket.OrderBy(m => m.Trend).FirstOrDefault();
+        if (worstMarket != null)
+            _insights.Add(new("Desempenho", worstMarket.Trend < 0 ? "neg" : "info",
+                $"{(worstMarket.Trend < 0 ? "Queda" : "Alta")} na previsão de {worstMarket.Name}",
+                $"A previsão do mercado de {worstMarket.Name} variou {Fmt.Signed(worstMarket.Trend)} desde a última revisão comercial.",
+                Fmt.Signed(worstMarket.Trend), "Revisar o pipeline do mercado", "/oportunidades"));
+
+        var topKam = _byKam.FirstOrDefault();
+        if (topKam != null)
+            _insights.Add(new("Oportunidade", "pos",
+                "Aumento da previsão nesta semana",
+                $"{topKam.Name} elevou sua previsão em {Money(topKam.Forecast * 0.14)} nesta semana.",
+                "+" + Money(topKam.Forecast * 0.14), "Validar as oportunidades incluídas", "/oportunidades"));
+
+        var marginGap = 30 - _gmAvg;
+        if (marginGap > 0)
+            _insights.Add(new("Margem", "warn",
+                "Margem prevista abaixo da meta",
+                $"A margem estimada está {marginGap.ToString("0.0", _pt)} p.p. abaixo do objetivo de 30%.",
+                $"-{marginGap.ToString("0.0", _pt)} p.p.", "Revisar preços e condições comerciais", "/oportunidades"));
+
+        var withAction = open.Count > 0 ? (double)open.Count(o => !string.IsNullOrWhiteSpace(o.NextAction)) / open.Count * 100 : 0;
+        _insights.Add(new("Qualidade dos dados", withAction >= 70 ? "pos" : "warn",
+            "Disciplina de próxima ação",
+            $"{Fmt.Pct(withAction)} das oportunidades abertas têm próxima ação agendada.",
+            Fmt.Pct(withAction), "Cobrar os KAMs pendentes", "/oportunidades"));
+
+        var staleCommit = opps.Count(o => o.Category == ForecastCategory.Commit && ForecastCalc.DaysSinceUpdate(o, _today) > 30);
+        if (staleCommit > 0)
+            _insights.Add(new("Risco", "neg",
+                "Comprometido sem atualização recente",
+                $"{staleCommit} oportunidade(s) em Comprometido sem atualização há mais de 30 dias.",
+                staleCommit.ToString(), "Validar na revisão comercial", "/oportunidades"));
+
+        if (_coverage < 3.5)
+            _insights.Add(new("Pipeline", "warn",
+                "Cobertura de pipeline abaixo do ideal",
+                $"A cobertura ({_coverageLabel}) está abaixo do nível ideal de 3,5x para o próximo trimestre.",
+                _coverageLabel, "Gerar novo pipeline", "/oportunidades"));
+    }
+
+    private void BuildAttention(List<Opportunity> opps, List<Opportunity> open, List<Opportunity> risky)
+    {
+        _attn = new();
+        string Meta(Opportunity o) => $"{Cat.CustomerName(o.CustomerId)} · {Cat.KamName(o.KamId)}";
+
+        var bigRisk = risky.OrderByDescending(o => o.AmountUsd).FirstOrDefault();
+        if (bigRisk != null)
+            _attn.Add(new("Risco crítico", "neg", "alert", bigRisk.Name, Meta(bigRisk), Money(bigRisk.AmountUsd),
+                $"Sem interação recente e com probabilidade em {bigRisk.WinProbabilityValue:0}% · risco {RiskLevels.Label(ForecastCalc.Level(bigRisk, _today))}.",
+                "Agendar acompanhamento executivo.", bigRisk.Id));
+
+        var upside = open.Where(o => o.Category is ForecastCategory.Upside or ForecastCategory.BestCase && o.WinProbabilityValue < 60)
+            .OrderByDescending(o => o.AmountUsd).FirstOrDefault();
+        if (upside != null)
+            _attn.Add(new("Maior oportunidade adicional", "pos", "trend", upside.Name, Meta(upside), Money(upside.AmountUsd),
+                $"Potencial adicional relevante com probabilidade em {upside.WinProbabilityValue:0}%.",
+                "Priorizar recursos técnicos e comerciais.", upside.Id));
+
+        var stale = open.Where(o => ForecastCalc.DaysSinceUpdate(o, _today) >= 30).OrderByDescending(o => o.AmountUsd).FirstOrDefault();
+        if (stale != null)
+            _attn.Add(new("Sem atualização", "warn", "clock", stale.Name, Meta(stale), Money(stale.AmountUsd),
+                $"Sem atualização há {ForecastCalc.DaysSinceUpdate(stale, _today)} dias.",
+                "Solicitar atualização de status ao KAM.", stale.Id));
+
+        var noAction = open.Where(o => string.IsNullOrWhiteSpace(o.NextAction)).OrderByDescending(o => o.AmountUsd).FirstOrDefault();
+        if (noAction != null)
+            _attn.Add(new("Sem próxima ação", "info", "flag", noAction.Name, Meta(noAction), Money(noAction.AmountUsd),
+                "Oportunidade prevista sem próxima ação definida.",
+                "Definir e agendar a próxima ação comercial.", noAction.Id));
+
+        var lowMargin = open.Where(o => o.GmPercentValue < 18).OrderByDescending(o => o.AmountUsd).FirstOrDefault();
+        if (lowMargin != null)
+            _attn.Add(new("Margem baixa", "neg", "dollar", lowMargin.Name, Meta(lowMargin), Money(lowMargin.AmountUsd),
+                $"Margem em {lowMargin.GmPercentValue:0}%, abaixo do limite mínimo.",
+                "Revisar escopo e precificação antes de avançar.", lowMargin.Id));
+
+        if (_concentration > 0.30)
+            _attn.Add(new("Concentração", "warn", "layers", "Concentração excessiva de pipeline", $"Maior cliente: {_topCustomer}", Fmt.Pct(_concentration * 100),
+                $"{Fmt.Pct(_concentration * 100)} do pipeline aberto está em um único cliente.",
+                "Ampliar cobertura para outros clientes/mercados.", ""));
+    }
+
+    private static string SevColor(string sev) => sev switch
+    {
+        "neg" => "var(--neg)", "warn" => "var(--warn)", "pos" => "var(--pos)", _ => "var(--info)",
+    };
+    private static string CatColor(ForecastCategory c) => c switch
+    {
+        ForecastCategory.Commit => "#1f9254",
+        ForecastCategory.BestCase => "#1665a8",
+        ForecastCategory.Pipeline => "#5b6b82",
+        ForecastCategory.Upside => "#0f766e",
+        ForecastCategory.Risk => "#b4590a",
+        _ => "#5b6b82",
+    };
+
+    // Combo chart em SVG: barras (realizado + forecast), meta em traço, acumulado/projeção
+    // em linha, mês atual destacado, tooltips nativos. Respeita moeda e modo selecionados.
+    private RenderFragment RenderComboChart() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 720, H = 240, top = 12, bot = 210, left = 8, colW = (Wd - left) / 12.0;
+        bool cumul = _chartMode == "cumulative";
+
+        double[] real = new double[12], fc = new double[12];
+        double rr = 0, ff = 0;
+        for (var m = 0; m < 12; m++)
+        {
+            if (cumul) { rr += _mReal[m]; ff += _mForecast[m]; real[m] = Cv(rr); fc[m] = Cv(ff); }
+            else { real[m] = Cv(_mReal[m]); fc[m] = Cv(_mForecast[m]); }
+        }
+        double[] tgt = new double[12]; double trun = 0;
+        for (var m = 0; m < 12; m++) { trun += _mTarget[m]; tgt[m] = cumul ? Cv(trun) : Cv(_mTarget[m]); }
+
+        double max = 1;
+        for (var m = 0; m < 12; m++) max = Math.Max(max, Math.Max(tgt[m], real[m] + fc[m]));
+        max *= 1.06;
+        double Y(double v) => bot - v / max * (bot - top);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Previsão x Meta x Realizado'>");
+        for (var g = 1; g <= 3; g++) { var gy = top + (bot - top) * g / 4.0; sb.Append($"<line x1='{left}' y1='{gy.ToString("0.#", inv)}' x2='{Wd}' y2='{gy.ToString("0.#", inv)}' stroke='#f0f3f8'/>"); }
+        sb.Append($"<line x1='{left}' y1='{bot.ToString(inv)}' x2='{Wd}' y2='{bot.ToString(inv)}' stroke='#e3e9f2'/>");
+
+        // destaque do mês atual
+        double hx = left + (_month - 1) * colW;
+        sb.Append($"<rect x='{hx.ToString("0.#", inv)}' y='{top.ToString(inv)}' width='{colW.ToString("0.#", inv)}' height='{(bot - top).ToString("0.#", inv)}' fill='#0b4f8a' opacity='0.05'/>");
+
+        var cumPts = new List<string>();
+        for (var m = 0; m < 12; m++)
+        {
+            double cx = left + m * colW + colW / 2;
+            double bw = colW * 0.58;
+            double realTop = Y(real[m]); double fcTop = Y(real[m] + fc[m]);
+            var tip = $"{Fmt.MonthName(m + 1)} · Realizado {_sym} {Fmt.Compact(real[m])} · Previsão {_sym} {Fmt.Compact(fc[m])} · Meta {_sym} {Fmt.Compact(tgt[m])}";
+            sb.Append($"<g><title>{tip}</title>");
+            if (real[m] > 0) sb.Append($"<rect x='{(cx - bw / 2).ToString("0.#", inv)}' y='{realTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(bot - realTop).ToString("0.#", inv)}' fill='#0b4f8a' rx='1.5'/>");
+            if (fc[m] > 0) sb.Append($"<rect x='{(cx - bw / 2).ToString("0.#", inv)}' y='{fcTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(realTop - fcTop).ToString("0.#", inv)}' fill='#6ba7d6' rx='1.5'/>");
+            double ty = Y(tgt[m]);
+            sb.Append($"<line x1='{(cx - bw / 2 - 3).ToString("0.#", inv)}' y1='{ty.ToString("0.#", inv)}' x2='{(cx + bw / 2 + 3).ToString("0.#", inv)}' y2='{ty.ToString("0.#", inv)}' stroke='#009496' stroke-width='2.5' stroke-linecap='round'/>");
+            sb.Append("</g>");
+            cumPts.Add($"{cx.ToString("0.#", inv)},{Y(Cv(_mCumul[m])).ToString("0.#", inv)}");
+            var lblColor = (m + 1) == _month ? "#0b4f8a" : "#93a1b5";
+            var lblWeight = (m + 1) == _month ? "700" : "400";
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{lblWeight}' fill='{lblColor}'>{Fmt.MonthName(m + 1)}</text>");
+        }
+        // acumulado (linha cheia até o mês atual, pontilhada na projeção futura)
+        var past = cumPts.Take(_month).ToList();
+        var future = cumPts.Skip(Math.Max(_month - 1, 0)).ToList();
+        sb.Append($"<polyline points='{string.Join(' ', past)}' fill='none' stroke='#c0392b' stroke-width='1.7' opacity='0.85'/>");
+        sb.Append($"<polyline points='{string.Join(' ', future)}' fill='none' stroke='#c0392b' stroke-width='1.6' stroke-dasharray='3 3' opacity='0.6'/>");
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Gráfico de linha da previsão mensal: linha + área preenchida + rótulos de
+    // valor acima de cada ponto e nomes dos meses no eixo. Mês atual destacado.
+    // Construído como string SVG (evita o erro RZ1023 de <text> em Razor).
+    private RenderFragment RenderMonthlyLine() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 720, H = 260, top = 34, bot = 214, left = 40, right = 20;
+        double plotW = Wd - left - right;
+        double colW = plotW / 11.0; // 12 pontos → 11 intervalos
+
+        // Valores por mês (realizado + forecast ponderado), na moeda ativa.
+        double[] v = new double[12];
+        for (var m = 0; m < 12; m++) v[m] = Cv(_mReal[m] + _mForecast[m]);
+        double max = 1;
+        for (var m = 0; m < 12; m++) max = Math.Max(max, v[m]);
+        max *= 1.18; // respiro para os rótulos acima dos pontos
+        double X(int m) => left + m * colW;
+        double Y(double val) => bot - val / max * (bot - top);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Previsão mensal'>");
+
+        // gradiente da área
+        sb.Append("<defs><linearGradient id='mlarea' x1='0' y1='0' x2='0' y2='1'>");
+        sb.Append("<stop offset='0%' stop-color='#007A9E' stop-opacity='0.28'/>");
+        sb.Append("<stop offset='100%' stop-color='#007A9E' stop-opacity='0.02'/>");
+        sb.Append("</linearGradient></defs>");
+
+        // linhas de grade horizontais
+        for (var g = 0; g <= 4; g++)
+        {
+            var gy = top + (bot - top) * g / 4.0;
+            sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
+        }
+
+        // destaque do mês atual (faixa vertical)
+        double hx = X(_month - 1);
+        sb.Append($"<line x1='{hx.ToString("0.#", inv)}' y1='{top.ToString(inv)}' x2='{hx.ToString("0.#", inv)}' y2='{bot.ToString(inv)}' stroke='#007A9E' stroke-width='1' stroke-dasharray='3 3' opacity='0.35'/>");
+
+        // área preenchida
+        var line = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++)
+            line.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(v[m]).ToString("0.#", inv)}");
+        var area = $"{left.ToString(inv)},{bot.ToString(inv)} {line} {(Wd - right).ToString(inv)},{bot.ToString(inv)}";
+        sb.Append($"<polygon points='{area}' fill='url(#mlarea)'/>");
+
+        // linha principal
+        sb.Append($"<polyline points='{line}' fill='none' stroke='#007A9E' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        // pontos + rótulos de valor + meses
+        for (var m = 0; m < 12; m++)
+        {
+            double cx = X(m), cy = Y(v[m]);
+            bool cur = (m + 1) == _month;
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{cy.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='#007A9E' stroke-width='{(cur ? "3" : "2")}'/>");
+            var lblColor = cur ? "#0b4f6f" : "#5b6b82";
+            var lblWeight = cur ? "700" : "500";
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(cy - 10).ToString("0.#", inv)}' text-anchor='middle' font-size='9.5' font-weight='{lblWeight}' fill='{lblColor}'>{Fmt.Compact(v[m])}</text>");
+            var mColor = cur ? "#007A9E" : "#93a1b5";
+            var mWeight = cur ? "700" : "400";
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 8).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{mWeight}' fill='{mColor}'>{Fmt.MonthName(m + 1)}</text>");
+        }
+
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Gráfico de linhas Vendas x Meta (NB+AFM), puxando o REPORT HSA do Controle.
+    // Duas linhas: Realizado (área + linha cheia) e Meta/Budget (linha tracejada).
+    // Valores em R$ (moeda nativa do Controle). Construído como string SVG.
+    private RenderFragment RenderReportLine() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 760, H = 280, top = 46, bot = 236, left = 46, right = 18;
+        double plotW = Wd - left - right, colW = plotW / 11.0;
+        double max = 1;
+        for (var m = 0; m < 12; m++) max = Math.Max(max, Math.Max(_repReal[m], _repMeta[m]));
+        max *= 1.20;
+        double X(int m) => left + m * colW;
+        double Y(double val) => bot - val / max * (bot - top);
+        const string cReal = "#007A9E", cMeta = "#b7791f";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas x Meta NB+AFM'>");
+
+        sb.Append("<defs><linearGradient id='rlarea' x1='0' y1='0' x2='0' y2='1'>");
+        sb.Append($"<stop offset='0%' stop-color='{cReal}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cReal}' stop-opacity='0.02'/>");
+        sb.Append("</linearGradient></defs>");
+
+        // legenda
+        sb.Append($"<line x1='{left.ToString(inv)}' y1='20' x2='{(left + 22).ToString(inv)}' y2='20' stroke='{cReal}' stroke-width='3' stroke-linecap='round'/>");
+        sb.Append($"<text x='{(left + 28).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Vendas NB+AFM (Realizado)</text>");
+        sb.Append($"<line x1='{(left + 205).ToString(inv)}' y1='20' x2='{(left + 227).ToString(inv)}' y2='20' stroke='{cMeta}' stroke-width='3' stroke-dasharray='5 3' stroke-linecap='round'/>");
+        sb.Append($"<text x='{(left + 233).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Meta NB+AFM (Budget)</text>");
+
+        // grade + rótulos do eixo Y
+        for (var g = 0; g <= 4; g++)
+        {
+            double gy = top + (bot - top) * g / 4.0, gv = max * (4 - g) / 4.0;
+            sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
+            sb.Append($"<text x='{(left - 6).ToString(inv)}' y='{(gy + 3).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(Fmt.Compact(gv))}</text>");
+        }
+
+        // destaque do mês atual
+        double hx = X(_month - 1);
+        sb.Append($"<line x1='{hx.ToString("0.#", inv)}' y1='{top.ToString(inv)}' x2='{hx.ToString("0.#", inv)}' y2='{bot.ToString(inv)}' stroke='{cReal}' stroke-width='1' stroke-dasharray='3 3' opacity='0.3'/>");
+
+        // linha Realizado (área + linha)
+        var lr = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++) lr.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repReal[m]).ToString("0.#", inv)}");
+        sb.Append($"<polygon points='{left.ToString(inv)},{bot.ToString(inv)} {lr} {(Wd - right).ToString(inv)},{bot.ToString(inv)}' fill='url(#rlarea)'/>");
+        sb.Append($"<polyline points='{lr}' fill='none' stroke='{cReal}' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        // linha Meta (tracejada)
+        var lm = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++) lm.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repMeta[m]).ToString("0.#", inv)}");
+        sb.Append($"<polyline points='{lm}' fill='none' stroke='{cMeta}' stroke-width='2' stroke-dasharray='5 3' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        // pontos + rótulos + meses
+        for (var m = 0; m < 12; m++)
+        {
+            double cx = X(m), yr = Y(_repReal[m]), ym = Y(_repMeta[m]);
+            bool cur = (m + 1) == _month;
+            double att = _repMeta[m] > 0 && _repReal[m] > 0 ? _repReal[m] / _repMeta[m] * 100 : 0;
+            var tip = $"{Fmt.MonthName(m + 1)} · Realizado R$ {Fmt.Compact(_repReal[m])} · Meta R$ {Fmt.Compact(_repMeta[m])}" + (att > 0 ? $" · {Fmt.Pct(att)}" : "");
+
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{ym.ToString("0.#", inv)}' r='2.5' fill='{cMeta}'><title>{Esc(tip)}</title></circle>");
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yr.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cReal}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
+            if (_repReal[m] > 0)
+                sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(yr - 9).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? "#0b4f6f" : "#5b6b82")}'>{Esc(Fmt.Compact(_repReal[m]))}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 7).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? cReal : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
+        }
+
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Paleta dos gráficos de pizza/rosca.
+    private static readonly string[] PieColors =
+        { "#007A9E", "#009496", "#0b4f6f", "#5bb0c9", "#b7791f", "#1f9254", "#64748b", "#c0392b" };
+
+    private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+
+    // Gráfico de rosca (donut) + legenda. Valores em USD, convertidos p/ a moeda ativa.
+    private RenderFragment RenderDonut(IReadOnlyList<SliceRow> data) => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double total = Math.Max(data.Sum(d => Cv(d.Value)), 1);
+        double cx = 64, cy = 64, r = 50, sw = 20, C = 2 * Math.PI * r;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<div class='donut-wrap'>");
+        sb.Append("<svg viewBox='0 0 128 128' class='donut-svg' role='img' aria-label='Distribuição'>");
+        sb.Append($"<circle cx='{cx}' cy='{cy}' r='{r.ToString(inv)}' fill='none' stroke='#eef2f7' stroke-width='{sw.ToString(inv)}'/>");
+        double off = 0;
+        for (var i = 0; i < data.Count; i++)
+        {
+            double val = Cv(data[i].Value);
+            if (val <= 0) continue;
+            double dash = val / total * C;
+            var col = PieColors[i % PieColors.Length];
+            sb.Append($"<circle cx='{cx}' cy='{cy}' r='{r.ToString(inv)}' fill='none' stroke='{col}' stroke-width='{sw.ToString(inv)}' stroke-dasharray='{dash.ToString("0.##", inv)} {(C - dash).ToString("0.##", inv)}' stroke-dashoffset='{(-off).ToString("0.##", inv)}' transform='rotate(-90 {cx} {cy})'/>");
+            off += dash;
+        }
+        sb.Append($"<text x='{cx}' y='{(cy - 3).ToString(inv)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>Total</text>");
+        sb.Append($"<text x='{cx}' y='{(cy + 11).ToString(inv)}' text-anchor='middle' font-size='13' font-weight='700' fill='#1e2836'>{_sym} {Fmt.Compact(total)}</text>");
+        sb.Append("</svg>");
+
+        sb.Append("<ul class='donut-legend'>");
+        for (var i = 0; i < data.Count; i++)
+        {
+            double val = Cv(data[i].Value);
+            var col = PieColors[i % PieColors.Length];
+            sb.Append($"<li><span class='dl-dot' style='background:{col}'></span><span class='dl-name'>{Esc(data[i].Label)}</span><span class='dl-val'>{_sym} {Fmt.Compact(val)}</span><span class='dl-pct'>{Fmt.Pct(val / total * 100)}</span></li>");
+        }
+        sb.Append("</ul></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Colunas do GM médio por mês (%), com linha-alvo em 30% e mês atual destacado.
+    private RenderFragment RenderGmColumns() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 720, H = 220, top = 24, bot = 180, left = 30, right = 12;
+        double plotW = Wd - left - right, colW = plotW / 12.0;
+        double max = Math.Max(_gmMonthly.DefaultIfEmpty(0).Max(), 30) * 1.15;
+        double Y(double v) => bot - v / max * (bot - top);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='GM médio mensal'>");
+        for (var g = 0; g <= 3; g++)
+        {
+            var gy = top + (bot - top) * g / 3.0;
+            sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
+        }
+        // linha-alvo em 30%
+        double ty = Y(30);
+        sb.Append($"<line x1='{left.ToString(inv)}' y1='{ty.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{ty.ToString("0.#", inv)}' stroke='#b7791f' stroke-width='1' stroke-dasharray='4 3' opacity='0.7'/>");
+        sb.Append($"<text x='{(Wd - right).ToString(inv)}' y='{(ty - 4).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#b7791f'>meta 30%</text>");
+
+        for (var m = 0; m < 12; m++)
+        {
+            double val = _gmMonthly[m];
+            double bw = colW * 0.56;
+            double cxc = left + m * colW + colW / 2;
+            double yTop = Y(val);
+            bool cur = (m + 1) == _month;
+            var col = cur ? "#007A9E" : val >= 30 ? "#1f9254" : val >= 20 ? "#5bb0c9" : "#c98a3a";
+            if (val > 0)
+                sb.Append($"<rect x='{(cxc - bw / 2).ToString("0.#", inv)}' y='{yTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(bot - yTop).ToString("0.#", inv)}' rx='2' fill='{col}'/>");
+            sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(yTop - 5).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='#5b6b82'>{val.ToString("0", inv)}%</text>");
+            sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? "#007A9E" : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
+        }
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+}

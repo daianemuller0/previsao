@@ -1,0 +1,73 @@
+@* Waterfall de variação do forecast: base, deltas (+/-) e total. SVG puro,
+   montado como string para evitar o conflito da tag <text> no parser Razor. *@
+
+<div style="overflow-x:auto;">@((MarkupString)BuildSvg())</div>
+
+@code {
+    public record WaterItem(string Label, double Value, bool Total);
+
+    [Parameter] public List<WaterItem> Items { get; set; } = new();
+
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private const double Col = 96, Gap = 22, PlotTop = 24, PlotBot = 180;
+    private double BarW => Col - Gap;
+    private double W => Math.Max(Items.Count * Col, 300);
+
+    private double Max
+    {
+        get
+        {
+            double run = 0, max = 1;
+            foreach (var it in Items)
+            {
+                run = it.Total ? it.Value : run + it.Value;
+                max = Math.Max(max, run);
+            }
+            return max * 1.12;
+        }
+    }
+
+    private double ScaleY(double v) => PlotBot - v / Max * (PlotBot - PlotTop);
+
+    private string BuildSvg()
+    {
+        string N(double v) => v.ToString("0.#", Inv);
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {N(W)} 210' width='100%' height='230' preserveAspectRatio='xMinYMin meet' role='img' aria-label='Variação da previsão'>");
+        sb.Append($"<line x1='0' y1='{N(PlotBot)}' x2='{N(W)}' y2='{N(PlotBot)}' stroke='#e3e9f2' stroke-width='1'/>");
+
+        double run = 0;
+        for (var i = 0; i < Items.Count; i++)
+        {
+            var it = Items[i];
+            double top, bot;
+            string fill;
+            if (it.Total)
+            {
+                top = ScaleY(it.Value); bot = PlotBot; fill = "#0b4f8a"; run = it.Value;
+            }
+            else
+            {
+                var from = run; var to = run + it.Value; run = to;
+                top = ScaleY(Math.Max(from, to)); bot = ScaleY(Math.Min(from, to));
+                fill = it.Value >= 0 ? "#1f9254" : "#c0392b";
+            }
+            var x = i * Col + Gap / 2;
+            var h = Math.Max(2, bot - top);
+            var cx = x + BarW / 2;
+            sb.Append($"<rect x='{N(x)}' y='{N(top)}' width='{N(BarW)}' height='{N(h)}' rx='2' fill='{fill}'/>");
+            sb.Append($"<text x='{N(cx)}' y='{N(top - 5)}' text-anchor='middle' font-size='10' font-weight='700' fill='#3b4a61'>{Esc(Label(it.Value, it.Total))}</text>");
+            sb.Append($"<text x='{N(cx)}' y='200' text-anchor='middle' font-size='10' fill='#6b7a90'>{Esc(Trim(it.Label))}</text>");
+        }
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+
+    private string Label(double v, bool total)
+    {
+        var s = Data.Fmt.Compact(Math.Abs(v));
+        return total ? s : (v >= 0 ? "+" : "−") + s;
+    }
+    private static string Trim(string s) => s.Length > 12 ? s[..11] + "…" : s;
+    private static string Esc(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+}

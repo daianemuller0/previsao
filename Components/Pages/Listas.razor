@@ -1,0 +1,120 @@
+@page "/listas"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ListRepository Lists
+
+<div class="breadcrumbs"><span>Dados &amp; Cadastros</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Listas</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Listas de preenchimento</h1>
+        <p class="subtitle">Valores usados nos campos das oportunidades · adicione, edite ou exclua para manutenção</p>
+    </div>
+</div>
+
+<div class="g12 top">
+    <div class="c4">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Listas</div></div>
+            <div class="list-menu">
+                @foreach (var d in ListSeed.All)
+                {
+                    <button class="list-menu-item @(_selectedKey == d.Key ? "active" : "")" @onclick="() => Select(d.Key)">
+                        <span class="lm-name">@d.Label</span>
+                        <span class="lm-count">@Lists.Items(d.Key).Count</span>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="c8">
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-title">@(_selectedDef?.Label ?? "Selecione uma lista")
+                    @if (_selectedDef is { FreeText: true }) { <span class="hint">o usuário também pode digitar um valor fora da lista</span> }
+                </div>
+                <span class="tag">@_items.Count item(ns)</span>
+            </div>
+
+            @if (_selectedDef is null)
+            {
+                <div class="empty">Escolha uma lista à esquerda para gerenciar seus valores.</div>
+            }
+            else
+            {
+                <div class="add-row">
+                    <input class="field" placeholder="Novo valor…" @bind="_newVal" @bind:event="oninput" @onkeydown="AddKey" />
+                    <button class="btn-primary" disabled="@string.IsNullOrWhiteSpace(_newVal)" @onclick="AddItem">@Icons.Svg("check")Adicionar</button>
+                </div>
+
+                <div class="list-items">
+                    @foreach (var it in _items)
+                    {
+                        <div class="list-item">
+                            @if (_editId == it.Id)
+                            {
+                                <input class="field" @bind="_editVal" @bind:event="oninput" @onkeydown="@(e => EditKey(e, it.Id))" />
+                                <button class="row-act" title="Salvar" @onclick="() => SaveEdit(it.Id)">@Icons.Svg("check")</button>
+                                <button class="row-act" title="Cancelar" @onclick="CancelEdit">@Icons.Svg("x")</button>
+                            }
+                            else
+                            {
+                                <span class="li-value">@it.Value</span>
+                                <button class="row-act" title="Editar" @onclick="() => StartEdit(it)">@Icons.Svg("edit")</button>
+                                <button class="row-act del" title="Excluir" @onclick="() => Delete(it.Id)">@Icons.Svg("trash")</button>
+                            }
+                        </div>
+                    }
+                    @if (_items.Count == 0) { <div class="empty">Lista vazia. Adicione o primeiro valor acima.</div> }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _selectedKey = "";
+    private ListSeed.Def? _selectedDef;
+    private List<ListItem> _items = new();
+    private string _newVal = "", _editVal = "", _editId = "";
+
+    protected override void OnInitialized() => Select(ListSeed.All.First().Key);
+
+    private void Select(string key)
+    {
+        _selectedKey = key;
+        _selectedDef = ListSeed.All.FirstOrDefault(d => d.Key == key);
+        _editId = ""; _newVal = "";
+        Reload();
+    }
+
+    private void Reload() => _items = Lists.ItemsFull(_selectedKey);
+
+    private void AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(_newVal)) return;
+        Lists.Add(_selectedKey, _newVal);
+        _newVal = "";
+        Reload();
+    }
+
+    private void AddKey(KeyboardEventArgs e) { if (e.Key == "Enter") AddItem(); }
+
+    private void StartEdit(ListItem it) { _editId = it.Id; _editVal = it.Value; }
+    private void CancelEdit() { _editId = ""; _editVal = ""; }
+
+    private void SaveEdit(string id)
+    {
+        if (!string.IsNullOrWhiteSpace(_editVal)) Lists.Update(id, _editVal);
+        _editId = "";
+        Reload();
+    }
+
+    private void EditKey(KeyboardEventArgs e, string id)
+    {
+        if (e.Key == "Enter") SaveEdit(id);
+        else if (e.Key == "Escape") CancelEdit();
+    }
+
+    private void Delete(string id) { Lists.Delete(id); Reload(); }
+}

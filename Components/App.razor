@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="app.css?v=@Ver" />
+    <title>Howden Sales Forecast</title>
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="app.js?v=@Ver"></script>
+</body>
+
+</html>
+
+@code {
+    // Muda a cada inicialização do app: força o navegador a recarregar o CSS/JS
+    // após um "git pull" + "dotnet run" (evita servir um app.css em cache).
+    private static readonly string Ver = Guid.NewGuid().ToString("N")[..8];
+}

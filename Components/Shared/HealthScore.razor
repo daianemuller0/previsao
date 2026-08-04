@@ -1,0 +1,51 @@
+@* Sales Forecast Health — score consolidado (0–100) com submétricas.
+   Anel radial elegante (sem aparência de velocímetro) + barras de composição. *@
+
+<div class="health">
+    <div class="health-ring">
+        <svg viewBox="0 0 120 120" role="img" aria-label="Forecast health @Score of 100">
+            <title>Overall forecast health — weighted average of the six components below (0–100).</title>
+            <circle cx="60" cy="60" r="51" fill="none" stroke="#edf1f7" stroke-width="10" />
+            <circle cx="60" cy="60" r="51" fill="none" stroke="@BandColor" stroke-width="10"
+                    stroke-linecap="round" stroke-dasharray="@Dash" stroke-dashoffset="0"
+                    transform="rotate(-90 60 60)" />
+            <text x="60" y="56" text-anchor="middle" font-size="37" font-weight="800" fill="var(--text)">@Score</text>
+            <text x="60" y="77" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--muted)">/ 100</text>
+        </svg>
+        <div class="health-band @BandCss">@Label</div>
+    </div>
+    <div class="health-metrics">
+        @foreach (var m in Metrics)
+        {
+            <div class="hm-row" title="@m.Name: @m.Value / 100">
+                <span class="hm-name">@m.Name</span>
+                <span class="hm-bar"><span class="hm-fill" style="width:@(Math.Clamp(m.Value, 2, 100))%;background:@MetricColor(m.Value)"></span></span>
+                <span class="hm-val">@m.Value</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    public record Metric(string Name, int Value);
+
+    [Parameter] public int Score { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public List<Metric> Metrics { get; set; } = new();
+
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private const double Circ = 2 * Math.PI * 51;
+
+    private string Dash
+    {
+        get
+        {
+            var on = Math.Clamp(Score, 0, 100) / 100.0 * Circ;
+            return $"{on.ToString("0.#", Inv)} {(Circ - on).ToString("0.#", Inv)}";
+        }
+    }
+
+    private string BandCss => Score >= 85 ? "hb-pos" : Score >= 70 ? "hb-warn" : "hb-neg";
+    private string BandColor => Score >= 85 ? "#1f9254" : Score >= 70 ? "#b7791f" : "#c0392b";
+    private static string MetricColor(int v) => v >= 80 ? "#1f9254" : v >= 60 ? "#b7791f" : "#c0392b";
+}

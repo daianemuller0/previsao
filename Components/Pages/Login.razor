@@ -1,0 +1,55 @@
+@page "/login"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="brand center">
+            <div class="brand-mark big">H</div>
+            <div>
+                <div class="brand-name" style="color:var(--text);font-size:18px;">Howden</div>
+                <div class="brand-sub" style="color:var(--muted);">Sales Forecast</div>
+            </div>
+        </div>
+
+        <h1 class="login-title">Entrar na plataforma</h1>
+
+        @if (Error)
+        {
+            <div class="alert-error">Usuário ou senha inválidos.</div>
+        }
+
+        <form method="post" action="/auth/login" class="login-form">
+            <label>
+                Usuário
+                <input type="text" name="usuario" autocomplete="username" required />
+            </label>
+            <label>
+                Senha
+                <input type="password" name="senha" autocomplete="current-password" required />
+            </label>
+            <label>
+                Perfil de acesso
+                <select name="perfil">
+                    @foreach (var r in Roles.All)
+                    {
+                        <option value="@r.Role">@r.Label</option>
+                    }
+                </select>
+            </label>
+            <button type="submit" class="btn-primary">Entrar</button>
+        </form>
+
+        <div class="login-hint">
+            Acesso da equipe — padrão: <strong>howden / howden2026</strong><br />
+            O perfil adapta a navegação aos três níveis (executivo, gestão, operação).
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? ErrorFlag { get; set; }
+
+    private bool Error => ErrorFlag == "1";
+}

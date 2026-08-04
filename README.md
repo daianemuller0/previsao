@@ -1,66 +1,106 @@
-# Previsão · Aftermarket Intelligence
+# Howden Sales Forecast
 
-Starter de projeto com a **identidade visual** reaproveitada do sistema de Licenças
-(Howden Aftermarket Intelligence). Serve como ponto de partida para construir a nova
-aplicação já com o mesmo design system.
+Sistema web de **gestão e previsão de vendas** da Howden Brasil — substitui o
+processo atual em Excel por uma plataforma corporativa de *revenue intelligence*.
 
-## Como abrir
+Construído com a **mesma stack e arquitetura do projeto de Licenças**
+(`Licencas_HSA`): C# / .NET 8 / Blazor Server, com persistência em **arquivos
+Parquet consolidados pelo DuckDB** — sem servidor de banco de dados.
 
-É um projeto estático — basta abrir `index.html` no navegador (ou servir a pasta):
+> ⚠️ **Compilação:** este ambiente não possui o SDK .NET (download bloqueado por
+> política de rede), então o projeto **não foi compilado aqui**. O código segue
+> fielmente as convenções já comprovadas do projeto de Licenças. Rode localmente:
+> `dotnet run` (requer .NET 8 SDK). Podem ser necessários pequenos ajustes de
+> compilação — veja o roadmap.
+
+## Como rodar
 
 ```bash
-python3 -m http.server 8080
-# depois acesse http://localhost:8080
+dotnet run
+# abre em http://localhost:5080  ·  login: howden / howden2026
 ```
 
-## Estrutura
+O perfil escolhido no login (Diretoria, Gestor, KAM, Financeiro, Visualizador,
+Admin) adapta a navegação aos três níveis de experiência.
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Runtime | .NET 8, ASP.NET Core |
+| UI | Blazor Server (Razor Components, render interativo no servidor) |
+| Dados | DuckDB em memória sobre Parquet (`DuckDB.NET.Data.Full` 1.1.3) |
+| Importação | `ClosedXML` 0.102.2 (leitura de `.xlsx`) |
+| Autenticação | Cookie + perfis de acesso |
+| Estilo | CSS puro (`wwwroot/app.css`), identidade visual Howden |
+
+## Arquitetura em camadas
 
 ```
-index.html   Shell de exemplo (sidebar + topbar + painel demonstrando os componentes)
-app.css      Design system completo (tokens, layout, componentes)
+Program.cs            Composição: DI, autenticação, seed, endpoints (login, export CSV)
+Components/
+  Layout/             MainLayout (topbar) + NavMenu (11 áreas, recolhível, por perfil)
+  Shared/             Componentes reutilizáveis: StatCard, Sparkline, Donut, Waterfall
+  Pages/              Telas (11 áreas do menu + detalhe da oportunidade + login)
+Data/
+  ParquetStore.cs     Núcleo da persistência (DuckDB sobre Parquet, append-only)
+  Catalog.cs          Dados-mestre (mercados, produtos, KAMs, clientes, metas…)
+  ForecastCalc.cs     Regras de negócio (ponderado, margem, cobertura, gap, risco)
+  Fmt.cs              Formatação corporativa (USD, BRL, %, datas, quarter)
+  DemoSeed.cs         40 oportunidades demonstrativas realistas
+  OpportunityRepository.cs / DbInitializer.cs
+Models/               Opportunity, Catalog (entidades), ForecastCategory, Roles
+Icons.cs              Conjunto central de ícones SVG
 ```
 
-## Design system
+- **UI**: páginas Razor `InteractiveServer`; todas exigem login (`[Authorize]`).
+- **Domínio**: classes estáticas puras (`ForecastCalc`, `Fmt`).
+- **Dados**: repositório fino sobre um `ParquetStore` singleton; catálogo de
+  dados-mestre injetado como singleton.
 
-### Paleta (CSS variables em `:root`)
+### Cálculos do forecast (`ForecastCalc`)
 
-| Token              | Cor        | Uso                                  |
-| ------------------ | ---------- | ------------------------------------ |
-| `--primary`        | `#004785`  | Azul principal — títulos, botões     |
-| `--primary-dark`   | `#06345d`  | Hover de botões primários            |
-| `--secondary`      | `#007A9E`  | Links, foco de inputs, chips ativos  |
-| `--accent`         | `#009496`  | Destaques, botão "accent" (teal)     |
-| `--sidebar-top`    | `#14315c`  | Topo do gradiente da sidebar         |
-| `--sidebar-bottom` | `#172d54`  | Base do gradiente da sidebar         |
-| `--sidebar-active` | `#2f62b4`  | Item de menu ativo                   |
-| `--bg`             | `#f2f5f9`  | Fundo da página                      |
-| `--panel`          | `#ffffff`  | Cards e painéis                      |
-| `--border`         | `#e4e9f1`  | Bordas                               |
-| `--text`           | `#1c2a3a`  | Texto principal                      |
-| `--muted`          | `#64748b`  | Texto secundário                     |
+| Métrica | Fórmula |
+|---|---|
+| Valor USD | Valor BRL ÷ taxa de câmbio (ou valor direto em USD) |
+| Forecast ponderado | valor × prob. de ganho × prob. de fechamento no período |
+| Margem prevista | valor × GM% |
+| Pipeline coverage | pipeline elegível ÷ meta restante |
+| Gap para meta | meta − realizado − forecast elegível |
+| Score de risco | composto (probabilidade, tempo sem atualização, postergações, ausência de ação, margem, divergência vendedor×gestor) → Baixo/Moderado/Alto/Crítico |
 
-Raios: `--radius: 14px`, `--radius-sm: 10px`. Sombras: `--shadow-sm`, `--shadow`.
+### Forecast Categories
 
-### Tipografia
+Commit · Best Case · Pipeline · Upside · Risk · Closed Won · Closed Lost · Postponed
+(cores discretas e corporativas).
 
-`"Segoe UI", system-ui, -apple-system, sans-serif` — base **14px**.
+## Telas implementadas
 
-### Componentes prontos (classes)
+| Rota | Tela | Status |
+|---|---|---|
+| `/executivo` | **Visão Executiva** — 12 KPIs, Forecast×Meta×Realizado, cobertura, mercado/produto/KAM, waterfall de variação, Executive Attention | ✅ completa |
+| `/forecast` | **Forecast** — tabela com agrupamento, subtotais, ordenação, filtros e edição rápida (persistência) | ✅ completa |
+| `/pipeline` | **Pipeline** — funil por etapa, conversão, aging, distribuição | ✅ completa |
+| `/oportunidades` | **Oportunidades** — lista com filtros + cadastro | ✅ completa |
+| `/oportunidades/{id}` | **Detalhe** — 8 abas (resumo, comercial, valores, forecast, atividades, riscos, histórico, documentos) | ✅ completa |
+| `/revisao` | **Revisão Comercial** — revisão por KAM + modo reunião | ✅ completa |
+| `/analises` | **Análises** — win rate, bias, accuracy, ciclo, performance | ✅ completa |
+| `/historico` | **Histórico** — snapshots e comparação | ◑ base |
+| `/clientes` | **Clientes e Plantas** | ✅ completa |
+| `/importacoes` | **Importação** — fluxo, mapeamento e validações | ◑ UI (parser a conectar) |
+| `/cadastros` | **Cadastros mestres** | ✅ completa |
+| `/administracao` | **Administração** — perfis e governança | ✅ completa |
 
-- **Layout:** `.app-shell`, `.sidebar`, `.topbar`, `.content`
-- **Marca:** `.brand`, `.brand-mark`, `.brand-name`, `.brand-sub`
-- **Navegação:** `.nav`, `.nav-item` (`.active`), `.nav-section`
-- **Cards / KPIs:** `.cards` + `.card`, `.kpis` + `.kpi` (variações `.k-ren`, `.k-urg`, `.k-aten`, `.k-risk`…)
-- **Tabelas:** `.grid` (com `th`/`td`, `.right`, `.center`, `.nowrap`)
-- **Badges de status:** `.badge` + `.st-ok`, `.st-atencao`, `.st-urgente`, `.st-critica`, `.st-vencida`, `.st-plan`
-- **Botões:** `.btn-primary`, `.btn-ghost`, `.btn-accent`, `.btn-link`, `.btn-routine`
-- **Faixa de destaque:** `.routine` (usa o gradiente da marca)
-- **Abas / chips / filtros:** `.tabs` + `.tab`, `.views` + `.view`, `.chips` + `.chip`
-- **Barras de progresso:** `.bar-row`, `.bar-track`, `.bar`
-- **Modal e login:** `.modal-backdrop` + `.modal`, `.login-wrap` + `.login-card`
+## Roadmap (próximos passos)
 
-Consulte `index.html` para exemplos de uso de cada bloco.
+- **Compilar e validar** localmente (`dotnet build`); ajustar detalhes se necessário.
+- **Persistir snapshots** de forecast (hoje a comparação é indicativa).
+- **Conectar o parser do Excel** (ClosedXML) ao módulo de Importação, reaproveitando
+  o `LicenseImport` do projeto de Licenças.
+- **Filtros globais** funcionais (hoje demonstrativos na Visão Executiva).
+- **Persistir dados-mestre** dos Cadastros (hoje em catálogo em memória).
+- **Controle de acesso no nível dos dados** (cada KAM vê sua carteira).
 
 ---
 
-Identidade visual originada do repositório `daianemuller0/Licencas_HSA`.
+Identidade visual e arquitetura derivadas do repositório `daianemuller0/Licencas_HSA`.
