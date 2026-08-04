@@ -943,3 +943,8 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 /* Tabela compacta dentro de um gráfico */
 .grid-tbl.mini { font-size: 12px; }
 .grid-tbl.mini th, .grid-tbl.mini td { padding: 6px 8px; }
+
+/* ---- Indicador de atendimento ao budget (Vendas x Meta) ---- */
+.rep-attain-box { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; white-space: nowrap; }
+.rep-attain-box .ra-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-2); font-weight: 700; }
+.rep-attain-box .ra-value { font-size: 20px; font-weight: 800; line-height: 1.05; }

@@ -58,6 +58,27 @@ public class ControleRepository
             .Select(Clone).FirstOrDefault();
     }
 
+    // Categorias que compõem "Vendas NB+AFM (Realizado)" no REPORT HSA.
+    private static readonly string[] ReportCats = { "NB", "AFM", "SV", "LTSA" };
+
+    // Séries mensais do REPORT HSA (índice 0 = janeiro … 11 = dezembro) para uso
+    // em dashboards externos (ex.: Visão Executiva). Reproduz exatamente as linhas
+    // da planilha: Realizado = soma de NB+AFM+SV+LTSA; Meta = orçamento consolidado.
+    public (double[] Realizado, double[] Meta) ReportSeries(int year)
+    {
+        var entries = Entries(year);
+        double Real(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.RealizadoV ?? 0;
+        double Meta(int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == "CONS")?.BudgetV ?? 0;
+        var real = new double[12];
+        var meta = new double[12];
+        for (var m = 1; m <= 12; m++)
+        {
+            real[m - 1] = ReportCats.Sum(c => Real(c, m));
+            meta[m - 1] = Meta(m);
+        }
+        return (real, meta);
+    }
+
     public void Refresh()
     {
         lock (_lock) { _entries = LoadEntries(); LoadedAt = DateTime.Now; }

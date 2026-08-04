@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject OpportunityRepository Repo
 @inject Catalog Cat
+@inject ControleRepository ControleRepo
 @inject NavigationManager Nav
 
 @{ Build(); }
@@ -75,6 +76,27 @@
         </div>
         <div class="hero-spark"><Sparkline Values="@_evoMonth" Stroke="#8fe3c4" /></div>
     </div>
+</div>
+
+@* ---- Vendas x Meta (NB+AFM) · fonte: Controle · REPORT HSA ---- *@
+<div class="panel" style="margin-top:16px">
+    <div class="panel-head">
+        <div class="panel-title">Vendas x Meta · NB+AFM
+            <span class="hint">realizado x budget mensal · fonte: Controle · REPORT HSA · R$ · @_repYear</span>
+        </div>
+        <div class="rep-attain-box">
+            <span class="ra-label">Atendimento ao Budget (ano)</span>
+            <span class="ra-value" style="color:@AtColor(_repAttain)">@Fmt.Pct(_repAttain)</span>
+        </div>
+    </div>
+    @if (_repReal.Any(v => v > 0) || _repMeta.Any(v => v > 0))
+    {
+        <div class="chart-body">@RenderReportLine()</div>
+    }
+    else
+    {
+        <div class="empty">Sem dados no Controle (REPORT HSA) para @_repYear. Preencha os valores na guia <a href="/controle">Controle</a>.</div>
+    }
 </div>
 
 @* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
@@ -392,7 +414,26 @@
     private static string Clamp(double v) => Math.Clamp(v, 3, 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
     private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    protected override void OnInitialized() => _opps = Repo.All();
+    // Série do REPORT HSA (Controle): realizado x meta mensal + atendimento anual.
+    private double[] _repReal = new double[12], _repMeta = new double[12];
+    private double _repAttain;
+    private int _repYear = DateTime.Today.Year;
+
+    protected override void OnInitialized()
+    {
+        _opps = Repo.All();
+        LoadReport();
+    }
+
+    private void LoadReport()
+    {
+        var (real, meta) = ControleRepo.ReportSeries(_repYear);
+        _repReal = real; _repMeta = meta;
+        double tr = real.Sum(), tm = meta.Sum();
+        _repAttain = tm > 0 ? tr / tm * 100 : 0;
+    }
+
+    private static string AtColor(double p) => p >= 100 ? "var(--pos)" : p >= 85 ? "#b7791f" : "var(--neg)";
 
     // Recarrega as oportunidades após editar/duplicar/excluir na tabela.
     // Build() é chamado no topo do render e recomputa Top 10 e listagem.
@@ -873,6 +914,76 @@
             var mColor = cur ? "#007A9E" : "#93a1b5";
             var mWeight = cur ? "700" : "400";
             sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 8).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{mWeight}' fill='{mColor}'>{Fmt.MonthName(m + 1)}</text>");
+        }
+
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Gráfico de linhas Vendas x Meta (NB+AFM), puxando o REPORT HSA do Controle.
+    // Duas linhas: Realizado (área + linha cheia) e Meta/Budget (linha tracejada).
+    // Valores em R$ (moeda nativa do Controle). Construído como string SVG.
+    private RenderFragment RenderReportLine() => builder =>
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double Wd = 760, H = 280, top = 46, bot = 236, left = 46, right = 18;
+        double plotW = Wd - left - right, colW = plotW / 11.0;
+        double max = 1;
+        for (var m = 0; m < 12; m++) max = Math.Max(max, Math.Max(_repReal[m], _repMeta[m]));
+        max *= 1.20;
+        double X(int m) => left + m * colW;
+        double Y(double val) => bot - val / max * (bot - top);
+        const string cReal = "#007A9E", cMeta = "#b7791f";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas x Meta NB+AFM'>");
+
+        sb.Append("<defs><linearGradient id='rlarea' x1='0' y1='0' x2='0' y2='1'>");
+        sb.Append($"<stop offset='0%' stop-color='{cReal}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cReal}' stop-opacity='0.02'/>");
+        sb.Append("</linearGradient></defs>");
+
+        // legenda
+        sb.Append($"<line x1='{left.ToString(inv)}' y1='20' x2='{(left + 22).ToString(inv)}' y2='20' stroke='{cReal}' stroke-width='3' stroke-linecap='round'/>");
+        sb.Append($"<text x='{(left + 28).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Vendas NB+AFM (Realizado)</text>");
+        sb.Append($"<line x1='{(left + 205).ToString(inv)}' y1='20' x2='{(left + 227).ToString(inv)}' y2='20' stroke='{cMeta}' stroke-width='3' stroke-dasharray='5 3' stroke-linecap='round'/>");
+        sb.Append($"<text x='{(left + 233).ToString(inv)}' y='23.5' font-size='11' font-weight='600' fill='#3b4a61'>Meta NB+AFM (Budget)</text>");
+
+        // grade + rótulos do eixo Y
+        for (var g = 0; g <= 4; g++)
+        {
+            double gy = top + (bot - top) * g / 4.0, gv = max * (4 - g) / 4.0;
+            sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
+            sb.Append($"<text x='{(left - 6).ToString(inv)}' y='{(gy + 3).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(Fmt.Compact(gv))}</text>");
+        }
+
+        // destaque do mês atual
+        double hx = X(_month - 1);
+        sb.Append($"<line x1='{hx.ToString("0.#", inv)}' y1='{top.ToString(inv)}' x2='{hx.ToString("0.#", inv)}' y2='{bot.ToString(inv)}' stroke='{cReal}' stroke-width='1' stroke-dasharray='3 3' opacity='0.3'/>");
+
+        // linha Realizado (área + linha)
+        var lr = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++) lr.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repReal[m]).ToString("0.#", inv)}");
+        sb.Append($"<polygon points='{left.ToString(inv)},{bot.ToString(inv)} {lr} {(Wd - right).ToString(inv)},{bot.ToString(inv)}' fill='url(#rlarea)'/>");
+        sb.Append($"<polyline points='{lr}' fill='none' stroke='{cReal}' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        // linha Meta (tracejada)
+        var lm = new System.Text.StringBuilder();
+        for (var m = 0; m < 12; m++) lm.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repMeta[m]).ToString("0.#", inv)}");
+        sb.Append($"<polyline points='{lm}' fill='none' stroke='{cMeta}' stroke-width='2' stroke-dasharray='5 3' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        // pontos + rótulos + meses
+        for (var m = 0; m < 12; m++)
+        {
+            double cx = X(m), yr = Y(_repReal[m]), ym = Y(_repMeta[m]);
+            bool cur = (m + 1) == _month;
+            double att = _repMeta[m] > 0 && _repReal[m] > 0 ? _repReal[m] / _repMeta[m] * 100 : 0;
+            var tip = $"{Fmt.MonthName(m + 1)} · Realizado R$ {Fmt.Compact(_repReal[m])} · Meta R$ {Fmt.Compact(_repMeta[m])}" + (att > 0 ? $" · {Fmt.Pct(att)}" : "");
+
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{ym.ToString("0.#", inv)}' r='2.5' fill='{cMeta}'><title>{Esc(tip)}</title></circle>");
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yr.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cReal}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
+            if (_repReal[m] > 0)
+                sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(yr - 9).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? "#0b4f6f" : "#5b6b82")}'>{Esc(Fmt.Compact(_repReal[m]))}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 7).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? cReal : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
         }
 
         sb.Append("</svg>");
