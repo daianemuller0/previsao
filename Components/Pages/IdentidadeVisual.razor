@@ -1,0 +1,111 @@
+@page "/identidade"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject BrandRepository Brand
+
+<div class="breadcrumbs"><span>Sistema</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Identidade visual</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Identidade visual</h1>
+        <p class="subtitle">Personalize os logos da plataforma · PNG, JPG, SVG ou WebP · até 3 MB</p>
+    </div>
+</div>
+
+@if (_toast is not null) { <div class="info-banner" style="margin-bottom:14px">@_toast</div> }
+@if (_err is not null) { <div class="confirm-err" style="margin-bottom:14px">@_err</div> }
+
+<div class="g12">
+    <div class="c6">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Logo da capa <span class="hint">tela de login</span></div></div>
+            <div class="logo-slot">
+                <div class="logo-preview on-dark">
+                    @if (LoginShown is { } s) { <img src="@s" alt="Logo da capa" /> } else { <div class="brand-mark big">H</div> }
+                </div>
+                <div class="logo-actions">
+                    <label class="btn-ghost sm file-btn">@Icons.Svg("import")<span>Escolher imagem</span>
+                        <InputFile OnChange="@(e => OnPick(e, BrandRepository.LoginLogo))" accept="image/png,image/jpeg,image/svg+xml,image/webp" />
+                    </label>
+                    @if (_loginPending is not null)
+                    {
+                        <button class="btn-primary sm" @onclick="() => Save(BrandRepository.LoginLogo)">@Icons.Svg("check")Salvar</button>
+                    }
+                    @if (LoginShown is not null)
+                    {
+                        <button class="btn-danger-ghost sm" @onclick="() => Remove(BrandRepository.LoginLogo)">@Icons.Svg("trash")@(_loginPending is not null ? "Descartar" : "Remover")</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="c6">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title">Logo da página interna <span class="hint">menu lateral</span></div></div>
+            <div class="logo-slot">
+                <div class="logo-preview">
+                    @if (AppShown is { } s) { <img src="@s" alt="Logo interno" /> } else { <div class="brand-mark big">H</div> }
+                </div>
+                <div class="logo-actions">
+                    <label class="btn-ghost sm file-btn">@Icons.Svg("import")<span>Escolher imagem</span>
+                        <InputFile OnChange="@(e => OnPick(e, BrandRepository.AppLogo))" accept="image/png,image/jpeg,image/svg+xml,image/webp" />
+                    </label>
+                    @if (_appPending is not null)
+                    {
+                        <button class="btn-primary sm" @onclick="() => Save(BrandRepository.AppLogo)">@Icons.Svg("check")Salvar</button>
+                    }
+                    @if (AppShown is not null)
+                    {
+                        <button class="btn-danger-ghost sm" @onclick="() => Remove(BrandRepository.AppLogo)">@Icons.Svg("trash")@(_appPending is not null ? "Descartar" : "Remover")</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? _loginPending, _appPending;   // data URI carregada, ainda não salva
+    private string? _err, _toast;
+
+    private string? LoginShown => _loginPending ?? Brand.Get(BrandRepository.LoginLogo);
+    private string? AppShown => _appPending ?? Brand.Get(BrandRepository.AppLogo);
+
+    private async Task OnPick(InputFileChangeEventArgs e, string key)
+    {
+        _err = null; _toast = null;
+        try
+        {
+            var file = e.File;
+            if (file.Size > 3 * 1024 * 1024) { _err = "Arquivo maior que 3 MB."; return; }
+            using var ms = new MemoryStream();
+            await file.OpenReadStream(3 * 1024 * 1024).CopyToAsync(ms);
+            var ct = string.IsNullOrWhiteSpace(file.ContentType) ? "image/png" : file.ContentType;
+            var uri = $"data:{ct};base64,{Convert.ToBase64String(ms.ToArray())}";
+            if (key == BrandRepository.LoginLogo) _loginPending = uri; else _appPending = uri;
+        }
+        catch (Exception ex) { _err = "Falha ao ler a imagem: " + ex.Message; }
+    }
+
+    private void Save(string key)
+    {
+        var pending = key == BrandRepository.LoginLogo ? _loginPending : _appPending;
+        if (pending is null) return;
+        Brand.Set(key, pending);
+        if (key == BrandRepository.LoginLogo) _loginPending = null; else _appPending = null;
+        _toast = "Logo salvo. A mudança aparece ao recarregar a página.";
+    }
+
+    private void Remove(string key)
+    {
+        var pending = key == BrandRepository.LoginLogo ? _loginPending : _appPending;
+        if (pending is not null)
+        {
+            if (key == BrandRepository.LoginLogo) _loginPending = null; else _appPending = null;   // descarta a seleção
+            return;
+        }
+        Brand.Set(key, "");
+        _toast = "Logo removido. Voltou ao padrão ao recarregar a página.";
+    }
+}

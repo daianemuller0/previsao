@@ -1,16 +1,24 @@
 @rendermode InteractiveServer
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject HowdenSalesForecast.Data.BrandRepository Brand
 
 <aside class="sidebar no-print @(Collapsed ? "collapsed" : "")">
     <div class="brand @(Collapsed ? "center" : "")">
-        <div class="brand-mark">H</div>
-        @if (!Collapsed)
+        @if (AppLogo is { } logo)
         {
-            <div class="brand-text">
-                <div class="brand-name">Howden</div>
-                <div class="brand-sub">Sales Forecast</div>
-            </div>
+            <img src="@logo" alt="Logo" class="brand-logo-img" />
+        }
+        else
+        {
+            <div class="brand-mark">H</div>
+            @if (!Collapsed)
+            {
+                <div class="brand-text">
+                    <div class="brand-name">Howden</div>
+                    <div class="brand-sub">Sales Forecast</div>
+                </div>
+            }
         }
     </div>
 
@@ -49,6 +57,7 @@
 
     private bool Collapsed { get; set; }
     private string _role = Roles.Admin;
+    private string? AppLogo => Brand.Get(HowdenSalesForecast.Data.BrandRepository.AppLogo);
 
     private record NavItem(string Key, string Route, string Icon, string Label);
     private record NavGroup(string Name, NavItem[] Items);
@@ -70,6 +79,7 @@
         }),
         new("Sistema", new[]
         {
+            new NavItem("identidade", "/identidade", "image", "Identidade visual"),
             new NavItem("administracao", "/administracao", "admin", "Administração"),
         }),
     };

@@ -1,48 +1,85 @@
 @page "/login"
 @layout EmptyLayout
 @attribute [AllowAnonymous]
+@inject HowdenSalesForecast.Data.BrandRepository Brand
 
-<div class="login-wrap">
-    <div class="login-card">
-        <div class="brand center">
-            <div class="brand-mark big">H</div>
-            <div>
-                <div class="brand-name" style="color:var(--text);font-size:18px;">Howden</div>
-                <div class="brand-sub" style="color:var(--muted);">Sales Forecast</div>
+<div class="cover">
+    <!-- Painel esquerdo: apresentação -->
+    <div class="cover-left">
+        <div class="cover-top">
+            <div class="cover-brand">
+                @if (LoginLogo is { } logo)
+                {
+                    <img src="@logo" alt="Logo" class="cover-logo-img" />
+                }
+                else
+                {
+                    <div class="brand-mark big">H</div>
+                    <div class="cover-brand-text"><strong>Howden</strong><span>A Chart Industries Company</span></div>
+                }
+            </div>
+            <div class="cover-tags-top">
+                <span>ENTERPRISE PLATFORM</span>
+                <span class="dot">·</span>
+                <span>PREDICTIVE REVENUE INTELLIGENCE</span>
             </div>
         </div>
 
-        <h1 class="login-title">Entrar na plataforma</h1>
+        <div class="cover-hero">
+            <div class="cover-eyebrow">Aftermarket Intelligence</div>
+            <h1 class="cover-title">Inteligência preditiva para <span>maximizar receita</span> no aftermarket industrial</h1>
+            <p class="cover-desc">
+                Plataforma executiva para antecipar demanda, priorizar oportunidades e projetar
+                receita futura com base na operação real, no histórico de trocas, no parque
+                instalado e no comportamento dos clientes.
+            </p>
+            <ul class="cover-list">
+                <li>@Icons.Svg("check")Previsão de oportunidades por cliente, equipamento e período</li>
+                <li>@Icons.Svg("check")Priorização comercial baseada em potencial de receita</li>
+                <li>@Icons.Svg("check")Visão executiva da base instalada e do ciclo de reposição</li>
+                <li>@Icons.Svg("check")Apoio à decisão para vendas, serviços e gestão industrial</li>
+            </ul>
+            <div class="cover-badges">
+                <span>Industrial Aftermarket</span>
+                <span>Predictive Revenue</span>
+                <span>Installed Base Analytics</span>
+            </div>
+        </div>
+    </div>
 
-        @if (Error)
-        {
-            <div class="alert-error">Usuário ou senha inválidos.</div>
-        }
+    <!-- Painel direito: formulário -->
+    <div class="cover-right">
+        <div class="cover-form">
+            <div class="cover-eyebrow dark">Aftermarket Intelligence</div>
+            <h2 class="cover-form-title">Acesso à plataforma</h2>
+            <p class="cover-form-sub">Entre para visualizar previsões, oportunidades e indicadores executivos da sua operação.</p>
 
-        <form method="post" action="/auth/login" class="login-form">
-            <label>
-                Usuário
-                <input type="text" name="usuario" autocomplete="username" required />
-            </label>
-            <label>
-                Senha
-                <input type="password" name="senha" autocomplete="current-password" required />
-            </label>
-            <label>
-                Perfil de acesso
-                <select name="perfil">
-                    @foreach (var r in Roles.All)
-                    {
-                        <option value="@r.Role">@r.Label</option>
-                    }
-                </select>
-            </label>
-            <button type="submit" class="btn-primary">Entrar</button>
-        </form>
+            @if (Error)
+            {
+                <div class="alert-error">Usuário ou senha inválidos.</div>
+            }
 
-        <div class="login-hint">
-            Acesso da equipe — padrão: <strong>howden / howden2026</strong><br />
-            O perfil adapta a navegação aos três níveis (executivo, gestão, operação).
+            <form method="post" action="/auth/login" class="login-form">
+                <label>Usuário
+                    <input type="text" name="usuario" autocomplete="username" placeholder="usuario@howden.com" required />
+                </label>
+                <label>Senha
+                    <input type="password" name="senha" autocomplete="current-password" placeholder="••••••••" required />
+                </label>
+                <label>Perfil de acesso
+                    <select name="perfil">
+                        @foreach (var r in Roles.All)
+                        {
+                            <option value="@r.Role">@r.Label</option>
+                        }
+                    </select>
+                </label>
+                <button type="submit" class="btn-primary">Acessar plataforma @Icons.Svg("arrow-right")</button>
+            </form>
+
+            <div class="cover-form-foot">
+                @Icons.Svg("lock")<span>Conexão segura · acesso restrito</span>
+            </div>
         </div>
     </div>
 </div>
@@ -52,4 +89,5 @@
     public string? ErrorFlag { get; set; }
 
     private bool Error => ErrorFlag == "1";
+    private string? LoginLogo => Brand.Get(HowdenSalesForecast.Data.BrandRepository.LoginLogo);
 }
