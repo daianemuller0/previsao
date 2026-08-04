@@ -497,10 +497,21 @@
 
     // Agrupa oportunidades pelo VALOR real de um campo (não pelo catálogo),
     // somando a métrica ativa; rótulo via função de nome (com fallback ao texto cru).
+    // Agrupa pelo NOME RESOLVIDO (não pelo id cru): na importação um mesmo item
+    // pode chegar ora como id do catálogo, ora como texto — se agrupasse pelo id,
+    // o mesmo mercado/país viraria barras separadas e cada valor ficaria menor.
     private List<SliceRow> GroupSlices(IEnumerable<Opportunity> src, Func<Opportunity, string> key, Func<string, string> name) =>
-        src.GroupBy(o => key(o) ?? "")
-           .Select(g => new SliceRow(g.Key == "" ? "—" : name(g.Key), g.Sum(Metric)))
+        src.GroupBy(o => DisplayKey(key(o), name), StringComparer.OrdinalIgnoreCase)
+           .Select(g => new SliceRow(g.Key, g.Sum(Metric)))
            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+
+    // Rótulo de agrupamento: nome do catálogo quando o id casa; senão o texto cru
+    // aparado; vazio vira "—". Usado para consolidar barras equivalentes.
+    private static string DisplayKey(string? id, Func<string, string> name)
+    {
+        var raw = (id ?? "").Trim();
+        return raw == "" ? "—" : name(raw).Trim();
+    }
 
     private static string CommName(string code) => CommercialCategory.Name(code);
 
@@ -712,20 +723,21 @@
         _gmMonthly = new double[12];
         for (var m = 0; m < 12; m++) _gmMonthly[m] = gmCnt[m] > 0 ? gmSum[m] / gmCnt[m] : 0;
 
-        // Mercado / produto — agrupados pelos valores reais.
-        _byMarket = eligYear.GroupBy(o => o.MarketId ?? "")
-            .Select(g => new MarketRow(g.Key == "" ? "—" : Cat.MarketName(g.Key), g.Sum(Metric), PseudoTrend(g.Key, 14)))
+        // Mercado / produto — agrupados pelo NOME resolvido (consolida id do
+        // catálogo + texto cru do mesmo mercado numa única barra).
+        _byMarket = eligYear.GroupBy(o => DisplayKey(o.MarketId, Cat.MarketName), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new MarketRow(g.Key, g.Sum(Metric), PseudoTrend(g.Key, 14)))
             .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _marketTotal = Math.Max(_byMarket.Sum(x => x.Value), 1);
         _maxMarket = Math.Max(_byMarket.Count > 0 ? _byMarket.Max(x => x.Value) : 1, 1);
         _marketTopRise = _byMarket.Count > 0 ? _byMarket.OrderByDescending(x => x.Trend).First().Name : "";
         _marketTopFall = _byMarket.Count > 0 ? _byMarket.OrderBy(x => x.Trend).First().Name : "";
 
-        _byProduct = eligYear.GroupBy(o => o.ProductId ?? "")
+        _byProduct = eligYear.GroupBy(o => DisplayKey(o.ProductId, Cat.ProductName), StringComparer.OrdinalIgnoreCase)
             .Select(g =>
             {
                 var items = g.ToList();
-                return new ProductRow(g.Key == "" ? "—" : Cat.ProductName(g.Key), items.Sum(Metric),
+                return new ProductRow(g.Key, items.Sum(Metric),
                     items.Average(o => o.GmPercentValue), PseudoTrend(g.Key, 12));
             })
             .Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(6).ToList();
