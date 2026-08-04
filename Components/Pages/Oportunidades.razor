@@ -12,7 +12,7 @@
 <div class="page-head">
     <div>
         <h1>Oportunidades</h1>
-        <p class="subtitle">Carteira comercial · @Rows.Count de @_all.Count oportunidade(s) · valor @Fmt.UsdShort(Rows.Sum(o => o.AmountUsd))</p>
+        <p class="subtitle">Carteira comercial · @Rows.Count de @_all.Count oportunidade(s) · valor total @Fmt.Brl(Rows.Sum(o => o.AmountBrl))</p>
     </div>
     <div class="page-actions">
         <button class="icon-btn danger" title="Excluir base inteira" @onclick="() => _wipe = true">@Icons.Svg("trash")</button>
