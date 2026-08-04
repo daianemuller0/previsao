@@ -167,13 +167,15 @@
     // ---- agregação ----
     private record Slice(string Label, double Value);
 
+    // Medidas monetárias em R$ nativo (Net Value) — mesma base do resto do app.
+    // Evita o desvio de reconverter USD (Net Value ÷ taxa por linha) pela taxa global.
     private double Measure(ChartSpec s, Opportunity o) => s.Measure switch
     {
-        "conversao" => ForecastCalc.ConversionUsd(o),
-        "ponderado" => ForecastCalc.WeightedUsd(o),
-        "margem" => ForecastCalc.MarginUsd(o),
+        "conversao" => ForecastCalc.ConversionBrl(o),
+        "ponderado" => ForecastCalc.WeightedBrl(o),
+        "margem" => ForecastCalc.MarginBrl(o),
         "contagem" => 1,
-        _ => o.AmountUsd,
+        _ => o.AmountBrl,
     };
 
     private List<Slice> Series(ChartSpec s)
@@ -199,7 +201,7 @@
             "customer" => o => Cat.CustomerName(o.CustomerId),
             _ => o => Cat.MarketName(o.MarketId),
         };
-        var groups = Data.GroupBy(o => { var k = key(o); return string.IsNullOrWhiteSpace(k) ? "—" : k; })
+        var groups = Data.GroupBy(o => { var k = key(o); return string.IsNullOrWhiteSpace(k) ? "—" : k.Trim(); }, StringComparer.OrdinalIgnoreCase)
             .Select(g => new Slice(g.Key, g.Sum(o => Measure(s, o))))
             .Where(x => x.Value != 0)
             .OrderByDescending(x => x.Value)
@@ -217,7 +219,8 @@
     }
 
     // ---- formatação ----
-    private double Cv(double usd) => Currency == "BRL" ? usd * Rate : usd;
+    // Valores já são nativos em R$; converte para USD só quando o usuário troca a moeda.
+    private double Cv(double brl) => Currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
     // Valor de exibição de um valor BRUTO: contagem não converte moeda.
     private double Disp(ChartSpec s, double raw) => s.Measure == "contagem" ? raw : Cv(raw);
     // Formata um valor BRUTO para rótulo (converte moeda, exceto contagem).
