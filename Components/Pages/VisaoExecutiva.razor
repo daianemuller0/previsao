@@ -85,7 +85,7 @@
     <a class="btn-link" href="/oportunidades">Ver todas</a>
 </div>
 <OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
-                  EmptyText="Sem oportunidades acima de R$ 1 mi no recorte." />
+                  EmptyText="Sem oportunidades acima de R$ 1 mi no recorte." OnChanged="ReloadOpps" />
 
 @* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
 <div class="section-head"><span class="st-title">Indicadores estratégicos</span><span class="st-line"></span></div>
@@ -290,7 +290,7 @@
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
 </div>
-<OpportunityTable Rows="_filteredSorted" />
+<OpportunityTable Rows="_filteredSorted" OnChanged="ReloadOpps" />
 
 @* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
 <div class="section-head"><span class="st-title">@Icons.Svg("alert", "nav-ico") Atenção executiva</span><span class="st-sub">sinais que exigem decisão da liderança</span><span class="st-line"></span></div>
@@ -390,6 +390,10 @@
     private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     protected override void OnInitialized() => _opps = Repo.All();
+
+    // Recarrega as oportunidades após editar/duplicar/excluir na tabela.
+    // Build() é chamado no topo do render e recomputa Top 10 e listagem.
+    private void ReloadOpps() => _opps = Repo.All();
 
     private IEnumerable<Opportunity> Filtered()
     {
