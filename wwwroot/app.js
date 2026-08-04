@@ -33,13 +33,13 @@ window.worldMap = (function () {
         if (ns === 1) { s.tx = 0; s.ty = 0; }
         apply(s);
     }
-    function init(id) {
+    function init(id, ref) {
         const wrap = document.getElementById(id);
         if (!wrap) return;
         const inner = wrap.querySelector('.worldmap-inner');
         if (!inner) return;
-        if (S[id]) { S[id].inner = inner; apply(S[id]); return; }
-        const s = { wrap, inner, scale: 1, tx: 0, ty: 0, drag: null };
+        if (S[id]) { S[id].inner = inner; if (ref) S[id].ref = ref; apply(S[id]); return; }
+        const s = { wrap, inner, scale: 1, tx: 0, ty: 0, drag: null, ref: ref || null, downX: 0, downY: 0, moved: 0 };
         S[id] = s;
         inner.style.transformOrigin = '0 0';
         let tip = wrap.querySelector('.wm-tip');
@@ -63,17 +63,27 @@ window.worldMap = (function () {
         wrap.addEventListener('wheel', e => { e.preventDefault(); zoomAt(s, e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX, e.clientY); }, { passive: false });
         wrap.addEventListener('pointerdown', e => {
             s.drag = { x: e.clientX, y: e.clientY, tx: s.tx, ty: s.ty };
+            s.downX = e.clientX; s.downY = e.clientY; s.moved = 0;
             wrap.setPointerCapture(e.pointerId); wrap.classList.add('grabbing'); tip.style.display = 'none';
         });
         wrap.addEventListener('pointermove', e => {
             if (!s.drag) return;
             s.tx = s.drag.tx + (e.clientX - s.drag.x);
             s.ty = s.drag.ty + (e.clientY - s.drag.y);
+            s.moved = Math.max(s.moved, Math.abs(e.clientX - s.downX) + Math.abs(e.clientY - s.downY));
             apply(s);
         });
         const end = () => { if (s.drag) { s.drag = null; wrap.classList.remove('grabbing'); } };
         wrap.addEventListener('pointerup', end);
         wrap.addEventListener('pointercancel', end);
+        // Clique num país (sem arrastar) dispara o cross-filter no componente Blazor.
+        wrap.addEventListener('click', e => {
+            if (s.moved > 6 || !s.ref) return;
+            const p = e.target.closest && e.target.closest('path[data-xf-val]');
+            if (!p) return;
+            const val = p.getAttribute('data-xf-val');
+            if (val) s.ref.invokeMethodAsync('ApplyCrossFilter', 'country', val);
+        });
         apply(s);
     }
     function zoom(id, factor) {
