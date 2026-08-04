@@ -78,7 +78,19 @@ public sealed class OpportunityImporter
                         return row.Cell(col).GetString().Trim();
                 return "";
             }
-            BuildRow(r, Get);
+            // Lê o VALOR NUMÉRICO direto da célula quando ela é numérica — evita a
+            // ambiguidade de separador (ponto/vírgula) ao converter para texto.
+            double? GetN(params string[] names)
+            {
+                foreach (var n in names)
+                    if (map.TryGetValue(Norm(n), out var col))
+                    {
+                        var cell = row.Cell(col);
+                        return cell.Value.IsNumber ? cell.Value.GetNumber() : (double?)null;
+                    }
+                return null;
+            }
+            BuildRow(r, Get, GetN);
         }
         return r;
     }
@@ -111,7 +123,7 @@ public sealed class OpportunityImporter
                         return cells[i].Trim();
                 return "";
             }
-            BuildRow(r, Get);
+            BuildRow(r, Get, _ => null);
         }
         return r;
     }
@@ -137,8 +149,13 @@ public sealed class OpportunityImporter
     }
 
     // ---- Monta uma oportunidade a partir de um acessor de células ----------
-    private void BuildRow(Result r, Func<string[], string> get)
+    private void BuildRow(Result r, Func<string[], string> get, Func<string[], double?> getNum)
     {
+        // Número de um campo: usa o valor numérico da célula (Excel) e, na falta,
+        // o texto interpretado (CSV). Evita erro de separador de milhar/decimal.
+        double? Num(params string[] names) => getNum(names) ?? ParseNum(get(names));
+        double PctOf(params string[] names) => PctField(getNum(names), get(names));
+
         var proposta = get(new[] { "Proposta" });
         var customerRaw = get(new[] { "Customer", "Cliente" });
         var valueRaw = get(new[] { "Net Value", "Valor BRL", "Valor" });
@@ -158,8 +175,8 @@ public sealed class OpportunityImporter
         var puv = MatchBu(get(new[] { "Unidade de Venda", "BU do PV", "Unidade de venda" }));
         var buInter = MatchBu(get(new[] { "BU Intercompany", "BU  Intercompany" }));
 
-        var netBrl = ParseNum(valueRaw) ?? 0;
-        var taxa = ParseNum(get(new[] { "Taxa", "Taxa de câmbio", "Taxa de cambio" })) ?? 0;
+        var netBrl = Num("Net Value", "Valor BRL", "Valor") ?? 0;
+        var taxa = Num("Taxa", "Taxa de câmbio", "Taxa de cambio") ?? 0;
         if (taxa <= 0) taxa = _cat.RateToUsd("USD"); // cai no câmbio padrão do catálogo
 
         var o = new Opportunity
@@ -186,12 +203,12 @@ public sealed class OpportunityImporter
             CurrencyCode = "BRL",
             AmountOriginal = netBrl.ToString(Inv),
             ExchangeRate = taxa.ToString(Inv),
-            GmPercent = Pct(get(new[] { "PM %", "PM%", "GM%", "GM %" })).ToString(Inv),
+            GmPercent = PctOf("PM %", "PM%", "GM%", "GM %").ToString(Inv),
             ForecastCategory = "Pipeline",
             PipelineStageId = "st-qual",
             ExpectedDate = dateIso,
-            WinProbability = Pct(get(new[] { "% de Ganho", "% de ganho" })).ToString(Inv),
-            CloseInPeriodProbability = Pct(get(new[] { "% de Sair no Mês", "% de sair no mês", "% de sair no mes" })).ToString(Inv),
+            WinProbability = PctOf("% de Ganho", "% de ganho").ToString(Inv),
+            CloseInPeriodProbability = PctOf("% de Sair no Mês", "% de sair no mês", "% de sair no mes").ToString(Inv),
             Notes = get(new[] { "Observação", "Observacao", "Observações", "Observacoes" }),
             PostponeCount = "0",
             CreatedAt = DateTime.Today.ToString("yyyy-MM-dd"),
@@ -240,10 +257,31 @@ public sealed class OpportunityImporter
     {
         if (string.IsNullOrWhiteSpace(s)) return null;
         s = s.Replace("R$", "").Replace("US$", "").Replace("%", "").Replace(" ", " ").Trim();
+        s = new string(s.Where(c => !char.IsWhiteSpace(c)).ToArray());
         if (s == "") return null;
-        if (double.TryParse(s, NumberStyles.Any, Br, out var v)) return v;
-        if (double.TryParse(s, NumberStyles.Any, Inv, out v)) return v;
-        return null;
+
+        // Decide o separador decimal pelo símbolo que aparece por ÚLTIMO — robusto
+        // p/ pt-BR e en: "1.234.567,89", "1,234,567.89", "1234,56", "1.234.567".
+        int dot = s.LastIndexOf('.'), comma = s.LastIndexOf(',');
+        if (dot >= 0 && comma >= 0)
+            s = comma > dot ? s.Replace(".", "").Replace(',', '.')
+                            : s.Replace(",", "");
+        else if (comma >= 0)
+            s = (s.IndexOf(',') == comma && s.Length - comma - 1 <= 2)
+                ? s.Replace(',', '.')
+                : s.Replace(",", "");
+        else if (dot >= 0 && s.Count(c => c == '.') > 1)
+            s = s.Replace(".", "");
+
+        return double.TryParse(s, NumberStyles.Any, Inv, out var v) ? v : (double?)null;
+    }
+
+    // Percentual: usa o valor numérico da célula (0,94 → 94; 94 → 94) ou, na
+    // falta, interpreta o texto preservando a semântica do "%".
+    private static double PctField(double? num, string text)
+    {
+        if (num is { } n) return Math.Clamp(n > 0 && n <= 1 ? n * 100 : n, 0, 100);
+        return Pct(text);
     }
 
     private static double Pct(string raw)
