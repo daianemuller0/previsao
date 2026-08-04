@@ -47,6 +47,8 @@ builder.Services.AddSingleton<ListRepository>();
 builder.Services.AddSingleton<ControleRepository>();
 // Gráficos personalizados do estúdio da Visão Executiva.
 builder.Services.AddSingleton<ChartConfigRepository>();
+// Identidade visual (logos da capa e da página interna).
+builder.Services.AddSingleton<BrandRepository>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
 
