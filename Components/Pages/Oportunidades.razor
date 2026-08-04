@@ -73,6 +73,8 @@
                 <th class="right">VALOR USD</th>
                 <th class="right">Taxa</th>
                 <th>Coluna1</th>
+                <th class="center">OTP</th>
+                <th class="center">TOP 10</th>
             </tr>
         </thead>
         <tbody>
@@ -111,11 +113,13 @@
                     <td class="right num">@Fmt.Usd(o.AmountUsd)</td>
                     <td class="right num">@o.ExchangeRateValue.ToString("0.00", _pt)</td>
                     <td>@Dash(o.Coluna1)</td>
+                    <td class="center">@Mark(o.Otp)</td>
+                    <td class="center">@Mark(o.Top10)</td>
                 </tr>
             }
             @if (Rows.Count == 0)
             {
-                <tr><td colspan="27" class="empty">Nenhuma oportunidade encontrada.</td></tr>
+                <tr><td colspan="29" class="empty">Nenhuma oportunidade encontrada.</td></tr>
             }
         </tbody>
     </table>
@@ -245,6 +249,8 @@
             <label class="fld">VALOR USD<input class="field num" value="@Fmt.Usd(_new.AmountUsd)" readonly /></label>
             <label class="fld">Taxa<input class="field num" @bind="_new.ExchangeRate" /></label>
             <label class="fld">Coluna1<input class="field" @bind="_new.Coluna1" /></label>
+            <label class="fld">OTP<select class="field" @bind="_new.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">TOP 10<select class="field" @bind="_new.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
         </div>
         <div class="modal-actions">
             <button class="btn-ghost" @onclick="() => _new = null">Cancelar</button>
@@ -321,6 +327,8 @@
 
             <label class="fld">RAMP<input class="field" @bind="_edit.Ramp" /></label>
             <label class="fld">Coluna1<input class="field" @bind="_edit.Coluna1" /></label>
+            <label class="fld">OTP<select class="field" @bind="_edit.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">TOP 10<select class="field" @bind="_edit.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
             <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
         </div>
@@ -375,6 +383,10 @@
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
+    private static MarkupString Mark(string? s) =>
+        string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase) ? new("<span class='mk yes'>Sim</span>")
+        : (string.Equals(s, "Não", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "Nao", StringComparison.OrdinalIgnoreCase)) ? new MarkupString("<span class='mk no'>Não</span>")
+        : new MarkupString("—");
 
     // Rótulos derivados do formulário de nova oportunidade.
     private string NewQuarter() => $"Q{Fmt.QuarterOf(_newMonthNum)} {_newYear}";

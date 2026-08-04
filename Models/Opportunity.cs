@@ -31,6 +31,8 @@ public class Opportunity
     public string MarketOnestream { get; set; } = "";       // Market onestream
     public string Ramp { get; set; } = "";                  // RAMP
     public string Coluna1 { get; set; } = "";               // Coluna1 (livre)
+    public string Otp { get; set; } = "";                   // OTP (marcador Sim/Não · controle externo)
+    public string Top10 { get; set; } = "";                 // TOP 10 (marcador Sim/Não · controle externo)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";

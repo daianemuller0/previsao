@@ -1046,3 +1046,8 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .fb-sum-k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-2); font-weight: 700; }
 .fb-sum-v { font-size: 13.5px; font-weight: 800; color: var(--text); line-height: 1.05; }
 .fb-sum-v.pos { color: var(--pos); }
+
+/* ---- Marcador Sim/Não (colunas OTP / TOP 10) ---- */
+.mk { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.mk.yes { background: var(--pos-bg, #e6f6ee); color: var(--pos, #1f9254); }
+.mk.no { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
