@@ -67,6 +67,9 @@
         <div class="flt"><span class="flt-label">Produto</span><select @bind="_product"><option value="">Todos</option>@foreach (var id in ProductOptions){<option value="@id">@Cat.ProductName(id)</option>}</select></div>
         <div class="flt"><span class="flt-label">Cliente</span><select @bind="_customer"><option value="">Todos</option>@foreach (var id in CustomerOptions){<option value="@id">@Cat.CustomerName(id)</option>}</select></div>
         <div class="flt"><span class="flt-label">Unidade de negócio</span><select @bind="_bu"><option value="">Todas</option>@foreach (var id in BuOptions){<option value="@id">@Cat.BuCode(id)</option>}</select></div>
+        <div class="flt"><span class="flt-label">Filtrar por</span><select @bind="_valMetric"><option value="total">Valor total</option><option value="conv">Chance de conversão</option></select></div>
+        <div class="flt"><span class="flt-label">Mínimo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="0" @bind="_valMin" /></div>
+        <div class="flt"><span class="flt-label">Máximo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="—" @bind="_valMax" /></div>
     }
     <button class="btn-link" @onclick="() => _showMore = !_showMore">@(_showMore ? "Menos filtros" : "Mais filtros")</button>
     <div class="filterbar-spacer"></div>
@@ -384,6 +387,12 @@
     private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
     private int _monthFilter;              // 0 = todos
     private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
+    private string _valMetric = "total";   // total (Net Value) | conv (Chance de conversão)
+    private double? _valMin, _valMax;      // faixa de valor (R$) do métrico escolhido
+
+    // Valor do métrico escolhido, em R$ (Net Value ou Chance de conversão).
+    private static double MetricBrl(Opportunity o, string metric) =>
+        metric == "conv" ? ForecastCalc.ConversionBrl(o) : o.AmountBrl;
     private bool _showMore, _savedMsg;
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
@@ -501,6 +510,8 @@
         if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
         if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
         if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
+        if (_valMin is { } vmin) q = q.Where(o => MetricBrl(o, _valMetric) >= vmin);
+        if (_valMax is { } vmax) q = q.Where(o => MetricBrl(o, _valMetric) <= vmax);
         return q;
     }
 
@@ -509,6 +520,7 @@
         _market = _catFilter = _country = _product = _customer = _bu = "";
         _kams.Clear();
         _monthFilter = 0; _dateFrom = _dateTo = null;
+        _valMin = _valMax = null; _valMetric = "total";
     }
     private void SaveView() { _savedMsg = true; }
 
@@ -518,7 +530,8 @@
         _year = _today.Year; _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
         _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu }.Count(s => s != "")
             + (_kams.Count > 0 ? 1 : 0)
-            + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0);
+            + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
+            + (_valMin is not null || _valMax is not null ? 1 : 0);
 
         var opps = Filtered().ToList();
         _filtered = opps;

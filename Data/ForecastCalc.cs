@@ -43,6 +43,13 @@ public static class ForecastCalc
     public static double WeightedBrl(Opportunity o) =>
         o.AmountBrl * (Confidence(o) / 100.0);
 
+    // Chance de conversão = Net Value × % de ganho × % de sair no mês (valor em R$/US$).
+    // Não é uma porcentagem: é o valor esperado da oportunidade.
+    public static double ConversionBrl(Opportunity o) =>
+        o.AmountBrl * (o.WinProbabilityValue / 100.0) * (o.CloseProbabilityValue / 100.0);
+    public static double ConversionUsd(Opportunity o) =>
+        o.AmountUsd * (o.WinProbabilityValue / 100.0) * (o.CloseProbabilityValue / 100.0);
+
     // Margem bruta prevista = valor × GM%.
     public static double MarginUsd(Opportunity o) => o.AmountUsd * (o.GmPercentValue / 100.0);
     public static double MarginBrl(Opportunity o) => o.AmountBrl * (o.GmPercentValue / 100.0);

@@ -64,7 +64,7 @@
                     <td class="right num">@Fmt.Pct(o.GmPercentValue)</td>
                     <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td>
                     <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td>
-                    <td class="right num">@Fmt.Pct(ForecastCalc.Confidence(o))</td>
+                    <td class="right num">@Fmt.Brl(ForecastCalc.ConversionBrl(o))</td>
                     <td class="center">@Dash(o.CommercialCategory)</td>
                     <td>@Dash(o.ServicoPrevisto)</td>
                     <td>@Dash(o.MarketOnestream)</td>
