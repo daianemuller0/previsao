@@ -5,6 +5,7 @@
 @inject Catalog Cat
 @inject ControleRepository ControleRepo
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @{ Build(); }
 
@@ -319,18 +320,17 @@
     <div class="c12">
         <div class="panel">
             <div class="panel-head">
-                <div class="panel-title">Por país <span class="hint">mapa-múndi · participação · @MetricLabel</span></div>
+                <div class="panel-title">Por país <span class="hint">mapa-múndi · role o mouse · roda p/ zoom · arraste p/ mover</span></div>
                 <div class="map-zoom">
-                    <button class="icon-btn" title="Diminuir" @onclick="() => MapZoom(1/1.4)">@Icons.Svg("down")</button>
-                    <span class="map-zoom-lbl">@(_mapZoom.ToString("0", System.Globalization.CultureInfo.InvariantCulture))%</span>
-                    <button class="icon-btn" title="Aumentar" @onclick="() => MapZoom(1.4)">@Icons.Svg("up")</button>
-                    <button class="icon-btn" title="Redefinir" @onclick="() => _mapZoom = 100">@Icons.Svg("target")</button>
+                    <button class="icon-btn" title="Diminuir" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1/1.3)'>@Icons.Svg("down")</button>
+                    <button class="icon-btn" title="Aumentar" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1.3)'>@Icons.Svg("up")</button>
+                    <button class="icon-btn" title="Redefinir" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapId)'>@Icons.Svg("target")</button>
                 </div>
             </div>
             @if (_byCountry.Count > 0)
             {
-                <div class="worldmap-scroll">
-                    <div class="worldmap-inner" style="width:@(_mapZoom.ToString("0", System.Globalization.CultureInfo.InvariantCulture))%">@RenderWorldMap()</div>
+                <div class="worldmap" id="@MapId">
+                    <div class="worldmap-inner">@RenderWorldMap()</div>
                 </div>
                 <div class="map-legend cols">
                     @foreach (var c in _byCountry.OrderByDescending(x => x.Value))
@@ -500,6 +500,12 @@
     {
         _opps = Repo.All();
         LoadReport();
+    }
+
+    // Inicializa (idempotente) o mapa interativo depois de renderizar.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try { await JS.InvokeVoidAsync("worldMap.init", MapId); } catch { }
     }
 
     private void LoadReport()
@@ -1122,8 +1128,7 @@
         return $"rgb({r},{g},{b})";
     }
 
-    private double _mapZoom = 100;
-    private void MapZoom(double factor) => _mapZoom = Math.Clamp(Math.Round(_mapZoom * factor), 100, 800);
+    private const string MapId = "worldmap";
 
     // Mapa-múndi (choropleth) com fronteiras reais dos países.
     private RenderFragment RenderWorldMap() => builder =>
@@ -1142,8 +1147,10 @@
         {
             var has = byName.TryGetValue(name, out var v);
             var fill = has ? Shade(maxV > 0 ? v / maxV : 0) : "#e7edf3";
-            var tip = has ? $"{name} · {Money(v)}" : name;
-            sb.Append($"<path d='{d}' fill='{fill}' stroke='#cdd8e4' stroke-width='0.4'><title>{Esc(tip)}</title></path>");
+            var data = has
+                ? $" data-value='{Esc(Money(v))}' data-pct='{Esc(Fmt.Pct(v / Math.Max(_countryTotal, 1) * 100))}' data-metric='{Esc(MetricLabel)}'"
+                : "";
+            sb.Append($"<path d='{d}' fill='{fill}' stroke='#cdd8e4' stroke-width='0.4' data-country='{Esc(name)}'{data} class='wm-path'/>");
         }
         // rótulo de valor no país (centroide gerado) com contraste conforme o tom
         foreach (var kv in byName)
