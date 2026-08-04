@@ -129,9 +129,10 @@
         ("bu", "Unidade / BU"), ("category", "Categoria"), ("customer", "Cliente"),
         ("month", "Mês"), ("quarter", "Trimestre"),
     };
+    // "valor" = Net Value das oportunidades (R$). As demais são métricas derivadas.
     private static readonly (string Val, string Lbl)[] Measures =
     {
-        ("valor", "Valor (R$)"), ("conversao", "Chance de conversão"), ("ponderado", "Ponderado"), ("margem", "Margem bruta"), ("contagem", "Contagem"),
+        ("valor", "Valor · Net Value (R$)"), ("conversao", "Chance de conversão (derivada)"), ("ponderado", "Ponderado (derivada)"), ("margem", "Margem bruta (derivada)"), ("contagem", "Contagem de oportunidades"),
     };
 
     private static string DimLabel(string d) => Dimensions.FirstOrDefault(x => x.Val == d).Lbl ?? d;
