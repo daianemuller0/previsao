@@ -362,7 +362,7 @@
 @* ===================== 4b · OPORTUNIDADES ===================== *@
 <div class="section-head">
     <span class="st-title">Oportunidades</span>
-    <span class="st-sub">@_filtered.Count no recorte · @Money(_filtered.Sum(o => o.AmountUsd)) em valor</span>
+    <span class="st-sub">@_filtered.Count no recorte · @MoneyBrl(_filtered.Sum(o => o.AmountBrl)) em valor</span>
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
 </div>
@@ -489,7 +489,10 @@
 
     // Métrica exibida nos gráficos, conforme o seletor "Filtrar por":
     // "conv" = Chance de conversão (Net Value × %ganho × %sair); senão Valor total.
-    private double Metric(Opportunity o) => _valMetric == "conv" ? ForecastCalc.ConversionUsd(o) : o.AmountUsd;
+    // Canônico em US$ derivado SEMPRE do Net Value (R$) pela taxa global — assim o
+    // total em R$ (Money → × Rate) reproduz exatamente o Net Value somado na aba
+    // Oportunidades, sem a distorção do câmbio por linha (Net Value ÷ taxa da linha).
+    private double Metric(Opportunity o) => MetricBrl(o, _valMetric) / Math.Max(Rate, 0.0001);
     private string MetricLabel => _valMetric == "conv" ? "chance de conversão" : "valor total";
 
     // Agrupa oportunidades pelo VALOR real de um campo (não pelo catálogo),
