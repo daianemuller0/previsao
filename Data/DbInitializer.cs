@@ -6,10 +6,9 @@ public static class DbInitializer
 {
     public static void Initialize(ParquetStore store, Catalog catalog)
     {
-        if (store.IsEmpty("opportunities"))
-        {
-            // Gravação em lote: um único Parquet (evita 40 escritas na rede).
-            new OpportunityRepository(store).SaveMany(DemoSeed.Opportunities(catalog));
-        }
+        // Dados demonstrativos DESATIVADOS: a base real é importada pela guia
+        // Oportunidades. Se quiser reativar o seed demo, descomente abaixo.
+        // if (store.IsEmpty("opportunities"))
+        //     new OpportunityRepository(store).SaveMany(DemoSeed.Opportunities(catalog));
     }
 }

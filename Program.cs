@@ -71,8 +71,10 @@ _ = Task.Run(() =>
     try
     {
         var store = app.Services.GetRequiredService<ParquetStore>();
-        store.Compact("opportunities");
-        app.Services.GetRequiredService<OpportunityRepository>().Refresh();
+        var oppRepo = app.Services.GetRequiredService<OpportunityRepository>();
+        oppRepo.RemoveDemo();                 // remove oportunidades demo antigas
+        store.Compact("opportunities");        // consolida e descarta os tombstones
+        oppRepo.Refresh();
     }
     catch { /* pasta indisponível ou lenta: o app segue no ar */ }
 });
