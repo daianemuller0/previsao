@@ -78,6 +78,11 @@ else
                         @for (var m = 1; m <= 12; m++){var mm = m;<td class="right @(mm == _month ? "cur" : "")">@Cell("CONS", mm, "Budget")</td>}
                         <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(Budget))</td>
                     </tr>
+                    <tr>
+                        <td class="rname">Meta Vendas HSA</td>
+                        @for (var m = 1; m <= 12; m++){var mm = m;<td class="right @(mm == _month ? "cur" : "")">@Cell("MHSA", mm, "Budget")</td>}
+                        <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(x => BudgetOf("MHSA", x)))</td>
+                    </tr>
                     <tr class="rep-att">
                         <td class="rname">Atendimento ao Budget</td>
                         @for (var m = 1; m <= 12; m++){var a = Budget(m) > 0 && ConsReal(m) > 0 ? ConsReal(m) / Budget(m) * 100 : (double?)null;<td class="right att @(m == _month ? "cur" : "")" style="@AttStyle(a)">@(a is { } av ? Pct(av) : "—")</td>}
@@ -365,7 +370,8 @@ else
     private double? Pend(int m, string cat, string field) => _pending.TryGetValue(PKey(m, cat, field), out var s) ? ParseVal(s) : null;
 
     private double Real(string cat, int m) => Pend(m, cat, "Realizado") ?? (Entry(m, cat)?.RealizadoV ?? 0);
-    private double Budget(int m) => Pend(m, "CONS", "Budget") ?? (Entry(m, "CONS")?.BudgetV ?? 0);
+    private double BudgetOf(string cat, int m) => Pend(m, cat, "Budget") ?? (Entry(m, cat)?.BudgetV ?? 0);
+    private double Budget(int m) => BudgetOf("CONS", m);
     private double ConsReal(int m) => Cats.Sum(c => Real(c, m));
 
     private static double Sum(double[] a, int from, int to) { double s = 0; for (var i = from; i < to; i++) s += a[i + 1]; return s; }
@@ -374,7 +380,7 @@ else
     // Célula: input no modo edição, texto caso contrário.
     private RenderFragment Cell(string cat, int m, string field) => builder =>
     {
-        var val = field == "Budget" ? Budget(m) : Real(cat, m);
+        var val = field == "Budget" ? BudgetOf(cat, m) : Real(cat, m);
         if (_edit)
         {
             builder.OpenElement(0, "input");
