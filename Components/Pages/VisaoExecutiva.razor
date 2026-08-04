@@ -87,17 +87,22 @@
     <div class="hero-main">
         <div class="hero-eyebrow">Realizado × Meta · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? Fmt.MonthLong(_monthFilter) + " " + _repYear : "Ano " + _repYear)</div>
         <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(_heroReal))</div>
-        <div class="hero-target-line">Meta @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))</div>
+        <div class="hero-target-line">
+            Meta NB+AFM @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))<br />
+            Meta Vendas HSA @MoneyBrl(_heroMetaHsa) · @Fmt.Pct(_heroAttainHsa) da meta · gap @MoneyBrl(Math.Max(_heroMetaHsa - _heroReal, 0))
+        </div>
         <div class="hero-chips">
             <div class="hero-chip"><div class="k">Meta NB+AFM</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
             <div class="hero-chip"><div class="k">Meta Vendas HSA</div><div class="v">@MoneyBrl(_heroMetaHsa)</div></div>
             <div class="hero-chip"><div class="k">Realizado</div><div class="v">@MoneyBrl(_heroReal)</div></div>
-            <div class="hero-chip"><div class="k">Gap para a meta</div><div class="v @(_heroReal >= _heroMeta ? "pos" : "neg")">@MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))</div></div>
-            <div class="hero-chip"><div class="k">Atingimento</div><div class="v @(_heroAttain >= 100 ? "pos" : "neg")">@Fmt.Pct(_heroAttain)</div></div>
         </div>
         <div class="hero-gauge">
             <div class="gt"><div class="gf" style="width:@Clamp(_heroAttain)%"></div></div>
-            <div class="gl"><span>Atingimento da meta @(_monthFilter is >= 1 and <= 12 ? "mensal" : "do ano")</span><span>@Fmt.Pct(_heroAttain)</span></div>
+            <div class="gl"><span>Atingimento · Meta NB+AFM</span><span>@Fmt.Pct(_heroAttain)</span></div>
+        </div>
+        <div class="hero-gauge" style="margin-top:8px">
+            <div class="gt"><div class="gf" style="width:@Clamp(_heroAttainHsa)%"></div></div>
+            <div class="gl"><span>Atingimento · Meta Vendas HSA</span><span>@Fmt.Pct(_heroAttainHsa)</span></div>
         </div>
     </div>
 </div>
@@ -451,7 +456,7 @@
     private int _repYear = DateTime.Today.Year;
 
     // Hero (Meta × Realizado do REPORT HSA), sensível ao filtro de mês.
-    private double _heroReal, _heroMeta, _heroMetaHsa, _heroAttain;
+    private double _heroReal, _heroMeta, _heroMetaHsa, _heroAttain, _heroAttainHsa;
 
     // Conversão de valores em R$ (REPORT HSA é nativo em R$) respeitando o toggle.
     private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
@@ -557,6 +562,7 @@
             _heroMetaHsa = _repMetaHsa.Sum();
         }
         _heroAttain = _heroMeta > 0 ? _heroReal / _heroMeta * 100 : 0;
+        _heroAttainHsa = _heroMetaHsa > 0 ? _heroReal / _heroMetaHsa * 100 : 0;
 
         bool InYear(Opportunity o) => (o.ExpectedDateValue?.Year ?? 0) == _year;
         bool InMonth(Opportunity o) => InYear(o) && o.ExpectedDateValue!.Value.Month == _month;
