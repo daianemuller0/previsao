@@ -152,10 +152,10 @@
 @* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
 <div class="section-head"><span class="st-title">Indicadores estratégicos</span><span class="st-line"></span></div>
 <div class="exec-grid cols-2">
-    <StatCard Label="Previsão do trimestre" Value="@Money(_fcQuarter)" Delta="@_fcQuarterDelta" Context="@($"Meta {Money(_tgtQuarter)}")" AccentLeft="true">
+    <StatCard Label="Previsão do trimestre" Value="@Money(_fcQuarter)" Context="@($"Meta {MoneyBrl(_metaQuarter)}")" AccentLeft="true">
         <div class="spark"><Sparkline Values="@_evoQuarter" Stroke="#007A9E" /></div>
     </StatCard>
-    <StatCard Label="Previsão anual" Value="@Money(_fcYear)" Delta="@_fcYearDelta" Context="@($"Meta {Money(_tgtYear)}")" AccentLeft="true">
+    <StatCard Label="Previsão anual" Value="@Money(_fcYear)" Context="@($"Meta {MoneyBrl(_metaYear)}")" AccentLeft="true">
         <div class="spark"><Sparkline Values="@_evoYear" Stroke="#009496" /></div>
     </StatCard>
 </div>
@@ -428,6 +428,7 @@
 
     // ---- valores calculados ----
     private double _fcMonth, _fcQuarter, _fcYear, _tgtMonth, _tgtQuarter, _tgtYear;
+    private double _metaQuarter, _metaYear;   // metas do trimestre/ano (REPORT HSA)
     private double _realizedYtd, _attainYtd, _attainYear, _attainMonth, _committedMonth;
     private double _pipelineTotal, _pipelineWeighted, _marginForecast, _gmAvg;
     private double _coverage, _gapYear, _concentration, _atRisk, _eligiblePipeline, _remainingTarget;
@@ -607,8 +608,13 @@
         double W(Opportunity o) => ForecastCalc.WeightedUsd(o);
 
         _fcMonth = opps.Where(o => InMonth(o) && Eligible(o)).Sum(W);
-        _fcQuarter = opps.Where(o => InQuarter(o) && Eligible(o)).Sum(W);
-        _fcYear = opps.Where(o => InYear(o) && Eligible(o)).Sum(W);
+        // Previsão = somatória das oportunidades abertas (métrico ativo: valor total
+        // ou chance de conversão) no trimestre / ano.
+        _fcQuarter = opps.Where(o => InQuarter(o) && Eligible(o)).Sum(Metric);
+        _fcYear = opps.Where(o => InYear(o) && Eligible(o)).Sum(Metric);
+        // Meta do trimestre / ano puxada do REPORT HSA (Controle), não do catálogo demo.
+        _metaQuarter = 0; for (var mi = (_quarter - 1) * 3; mi < _quarter * 3 && mi < 12; mi++) _metaQuarter += _repMeta[mi];
+        _metaYear = _repMeta.Sum();
         _committedMonth = opps.Where(o => InMonth(o) && o.Category == ForecastCategory.Commit).Sum(W);
         _tgtMonth = Cat.TargetMonth(_year, _month);
         _tgtQuarter = Cat.TargetQuarter(_year, _quarter);
