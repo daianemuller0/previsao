@@ -131,7 +131,7 @@
     };
     private static readonly (string Val, string Lbl)[] Measures =
     {
-        ("valor", "Valor (R$)"), ("ponderado", "Ponderado"), ("margem", "Margem bruta"), ("contagem", "Contagem"),
+        ("valor", "Valor (R$)"), ("conversao", "Chance de conversão"), ("ponderado", "Ponderado"), ("margem", "Margem bruta"), ("contagem", "Contagem"),
     };
 
     private static string DimLabel(string d) => Dimensions.FirstOrDefault(x => x.Val == d).Lbl ?? d;
@@ -169,6 +169,7 @@
 
     private double Measure(ChartSpec s, Opportunity o) => s.Measure switch
     {
+        "conversao" => ForecastCalc.ConversionUsd(o),
         "ponderado" => ForecastCalc.WeightedUsd(o),
         "margem" => ForecastCalc.MarginUsd(o),
         "contagem" => 1,
