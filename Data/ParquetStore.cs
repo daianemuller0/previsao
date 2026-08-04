@@ -23,17 +23,32 @@ public sealed class ParquetStore
 
     public ParquetStore(string folder)
     {
-        Folder = Path.GetFullPath(folder);
+        var configured = Path.GetFullPath(folder);
         try
         {
-            Directory.CreateDirectory(Folder);
+            Directory.CreateDirectory(configured);
+            Folder = configured;
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
-                $"Não foi possível acessar a pasta de dados '{Folder}'. " +
-                "Verifique a chave \"Data:Folder\" no appsettings e se o caminho de rede " +
-                "está acessível a partir desta máquina.", ex);
+            // Caminho configurado indisponível (ex.: pasta de rede sem acesso
+            // nesta máquina). Em vez de derrubar a aplicação, cai para uma pasta
+            // local "data" ao lado do executável, para que rode em qualquer lugar.
+            var fallback = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "data"));
+            try
+            {
+                Directory.CreateDirectory(fallback);
+                Folder = fallback;
+                Console.Error.WriteLine(
+                    $"[ParquetStore] Pasta de dados '{configured}' inacessível ({ex.Message}). " +
+                    $"Usando pasta local '{fallback}'.");
+            }
+            catch (Exception ex2)
+            {
+                throw new InvalidOperationException(
+                    $"Não foi possível acessar a pasta de dados '{configured}' nem a alternativa local '{fallback}'. " +
+                    "Verifique a chave \"Data:Folder\" no appsettings.", ex2);
+            }
         }
     }
 
