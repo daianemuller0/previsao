@@ -69,12 +69,14 @@ public class ControleRepository
         var entries = Entries(year);
         double Real(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.RealizadoV ?? 0;
         double Budget(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.BudgetV ?? 0;
+        // Realizado NB+AFM: valor digitado direto (VNBAFM) quando existir; senão soma a composição.
+        bool HasVendas(int m) => entries.Any(e => e.MonthV == m && e.Category == "VNBAFM");
         var real = new double[12];
         var meta = new double[12];
         var metaHsa = new double[12];
         for (var m = 1; m <= 12; m++)
         {
-            real[m - 1] = ReportCats.Sum(c => Real(c, m));
+            real[m - 1] = HasVendas(m) ? Real("VNBAFM", m) : ReportCats.Sum(c => Real(c, m));
             meta[m - 1] = Budget("CONS", m);
             metaHsa[m - 1] = Budget("MHSA", m);
         }
