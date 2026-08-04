@@ -1014,3 +1014,13 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 
 /* Dois indicadores de atendimento (Vendas x Meta) lado a lado */
 .rep-attain-group { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---- Mapa por país (bolhas proporcionais) ---- */
+.country-map { width: 100%; }
+.country-map svg { width: 100%; height: auto; display: block; }
+.map-legend { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.map-legend .ml-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 8px; font-size: 12px; }
+.map-legend .ml-dot { width: 9px; height: 9px; border-radius: 3px; background: #007A9E; }
+.map-legend .ml-name { color: var(--text-2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-legend .ml-val { color: var(--text); font-weight: 600; text-align: right; white-space: nowrap; }
+.map-legend .ml-pct { color: var(--muted-2); font-size: 11px; text-align: right; min-width: 42px; }
