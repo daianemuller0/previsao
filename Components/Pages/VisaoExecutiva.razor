@@ -1070,54 +1070,66 @@
         builder.AddMarkupContent(0, sb.ToString());
     };
 
-    // Centroides aproximados (lon, lat) dos países da América do Sul p/ o mapa.
-    private static readonly Dictionary<string, (double Lon, double Lat)> CountryPos = new(StringComparer.OrdinalIgnoreCase)
+    // Nome do país (PT / variações) -> nome no mapa (inglês, chave de SouthAmericaMap).
+    private static readonly Dictionary<string, string> CountryToMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["brasil"] = (-51, -11), ["brazil"] = (-51, -11), ["chile"] = (-71, -35),
-        ["peru"] = (-75, -10), ["perú"] = (-75, -10), ["argentina"] = (-64, -36),
-        ["colombia"] = (-73, 4), ["colômbia"] = (-73, 4), ["bolivia"] = (-64, -17), ["bolívia"] = (-64, -17),
-        ["venezuela"] = (-66, 7), ["ecuador"] = (-78, -1), ["equador"] = (-78, -1),
-        ["paraguai"] = (-58, -23), ["paraguay"] = (-58, -23), ["uruguai"] = (-56, -33), ["uruguay"] = (-56, -33),
+        ["brasil"] = "Brazil", ["brazil"] = "Brazil", ["chile"] = "Chile",
+        ["peru"] = "Peru", ["perú"] = "Peru", ["argentina"] = "Argentina",
+        ["colombia"] = "Colombia", ["colômbia"] = "Colombia", ["bolivia"] = "Bolivia", ["bolívia"] = "Bolivia",
+        ["venezuela"] = "Venezuela", ["ecuador"] = "Ecuador", ["equador"] = "Ecuador",
+        ["paraguai"] = "Paraguay", ["paraguay"] = "Paraguay", ["uruguai"] = "Uruguay", ["uruguay"] = "Uruguay",
+        ["guiana"] = "Guyana", ["guyana"] = "Guyana", ["suriname"] = "Suriname",
+    };
+    // Centroides aproximados (lon, lat) para o rótulo de valor sobre o país.
+    private static readonly Dictionary<string, (double Lon, double Lat)> MapCentroid = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Brazil"] = (-51, -10), ["Chile"] = (-71, -38), ["Peru"] = (-75, -10), ["Argentina"] = (-65, -37),
+        ["Colombia"] = (-73, 4), ["Bolivia"] = (-64, -17), ["Venezuela"] = (-66, 7), ["Ecuador"] = (-78, -1.5),
+        ["Paraguay"] = (-58, -23), ["Uruguay"] = (-56, -33), ["Guyana"] = (-59, 5), ["Suriname"] = (-56, 4),
     };
 
-    // Mapa de bolhas por país: símbolos proporcionais sobre uma silhueta
-    // estilizada da América do Sul (SVG como string, sem dependências externas).
+    // Interpolação de cor (claro -> teal) para o choropleth, t em [0,1].
+    private static string Shade(double t)
+    {
+        t = Math.Clamp(t, 0, 1);
+        int r = (int)(238 + (0 - 238) * t), g = (int)(244 + (122 - 244) * t), b = (int)(248 + (158 - 248) * t);
+        return $"rgb({r},{g},{b})";
+    }
+
+    // Mapa por país (choropleth) com fronteiras reais da América do Sul.
     private RenderFragment RenderCountryMap() => builder =>
     {
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
-        double W = 340, H = 316, pad = 10;
-        double lonMin = -82, lonMax = -34, latMin = -56, latMax = 13;
-        double PX(double lon) => pad + (lon - lonMin) / (lonMax - lonMin) * (W - 2 * pad);
-        double PY(double lat) => pad + (latMax - lat) / (latMax - latMin) * (H - 2 * pad);
+        // valor por país no nome do mapa (soma variações)
+        var byName = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in _byCountry)
+            if (CountryToMap.TryGetValue(c.Label.Trim(), out var en))
+                byName[en] = byName.GetValueOrDefault(en) + c.Value;
+        double maxV = byName.Count > 0 ? byName.Values.Max() : 1;
 
-        // Silhueta aproximada da América do Sul (contorno em lon/lat).
-        var outline = new (double Lon, double Lat)[]
-        {
-            (-77,8),(-72,11),(-60,10),(-52,5),(-50,0),(-44,-2),(-35,-6),(-38,-13),(-39,-22),
-            (-48,-25),(-53,-34),(-58,-35),(-62,-40),(-65,-46),(-69,-53),(-74,-52),(-71,-45),
-            (-71,-33),(-70,-25),(-76,-16),(-81,-6),(-80,1),(-78,5),
-        };
+        // projeção usada na geração dos contornos (plate carrée)
+        double lonMin = -81.41, latMax = 12.44, pad = 6, scale = 308.0 / 46.68;
+        double PX(double lon) => pad + (lon - lonMin) * scale;
+        double PY(double lat) => pad + (latMax - lat) * scale;
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Distribuição por país'>");
-        var poly = string.Join(" ", outline.Select(p => $"{F(PX(p.Lon))},{F(PY(p.Lat))}"));
-        sb.Append($"<polygon points='{poly}' fill='#eef4f8' stroke='#d3dcea' stroke-width='1'/>");
-
-        // bolhas por país (raio ~ proporcional à raiz do valor)
-        double maxV = Math.Max(_byCountry.Max(c => c.Value), 1);
-        foreach (var c in _byCountry.OrderBy(c => c.Value))   // menores primeiro (maiores por cima)
+        sb.Append($"<svg viewBox='0 0 {F(SouthAmericaMap.ViewW)} {F(SouthAmericaMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Distribuição por país'>");
+        foreach (var (name, d) in SouthAmericaMap.Paths)
         {
-            if (!CountryPos.TryGetValue(c.Label.Trim(), out var pos)) { continue; }
-            double cx = PX(pos.Lon), cy = PY(pos.Lat);
-            double r = 7 + Math.Sqrt(Math.Clamp(c.Value / maxV, 0, 1)) * 24;
-            var tip = $"{c.Label} · {Money(c.Value)} · {Fmt.Pct(c.Value / _countryTotal * 100)}";
-            sb.Append($"<circle cx='{F(cx)}' cy='{F(cy)}' r='{F(r)}' fill='#007A9E' fill-opacity='0.72' stroke='#fff' stroke-width='1.5'><title>{Esc(tip)}</title></circle>");
-            sb.Append($"<text x='{F(cx)}' y='{F(cy + 3)}' text-anchor='middle' font-size='9' font-weight='700' fill='#fff'>{Esc(Fmt.Compact(Cv(c.Value)))}</text>");
-            sb.Append($"<text x='{F(cx)}' y='{F(cy + r + 11)}' text-anchor='middle' font-size='9' font-weight='600' fill='#3b4a61'>{Esc(Trunc(c.Label, 12))}</text>");
+            var has = byName.TryGetValue(name, out var v);
+            var fill = has ? Shade(maxV > 0 ? v / maxV : 0) : "#eef4f8";
+            var tip = has ? $"{name} · {Money(v)}" : name;
+            sb.Append($"<path d='{d}' fill='{fill}' stroke='#c4d2e2' stroke-width='0.7'><title>{Esc(tip)}</title></path>");
+        }
+        // rótulo de valor no país (cor de contraste conforme o tom)
+        foreach (var kv in byName)
+        {
+            if (!MapCentroid.TryGetValue(kv.Key, out var pos)) continue;
+            bool dark = (maxV > 0 ? kv.Value / maxV : 0) > 0.5;
+            sb.Append($"<text x='{F(PX(pos.Lon))}' y='{F(PY(pos.Lat))}' text-anchor='middle' font-size='10' font-weight='700' fill='{(dark ? "#fff" : "#1e2836")}'>{Esc(Fmt.Compact(Cv(kv.Value)))}</text>");
         }
         sb.Append("</svg>");
 
-        // legenda compacta abaixo do mapa (inclui países fora da América do Sul)
+        // legenda compacta (inclui países fora da América do Sul, se houver)
         sb.Append("<div class='map-legend'>");
         foreach (var c in _byCountry.OrderByDescending(c => c.Value))
             sb.Append($"<div class='ml-row'><span class='ml-dot'></span><span class='ml-name'>{Esc(c.Label)}</span><span class='ml-val'>{Esc(Money(c.Value))}</span><span class='ml-pct'>{Esc(Fmt.Pct(c.Value / _countryTotal * 100))}</span></div>");
@@ -1127,7 +1139,6 @@
     };
 
     private static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-    private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) ? "" : (s.Length <= n ? s : s.Substring(0, n - 1) + "…");
 
     // Paleta dos gráficos de pizza/rosca.
     private static readonly string[] PieColors =
