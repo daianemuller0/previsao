@@ -1011,3 +1011,6 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .logo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .file-btn { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .file-btn input[type=file] { display: none; }
+
+/* Dois indicadores de atendimento (Vendas x Meta) lado a lado */
+.rep-attain-group { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }

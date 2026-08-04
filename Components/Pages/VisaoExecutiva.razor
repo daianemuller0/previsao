@@ -113,9 +113,15 @@
         <div class="panel-title">Vendas x Meta · NB+AFM
             <span class="hint">realizado x budget mensal · fonte: Controle · REPORT HSA · R$ · @_repYear</span>
         </div>
-        <div class="rep-attain-box">
-            <span class="ra-label">Atendimento ao Budget (ano)</span>
-            <span class="ra-value" style="color:@AtColor(_repAttain)">@Fmt.Pct(_repAttain)</span>
+        <div class="rep-attain-group">
+            <div class="rep-attain-box">
+                <span class="ra-label">Atend. Meta NB+AFM (ano)</span>
+                <span class="ra-value" style="color:@AtColor(_repAttain)">@Fmt.Pct(_repAttain)</span>
+            </div>
+            <div class="rep-attain-box">
+                <span class="ra-label">Atend. Meta Vendas HSA (ano)</span>
+                <span class="ra-value" style="color:@AtColor(_repAttainHsa)">@Fmt.Pct(_repAttainHsa)</span>
+            </div>
         </div>
     </div>
     @if (_repReal.Any(v => v > 0) || _repMeta.Any(v => v > 0) || _repMetaHsa.Any(v => v > 0))
@@ -452,7 +458,7 @@
 
     // Série do REPORT HSA (Controle): realizado x meta mensal + atendimento anual.
     private double[] _repReal = new double[12], _repMeta = new double[12], _repMetaHsa = new double[12];
-    private double _repAttain;
+    private double _repAttain, _repAttainHsa;
     private int _repYear = DateTime.Today.Year;
 
     // Hero (Meta × Realizado do REPORT HSA), sensível ao filtro de mês.
@@ -486,8 +492,9 @@
     {
         var (real, meta, metaHsa) = ControleRepo.ReportSeries(_repYear);
         _repReal = real; _repMeta = meta; _repMetaHsa = metaHsa;
-        double tr = real.Sum(), tm = meta.Sum();
+        double tr = real.Sum(), tm = meta.Sum(), tmh = metaHsa.Sum();
         _repAttain = tm > 0 ? tr / tm * 100 : 0;
+        _repAttainHsa = tmh > 0 ? tr / tmh * 100 : 0;
     }
 
     private static string AtColor(double p) => p >= 100 ? "var(--pos)" : p >= 85 ? "#b7791f" : "var(--neg)";
