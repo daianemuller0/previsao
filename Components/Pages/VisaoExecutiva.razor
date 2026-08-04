@@ -89,7 +89,8 @@
         <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(_heroReal))</div>
         <div class="hero-target-line">Meta @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))</div>
         <div class="hero-chips">
-            <div class="hero-chip"><div class="k">Meta do período</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
+            <div class="hero-chip"><div class="k">Meta NB+AFM</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
+            <div class="hero-chip"><div class="k">Meta Vendas HSA</div><div class="v">@MoneyBrl(_heroMetaHsa)</div></div>
             <div class="hero-chip"><div class="k">Realizado</div><div class="v">@MoneyBrl(_heroReal)</div></div>
             <div class="hero-chip"><div class="k">Gap para a meta</div><div class="v @(_heroReal >= _heroMeta ? "pos" : "neg")">@MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))</div></div>
             <div class="hero-chip"><div class="k">Atingimento</div><div class="v @(_heroAttain >= 100 ? "pos" : "neg")">@Fmt.Pct(_heroAttain)</div></div>
@@ -450,7 +451,7 @@
     private int _repYear = DateTime.Today.Year;
 
     // Hero (Meta × Realizado do REPORT HSA), sensível ao filtro de mês.
-    private double _heroReal, _heroMeta, _heroAttain;
+    private double _heroReal, _heroMeta, _heroMetaHsa, _heroAttain;
 
     // Conversão de valores em R$ (REPORT HSA é nativo em R$) respeitando o toggle.
     private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
@@ -547,11 +548,13 @@
         {
             _heroReal = _repReal[_monthFilter - 1];
             _heroMeta = _repMeta[_monthFilter - 1];
+            _heroMetaHsa = _repMetaHsa[_monthFilter - 1];
         }
         else
         {
             _heroReal = _repReal.Sum();
             _heroMeta = _repMeta.Sum();
+            _heroMetaHsa = _repMetaHsa.Sum();
         }
         _heroAttain = _heroMeta > 0 ? _heroReal / _heroMeta * 100 : 0;
 
