@@ -403,7 +403,7 @@
     private double _coverage, _gapYear, _concentration, _atRisk, _eligiblePipeline, _remainingTarget;
     private int _openCount, _atRiskCount, _dq, _confidence, _health;
     private string _topCustomer = "—", _healthLabel = "", _coverageLabel = "", _sym = "US$";
-    private double _fcMonthDelta, _fcQuarterDelta, _fcYearDelta, _fcMonthMoM, _moveNet;
+    private double _fcMonthDelta, _fcQuarterDelta, _fcYearDelta, _moveNet;
     private double[] _evoMonth = Array.Empty<double>(), _evoQuarter = Array.Empty<double>(), _evoYear = Array.Empty<double>();
     private double[] _mTarget = new double[12], _mReal = new double[12], _mForecast = new double[12], _mCumul = new double[12];
     private int _activeFilters;
@@ -615,7 +615,6 @@
         double[] Evo(double v) => new[] { v * 0.86, v * 0.91, v * 0.97, v };
         _evoMonth = Evo(_fcMonth); _evoQuarter = Evo(_fcQuarter); _evoYear = Evo(_fcYear);
         _fcMonthDelta = Delta(_evoMonth); _fcQuarterDelta = Delta(_evoQuarter); _fcYearDelta = Delta(_evoYear);
-        _fcMonthMoM = 8.7;
 
         BuildHealth(open);
 
