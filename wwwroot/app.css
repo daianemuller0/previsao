@@ -1025,11 +1025,17 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .map-legend .ml-val { color: var(--text); font-weight: 600; text-align: right; white-space: nowrap; }
 .map-legend .ml-pct { color: var(--muted-2); font-size: 11px; text-align: right; min-width: 42px; }
 
-/* ---- Mapa-múndi por país (choropleth + zoom) ---- */
+/* ---- Mapa-múndi interativo (choropleth + tooltip + zoom/pan) ---- */
 .map-zoom { display: flex; align-items: center; gap: 6px; }
 .map-zoom .icon-btn { width: 30px; height: 30px; }
-.map-zoom-lbl { font-size: 12px; color: var(--muted); min-width: 44px; text-align: center; font-weight: 600; }
-.worldmap-scroll { overflow: auto; max-height: 480px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #f7fafc; }
-.worldmap-inner { min-width: 100%; transition: width .12s ease; }
+.worldmap { position: relative; overflow: hidden; height: 460px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #f7fafc; cursor: grab; touch-action: none; }
+.worldmap.grabbing { cursor: grabbing; }
+.worldmap-inner { width: 100%; will-change: transform; }
 .worldmap-inner svg { display: block; width: 100%; height: auto; }
+.wm-path { transition: fill .1s; }
+.wm-path:hover { fill: var(--accent, #12a594) !important; }
+.wm-tip { position: absolute; display: none; z-index: 20; pointer-events: none; background: #0b2440; color: #eaf2fb; border-radius: 8px; padding: 8px 11px; font-size: 12px; box-shadow: 0 8px 22px rgba(9,27,50,.4); max-width: 220px; }
+.wm-tip .wm-tip-name { font-weight: 700; font-size: 12.5px; margin-bottom: 2px; }
+.wm-tip .wm-tip-v { font-weight: 700; color: #6fe0cb; }
+.wm-tip .wm-tip-p { font-size: 11px; opacity: .82; }
 .map-legend.cols { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 22px; }
