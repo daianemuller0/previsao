@@ -1039,3 +1039,10 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .wm-tip .wm-tip-v { font-weight: 700; color: #6fe0cb; }
 .wm-tip .wm-tip-p { font-size: 11px; opacity: .82; }
 .map-legend.cols { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 22px; }
+
+/* ---- Totais fixos na barra de filtros (Vendido / Previsão) ---- */
+.fb-summary { display: flex; align-items: stretch; gap: 8px; }
+.fb-sum { display: flex; flex-direction: column; align-items: flex-end; gap: 0; padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); white-space: nowrap; }
+.fb-sum-k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-2); font-weight: 700; }
+.fb-sum-v { font-size: 13.5px; font-weight: 800; color: var(--text); line-height: 1.05; }
+.fb-sum-v.pos { color: var(--pos); }

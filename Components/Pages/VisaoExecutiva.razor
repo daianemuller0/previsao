@@ -74,6 +74,10 @@
     }
     <button class="btn-link" @onclick="() => _showMore = !_showMore">@(_showMore ? "Menos filtros" : "Mais filtros")</button>
     <div class="filterbar-spacer"></div>
+    <div class="fb-summary">
+        <div class="fb-sum"><span class="fb-sum-k">Vendido</span><span class="fb-sum-v pos">@MoneyBrl(_repReal.Sum())</span></div>
+        <div class="fb-sum"><span class="fb-sum-k">Previsão</span><span class="fb-sum-v">@Money(_fcYear)</span></div>
+    </div>
     @if (_activeFilters > 0)
     {
         <span class="tag">@_activeFilters ativo(s)</span>
