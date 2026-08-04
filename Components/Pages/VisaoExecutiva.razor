@@ -275,7 +275,7 @@
     <div class="c7">
         <div class="panel" style="height:100%">
             <div class="panel-head">
-                <div class="panel-title">Previsão mensal <span class="hint">realizado + forecast ponderado por mês · @_currency</span></div>
+                <div class="panel-title">Previsão mensal <span class="hint">realizado + @MetricLabel por mês · @_currency</span></div>
                 <div class="total-box">
                     <span class="tb-l">Valor total</span>
                     <span class="tb-v">@Money(Enumerable.Range(0, 12).Sum(m => _mReal[m] + _mForecast[m]))</span>
@@ -287,7 +287,7 @@
 </div>
 
 @* ---- Distribuição da carteira: unidade · trimestre · país · GM ---- *@
-<div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">forecast ponderado elegível · @_year · @_currency</span><span class="st-line"></span></div>
+<div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
 <div class="g12 top">
     <div class="c4">
         <div class="panel">
@@ -456,11 +456,16 @@
     private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
     private string MoneyBrl(double brl) => _sym + " " + Fmt.Compact(CvBrl(brl));
 
+    // Métrica exibida nos gráficos, conforme o seletor "Filtrar por":
+    // "conv" = Chance de conversão (Net Value × %ganho × %sair); senão Valor total.
+    private double Metric(Opportunity o) => _valMetric == "conv" ? ForecastCalc.ConversionUsd(o) : o.AmountUsd;
+    private string MetricLabel => _valMetric == "conv" ? "chance de conversão" : "valor total";
+
     // Agrupa oportunidades pelo VALOR real de um campo (não pelo catálogo),
-    // somando o ponderado; rótulo via função de nome (com fallback ao texto cru).
-    private static List<SliceRow> GroupSlices(IEnumerable<Opportunity> src, Func<Opportunity, string> key, Func<string, string> name) =>
+    // somando a métrica ativa; rótulo via função de nome (com fallback ao texto cru).
+    private List<SliceRow> GroupSlices(IEnumerable<Opportunity> src, Func<Opportunity, string> key, Func<string, string> name) =>
         src.GroupBy(o => key(o) ?? "")
-           .Select(g => new SliceRow(g.Key == "" ? "—" : name(g.Key), g.Sum(ForecastCalc.WeightedUsd)))
+           .Select(g => new SliceRow(g.Key == "" ? "—" : name(g.Key), g.Sum(Metric)))
            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
 
     private static string CommName(string code) => CommercialCategory.Name(code);
@@ -625,7 +630,7 @@
         var compRaw = bands.Select(b =>
         {
             var items = open.Where(o => { var c = ForecastCalc.Confidence(o); return c >= b.Lo && c < b.Hi; }).ToList();
-            return (b.Band, b.Color, Value: items.Sum(W), Count: items.Count);
+            return (b.Band, b.Color, Value: items.Sum(Metric), Count: items.Count);
         }).ToList();
         _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
         _comp = compRaw.Select(x => new CompRow(x.Band, x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
@@ -633,7 +638,7 @@
         // Aftermarket × New Business — agrupa pela categoria comercial real (NB/AFM/…).
         _byCommercial = opps.Where(o => InYear(o) && Eligible(o))
             .GroupBy(o => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim())
-            .Select(g => new CommRow(g.Key, CommName(g.Key), g.Sum(W)))
+            .Select(g => new CommRow(g.Key, CommName(g.Key), g.Sum(Metric)))
             .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _maxComm = Math.Max(_byCommercial.Count > 0 ? _byCommercial.Max(x => x.Value) : 1, 1);
 
@@ -644,7 +649,7 @@
         _byBu = GroupSlices(eligYear, o => o.PvBusinessUnitId, Cat.BuCode);
 
         _byQuarter = new double[4];
-        foreach (var o in eligYear) _byQuarter[(o.ExpectedDateValue!.Value.Month - 1) / 3] += W(o);
+        foreach (var o in eligYear) _byQuarter[(o.ExpectedDateValue!.Value.Month - 1) / 3] += Metric(o);
 
         _byCountry = GroupSlices(eligYear, o => o.CountryId, Cat.CountryName);
         _maxCountry = Math.Max(_byCountry.Count > 0 ? _byCountry.Max(x => x.Value) : 1, 1);
@@ -661,7 +666,7 @@
 
         // Mercado / produto — agrupados pelos valores reais.
         _byMarket = eligYear.GroupBy(o => o.MarketId ?? "")
-            .Select(g => new MarketRow(g.Key == "" ? "—" : Cat.MarketName(g.Key), g.Sum(W), PseudoTrend(g.Key, 14)))
+            .Select(g => new MarketRow(g.Key == "" ? "—" : Cat.MarketName(g.Key), g.Sum(Metric), PseudoTrend(g.Key, 14)))
             .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _marketTotal = Math.Max(_byMarket.Sum(x => x.Value), 1);
         _maxMarket = Math.Max(_byMarket.Count > 0 ? _byMarket.Max(x => x.Value) : 1, 1);
@@ -672,7 +677,7 @@
             .Select(g =>
             {
                 var items = g.ToList();
-                return new ProductRow(g.Key == "" ? "—" : Cat.ProductName(g.Key), items.Sum(W),
+                return new ProductRow(g.Key == "" ? "—" : Cat.ProductName(g.Key), items.Sum(Metric),
                     items.Average(o => o.GmPercentValue), PseudoTrend(g.Key, 12));
             })
             .Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(6).ToList();
@@ -684,7 +689,7 @@
             .Select(g =>
             {
                 var name = g.Key == "" ? "—" : Cat.KamName(g.Key);
-                var f = g.Sum(W);
+                var f = g.Sum(Metric);
                 var t = Cat.TargetYear(_year, "kam", g.Key);
                 var cov = t > 0 ? f / t : 0;
                 var (st, css) = t <= 0 ? ("Sem meta", "st-neutral")
@@ -706,7 +711,7 @@
         {
             var mi = o.ExpectedDateValue!.Value.Month - 1;
             if (Won(o)) _mReal[mi] += o.AmountUsd;
-            else if (Eligible(o)) _mForecast[mi] += W(o);
+            else if (Eligible(o)) _mForecast[mi] += Metric(o);
         }
         double run = 0;
         for (var m = 0; m < 12; m++) { run += _mReal[m] + _mForecast[m]; _mCumul[m] = run; }
