@@ -31,6 +31,10 @@ public sealed class OpportunityImporter
         public int Read { get; set; }
         public int Skipped { get; set; }
         public bool Ok => Rows.Count > 0;
+        // Conta ocorrências de cada id-base no arquivo. A base é consolidada por id
+        // (um registro por id), então propostas repetidas na planilha precisam de
+        // ids distintos para não colapsarem e some do total.
+        internal Dictionary<string, int> IdSeq { get; } = new();
     }
 
     public Result Parse(string fileName, Stream stream)
@@ -179,9 +183,19 @@ public sealed class OpportunityImporter
         var taxa = Num("Taxa", "Taxa de câmbio", "Taxa de cambio") ?? 0;
         if (taxa <= 0) taxa = _cat.RateToUsd("USD"); // cai no câmbio padrão do catálogo
 
+        // Id-base pela proposta (permite reimportar/atualizar sem duplicar). Quando
+        // a MESMA proposta aparece em várias linhas da planilha, cada ocorrência
+        // recebe um sufixo para não colapsar na consolidação por id.
+        var baseId = proposta != "" ? "imp-" + Norm(proposta) : "imp-" + Guid.NewGuid().ToString("N");
+        var seq = r.IdSeq.TryGetValue(baseId, out var nseq) ? nseq + 1 : 1;
+        r.IdSeq[baseId] = seq;
+        if (seq == 2 && proposta != "")
+            r.Warnings.Add($"Proposta {Show(proposta)} aparece em mais de uma linha; linhas mantidas separadamente.");
+        var id = seq == 1 ? baseId : baseId + "-" + seq.ToString(Inv);
+
         var o = new Opportunity
         {
-            Id = proposta != "" ? "imp-" + Norm(proposta) : "imp-" + Guid.NewGuid().ToString("N"),
+            Id = id,
             Name = customerRaw != "" && product != "" ? $"{_cat.ProductName(product)} — {_cat.CustomerName(customer)}"
                  : (proposta != "" ? proposta : "Oportunidade importada"),
             ProposalNumber = proposta,
