@@ -910,3 +910,36 @@ details.ctx > summary svg { width: 16px; height: 16px; }
     .content { padding: 0; max-width: none; }
     .panel, .stat, .hero-main, .hero-side { box-shadow: none; }
 }
+
+/* ===================== Estúdio de gráficos (Power BI) ===================== */
+.studio-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.studio-grid .studio-card.span2 { grid-column: span 2; }
+.studio-grid .studio-card.span1 { grid-column: span 1; }
+@media (max-width: 1050px) { .studio-grid { grid-template-columns: 1fr; } .studio-grid .studio-card.span2, .studio-grid .studio-card.span1 { grid-column: auto; } }
+.studio-card { display: flex; flex-direction: column; }
+.studio-card .chart-body { min-height: 210px; }
+.studio-card .chart-body.flow, .studio-card .chart-body.donut { min-height: 0; }
+.studio-acts { display: flex; gap: 4px; }
+
+/* Seletor de tipo de gráfico (grade de botões) */
+.chart-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+@media (max-width: 520px) { .chart-type-grid { grid-template-columns: repeat(2, 1fr); } }
+.chart-type { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; transition: border-color .14s, background .14s, color .14s; }
+.chart-type svg { width: 20px; height: 20px; }
+.chart-type:hover { border-color: var(--border-strong); background: var(--panel-2); color: var(--text-2); }
+.chart-type.active { border-color: var(--primary); background: rgba(0, 71, 133, .06); color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+
+/* Prévia dentro do editor */
+.studio-preview { margin-top: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; background: var(--panel-2); }
+.studio-preview .preview-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-2); font-weight: 700; margin-bottom: 8px; }
+.studio-preview .chart-body { min-height: 180px; background: var(--panel); border-radius: var(--radius-xs); padding: 8px; }
+
+/* Cartão KPI */
+.kpi-card { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 8px 4px; width: 100%; }
+.kpi-card .kpi-big { font-size: 30px; font-weight: 800; color: var(--primary); line-height: 1.05; }
+.kpi-card .kpi-sub { font-size: 12px; color: var(--muted); }
+.kpi-card .kpi-top { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+
+/* Tabela compacta dentro de um gráfico */
+.grid-tbl.mini { font-size: 12px; }
+.grid-tbl.mini th, .grid-tbl.mini td { padding: 6px 8px; }

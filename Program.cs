@@ -45,6 +45,8 @@ builder.Services.AddScoped<OpportunityImporter>();
 builder.Services.AddSingleton<ListRepository>();
 // Controle Orçamentário (valores, auditoria e observações).
 builder.Services.AddSingleton<ControleRepository>();
+// Gráficos personalizados do estúdio da Visão Executiva.
+builder.Services.AddSingleton<ChartConfigRepository>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
 
@@ -59,6 +61,7 @@ using (var scope = app.Services.CreateScope())
     var controleRepo = scope.ServiceProvider.GetRequiredService<ControleRepository>();
     controleRepo.SeedIfEmpty();
     controleRepo.SeedRegistrosIfEmpty();
+    scope.ServiceProvider.GetRequiredService<ChartConfigRepository>().SeedIfEmpty();
 }
 
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida
