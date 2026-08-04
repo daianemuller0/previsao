@@ -48,9 +48,9 @@ else
 
     @* ---- Cartões por semestre ---- *@
     <div class="exec-grid cols-4" style="margin-bottom:18px">
-        <div class="stat accent-left"><div class="stat-label">1º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div><div class="stat-context">Realizado @Brl(Sum(_real, 0, 6))</div></div>
+        <div class="stat accent-left"><div class="stat-label">1º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div><div class="stat-context">Realizado @Brl(Sum(_real, 0, 6))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 0, 6))</div></div>
         <div class="stat accent-left"><div class="stat-label">1º semestre · Atingimento</div><div class="stat-value sm" style="color:@AtCol(Attain(0, 6))">@Pct(Attain(0, 6))</div><div class="stat-context">Realizado ÷ Budget (Jan–Jun)</div></div>
-        <div class="stat accent-left"><div class="stat-label">2º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 6, 12))</div><div class="stat-context">Realizado @Brl(Sum(_real, 6, 12))</div></div>
+        <div class="stat accent-left"><div class="stat-label">2º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 6, 12))</div><div class="stat-context">Realizado @Brl(Sum(_real, 6, 12))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 6, 12))</div></div>
         <div class="stat accent-left"><div class="stat-label">2º semestre · Atingimento</div><div class="stat-value sm" style="color:@AtCol(Attain(6, 12))">@(Sum(_real, 6, 12) > 0 ? Pct(Attain(6, 12)) : "—")</div><div class="stat-context">Realizado ÷ Budget (Jul–Dez)</div></div>
     </div>
 
@@ -251,7 +251,7 @@ else
     private List<ControleEntry> _entries = new();
     private Dictionary<(int, string), ControleEntry> _map = new();
     private Dictionary<string, string> _pending = new();  // "m|cat|field" -> raw
-    private double[] _real = new double[13], _budget = new double[13];
+    private double[] _real = new double[13], _budget = new double[13], _metaHsa = new double[13];
 
     // Ofertas / pedidos (tabela livre)
     private List<ControleRegistro> _registros = new();
@@ -287,7 +287,7 @@ else
     {
         _map = new();
         foreach (var e in _entries) _map[(e.MonthV, e.Category)] = e;
-        for (var m = 1; m <= 12; m++) { _real[m] = ConsReal(m); _budget[m] = Budget(m); }
+        for (var m = 1; m <= 12; m++) { _real[m] = ConsReal(m); _budget[m] = Budget(m); _metaHsa[m] = BudgetOf("MHSA", m); }
 
         var q = _registros.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(_regSearch))
