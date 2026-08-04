@@ -6,6 +6,7 @@
 @inject ControleRepository ControleRepo
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@implements IDisposable
 
 @{ Build(); }
 
@@ -38,7 +39,7 @@
     <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
     <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
     <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
-    <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var id in MarketOptions){<option value="@id">@Cat.MarketName(id)</option>}</select></div>
+    <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var nm in MarketOptions){<option value="@nm">@nm</option>}</select></div>
     <div class="flt flt-multi">
         <span class="flt-label">KAM</span>
         <button type="button" class="flt-multi-btn" @onclick="() => _kamOpen = !_kamOpen">
@@ -52,10 +53,10 @@
                     @if (_kams.Count > 0) { <button class="btn-link" @onclick="() => _kams.Clear()">Limpar</button> }
                     <button class="btn-link" @onclick="() => _kamOpen = false">Fechar</button>
                 </div>
-                @foreach (var id in KamOptions)
+                @foreach (var nm in KamOptions)
                 {
-                    var kid = id;
-                    <label class="flt-check"><input type="checkbox" checked="@_kams.Contains(kid)" @onchange="() => ToggleKam(kid)" /> <span>@Cat.KamName(kid)</span></label>
+                    var kid = nm;
+                    <label class="flt-check"><input type="checkbox" checked="@_kams.Contains(kid)" @onchange="() => ToggleKam(kid)" /> <span>@kid</span></label>
                 }
                 @if (!KamOptions.Any()) { <div class="flt-multi-empty">Nenhum KAM nos dados.</div> }
             </div>
@@ -64,10 +65,10 @@
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
     @if (_showMore)
     {
-        <div class="flt"><span class="flt-label">País</span><select @bind="_country"><option value="">Todos</option>@foreach (var id in CountryOptions){<option value="@id">@Cat.CountryName(id)</option>}</select></div>
-        <div class="flt"><span class="flt-label">Produto</span><select @bind="_product"><option value="">Todos</option>@foreach (var id in ProductOptions){<option value="@id">@Cat.ProductName(id)</option>}</select></div>
-        <div class="flt"><span class="flt-label">Cliente</span><select @bind="_customer"><option value="">Todos</option>@foreach (var id in CustomerOptions){<option value="@id">@Cat.CustomerName(id)</option>}</select></div>
-        <div class="flt"><span class="flt-label">Unidade de negócio</span><select @bind="_bu"><option value="">Todas</option>@foreach (var id in BuOptions){<option value="@id">@Cat.BuCode(id)</option>}</select></div>
+        <div class="flt"><span class="flt-label">País</span><select @bind="_country"><option value="">Todos</option>@foreach (var nm in CountryOptions){<option value="@nm">@nm</option>}</select></div>
+        <div class="flt"><span class="flt-label">Produto</span><select @bind="_product"><option value="">Todos</option>@foreach (var nm in ProductOptions){<option value="@nm">@nm</option>}</select></div>
+        <div class="flt"><span class="flt-label">Cliente</span><select @bind="_customer"><option value="">Todos</option>@foreach (var nm in CustomerOptions){<option value="@nm">@nm</option>}</select></div>
+        <div class="flt"><span class="flt-label">Unidade de negócio</span><select @bind="_bu"><option value="">Todas</option>@foreach (var nm in BuOptions){<option value="@nm">@nm</option>}</select></div>
         <div class="flt"><span class="flt-label">Filtrar por</span><select @bind="_valMetric"><option value="total">Valor total</option><option value="conv">Chance de conversão</option></select></div>
         <div class="flt"><span class="flt-label">Mínimo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="0" @bind="_valMin" /></div>
         <div class="flt"><span class="flt-label">Máximo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="—" @bind="_valMax" /></div>
@@ -224,7 +225,7 @@
                     <tbody>
                         @foreach (var k in _byKam)
                         {
-                            <tr class="clickable" @onclick='() => Nav.NavigateTo("/oportunidades")'>
+                            <tr class="clickable @(IsActive("kam", k.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", k.Name)' title="Filtrar por @k.Name">
                                 <td class="col-strong">@k.Name</td>
                                 <td class="right num">@Money(k.Forecast)</td>
                                 <td class="right num">@Money(k.Target)</td>
@@ -246,7 +247,7 @@
             <div class="panel-head"><div class="panel-title">Previsão por mercado <span class="hint">participação · tendência</span></div></div>
             @foreach (var m in _byMarket)
             {
-                <div class="bar-row">
+                <div class="bar-row @XfCss("market", m.Name)" @onclick='() => CrossFilter("market", m.Name)' title="Filtrar por @m.Name">
                     <span class="bar-label">@m.Name
                         @if (m.Name == _marketTopRise) { <span class="tag" style="background:var(--pos-bg);color:var(--pos);margin-left:4px">▲ maior alta</span> }
                         else if (m.Name == _marketTopFall) { <span class="tag neg" style="margin-left:4px">▼ maior queda</span> }
@@ -262,7 +263,7 @@
             <div class="panel-head"><div class="panel-title">Previsão por produto <span class="hint">participação · margem · tendência</span></div></div>
             @foreach (var p in _byProduct)
             {
-                <div class="bar-row">
+                <div class="bar-row @XfCss("product", p.Name)" @onclick='() => CrossFilter("product", p.Name)' title="Filtrar por @p.Name">
                     <span class="bar-label">@p.Name</span>
                     <span class="bar-track"><span class="bar-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span>
                     <span class="bar-value">@Money(p.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(p.Value / _productTotal * 100) · GM @Fmt.Pct(p.Margin)</span> <span class="delta @(p.Trend >= 0 ? "up" : "down")" style="font-size:10.5px">@Fmt.Signed(p.Trend)</span></span>
@@ -280,7 +281,7 @@
             @foreach (var cc in _byCommercial)
             {
                 var destaque = cc.Code is "AFM" or "NB" ? "strong" : "";
-                <div class="bar-row">
+                <div class="bar-row @XfCss("commercial", cc.Code)" @onclick='() => CrossFilter("commercial", cc.Code)' title="Filtrar por @cc.Name">
                     <span class="bar-label @destaque">@cc.Name <span class="muted" style="font-weight:400">· @cc.Code</span></span>
                     <span class="bar-track"><span class="bar-fill @(cc.Code == "AFM" ? "afm" : "c-primary")" style="width:@Share(cc.Value, _maxComm)%"></span></span>
                     <span class="bar-value">@Money(cc.Value)</span>
@@ -339,7 +340,7 @@
                 <div class="map-legend cols">
                     @foreach (var c in _byCountry.OrderByDescending(x => x.Value))
                     {
-                        <div class="ml-row"><span class="ml-dot"></span><span class="ml-name">@c.Label</span><span class="ml-val">@Money(c.Value)</span><span class="ml-pct">@Fmt.Pct(c.Value / _countryTotal * 100)</span></div>
+                        <div class="ml-row @XfCss("country", c.Label)" @onclick='() => CrossFilter("country", c.Label)' title="Filtrar por @c.Label"><span class="ml-dot"></span><span class="ml-name">@c.Label</span><span class="ml-val">@Money(c.Value)</span><span class="ml-pct">@Fmt.Pct(c.Value / _countryTotal * 100)</span></div>
                     }
                 </div>
             }
@@ -410,10 +411,13 @@
     private DateTime _today = DateTime.Today;
     private DateTime _updated = DateTime.Now;
     private int _year, _month, _quarter;
-    private string _market = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "";
-    private HashSet<string> _kams = new();   // KAM é multi-seleção
+    // Filtros por NOME resolvido (mesmo rótulo mostrado nos gráficos), para que o
+    // clique num elemento (cross-filter estilo Power BI) case com o agrupamento.
+    private string _market = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "", _commercial = "";
+    private HashSet<string> _kams = new(StringComparer.OrdinalIgnoreCase);   // KAM é multi-seleção (por nome)
     private bool _kamOpen;
-    private void ToggleKam(string id) { if (!_kams.Remove(id)) _kams.Add(id); }
+    private void ToggleKam(string name) { if (!_kams.Remove(name)) _kams.Add(name); }
+    private DotNetObjectReference<VisaoExecutiva>? _ref;
     private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
     private int _monthFilter;              // 0 = todos
     private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
@@ -515,17 +519,73 @@
 
     private static string CommName(string code) => CommercialCategory.Name(code);
 
+    // ---- Chaves por dimensão (nome resolvido) — usadas no agrupamento E no filtro,
+    // garantindo que o valor clicado no gráfico bata exatamente com Filtered(). ----
+    private string KeyMarket(Opportunity o)   => DisplayKey(o.MarketId, Cat.MarketName);
+    private string KeyCountry(Opportunity o)  => DisplayKey(o.CountryId, Cat.CountryName);
+    private string KeyProduct(Opportunity o)  => DisplayKey(o.ProductId, Cat.ProductName);
+    private string KeyCustomer(Opportunity o) => DisplayKey(o.CustomerId, Cat.CustomerName);
+    private string KeyBu(Opportunity o)       => DisplayKey(o.PvBusinessUnitId, Cat.BuCode);
+    private string KeyKam(Opportunity o)      => DisplayKey(o.KamId, Cat.KamName);
+    private static string KeyCommercial(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim();
+
+    private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    // Cross-filter: alterna o filtro da dimensão (clicar de novo no mesmo valor limpa).
+    private void CrossFilter(string dim, string? val)
+    {
+        var v = (val ?? "").Trim();
+        if (v == "" || v == "—") return;
+        string Tog(string cur) => Eq(cur, v) ? "" : v;
+        switch (dim)
+        {
+            case "market":     _market = Tog(_market); break;
+            case "country":    _country = Tog(_country); break;
+            case "product":    _product = Tog(_product); break;
+            case "customer":   _customer = Tog(_customer); break;
+            case "bu":         _bu = Tog(_bu); break;
+            case "commercial": _commercial = Tog(_commercial); break;
+            case "category":   _catFilter = Tog(_catFilter); break;
+            case "kam":        if (!_kams.Remove(v)) _kams.Add(v); break;
+        }
+    }
+
+    // Marca visualmente o elemento ativo no cross-filter.
+    private bool IsActive(string dim, string val) => dim switch
+    {
+        "market" => Eq(_market, val),
+        "country" => Eq(_country, val),
+        "product" => Eq(_product, val),
+        "customer" => Eq(_customer, val),
+        "bu" => Eq(_bu, val),
+        "commercial" => Eq(_commercial, val),
+        "category" => Eq(_catFilter, val),
+        "kam" => _kams.Contains(val),
+        _ => false,
+    };
+    // Classe utilitária p/ marcar o elemento clicável e o estado ativo.
+    private string XfCss(string dim, string val) => "xf" + (IsActive(dim, val) ? " xf-on" : "");
+
+    // Chamado pelo mapa (JS) ao clicar num país. Reentra no contexto do componente.
+    [JSInvokable]
+    public Task ApplyCrossFilter(string dim, string val) =>
+        InvokeAsync(() => { CrossFilter(dim, val); StateHasChanged(); });
+
     protected override void OnInitialized()
     {
         _opps = Repo.All();
         LoadReport();
     }
 
-    // Inicializa (idempotente) o mapa interativo depois de renderizar.
+    // Inicializa (idempotente) o mapa interativo depois de renderizar. Passa a
+    // referência do componente para o mapa poder disparar o cross-filter ao clicar.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        try { await JS.InvokeVoidAsync("worldMap.init", MapId); } catch { }
+        if (firstRender) _ref ??= DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("worldMap.init", MapId, _ref); } catch { }
     }
+
+    public void Dispose() => _ref?.Dispose();
 
     private void LoadReport()
     {
@@ -545,25 +605,29 @@
     // Opções dos filtros vindas dos DADOS reais (não do catálogo demo): valores
     // distintos presentes nas oportunidades, exibidos pelo nome do catálogo
     // (com fallback ao texto cru para dados importados).
-    private IEnumerable<string> DistinctField(Func<Opportunity, string> sel, Func<string, string> name) =>
-        _opps.Select(sel).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(name, StringComparer.CurrentCultureIgnoreCase);
-    private IEnumerable<string> KamOptions => DistinctField(o => o.KamId, Cat.KamName);
-    private IEnumerable<string> MarketOptions => DistinctField(o => o.MarketId, Cat.MarketName);
-    private IEnumerable<string> CountryOptions => DistinctField(o => o.CountryId, Cat.CountryName);
-    private IEnumerable<string> ProductOptions => DistinctField(o => o.ProductId, Cat.ProductName);
-    private IEnumerable<string> CustomerOptions => DistinctField(o => o.CustomerId, Cat.CustomerName);
-    private IEnumerable<string> BuOptions => DistinctField(o => o.PvBusinessUnitId, Cat.BuCode);
+    // Opções dos filtros = nomes resolvidos distintos presentes nos dados (o valor
+    // do <option> é o próprio nome, igual ao rótulo dos gráficos e ao cross-filter).
+    private IEnumerable<string> NameOptions(Func<Opportunity, string> key) =>
+        _opps.Select(key).Where(s => !string.IsNullOrWhiteSpace(s) && s != "—")
+             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> KamOptions => NameOptions(KeyKam);
+    private IEnumerable<string> MarketOptions => NameOptions(KeyMarket);
+    private IEnumerable<string> CountryOptions => NameOptions(KeyCountry);
+    private IEnumerable<string> ProductOptions => NameOptions(KeyProduct);
+    private IEnumerable<string> CustomerOptions => NameOptions(KeyCustomer);
+    private IEnumerable<string> BuOptions => NameOptions(KeyBu);
 
     private IEnumerable<Opportunity> Filtered()
     {
         IEnumerable<Opportunity> q = _opps;
-        if (_market != "") q = q.Where(o => o.MarketId == _market);
-        if (_kams.Count > 0) q = q.Where(o => _kams.Contains(o.KamId));
+        if (_market != "") q = q.Where(o => Eq(KeyMarket(o), _market));
+        if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KeyKam(o)));
         if (_catFilter != "") q = q.Where(o => o.ForecastCategory == _catFilter);
-        if (_country != "") q = q.Where(o => o.CountryId == _country);
-        if (_product != "") q = q.Where(o => o.ProductId == _product);
-        if (_customer != "") q = q.Where(o => o.CustomerId == _customer);
-        if (_bu != "") q = q.Where(o => o.PvBusinessUnitId == _bu);
+        if (_country != "") q = q.Where(o => Eq(KeyCountry(o), _country));
+        if (_product != "") q = q.Where(o => Eq(KeyProduct(o), _product));
+        if (_customer != "") q = q.Where(o => Eq(KeyCustomer(o), _customer));
+        if (_bu != "") q = q.Where(o => Eq(KeyBu(o), _bu));
+        if (_commercial != "") q = q.Where(o => Eq(KeyCommercial(o), _commercial));
         if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
         if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
         if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
@@ -574,7 +638,7 @@
 
     private void ClearFilters()
     {
-        _market = _catFilter = _country = _product = _customer = _bu = "";
+        _market = _catFilter = _country = _product = _customer = _bu = _commercial = "";
         _kams.Clear();
         _monthFilter = 0; _dateFrom = _dateTo = null;
         _valMin = _valMax = null; _valMetric = "total";
@@ -585,7 +649,7 @@
     {
         _sym = _currency == "BRL" ? "R$" : "US$";
         _year = _today.Year; _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
-        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu }.Count(s => s != "")
+        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial }.Count(s => s != "")
             + (_kams.Count > 0 ? 1 : 0)
             + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
@@ -745,12 +809,12 @@
         _productTotal = Math.Max(_byProduct.Sum(x => x.Value), 1);
 
         // KAM com coverage e status — agrupado pelos KAMs reais das oportunidades.
-        _byKam = eligYear.GroupBy(o => o.KamId ?? "")
+        _byKam = eligYear.GroupBy(KeyKam, StringComparer.OrdinalIgnoreCase)
             .Select(g =>
             {
-                var name = g.Key == "" ? "—" : Cat.KamName(g.Key);
+                var name = g.Key;
                 var f = g.Sum(Metric);
-                var t = Cat.TargetYear(_year, "kam", g.Key);
+                var t = Cat.TargetYear(_year, "kam", g.First().KamId ?? "");
                 var cov = t > 0 ? f / t : 0;
                 var (st, css) = t <= 0 ? ("Sem meta", "st-neutral")
                     : cov >= 1 ? ("Dentro da meta", "st-pos")
@@ -1160,9 +1224,14 @@
     {
         // valor por país no nome do mapa (soma variações)
         var byName = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        // nome do mapa (inglês) -> rótulo PT usado no filtro (para o clique cruzado)
+        var mapToLabel = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var c in _byCountry)
             if (MapKey(c.Label) is { } key)
+            {
                 byName[key] = byName.GetValueOrDefault(key) + c.Value;
+                mapToLabel[key] = c.Label;
+            }
         double maxV = byName.Count > 0 ? byName.Values.Max() : 1;
 
         var sb = new System.Text.StringBuilder();
@@ -1172,10 +1241,13 @@
         {
             var has = byName.TryGetValue(name, out var v);
             var fill = has ? Shade(maxV > 0 ? v / maxV : 0) : "#e7edf3";
+            var label = mapToLabel.TryGetValue(name, out var lb) ? lb : "";
+            var active = label != "" && Eq(_country, label);
             var data = has
-                ? $" data-value='{Esc(Money(v))}' data-pct='{Esc(Fmt.Pct(v / Math.Max(_countryTotal, 1) * 100))}' data-metric='{Esc(MetricLabel)}'"
+                ? $" data-value='{Esc(Money(v))}' data-pct='{Esc(Fmt.Pct(v / Math.Max(_countryTotal, 1) * 100))}' data-metric='{Esc(MetricLabel)}' data-xf-val='{Esc(label)}'"
                 : "";
-            sb.Append($"<path d='{d}' fill='{fill}' stroke='#cdd8e4' stroke-width='0.4' data-country='{Esc(name)}'{data} class='wm-path'/>");
+            var cls = "wm-path" + (active ? " wm-active" : "");
+            sb.Append($"<path d='{d}' fill='{fill}' stroke='{(active ? "#0b4f6f" : "#cdd8e4")}' stroke-width='{(active ? "1.1" : "0.4")}' data-country='{Esc(name)}'{data} class='{cls}'/>");
         }
         // rótulo de valor no país (centroide gerado) com contraste conforme o tom
         foreach (var kv in byName)
