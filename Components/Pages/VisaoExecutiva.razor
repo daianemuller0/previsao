@@ -270,47 +270,45 @@
             @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="rank">
-                    <div class="rank-head rk-mkt"><span>Market</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span></div>
-                    <div class="scroll-y" style="max-height:300px">
-                        @foreach (var m in _byMarket)
-                        {
-                            <div class="rank-row rk-mkt @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name">
-                                <span class="rank-name">@m.Name</span>
-                                <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(m.Value, _maxMarket)%"></span></span></span>
-                                <span class="rank-val">@Money(m.Value)</span>
-                                <span class="rank-share">@Fmt.Pct(m.Value / _marketTotal * 100)</span>
+                <div class="ibar @(DimActive("market") ? "has-active" : "") scroll-y" style="max-height:340px">
+                    @foreach (var m in _byMarket)
+                    {
+                        var sh = m.Value / _marketTotal * 100;
+                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Forecast @Money(m.Value) · Share @Fmt.Pct(sh)">
+                            <div class="ibar-head">
+                                <span class="ibar-name">@m.Name</span>
+                                <span class="ibar-metrics"><span class="ibar-val">@Money(m.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span></span>
                             </div>
-                        }
-                    </div>
+                            <div class="ibar-track"><span class="ibar-fill" style="width:@Share(m.Value, _maxMarket)%"></span></div>
+                        </div>
+                    }
                 </div>
             }
         </div></div>
     </div>
 
-    @* ---- Sales Rep Performance (ranking numerado, todos, scroll) ---- *@
+    @* ---- Sales Rep Performance (barras interativas, todos, scroll) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c12"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Sales Rep Performance</div><div class="xcard-sub">@_byRep.Count vendedores · todos exibidos · maior → menor</div></div></div>
             @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="rank">
-                    <div class="rank-head rk-rep"><span>#</span><span>Sales Rep</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span></div>
-                    <div class="scroll-y" style="max-height:430px">
-                        @{ var ri = 0; }
-                        @foreach (var s in _byRep)
-                        {
-                            ri++;
-                            <div class="rank-row rk-rep @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="@s.Label">
-                                <span class="rank-num">@ri</span>
-                                <span class="rank-name">@s.Label</span>
-                                <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(s.Value, _repMax)%"></span></span></span>
-                                <span class="rank-val">@MoneyBrl(s.Value)</span>
-                                <span class="rank-share">@Fmt.Pct(s.Value / _repTot * 100)</span>
+                <div class="ibar @(DimActive("kam") ? "has-active" : "") scroll-y" style="max-height:460px">
+                    @{ var ri = 0; }
+                    @foreach (var s in _byRep)
+                    {
+                        ri++;
+                        var sh = s.Value / _repTot * 100;
+                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — Forecast @MoneyBrl(s.Value) · Share @Fmt.Pct(sh)">
+                            <div class="ibar-head">
+                                <span class="ibar-num">@ri</span>
+                                <span class="ibar-name">@s.Label</span>
+                                <span class="ibar-metrics"><span class="ibar-val">@MoneyBrl(s.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span></span>
                             </div>
-                        }
-                    </div>
+                            <div class="ibar-track"><span class="ibar-fill" style="width:@Share(s.Value, _repMax)%"></span></div>
+                        </div>
+                    }
                 </div>
             }
         </div></div>
@@ -323,21 +321,19 @@
             @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="rank">
-                    <div class="rank-head rk-prod"><span>Product</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span><span class="rank-share">GM</span></div>
-                    <div class="scroll-y" style="max-height:360px">
-                        @foreach (var p in _byProduct)
-                        {
-                            var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
-                            <div class="rank-row rk-prod @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name">
-                                <span class="rank-name">@p.Name</span>
-                                <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span></span>
-                                <span class="rank-val">@Money(p.Value)</span>
-                                <span class="rank-share">@Fmt.Pct(p.Value / _productTotal * 100)</span>
-                                <span style="text-align:right"><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span></span>
+                <div class="ibar @(DimActive("product") ? "has-active" : "") scroll-y" style="max-height:400px">
+                    @foreach (var p in _byProduct)
+                    {
+                        var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
+                        var sh = p.Value / _productTotal * 100;
+                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Forecast @Money(p.Value) · Share @Fmt.Pct(sh) · GM @Fmt.Pct(p.Margin)">
+                            <div class="ibar-head">
+                                <span class="ibar-name">@p.Name</span>
+                                <span class="ibar-metrics"><span class="ibar-val">@Money(p.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span></span>
                             </div>
-                        }
-                    </div>
+                            <div class="ibar-track"><span class="ibar-fill" style="width:@Share(p.Value, _maxProduct)%"></span></div>
+                        </div>
+                    }
                 </div>
             }
         </div></div>
@@ -545,40 +541,35 @@
 <div class="g12" style="margin-top:14px">
     <div class="c6"><div class="xcard">
         <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por mercado</div><div class="xcard-sub">@_byMarket.Count mercados · participação · tendência</div></div></div>
-        <div class="rank">
-            <div class="rank-head rk-mkt-t"><span>Market</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span><span class="rank-share">Trend</span></div>
-            <div class="scroll-y" style="max-height:320px">
-                @foreach (var m in _byMarket)
-                {
-                    <div class="rank-row rk-mkt-t @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name">
-                        <span class="rank-name">@m.Name</span>
-                        <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(m.Value, _maxMarket)%"></span></span></span>
-                        <span class="rank-val">@Money(m.Value)</span>
-                        <span class="rank-share">@Fmt.Pct(m.Value / _marketTotal * 100)</span>
-                        <span class="trend-pill @(m.Trend >= 0 ? "pos" : "neg")">@(m.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(m.Trend))</span>
+        <div class="ibar @(DimActive("market") ? "has-active" : "") scroll-y" style="max-height:340px">
+            @foreach (var m in _byMarket)
+            {
+                var sh = m.Value / _marketTotal * 100;
+                <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Forecast @Money(m.Value) · Share @Fmt.Pct(sh) · Trend @Fmt.Signed(m.Trend)">
+                    <div class="ibar-head">
+                        <span class="ibar-name">@m.Name</span>
+                        <span class="ibar-metrics"><span class="ibar-val">@Money(m.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="trend-pill @(m.Trend >= 0 ? "pos" : "neg")">@(m.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(m.Trend))</span></span>
                     </div>
-                }
-            </div>
+                    <div class="ibar-track"><span class="ibar-fill" style="width:@Share(m.Value, _maxMarket)%"></span></div>
+                </div>
+            }
         </div>
     </div></div>
     <div class="c6"><div class="xcard">
         <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por produto</div><div class="xcard-sub">@_byProduct.Count produtos · participação · margem · tendência</div></div></div>
-        <div class="rank">
-            <div class="rank-head rk-prod-t"><span>Product</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span><span class="rank-share">GM</span><span class="rank-share">Trend</span></div>
-            <div class="scroll-y" style="max-height:320px">
-                @foreach (var p in _byProduct)
-                {
-                    var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
-                    <div class="rank-row rk-prod-t @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name">
-                        <span class="rank-name">@p.Name</span>
-                        <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span></span>
-                        <span class="rank-val">@Money(p.Value)</span>
-                        <span class="rank-share">@Fmt.Pct(p.Value / _productTotal * 100)</span>
-                        <span style="text-align:right"><span class="gm-pill @gmCls">@Fmt.Pct(p.Margin)</span></span>
-                        <span class="trend-pill @(p.Trend >= 0 ? "pos" : "neg")">@(p.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(p.Trend))</span>
+        <div class="ibar @(DimActive("product") ? "has-active" : "") scroll-y" style="max-height:340px">
+            @foreach (var p in _byProduct)
+            {
+                var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
+                var sh = p.Value / _productTotal * 100;
+                <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Forecast @Money(p.Value) · Share @Fmt.Pct(sh) · GM @Fmt.Pct(p.Margin) · Trend @Fmt.Signed(p.Trend)">
+                    <div class="ibar-head">
+                        <span class="ibar-name">@p.Name</span>
+                        <span class="ibar-metrics"><span class="ibar-val">@Money(p.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span><span class="trend-pill @(p.Trend >= 0 ? "pos" : "neg")">@(p.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(p.Trend))</span></span>
                     </div>
-                }
-            </div>
+                    <div class="ibar-track"><span class="ibar-fill" style="width:@Share(p.Value, _maxProduct)%"></span></div>
+                </div>
+            }
         </div>
     </div></div>
 </div>
@@ -899,6 +890,18 @@
     };
     // Classe utilitária p/ marcar o elemento clicável e o estado ativo.
     private string XfCss(string dim, string val) => "xf" + (IsActive(dim, val) ? " xf-on" : "");
+
+    // Há algum filtro ativo nessa dimensão? (para desaturar os não-selecionados)
+    private bool DimActive(string dim) => dim switch
+    {
+        "market" => _market != "",
+        "product" => _product != "",
+        "kam" => _kams.Count > 0,
+        "segment" => _segment != "",
+        "bu" => _bu != "",
+        "submarket" => _submarket != "",
+        _ => false,
+    };
 
     // Largura da faixa do funil (% do maior valor), com mínimo p/ legibilidade.
     private string FunnelWidth(double v) =>
