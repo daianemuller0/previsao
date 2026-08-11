@@ -1517,3 +1517,34 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .fn3-conv { font-size: 11px; color: var(--muted-2); font-weight: 600; margin-top: 4px; }
 .fn3-conv b { color: var(--teal-deep); font-weight: 750; }
 @media (max-width: 1100px) { .fn3-funnel { width: 300px; } .fn3-info { padding-left: 22px; } }
+
+/* ==========================================================================
+   FUNNEL v5 — funil contínuo (sem linhas de separação) + valores DENTRO
+   ========================================================================== */
+.fn5 { width: 100%; max-width: 720px; margin: 2px auto 0; display: flex; flex-direction: column; align-items: center; }
+.fn5-seg {
+    position: relative; height: 72px; min-width: 280px; max-width: 100%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: opacity .18s ease, filter .18s ease;
+}
+.fn5-seg:hover .fn5-shape { filter: brightness(1.08) saturate(1.08); }
+.fn5-seg.xf-on .fn5-shape { box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+.fn5.has-active .fn5-seg:not(.xf-on) { opacity: .44; filter: saturate(.5); }
+.fn5.has-active .fn5-seg:not(.xf-on):hover { opacity: .85; filter: saturate(.9); }
+
+/* Forma (clip-path) SEM sombra → funil contínuo, sem linhas entre etapas */
+.fn5-shape { position: absolute; inset: 0; animation: fadeInSeg .4s ease; transition: filter .15s ease; }
+
+.fn5-text { position: relative; z-index: 1; text-align: center; padding: 0 26px; max-width: 100%; }
+.fn5-name {
+    font-size: 12.5px; font-weight: 700; color: #fff; line-height: 1.15; letter-spacing: -.1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,20,35,.30);
+}
+.fn5-amt {
+    font-size: 16.5px; font-weight: 800; color: #fff; letter-spacing: -.3px; margin-top: 1px;
+    font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,20,35,.30);
+}
+.fn5-sub {
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,.9); margin-top: 2px;
+    white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,20,35,.26);
+}
