@@ -186,35 +186,49 @@
     }
 </div>
 
-@* ===================== FUNIL DE VENDAS (por Stage) ===================== *@
-<div class="section-head">
-    <span class="st-title">@Icons.Svg("layers", "nav-ico") Funil de Vendas · por Stage</span>
-    <span class="st-sub">valor (Amount converted) · @_currency · ordem decrescente · clique para filtrar</span>
-    <span class="st-line"></span>
+@* ===================== SALES FUNNEL BY STAGE (pipeline horizontal) ===================== *@
+<div class="xsec">
+    <span class="xsec-t">Sales Funnel by Stage</span>
+    <span class="xsec-s">how the pipeline concentrates · @_currency</span>
+    <span class="xsec-line"></span>
     @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Stage</button> }
 </div>
-<div class="panel funnel-panel">
+<div class="xcard pf-card">
     @if (_funnel.Count == 0)
     {
         <div class="empty">Sem dados no recorte. Importe a base do Funil de Vendas HSA na guia <a href="/oportunidades">Oportunidades</a>.</div>
     }
     else
     {
-        <div class="funnel">
-            @{ var fi = 0; }
-            @foreach (var f in _funnel)
+        var _fnOpps = _funnel.Sum(x => x.Count);
+        var _fnTop2 = _funnel.Count >= 2 ? _funnel.Take(2).Sum(x => x.Value) / _funnelTotal * 100 : 100;
+        <div class="pf-head">
+            <div>
+                <div class="xcard-title">Sales Funnel by Stage</div>
+                <div class="xcard-sub">Amount · @_currency · @_funnel.Count stages · maior → menor</div>
+            </div>
+            <div class="pf-totals">
+                <div class="pf-tot"><div class="pf-tot-l">Total Pipeline</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
+                <div class="pf-tot"><div class="pf-tot-l">Total Opportunities</div><div class="pf-tot-v">@_fnOpps</div></div>
+            </div>
+        </div>
+        <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> of pipeline value is concentrated in the first @(_funnel.Count >= 2 ? "two stages" : "stage").</span></div>
+        <div class="pf @(DimActive("stage") ? "has-active" : "")">
+            @for (var i = 0; i < _funnel.Count; i++)
             {
-                var idx = fi++;
-                <div class="funnel-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="Filtrar por @f.Stage">
-                    <div class="funnel-band" style="width:@FunnelWidth(f.Value)%;background:@FunnelColor(idx)">
-                        <span class="funnel-stage">@f.Stage</span>
-                        <span class="funnel-val">@MoneyBrl(f.Value)</span>
-                    </div>
-                    <div class="funnel-meta">
-                        <span class="funnel-pct">@Fmt.Pct(f.Value / _funnelTotal * 100)</span>
-                        <span class="funnel-count">@f.Count op.</span>
-                    </div>
+                var f = _funnel[i];
+                var sh = f.Value / _funnelTotal * 100;
+                <div class="pf-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities">
+                    <div class="pf-stage">@f.Stage</div>
+                    <div class="pf-barcell"><span class="pf-track"><span class="pf-fill" style="width:@Share(f.Value, _funnelMax)%;background:@FunnelBar(i, _funnel.Count)"></span></span></div>
+                    <div class="pf-amount">@MoneyBrl(f.Value)</div>
+                    <div class="pf-meta">@Fmt.Pct(sh) of pipeline · @f.Count opportunities</div>
                 </div>
+                @if (i < _funnel.Count - 1 && f.Value > 0)
+                {
+                    var conv = _funnel[i + 1].Value / f.Value * 100;
+                    <div class="pf-conv">↓ <span class="pf-conv-txt">@Fmt.Pct(conv) conversion</span> to next stage</div>
+                }
             }
         </div>
     }
@@ -900,8 +914,19 @@
         "segment" => _segment != "",
         "bu" => _bu != "",
         "submarket" => _submarket != "",
+        "stage" => _stage != "",
         _ => false,
     };
+
+    // Tonalidade da barra do funil: teal escuro no topo → teal médio na base
+    // (variação MUITO sutil, sempre dentro da identidade — não é cor por stage).
+    private static int Lerp(int a, int b, double t) => (int)Math.Round(a + (b - a) * t);
+    private static string FunnelBar(int i, int n)
+    {
+        double t = n <= 1 ? 0 : (double)i / (n - 1);
+        int r = Lerp(0x0a, 0x1e, t), g = Lerp(0x5f, 0x9c, t), b = Lerp(0x7f, 0xbc, t);
+        return $"#{r:x2}{g:x2}{b:x2}";
+    }
 
     // Largura da faixa do funil (% do maior valor), com mínimo p/ legibilidade.
     private string FunnelWidth(double v) =>
