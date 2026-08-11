@@ -1242,3 +1242,55 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
   .rk-rep  { grid-template-columns: 24px 120px 1fr 88px 44px; }
   .rk-prod { grid-template-columns: 120px 1fr 84px 44px 72px; }
 }
+
+/* ==========================================================================
+   RANKINGS — refino premium (Market / Sales Rep / Product + legados)
+   ========================================================================== */
+/* Colunas dos legados com Trend / GM */
+.rk-mkt-t  { grid-template-columns: 160px 1fr 100px 50px 80px; }
+.rk-prod-t { grid-template-columns: 148px 1fr 96px 46px 64px 78px; }
+@media (max-width: 1200px) {
+  .rk-mkt-t  { grid-template-columns: 128px 1fr 88px 44px 70px; }
+  .rk-prod-t { grid-template-columns: 118px 1fr 84px 42px 58px 68px; }
+}
+
+/* Respiro e leitura */
+.rank-head { padding: 0 8px 9px; font-size: 10px; }
+.rank-row { padding: 12px 8px; gap: 14px; border-radius: 10px; }
+.rank-row + .rank-row { border-top: 1px solid #eef2f7; }
+.rank-row:hover { background: #f3f8fb; }
+.rank-row:hover .rank-fill { filter: saturate(1.12) brightness(1.03); }
+.rank-name { font-size: 13.5px; font-weight: 640; color: var(--text); }
+.rank-val { font-size: 13.5px; font-weight: 750; letter-spacing: -.2px; }
+.rank-share { font-size: 12px; }
+
+/* Barras mais vivas e nítidas, trilho mais limpo */
+.rank-track { height: 11px; background: #edf2f8; box-shadow: inset 0 1px 2px rgba(18,38,63,.05); }
+.rank-fill {
+    background: linear-gradient(90deg, #0a6f92 0%, #159bbd 70%, #1fb0d0 100%);
+    min-width: 7px; box-shadow: 0 1px 2px rgba(11,79,111,.18);
+    transition: filter .14s ease, width .3s cubic-bezier(.4,0,.2,1);
+}
+
+/* Número do ranking + destaque leve do top 3 */
+.rank-num { width: 24px; height: 24px; border-radius: 8px; font-size: 11.5px; }
+.rank-row.top1 .rank-num { background: linear-gradient(135deg, #0b6c8c, #1aa5c4); color: #fff; box-shadow: 0 2px 7px rgba(11,79,111,.32); }
+.rank-row.top2 .rank-num { background: #d8ebf2; color: #0b4f6f; }
+.rank-row.top3 .rank-num { background: #e4eef4; color: #0b4f6f; }
+.rank-row.top1 .rank-name { font-weight: 750; }
+.rank-row.top1 .rank-fill { background: linear-gradient(90deg, #0b5f80, #17a2c0 70%, #22b6d6); }
+
+/* GM pill e Trend pill mais elegantes */
+.gm-pill { padding: 3px 10px; font-size: 11px; letter-spacing: .1px; }
+.gm-pill.hi { background: var(--pos-bg); color: #157a45; }
+.gm-pill.lo { background: var(--orange-bg); color: var(--orange); }
+.trend-pill { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 11.5px; font-weight: 750; }
+.trend-pill.pos { color: var(--pos); }
+.trend-pill.neg { color: var(--neg); }
+
+/* Scrollbar discreta e elegante */
+.scroll-y { padding-right: 8px; scrollbar-width: thin; scrollbar-color: #cfdae6 transparent; }
+.scroll-y::-webkit-scrollbar { width: 9px; }
+.scroll-y::-webkit-scrollbar-thumb { background: #cfdae6; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+.scroll-y::-webkit-scrollbar-thumb:hover { background: #b6c4d6; background-clip: padding-box; }
+.scroll-y::-webkit-scrollbar-track { background: transparent; }

@@ -302,7 +302,7 @@
                         @foreach (var s in _byRep)
                         {
                             ri++;
-                            <div class="rank-row rk-rep @(ri == 1 ? "top1" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="@s.Label">
+                            <div class="rank-row rk-rep @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="@s.Label">
                                 <span class="rank-num">@ri</span>
                                 <span class="rank-name">@s.Label</span>
                                 <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(s.Value, _repMax)%"></span></span></span>
@@ -543,35 +543,44 @@
 </div>
 
 <div class="g12" style="margin-top:14px">
-    <div class="c6">
-        <div class="panel">
-            <div class="panel-head"><div class="panel-title">Previsão por mercado <span class="hint">participação · tendência</span></div></div>
-            @foreach (var m in _byMarket)
-            {
-                <div class="bar-row @XfCss("market", m.Name)" @onclick='() => CrossFilter("market", m.Name)' title="Filtrar por @m.Name">
-                    <span class="bar-label">@m.Name
-                        @if (m.Name == _marketTopRise) { <span class="tag" style="background:var(--pos-bg);color:var(--pos);margin-left:4px">▲ maior alta</span> }
-                        else if (m.Name == _marketTopFall) { <span class="tag neg" style="margin-left:4px">▼ maior queda</span> }
-                    </span>
-                    <span class="bar-track"><span class="bar-fill c-primary" style="width:@Share(m.Value, _maxMarket)%"></span></span>
-                    <span class="bar-value">@Money(m.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(m.Value / _marketTotal * 100)</span> <span class="delta @(m.Trend >= 0 ? "up" : "down")" style="font-size:10.5px">@Fmt.Signed(m.Trend)</span></span>
-                </div>
-            }
+    <div class="c6"><div class="xcard">
+        <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por mercado</div><div class="xcard-sub">@_byMarket.Count mercados · participação · tendência</div></div></div>
+        <div class="rank">
+            <div class="rank-head rk-mkt-t"><span>Market</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span><span class="rank-share">Trend</span></div>
+            <div class="scroll-y" style="max-height:320px">
+                @foreach (var m in _byMarket)
+                {
+                    <div class="rank-row rk-mkt-t @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name">
+                        <span class="rank-name">@m.Name</span>
+                        <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(m.Value, _maxMarket)%"></span></span></span>
+                        <span class="rank-val">@Money(m.Value)</span>
+                        <span class="rank-share">@Fmt.Pct(m.Value / _marketTotal * 100)</span>
+                        <span class="trend-pill @(m.Trend >= 0 ? "pos" : "neg")">@(m.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(m.Trend))</span>
+                    </div>
+                }
+            </div>
         </div>
-    </div>
-    <div class="c6">
-        <div class="panel">
-            <div class="panel-head"><div class="panel-title">Previsão por produto <span class="hint">participação · margem · tendência</span></div></div>
-            @foreach (var p in _byProduct)
-            {
-                <div class="bar-row @XfCss("product", p.Name)" @onclick='() => CrossFilter("product", p.Name)' title="Filtrar por @p.Name">
-                    <span class="bar-label">@p.Name</span>
-                    <span class="bar-track"><span class="bar-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span>
-                    <span class="bar-value">@Money(p.Value) <span class="muted" style="font-weight:400">· @Fmt.Pct(p.Value / _productTotal * 100) · GM @Fmt.Pct(p.Margin)</span> <span class="delta @(p.Trend >= 0 ? "up" : "down")" style="font-size:10.5px">@Fmt.Signed(p.Trend)</span></span>
-                </div>
-            }
+    </div></div>
+    <div class="c6"><div class="xcard">
+        <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por produto</div><div class="xcard-sub">@_byProduct.Count produtos · participação · margem · tendência</div></div></div>
+        <div class="rank">
+            <div class="rank-head rk-prod-t"><span>Product</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span><span class="rank-share">GM</span><span class="rank-share">Trend</span></div>
+            <div class="scroll-y" style="max-height:320px">
+                @foreach (var p in _byProduct)
+                {
+                    var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
+                    <div class="rank-row rk-prod-t @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name">
+                        <span class="rank-name">@p.Name</span>
+                        <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span></span>
+                        <span class="rank-val">@Money(p.Value)</span>
+                        <span class="rank-share">@Fmt.Pct(p.Value / _productTotal * 100)</span>
+                        <span style="text-align:right"><span class="gm-pill @gmCls">@Fmt.Pct(p.Margin)</span></span>
+                        <span class="trend-pill @(p.Trend >= 0 ? "pos" : "neg")">@(p.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(p.Trend))</span>
+                    </div>
+                }
+            </div>
         </div>
-    </div>
+    </div></div>
 </div>
 
 @* ---- Comparativo AFM × NB + Previsão mensal ---- *@
