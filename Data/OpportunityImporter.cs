@@ -21,6 +21,21 @@ public sealed class OpportunityImporter
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
+    // Cabeçalhos conhecidos (novo layout Funil HSA + legado) para localizar a linha
+    // de cabeçalho da planilha, que não é a primeira (há metadados acima).
+    private static readonly HashSet<string> KnownHeaders = new(new[]
+    {
+        // Funil de Vendas HSA
+        "close date", "installation location", "parent opportunity: end user site", "commercial segment",
+        "market", "sub-market", "process", "product type", "brand", "outside sales rep", "account name",
+        "opportunity number", "amount", "amount (converted)", "gross margin(%)", "stage", "probability (%)",
+        "chance", "customer ref#", "business unit", "is inter company", "opportunity name",
+        "status comments", "description", "status description",
+        // Layout legado
+        "net value", "proposta", "customer", "quarter", "date", "product", "kam", "key account",
+        "market variavel", "valor", "pm %",
+    }.Select(Norm));
+
     private readonly Catalog _cat;
     public OpportunityImporter(Catalog cat) => _cat = cat;
 
@@ -64,8 +79,17 @@ public sealed class OpportunityImporter
         var rows = ws.RowsUsed().ToList();
         if (rows.Count < 2) { r.Warnings.Add("Nenhuma linha de dados encontrada abaixo do cabeçalho."); return r; }
 
-        // Cabeçalho → índice da coluna.
-        var header = rows[0];
+        // Acha a linha de CABEÇALHO (a planilha do Funil HSA tem 14 linhas de
+        // metadados antes do cabeçalho real). Escolhe a linha com mais colunas
+        // conhecidas; ignora colunas em branco (coluna A e a vazia intermediária).
+        int hi = 0, best = 0;
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var hits = rows[i].CellsUsed().Count(c => KnownHeaders.Contains(Norm(c.GetString())));
+            if (hits > best) { best = hits; hi = i; }
+        }
+
+        var header = rows[hi];
         var map = new Dictionary<string, int>();
         foreach (var cell in header.CellsUsed())
         {
@@ -73,7 +97,7 @@ public sealed class OpportunityImporter
             if (key != "" && !map.ContainsKey(key)) map[key] = cell.Address.ColumnNumber;
         }
 
-        foreach (var row in rows.Skip(1))
+        foreach (var row in rows.Skip(hi + 1))
         {
             string Get(params string[] names)
             {
@@ -109,7 +133,16 @@ public sealed class OpportunityImporter
         if (lines.Count < 2) { r.Warnings.Add("Nenhuma linha de dados encontrada."); return r; }
 
         var delim = lines[0].Count(c => c == ';') >= lines[0].Count(c => c == ',') ? ';' : ',';
-        var headerCells = SplitCsv(lines[0], delim);
+
+        // Acha a linha de cabeçalho (mais colunas conhecidas), ignorando metadados.
+        int hi = 0, best = 0;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var hits = SplitCsv(lines[i], delim).Count(c => KnownHeaders.Contains(Norm(c)));
+            if (hits > best) { best = hits; hi = i; }
+        }
+
+        var headerCells = SplitCsv(lines[hi], delim);
         var map = new Dictionary<string, int>();
         for (var i = 0; i < headerCells.Count; i++)
         {
@@ -117,7 +150,7 @@ public sealed class OpportunityImporter
             if (key != "" && !map.ContainsKey(key)) map[key] = i;
         }
 
-        foreach (var line in lines.Skip(1))
+        foreach (var line in lines.Skip(hi + 1))
         {
             var cells = SplitCsv(line, delim);
             string Get(params string[] names)
@@ -160,28 +193,33 @@ public sealed class OpportunityImporter
         double? Num(params string[] names) => getNum(names) ?? ParseNum(get(names));
         double PctOf(params string[] names) => PctField(getNum(names), get(names));
 
-        var proposta = get(new[] { "Proposta" });
-        var customerRaw = get(new[] { "Customer", "Cliente" });
-        var valueRaw = get(new[] { "Net Value", "Valor BRL", "Valor" });
+        // Nº da oportunidade (novo: "Opportunity Number"; legado: "Proposta").
+        var proposta = get(new[] { "Opportunity Number", "Proposta" });
+        var customerRaw = get(new[] { "Account Name", "Customer", "Cliente" });
+        var valueRaw = get(new[] { "Amount (converted)", "Net Value", "Valor BRL", "Valor" });
 
         // Linha totalmente vazia: ignora silenciosamente.
         if (proposta == "" && customerRaw == "" && valueRaw == "") return;
         r.Read++;
 
-        var dateIso = ResolveDate(get(new[] { "Date", "Data", "Data prevista" }), get(new[] { "Quarter" }));
-        var country = Match(_cat.Countries, c => c.Name, c => c.Id, get(new[] { "País", "Pais", "Country" }));
+        // Close Date (novo) é data completa; Date/Quarter (legado) é mês+ano.
+        var dateIso = ResolveDate(get(new[] { "Close Date", "Date", "Data", "Data prevista" }), get(new[] { "Quarter" }));
+        // Installation Location = país do mapa.
+        var country = Match(_cat.Countries, c => c.Name, c => c.Id, get(new[] { "Installation Location", "País", "Pais", "Country" }));
         var market = Match(_cat.Markets, m => m.Name, m => m.Id, get(new[] { "Market" }));
-        var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "Market Variável", "Market Variavel", "Sub_Market", "Submercado" }));
-        var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "Product", "Produto" }));
+        var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "Sub-Market", "Market Variável", "Market Variavel", "Sub_Market", "Submercado" }));
+        var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "Product Type", "Product", "Produto" }));
         var equip = Match(_cat.EquipmentTypes, e => e.Name, e => e.Id, get(new[] { "Tipo de Equipamento", "Tipo de equipamento" }));
-        var kam = Match(_cat.Kams, k => k.Name, k => k.Id, get(new[] { "Key Account", "KAM" }));
+        // Outside Sales Rep = "Vendedor" (reaproveita a dimensão KAM).
+        var kam = Match(_cat.Kams, k => k.Name, k => k.Id, get(new[] { "Outside Sales Rep", "Key Account", "KAM" }));
         var customer = Match(_cat.Customers, c => c.Name, c => c.Id, customerRaw);
-        var puv = MatchBu(get(new[] { "Unidade de Venda", "BU do PV", "Unidade de venda" }));
+        var puv = MatchBu(get(new[] { "Business Unit", "Unidade de Venda", "BU do PV", "Unidade de venda" }));
         var buInter = MatchBu(get(new[] { "BU Intercompany", "BU  Intercompany" }));
 
-        var netBrl = Num("Net Value", "Valor BRL", "Valor") ?? 0;
-        var taxa = Num("Taxa", "Taxa de câmbio", "Taxa de cambio") ?? 0;
-        if (taxa <= 0) taxa = _cat.RateToUsd("USD"); // cai no câmbio padrão do catálogo
+        // Amount (converted) já vem em R$ (decisão do projeto) → sem conversão (taxa 1).
+        var netBrl = Num("Amount (converted)", "Net Value", "Valor BRL", "Valor") ?? 0;
+        var taxa = Num("Taxa", "Taxa de câmbio", "Taxa de cambio") ?? 1;
+        if (taxa <= 0) taxa = 1;
 
         // Id-base pela proposta (permite reimportar/atualizar sem duplicar). Quando
         // a MESMA proposta aparece em várias linhas da planilha, cada ocorrência
@@ -193,11 +231,13 @@ public sealed class OpportunityImporter
             r.Warnings.Add($"Proposta {Show(proposta)} aparece em mais de uma linha; linhas mantidas separadamente.");
         var id = seq == 1 ? baseId : baseId + "-" + seq.ToString(Inv);
 
+        var oppName = get(new[] { "Opportunity Name" });
         var o = new Opportunity
         {
             Id = id,
-            Name = customerRaw != "" && product != "" ? $"{_cat.ProductName(product)} — {_cat.CustomerName(customer)}"
-                 : (proposta != "" ? proposta : "Oportunidade importada"),
+            Name = oppName != "" ? oppName
+                 : (customerRaw != "" && product != "" ? $"{_cat.ProductName(product)} — {_cat.CustomerName(customer)}"
+                 : (proposta != "" ? proposta : "Oportunidade importada")),
             ProposalNumber = proposta,
             PvNumber = get(new[] { "PV" }),
             CountryId = country,
@@ -217,21 +257,34 @@ public sealed class OpportunityImporter
             CurrencyCode = "BRL",
             AmountOriginal = netBrl.ToString(Inv),
             ExchangeRate = taxa.ToString(Inv),
-            GmPercent = PctOf("PM %", "PM%", "GM%", "GM %").ToString(Inv),
+            GmPercent = PctOf("Gross Margin(%)", "Gross Margin (%)", "PM %", "PM%", "GM%", "GM %").ToString(Inv),
             ForecastCategory = "Pipeline",
             PipelineStageId = "st-qual",
             ExpectedDate = dateIso,
-            WinProbability = PctOf("% de Ganho", "% de ganho").ToString(Inv),
+            WinProbability = PctOf("Probability (%)", "% de Ganho", "% de ganho").ToString(Inv),
             CloseInPeriodProbability = PctOf("% de Sair no Mês", "% de sair no mês", "% de sair no mes").ToString(Inv),
-            Notes = get(new[] { "Observação", "Observacao", "Observações", "Observacoes" }),
+            Notes = get(new[] { "Status Comments", "Observação", "Observacao", "Observações", "Observacoes" }),
             PostponeCount = "0",
             CreatedAt = DateTime.Today.ToString("yyyy-MM-dd"),
             UpdatedAt = DateTime.Today.ToString("yyyy-MM-dd"),
             UpdatedBy = "Importação",
+
+            // ---- Colunas do Funil de Vendas HSA ----
+            Stage = get(new[] { "Stage" }),
+            CommercialSegment = get(new[] { "Commercial Segment" }),
+            Process = get(new[] { "Process" }),
+            Brand = get(new[] { "Brand" }),
+            EndUserSite = get(new[] { "Parent Opportunity: End User Site", "End User Site" }),
+            Chance = get(new[] { "Chance" }),
+            CustomerRef = get(new[] { "Customer Ref#", "Customer Ref" }),
+            IsInterCompany = get(new[] { "Is Inter Company" }),
+            Description = get(new[] { "Description" }),
+            StatusDescription = get(new[] { "Status Description" }),
+            AmountRaw = get(new[] { "Amount" }),
         };
 
-        if (dateIso == "") r.Warnings.Add($"Proposta {Show(proposta)}: data inválida ou ausente.");
-        if (netBrl <= 0) r.Warnings.Add($"Proposta {Show(proposta)}: valor (Net Value) ausente ou zero.");
+        if (dateIso == "") r.Warnings.Add($"Oportunidade {Show(proposta)}: data (Close Date) inválida ou ausente.");
+        if (netBrl <= 0) r.Warnings.Add($"Oportunidade {Show(proposta)}: valor (Amount converted) ausente ou zero.");
 
         r.Rows.Add(o);
     }

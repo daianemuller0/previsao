@@ -19,7 +19,9 @@ public class OpportunityRepository
         "currency_code, amount_original, exchange_rate, gm_percent, forecast_category, pipeline_stage_id, " +
         "expected_date, win_probability, close_probability, manager_probability, justification, next_action, " +
         "next_action_date, risks, notes, postpone_count, created_at, updated_at, updated_by, " +
-        "value_changed_at, date_changed_at, servico_previsto, market_onestream, ramp, coluna1, otp, top10";
+        "value_changed_at, date_changed_at, servico_previsto, market_onestream, ramp, coluna1, otp, top10, " +
+        "stage, commercial_segment, process, brand, end_user_site, chance, customer_ref, is_inter_company, " +
+        "description, status_description, amount_raw";
 
     private readonly ParquetStore _store;
     private readonly object _lock = new();
@@ -78,6 +80,17 @@ public class OpportunityRepository
             Coluna1 = S(r, 39),
             Otp = S(r, 40),
             Top10 = S(r, 41),
+            Stage = S(r, 42),
+            CommercialSegment = S(r, 43),
+            Process = S(r, 44),
+            Brand = S(r, 45),
+            EndUserSite = S(r, 46),
+            Chance = S(r, 47),
+            CustomerRef = S(r, 48),
+            IsInterCompany = S(r, 49),
+            Description = S(r, 50),
+            StatusDescription = S(r, 51),
+            AmountRaw = S(r, 52),
         }, orderBy: "expected_date");
 
     // Garante o cache carregado (dentro do lock).
@@ -179,6 +192,17 @@ public class OpportunityRepository
             new("coluna1", o.Coluna1),
             new("otp", o.Otp),
             new("top10", o.Top10),
+            new("stage", o.Stage),
+            new("commercial_segment", o.CommercialSegment),
+            new("process", o.Process),
+            new("brand", o.Brand),
+            new("end_user_site", o.EndUserSite),
+            new("chance", o.Chance),
+            new("customer_ref", o.CustomerRef),
+            new("is_inter_company", o.IsInterCompany),
+            new("description", o.Description),
+            new("status_description", o.StatusDescription),
+            new("amount_raw", o.AmountRaw),
         };
 
     public void Delete(string id)
@@ -224,5 +248,9 @@ public class OpportunityRepository
         ValueChangedAt = o.ValueChangedAt, DateChangedAt = o.DateChangedAt,
         ServicoPrevisto = o.ServicoPrevisto, MarketOnestream = o.MarketOnestream,
         Ramp = o.Ramp, Coluna1 = o.Coluna1, Otp = o.Otp, Top10 = o.Top10,
+        Stage = o.Stage, CommercialSegment = o.CommercialSegment, Process = o.Process, Brand = o.Brand,
+        EndUserSite = o.EndUserSite, Chance = o.Chance, CustomerRef = o.CustomerRef,
+        IsInterCompany = o.IsInterCompany, Description = o.Description, StatusDescription = o.StatusDescription,
+        AmountRaw = o.AmountRaw,
     };
 }

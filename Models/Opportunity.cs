@@ -34,6 +34,23 @@ public class Opportunity
     public string Otp { get; set; } = "";                   // OTP (marcador Sim/Não · controle externo)
     public string Top10 { get; set; } = "";                 // TOP 10 (marcador Sim/Não · controle externo)
 
+    // ---- Funil de Vendas HSA (layout novo da planilha) --------------------
+    // Colunas: Close Date, Installation Location (→ CountryId), Commercial Segment,
+    // Market (→ MarketId), Sub-Market (→ SubMarketId), Product Type (→ ProductId),
+    // Outside Sales Rep (→ KamId · "Vendedor"), Account Name (→ CustomerId),
+    // Business Unit (→ PvBusinessUnitId), Amount (converted) (→ valor).
+    public string Stage { get; set; } = "";                 // Stage (etapa do funil)
+    public string CommercialSegment { get; set; } = "";     // Commercial Segment
+    public string Process { get; set; } = "";               // Process
+    public string Brand { get; set; } = "";                 // Brand
+    public string EndUserSite { get; set; } = "";           // Parent Opportunity: End User Site
+    public string Chance { get; set; } = "";                // Chance
+    public string CustomerRef { get; set; } = "";           // Customer Ref#
+    public string IsInterCompany { get; set; } = "";        // Is Inter Company
+    public string Description { get; set; } = "";           // Description
+    public string StatusDescription { get; set; } = "";     // Status Description
+    public string AmountRaw { get; set; } = "";             // Amount (moeda de origem, não convertido)
+
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
     public string AmountOriginal { get; set; } = "0"; // valor na moeda de origem
