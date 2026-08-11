@@ -213,27 +213,24 @@
             </div>
         </div>
         <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> of pipeline value is concentrated in the first @(_funnel.Count >= 2 ? "two stages" : "stage").</span></div>
-        <div class="fn3 @(DimActive("stage") ? "has-active" : "")">
+        <div class="fn5 @(DimActive("stage") ? "has-active" : "")">
             @for (var i = 0; i < _funnel.Count; i++)
             {
                 var f = _funnel[i];
                 var sh = f.Value / _funnelTotal * 100;
                 var conv = i < _funnel.Count - 1 && f.Value > 0 ? _funnel[i + 1].Value / f.Value * 100 : (double?)null;
-                // Largura de exibição: piso de 55% (correção estética) — funil largo,
-                // pouco pontudo; estreitamento suave e base com boa largura mínima.
-                var dw = 55 + 45 * (f.Value / _funnelMax);
-                var dwN = i < _funnel.Count - 1 ? 55 + 45 * (_funnel[i + 1].Value / _funnelMax) : dw * 0.86;
-                var frac = Math.Clamp(dwN / dw, 0.62, 1.0);
+                // Largura com piso alto (62%) e estreitamento suave: funil largo,
+                // pouco pontudo. Base com boa largura mínima.
+                var dw = 62 + 38 * (f.Value / _funnelMax);
+                var dwN = i < _funnel.Count - 1 ? 62 + 38 * (_funnel[i + 1].Value / _funnelMax) : dw * 0.9;
+                var frac = Math.Clamp(dwN / dw, 0.74, 1.0);
                 var inset = (1 - frac) / 2 * 100;
-                <div class="fn3-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
-                    <div class="fn3-funnel">
-                        <div class="fn3-seg" style="width:@F(dw)%;clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
-                    </div>
-                    <div class="fn3-info">
-                        <div class="fn3-name">@f.Stage</div>
-                        <div class="fn3-amount">@MoneyBrl(f.Value)</div>
-                        <div class="fn3-sub">@Fmt.Pct(sh) of pipeline · @f.Count opps</div>
-                        @if (conv is { } c) { <div class="fn3-conv">↓ <b>@Fmt.Pct(c)</b> conversion to next stage</div> }
+                <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
+                    <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
+                    <div class="fn5-text">
+                        <div class="fn5-name">@f.Stage</div>
+                        <div class="fn5-amt">@MoneyBrl(f.Value)</div>
+                        <div class="fn5-sub">@Fmt.Pct(sh) of pipeline · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " to next" : "")</div>
                     </div>
                 </div>
             }
