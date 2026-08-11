@@ -118,6 +118,9 @@ public sealed class OpportunityImporter
                     }
                 return null;
             }
+            // Região de TOTAIS/rodapé no fim da planilha (posição varia): dessa
+            // linha para baixo nada é importado.
+            if (IsStopRow(row.CellsUsed().Select(c => c.GetString()), Get)) break;
             BuildRow(r, Get, GetN);
         }
         return r;
@@ -160,6 +163,7 @@ public sealed class OpportunityImporter
                         return cells[i].Trim();
                 return "";
             }
+            if (IsStopRow(cells, Get)) break;
             BuildRow(r, Get, _ => null);
         }
         return r;
@@ -184,6 +188,35 @@ public sealed class OpportunityImporter
         result.Add(sb.ToString());
         return result;
     }
+
+    // Detecta o início da região de TOTAIS/rodapé (Salesforce): a última parte da
+    // planilha traz linhas de total ("Total", "Sum", "Count"), a linha de grande
+    // total (valor cheio, sem proposta nem cliente) e o rodapé "Confidential /
+    // Copyright / salesforce.com". A posição varia conforme a quantidade de dados;
+    // ao encontrar a primeira, paramos e nada abaixo é importado.
+    private static bool IsStopRow(IEnumerable<string> cells, Func<string[], string> get)
+    {
+        foreach (var c in cells)
+        {
+            var n = Norm(c);
+            if (n is "total" or "sum" or "count" or "grand total" or "subtotal" or "totais") return true;
+            if (n.Contains("confidential information") || n.Contains("do not distribute")
+                || n.Contains("salesforce.com") || n.Contains("copyright")) return true;
+        }
+        // Linha de grande total: tem valor, mas sem identificadores (proposta/cliente).
+        var prop = get(new[] { "Opportunity Number", "Proposta" });
+        var acc = get(new[] { "Account Name", "Customer", "Cliente" });
+        if (prop == "" && acc == "")
+        {
+            var val = getNumStub(get, "Amount (converted)", "Net Value", "Valor", "Amount");
+            if (val != 0) return true;
+        }
+        return false;
+    }
+
+    // Valor numérico (texto) de um dos campos, para a detecção de linha de total.
+    private static double getNumStub(Func<string[], string> get, params string[] names)
+        => ParseNum(get(names)) ?? 0;
 
     // ---- Monta uma oportunidade a partir de um acessor de células ----------
     private void BuildRow(Result r, Func<string[], string> get, Func<string[], double?> getNum)
