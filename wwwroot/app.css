@@ -1089,3 +1089,156 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .donut-legend li.xf-mark { border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
 .donut-legend li.xf-mark:hover { background: var(--panel-2); }
 .donut-legend li.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 3px 0 0 var(--primary, #007A9E); }
+
+/* ==========================================================================
+   EXECUTIVE REDESIGN — Sales & Revenue Intelligence (premium)
+   Camada aditiva: componentes novos + refino de superfícies. Não remove nada.
+   ========================================================================== */
+:root {
+    --exec-bg: #f3f5f9;
+    --exec-card: #ffffff;
+    --exec-border: #e8edf4;
+    --exec-shadow: 0 1px 2px rgba(18,38,63,.05), 0 6px 20px rgba(18,38,63,.05);
+    --exec-shadow-hover: 0 2px 4px rgba(18,38,63,.06), 0 12px 32px rgba(18,38,63,.10);
+    --teal: #007A9E;
+    --teal-deep: #0b4f6f;
+    --teal-050: #eaf4f8;
+    --grad-teal: linear-gradient(90deg, #0b6c8c, #17a2c0);
+    --orange: #d98324;
+    --orange-bg: #fbf1e3;
+}
+
+/* Respiro geral e fundo mais clean */
+.exec-scope { background: var(--exec-bg); }
+
+/* ---- Cabeçalhos de seção (níveis de hierarquia) ---- */
+.xsec { display: flex; align-items: baseline; gap: 12px; margin: 30px 2px 14px; }
+.xsec-t { font-size: 17px; font-weight: 700; letter-spacing: -.2px; color: var(--text); }
+.xsec-s { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.xsec-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--exec-border), transparent); }
+.xsec.lvl1 .xsec-t { font-size: 20px; }
+.xsec.lvl3 .xsec-t { font-size: 15px; color: var(--text-2); }
+
+/* ---- Card premium ---- */
+.xcard {
+    background: var(--exec-card); border: 1px solid var(--exec-border); border-radius: 14px;
+    box-shadow: var(--exec-shadow); padding: 20px 22px; transition: box-shadow .16s ease, transform .16s ease;
+}
+.xcard.tight { padding: 16px 18px; }
+.xcard-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.xcard-title { font-size: 14.5px; font-weight: 650; color: var(--text); letter-spacing: -.1px; }
+.xcard-sub { font-size: 11.5px; color: var(--muted-2); font-weight: 500; }
+.xcard-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--teal-050); color: var(--teal); flex: none; }
+.xcard-ico svg { width: 17px; height: 17px; }
+
+/* ---- KPI Executive cards ---- */
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.kpi {
+    background: var(--exec-card); border: 1px solid var(--exec-border); border-radius: 14px;
+    box-shadow: var(--exec-shadow); padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 10px;
+    position: relative; overflow: hidden; transition: box-shadow .16s ease, transform .16s ease;
+}
+.kpi:hover { box-shadow: var(--exec-shadow-hover); transform: translateY(-2px); }
+.kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--grad-teal); opacity: .9; }
+.kpi.accent-pos::before { background: var(--pos); }
+.kpi.accent-warn::before { background: var(--orange); }
+.kpi.accent-neg::before { background: var(--neg); }
+.kpi-top { display: flex; align-items: center; gap: 10px; }
+.kpi-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--teal-050); color: var(--teal); flex: none; }
+.kpi-ico svg { width: 18px; height: 18px; }
+.kpi.accent-pos .kpi-ico { background: var(--pos-bg); color: var(--pos); }
+.kpi.accent-warn .kpi-ico { background: var(--orange-bg); color: var(--orange); }
+.kpi-label { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+.kpi-value { font-size: 27px; font-weight: 800; letter-spacing: -.8px; color: var(--text); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.kpi-delta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650; }
+.kpi-delta .arw { font-size: 11px; }
+.kpi-delta.pos { color: var(--pos); } .kpi-delta.neg { color: var(--neg); } .kpi-delta.warn { color: var(--orange); } .kpi-delta.neutral { color: var(--muted); }
+.kpi-delta .ctx { color: var(--muted); font-weight: 500; }
+.kpi-spark { height: 30px; margin-top: 2px; }
+.kpi-spark svg { width: 100%; height: 100%; display: block; }
+.kpi-bar { height: 6px; border-radius: 999px; background: #eef2f7; overflow: hidden; margin-top: 6px; }
+.kpi-bar > i { display: block; height: 100%; border-radius: 999px; background: var(--grad-teal); }
+.kpi.accent-pos .kpi-bar > i { background: var(--pos); }
+.kpi.accent-warn .kpi-bar > i { background: var(--orange); }
+
+/* ---- Ranking horizontal (Market / Product / Sales Rep) ---- */
+.rank { display: flex; flex-direction: column; }
+.rank-head { display: grid; align-items: center; gap: 12px; padding: 0 4px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted-2); border-bottom: 1px solid var(--exec-border); }
+.rank-row { display: grid; align-items: center; gap: 12px; padding: 11px 4px; border-radius: 9px; cursor: pointer; transition: background .12s ease; }
+.rank-row + .rank-row { border-top: 1px solid #f1f4f9; }
+.rank-row:hover { background: var(--panel-2); }
+.rank-row.xf-on { background: var(--teal-050); box-shadow: inset 3px 0 0 var(--teal); }
+.rank-num { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--teal-deep); background: var(--teal-050); flex: none; }
+.rank-row.top1 .rank-num { background: var(--teal); color: #fff; }
+.rank-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-barwrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rank-track { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; min-width: 40px; }
+.rank-fill { height: 100%; border-radius: 999px; background: var(--grad-teal); }
+.rank-val { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.rank-share { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.gm-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--teal-050); color: var(--teal-deep); white-space: nowrap; }
+.gm-pill.hi { background: var(--pos-bg); color: var(--pos); }
+.gm-pill.lo { background: var(--orange-bg); color: var(--orange); }
+.trend-pill { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.trend-pill.pos { color: var(--pos); } .trend-pill.neg { color: var(--neg); }
+
+/* Scroll interno (sem esconder ninguém) */
+.scroll-y { max-height: 420px; overflow-y: auto; padding-right: 6px; }
+.scroll-y::-webkit-scrollbar { width: 8px; }
+.scroll-y::-webkit-scrollbar-thumb { background: #d7dfea; border-radius: 999px; }
+.scroll-y::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Lollipop (Sub-Market) ---- */
+.lolli { display: flex; flex-direction: column; gap: 3px; }
+.lolli-row { display: grid; grid-template-columns: 210px 1fr auto; align-items: center; gap: 14px; padding: 7px 4px; border-radius: 8px; cursor: pointer; transition: background .12s ease; }
+.lolli-row:hover { background: var(--panel-2); }
+.lolli-row.xf-on { background: var(--teal-050); box-shadow: inset 3px 0 0 var(--teal); }
+.lolli-name { font-size: 12.5px; font-weight: 600; color: var(--text-2); white-space: normal; line-height: 1.25; }
+.lolli-track { position: relative; height: 16px; display: flex; align-items: center; }
+.lolli-line { height: 2px; border-radius: 2px; background: linear-gradient(90deg, #cfe1ea, var(--teal)); }
+.lolli-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--teal); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--teal); margin-left: -2px; flex: none; }
+.lolli-val { font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; min-width: 96px; }
+
+/* ---- Commercial Segment donut + lista ---- */
+.seg-wrap { display: grid; grid-template-columns: 190px 1fr; gap: 24px; align-items: center; }
+.seg-donut { position: relative; width: 190px; height: 190px; }
+.seg-donut svg { width: 100%; height: 100%; display: block; }
+.seg-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none; }
+.seg-center .lab { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted-2); }
+.seg-center .val { font-size: 22px; font-weight: 800; letter-spacing: -.6px; color: var(--text); font-variant-numeric: tabular-nums; }
+.seg-list { display: flex; flex-direction: column; gap: 2px; }
+.seg-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; cursor: pointer; transition: background .12s ease; }
+.seg-row + .seg-row { border-top: 1px solid #f1f4f9; }
+.seg-row:hover { background: var(--panel-2); }
+.seg-row.xf-on { background: var(--teal-050); box-shadow: inset 3px 0 0 var(--teal); }
+.seg-dot { width: 11px; height: 11px; border-radius: 3px; }
+.seg-name { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg-val { font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.seg-share { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; min-width: 40px; }
+
+/* ---- Executive Insights ---- */
+.exi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.exi { background: var(--exec-card); border: 1px solid var(--exec-border); border-radius: 14px; box-shadow: var(--exec-shadow); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.exi-top { display: flex; align-items: center; gap: 10px; }
+.exi-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--teal-050); color: var(--teal); flex: none; }
+.exi-ico svg { width: 16px; height: 16px; }
+.exi.pos .exi-ico { background: var(--pos-bg); color: var(--pos); }
+.exi.warn .exi-ico { background: var(--orange-bg); color: var(--orange); }
+.exi-label { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.exi-value { font-size: 21px; font-weight: 800; letter-spacing: -.5px; color: var(--text); font-variant-numeric: tabular-nums; }
+.exi-value.pos { color: var(--pos); } .exi-value.warn { color: var(--orange); }
+.exi-text { font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+
+/* Responsivo */
+@media (max-width: 1500px) { .kpi-row { grid-template-columns: repeat(5, 1fr); } .kpi-value { font-size: 24px; } }
+@media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } .exi-grid { grid-template-columns: repeat(2, 1fr); } .seg-wrap { grid-template-columns: 160px 1fr; } }
+
+/* Colunas dos rankings (alinhamento consistente head + rows) */
+.rk-mkt  { grid-template-columns: 168px 1fr 100px 52px; }
+.rk-rep  { grid-template-columns: 26px 148px 1fr 100px 48px; }
+.rk-prod { grid-template-columns: 156px 1fr 100px 48px 80px; }
+@media (max-width: 1200px) {
+  .rk-mkt  { grid-template-columns: 130px 1fr 88px 46px; }
+  .rk-rep  { grid-template-columns: 24px 120px 1fr 88px 44px; }
+  .rk-prod { grid-template-columns: 120px 1fr 84px 44px 72px; }
+}

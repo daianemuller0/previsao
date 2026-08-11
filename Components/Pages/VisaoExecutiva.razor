@@ -88,6 +88,52 @@
     @if (_savedMsg) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
 </div>
 
+@* ===================== EXECUTIVE OVERVIEW (KPIs) ===================== *@
+@{
+    var _fcBrl = _fcYear * Rate;   // sempre em R$ (Amount converted), independe do toggle
+    var _fcAtt = _metaYear > 0 ? _fcBrl / _metaYear * 100 : 0;
+    var _wonAtt = _heroMeta > 0 ? _heroReal / _heroMeta * 100 : 0;
+    var _gapTgt = Math.Max(_metaYear - _fcBrl, 0);
+    var _gmPp = _gmAvg - 30.0;
+}
+<div class="xsec lvl1">
+    <span class="xsec-t">Executive Overview</span>
+    <span class="xsec-s">how are we performing · @_year · @_currency</span>
+    <span class="xsec-line"></span>
+</div>
+<div class="kpi-row">
+    <div class="kpi">
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("trend")</span><span class="kpi-label">Forecast</span></div>
+        <div class="kpi-value">@Money(_fcYear)</div>
+        <div class="kpi-delta @(_fcAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_fcAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_fcAtt) <span class="ctx">of target</span></div>
+        <div class="kpi-spark"><Sparkline Values="@_monthAmt" Stroke="#17a2c0" /></div>
+    </div>
+    <div class="kpi accent-pos">
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("check")</span><span class="kpi-label">Won / Booked</span></div>
+        <div class="kpi-value">@MoneyBrl(_heroReal)</div>
+        <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">of target</span></div>
+        <div class="kpi-spark"><Sparkline Values="@_mReal" Stroke="#1f9254" /></div>
+    </div>
+    <div class="kpi accent-warn">
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("target")</span><span class="kpi-label">Gap vs Target</span></div>
+        <div class="kpi-value">@MoneyBrl(_gapTgt)</div>
+        <div class="kpi-delta warn"><span class="ctx">target @MoneyBrl(_metaYear)</span></div>
+        <div class="kpi-bar"><i style="width:@Share(_fcBrl, Math.Max(_metaYear, 1))%"></i></div>
+    </div>
+    <div class="kpi @(_gmAvg >= 30 ? "accent-pos" : "accent-warn")">
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("executive")</span><span class="kpi-label">Gross Margin</span></div>
+        <div class="kpi-value">@Fmt.Pct(_gmAvg)</div>
+        <div class="kpi-delta @(_gmPp >= 0 ? "pos" : "warn")"><span class="arw">@(_gmPp >= 0 ? "▲" : "▼")</span> @Math.Abs(_gmPp).ToString("0.0", _pt) pp <span class="ctx">vs 30% target</span></div>
+        <div class="kpi-bar"><i style="width:@Share(_gmAvg, 40)%"></i></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("layers")</span><span class="kpi-label">Pipeline Coverage</span></div>
+        <div class="kpi-value">@_coverage.ToString("0.0", _pt)x</div>
+        <div class="kpi-delta @(_coverage >= 1 ? "pos" : "neg")"><span class="arw">@(_coverage >= 1 ? "▲" : "▼")</span> <span class="ctx">weighted pipeline vs remaining target</span></div>
+        <div class="kpi-bar"><i style="width:@Share(Math.Min(_coverage, 2), 2)%"></i></div>
+    </div>
+</div>
+
 @* ===================== 2 · HERO EXECUTIVO ===================== *@
 <div class="hero">
     <div class="hero-main">
@@ -174,52 +220,224 @@
     }
 </div>
 
-@* ===================== ANÁLISE DO FUNIL (gráficos interativos) ===================== *@
-<div class="section-head">
-    <span class="st-title">Análise do funil</span>
-    <span class="st-sub">valor (Amount converted) · @_currency · clique em qualquer elemento para filtrar tudo</span>
-    <span class="st-line"></span>
+@* ===================== REVENUE DISTRIBUTION & PERFORMANCE ===================== *@
+@{
+    var _segTot = Math.Max(_bySegment.Sum(x => x.Value), 1);
+    var _repTot = Math.Max(_byRep.Sum(x => x.Value), 1);
+    var _repMax = _byRep.Count > 0 ? _byRep.Max(x => x.Value) : 1;
+    var _buTot = Math.Max(_byBu2.Sum(x => x.Value), 1);
+    var _smMax = _bySubMarket.Count > 0 ? _bySubMarket.Max(x => x.Value) : 1;
+}
+<div class="xsec">
+    <span class="xsec-t">Revenue Distribution &amp; Performance</span>
+    <span class="xsec-s">where is the revenue coming from · who is driving it · @_currency</span>
+    <span class="xsec-line"></span>
+    <span class="xsec-s">click any element to filter</span>
 </div>
 <div id="xf-charts">
-    @* Valor por Vendedor — barras horizontais, linha inteira *@
     <div class="g12">
-        <div class="c12"><div class="panel">
-            <div class="panel-head"><div class="panel-title">Valor por Vendedor <span class="hint">Outside Sales Rep · @_currency</span></div></div>
-            <div class="chart-body flow">@RenderXfHBars(_byRep, "kam", 0)</div>
+        @* ---- Commercial Segment (donut + lista) ---- *@
+        <div class="c6"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Commercial Segment</div><div class="xcard-sub">@_bySegment.Count segmentos · participação</div></div></div>
+            @if (_bySegment.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else
+            {
+                <div class="seg-wrap">
+                    <div class="seg-donut">
+                        @RenderDonutRing(_bySegment, "segment")
+                        <div class="seg-center"><div><div class="lab">Total</div><div class="val">@MoneyBrl(_bySegment.Sum(x => x.Value))</div></div></div>
+                    </div>
+                    <div class="seg-list scroll-y" style="max-height:230px">
+                        @{ var si = 0; }
+                        @foreach (var s in _bySegment)
+                        {
+                            var c = SegColors[si++ % SegColors.Length];
+                            <div class="seg-row @(IsActive("segment", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("segment", s.Label)' title="@s.Label">
+                                <span class="seg-dot" style="background:@c"></span>
+                                <span class="seg-name">@s.Label</span>
+                                <span class="seg-val">@MoneyBrl(s.Value)</span>
+                                <span class="seg-share">@Fmt.Pct(s.Value / _segTot * 100)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div></div>
+
+        @* ---- Forecast by Market (ranking) ---- *@
+        <div class="c6"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Forecast by Market</div><div class="xcard-sub">@_byMarket.Count mercados · maior → menor</div></div></div>
+            @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else
+            {
+                <div class="rank">
+                    <div class="rank-head rk-mkt"><span>Market</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span></div>
+                    <div class="scroll-y" style="max-height:300px">
+                        @foreach (var m in _byMarket)
+                        {
+                            <div class="rank-row rk-mkt @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name">
+                                <span class="rank-name">@m.Name</span>
+                                <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(m.Value, _maxMarket)%"></span></span></span>
+                                <span class="rank-val">@Money(m.Value)</span>
+                                <span class="rank-share">@Fmt.Pct(m.Value / _marketTotal * 100)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         </div></div>
     </div>
-    @* Valor por mês — colunas, linha inteira abaixo *@
-    <div class="g12" style="margin-top:14px">
-        <div class="c12"><div class="panel">
-            <div class="panel-head"><div class="panel-title">Valor por mês <span class="hint">Close Date · @_currency</span></div></div>
+
+    @* ---- Sales Rep Performance (ranking numerado, todos, scroll) ---- *@
+    <div class="g12" style="margin-top:16px">
+        <div class="c12"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Sales Rep Performance</div><div class="xcard-sub">@_byRep.Count vendedores · todos exibidos · maior → menor</div></div></div>
+            @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else
+            {
+                <div class="rank">
+                    <div class="rank-head rk-rep"><span>#</span><span>Sales Rep</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span></div>
+                    <div class="scroll-y" style="max-height:430px">
+                        @{ var ri = 0; }
+                        @foreach (var s in _byRep)
+                        {
+                            ri++;
+                            <div class="rank-row rk-rep @(ri == 1 ? "top1" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="@s.Label">
+                                <span class="rank-num">@ri</span>
+                                <span class="rank-name">@s.Label</span>
+                                <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(s.Value, _repMax)%"></span></span></span>
+                                <span class="rank-val">@MoneyBrl(s.Value)</span>
+                                <span class="rank-share">@Fmt.Pct(s.Value / _repTot * 100)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div></div>
+    </div>
+
+    @* ---- Forecast by Product (ranking + GM) ---- *@
+    <div class="g12" style="margin-top:16px">
+        <div class="c12"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Forecast by Product</div><div class="xcard-sub">@_byProduct.Count produtos · Gross Margin em destaque</div></div></div>
+            @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else
+            {
+                <div class="rank">
+                    <div class="rank-head rk-prod"><span>Product</span><span></span><span class="rank-val">Forecast</span><span class="rank-share">Share</span><span class="rank-share">GM</span></div>
+                    <div class="scroll-y" style="max-height:360px">
+                        @foreach (var p in _byProduct)
+                        {
+                            var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
+                            <div class="rank-row rk-prod @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name">
+                                <span class="rank-name">@p.Name</span>
+                                <span class="rank-barwrap"><span class="rank-track"><span class="rank-fill" style="width:@Share(p.Value, _maxProduct)%"></span></span></span>
+                                <span class="rank-val">@Money(p.Value)</span>
+                                <span class="rank-share">@Fmt.Pct(p.Value / _productTotal * 100)</span>
+                                <span style="text-align:right"><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span></span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div></div>
+    </div>
+
+    @* ===================== DETAIL (nível 3) ===================== *@
+    <div class="xsec lvl3">
+        <span class="xsec-t">Detail</span>
+        <span class="xsec-s">sub-markets · business units · timing</span>
+        <span class="xsec-line"></span>
+    </div>
+    <div class="g12">
+        @* ---- Sub-Market Performance (lollipop) ---- *@
+        <div class="c6"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Sub-Market Performance</div><div class="xcard-sub">@_bySubMarket.Count sub-markets · todos exibidos</div></div></div>
+            @if (_bySubMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else
+            {
+                <div class="lolli scroll-y" style="max-height:380px">
+                    @foreach (var s in _bySubMarket)
+                    {
+                        <div class="lolli-row @(IsActive("submarket", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("submarket", s.Label)' title="@s.Label">
+                            <span class="lolli-name">@s.Label</span>
+                            <span class="lolli-track"><span class="lolli-line" style="width:calc(@Share(s.Value, _smMax)% - 12px)"></span><span class="lolli-dot"></span></span>
+                            <span class="lolli-val">@MoneyBrl(s.Value)</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div></div>
+
+        @* ---- Business Unit Performance (donut + lista) ---- *@
+        <div class="c6"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Business Unit Performance</div><div class="xcard-sub">@_byBu2.Count unidades · participação</div></div></div>
+            @if (_byBu2.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else
+            {
+                <div class="seg-wrap">
+                    <div class="seg-donut">
+                        @RenderDonutRing(_byBu2, "bu")
+                        <div class="seg-center"><div><div class="lab">Total</div><div class="val">@MoneyBrl(_byBu2.Sum(x => x.Value))</div></div></div>
+                    </div>
+                    <div class="seg-list scroll-y" style="max-height:230px">
+                        @{ var bi = 0; }
+                        @foreach (var b in _byBu2)
+                        {
+                            var c = SegColors[bi++ % SegColors.Length];
+                            <div class="seg-row @(IsActive("bu", b.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("bu", b.Label)' title="@b.Label">
+                                <span class="seg-dot" style="background:@c"></span>
+                                <span class="seg-name">@b.Label</span>
+                                <span class="seg-val">@MoneyBrl(b.Value)</span>
+                                <span class="seg-share">@Fmt.Pct(b.Value / _buTot * 100)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div></div>
+    </div>
+
+    @* ---- Forecast by Month (timing) ---- *@
+    <div class="g12" style="margin-top:16px">
+        <div class="c12"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Forecast by Month</div><div class="xcard-sub">Close Date · clique num mês para filtrar</div></div></div>
             <div class="chart-body">@RenderXfColumns(_monthAmt)</div>
         </div></div>
     </div>
-    <div class="g12" style="margin-top:14px">
-        <div class="c6"><div class="panel">
-            <div class="panel-head"><div class="panel-title">Commercial Segment <span class="hint">participação · @_currency</span></div></div>
-            <div class="chart-body donut">@RenderXfPie(_bySegment, "segment")</div>
-        </div></div>
-        <div class="c6"><div class="panel">
-            <div class="panel-head"><div class="panel-title">Valor por Market <span class="hint">participação · @_currency</span></div></div>
-            <div class="chart-body flow">@RenderXfHBars(_byMarketH, "market", 12)</div>
-        </div></div>
+</div>
+
+@* ===================== EXECUTIVE INSIGHTS ===================== *@
+<div class="xsec">
+    <span class="xsec-t">Executive Insights</span>
+    <span class="xsec-s">calculado a partir dos dados reais do recorte</span>
+    <span class="xsec-line"></span>
+</div>
+<div class="exi-grid">
+    @{
+        var _topMkt = _byMarket.Take(2).Select(m => m.Name).ToList();
+        var _mktTxt = _topMkt.Count > 0 ? string.Join(" & ", _topMkt) : "—";
+        var _topSeg = _bySegment.Count > 0 ? _bySegment[0] : null;
+    }
+    <div class="exi">
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("trend")</span><span class="exi-label">Forecast vs Target</span></div>
+        <div class="exi-value @(_fcAtt >= 100 ? "pos" : "")">@Fmt.Pct(_fcAtt)</div>
+        <div class="exi-text">Previsão de @Money(_fcYear) frente à meta de @MoneyBrl(_metaYear). @_mktTxt lideram a contribuição do forecast.</div>
     </div>
-    <div class="g12" style="margin-top:14px">
-        <div class="c12"><div class="panel">
-            <div class="panel-head"><div class="panel-title">Valor por Sub-Market <span class="hint">@_currency</span></div></div>
-            <div class="chart-body">@RenderXfLine(_bySubMarket, "submarket", 16)</div>
-        </div></div>
+    <div class="exi warn">
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("target")</span><span class="exi-label">Gap to Target</span></div>
+        <div class="exi-value warn">@MoneyBrl(_gapTgt)</div>
+        <div class="exi-text">Distância da meta anual. Priorizar a conversão das maiores oportunidades do pipeline (@_openCount abertas).</div>
     </div>
-    <div class="g12" style="margin-top:14px">
-        <div class="c6"><div class="panel">
-            <div class="panel-head"><div class="panel-title">Business Unit <span class="hint">participação · @_currency</span></div></div>
-            <div class="chart-body donut">@RenderXfPie(_byBu2, "bu")</div>
-        </div></div>
-        <div class="c6"><div class="panel" style="height:100%;display:flex;flex-direction:column;justify-content:center">
-            <div class="panel-head"><div class="panel-title">Por país <span class="hint">Installation Location · role para o mapa abaixo</span></div></div>
-            <div class="muted" style="font-size:12.5px;padding:6px 2px">O mapa-múndi interativo (por Installation Location) está logo abaixo, na seção <strong>Distribuição da carteira</strong>. Clique num país lá para filtrar tudo.</div>
-        </div></div>
+    <div class="exi @(_gmAvg >= 30 ? "pos" : "warn")">
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("executive")</span><span class="exi-label">Gross Margin</span></div>
+        <div class="exi-value @(_gmAvg >= 30 ? "pos" : "warn")">@Fmt.Pct(_gmAvg)</div>
+        <div class="exi-text">Margem bruta média do recorte (@(_gmPp >= 0 ? "+" : "")@_gmPp.ToString("0.0", _pt) pp vs meta de 30%), sustentada pelo mix de produtos.</div>
+    </div>
+    <div class="exi @(_coverage >= 1 ? "pos" : "warn")">
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("layers")</span><span class="exi-label">Pipeline Coverage</span></div>
+        <div class="exi-value">@_coverage.ToString("0.0", _pt)x</div>
+        <div class="exi-text">Pipeline ponderado sobre a meta restante. @(_coverage >= 1 ? "Cobertura suporta a entrega do ano." : "Cobertura abaixo de 1x — reforçar geração de pipeline.")</div>
     </div>
 </div>
 
@@ -942,7 +1160,7 @@
                 return new ProductRow(g.Key, items.Sum(Metric),
                     items.Average(o => o.GmPercentValue), PseudoTrend(g.Key, 12));
             })
-            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(6).ToList();
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _maxProduct = Math.Max(_byProduct.Count > 0 ? _byProduct.Max(x => x.Value) : 1, 1);
         _productTotal = Math.Max(_byProduct.Sum(x => x.Value), 1);
 
@@ -1471,6 +1689,31 @@
             sb.Append($"<circle cx='{F(cx)}' cy='{F(cy)}' r='{(on ? "5.5" : "3.5")}' fill='{(on ? "#0b4f6f" : "#fff")}' stroke='#007A9E' stroke-width='2' class='xf-mark' data-xf-dim='{dim}' data-xf-val='{Esc(d[i].Label)}'><title>{Esc(d[i].Label)} · {Esc(MoneyBrl(d[i].Value))}</title></circle>");
             sb.Append($"<text x='{F(cx)}' y='{F(cy - 9)}' text-anchor='middle' font-size='8.5' font-weight='600' fill='#5b6b82'>{Esc(CompactBrl(d[i].Value))}</text>");
             sb.Append($"<text x='{F(cx)}' y='{F(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(Trunc(d[i].Label, 11))}</text>");
+        }
+        sb.Append("</svg>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Cores discretas e coerentes p/ segmentos/unidades (sem excesso de vibração).
+    private static readonly string[] SegColors =
+        { "#0b4f6f", "#0e7490", "#3f89a6", "#6aa9be", "#93c2d2", "#b9d7e0", "#5b6b82", "#8fa0b5", "#c3ccd8", "#7c8ba0" };
+
+    // Anel do donut (Commercial Segment / Business Unit) — fatias clicáveis.
+    private RenderFragment RenderDonutRing(IReadOnlyList<SliceRow> data, string dim) => builder =>
+    {
+        var d = data.Where(x => x.Value > 0).ToList();
+        if (d.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados</div>"); return; }
+        double total = Math.Max(d.Sum(x => x.Value), 1);
+        double cx = 80, cy = 80, r = 62, sw = 22, C = 2 * Math.PI * r, off = 0;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<svg viewBox='0 0 160 160' role='img'>");
+        sb.Append($"<circle cx='{cx}' cy='{cy}' r='{F(r)}' fill='none' stroke='#eef2f7' stroke-width='{F(sw)}'/>");
+        for (var i = 0; i < d.Count; i++)
+        {
+            double val = d[i].Value, dash = val / total * C; var col = SegColors[i % SegColors.Length];
+            var on = IsActive(dim, d[i].Label);
+            sb.Append($"<circle cx='{cx}' cy='{cy}' r='{F(r)}' fill='none' stroke='{col}' stroke-width='{F(on ? sw + 3 : sw)}' stroke-dasharray='{F(dash)} {F(C - dash)}' stroke-dashoffset='{F(-off)}' transform='rotate(-90 {cx} {cy})' class='xf-mark' data-xf-dim='{dim}' data-xf-val='{Esc(d[i].Label)}'><title>{Esc(d[i].Label)} · {Esc(MoneyBrl(d[i].Value))}</title></circle>");
+            off += dash;
         }
         sb.Append("</svg>");
         builder.AddMarkupContent(0, sb.ToString());
