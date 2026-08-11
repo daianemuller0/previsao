@@ -1342,11 +1342,11 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 
 /* A BARRA (herói) — grossa, viva, com track suave e cantos arredondados */
 .ibar-track {
-    height: 15px; border-radius: 999px; background: #e9eff6; overflow: hidden;
+    display: block; height: 15px; border-radius: 999px; background: #e9eff6; overflow: hidden;
     box-shadow: inset 0 1px 2px rgba(18,38,63,.06); transition: box-shadow .15s ease;
 }
 .ibar-fill {
-    height: 100%; border-radius: 999px; min-width: 9px;
+    display: block; height: 100%; border-radius: 999px; min-width: 9px;
     background: linear-gradient(90deg, #0a6f92 0%, #159bbd 68%, #22b0d0 100%);
     box-shadow: 0 1px 3px rgba(11,79,111,.22), inset 0 1px 0 rgba(255,255,255,.18);
     transform-origin: left center; animation: ibarGrow .55s cubic-bezier(.22,.61,.36,1);
