@@ -140,6 +140,40 @@
     }
 </div>
 
+@* ===================== FUNIL DE VENDAS (por Stage) ===================== *@
+<div class="section-head">
+    <span class="st-title">@Icons.Svg("layers", "nav-ico") Funil de Vendas · por Stage</span>
+    <span class="st-sub">valor (Amount converted) · @_currency · ordem decrescente · clique para filtrar</span>
+    <span class="st-line"></span>
+    @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Stage</button> }
+</div>
+<div class="panel funnel-panel">
+    @if (_funnel.Count == 0)
+    {
+        <div class="empty">Sem dados no recorte. Importe a base do Funil de Vendas HSA na guia <a href="/oportunidades">Oportunidades</a>.</div>
+    }
+    else
+    {
+        <div class="funnel">
+            @{ var fi = 0; }
+            @foreach (var f in _funnel)
+            {
+                var idx = fi++;
+                <div class="funnel-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="Filtrar por @f.Stage">
+                    <div class="funnel-band" style="width:@FunnelWidth(f.Value)%;background:@FunnelColor(idx)">
+                        <span class="funnel-stage">@f.Stage</span>
+                        <span class="funnel-val">@MoneyBrl(f.Value)</span>
+                    </div>
+                    <div class="funnel-meta">
+                        <span class="funnel-pct">@Fmt.Pct(f.Value / _funnelTotal * 100)</span>
+                        <span class="funnel-count">@f.Count op.</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
 @* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
 <div class="section-head">
     <span class="st-title">Top 10 oportunidades mais quentes</span>
@@ -413,7 +447,7 @@
     private int _year, _month, _quarter;
     // Filtros por NOME resolvido (mesmo rótulo mostrado nos gráficos), para que o
     // clique num elemento (cross-filter estilo Power BI) case com o agrupamento.
-    private string _market = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "", _commercial = "";
+    private string _market = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "", _commercial = "", _stage = "", _segment = "";
     private HashSet<string> _kams = new(StringComparer.OrdinalIgnoreCase);   // KAM é multi-seleção (por nome)
     private bool _kamOpen;
     private void ToggleKam(string name) { if (!_kams.Remove(name)) _kams.Add(name); }
@@ -455,6 +489,10 @@
     private List<CommRow> _byCommercial = new();
     private double _maxComm = 1;
     private record SliceRow(string Label, double Value);
+    // Funil de Vendas (por Stage), ordenado decrescente por valor.
+    private record FunnelRow(string Stage, double Value, int Count);
+    private List<FunnelRow> _funnel = new();
+    private double _funnelMax = 1, _funnelTotal = 1;
     private List<SliceRow> _byBu = new();
     private List<SliceRow> _byCountry = new();
     private double[] _byQuarter = new double[4];
@@ -528,6 +566,8 @@
     private string KeyBu(Opportunity o)       => DisplayKey(o.PvBusinessUnitId, Cat.BuCode);
     private string KeyKam(Opportunity o)      => DisplayKey(o.KamId, Cat.KamName);
     private static string KeyCommercial(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim();
+    private static string KeyStage(Opportunity o)   => string.IsNullOrWhiteSpace(o.Stage) ? "—" : o.Stage.Trim();
+    private static string KeySegment(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialSegment) ? "—" : o.CommercialSegment.Trim();
 
     private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
@@ -546,6 +586,8 @@
             case "bu":         _bu = Tog(_bu); break;
             case "commercial": _commercial = Tog(_commercial); break;
             case "category":   _catFilter = Tog(_catFilter); break;
+            case "stage":      _stage = Tog(_stage); break;
+            case "segment":    _segment = Tog(_segment); break;
             case "kam":        if (!_kams.Remove(v)) _kams.Add(v); break;
         }
     }
@@ -560,11 +602,21 @@
         "bu" => Eq(_bu, val),
         "commercial" => Eq(_commercial, val),
         "category" => Eq(_catFilter, val),
+        "stage" => Eq(_stage, val),
+        "segment" => Eq(_segment, val),
         "kam" => _kams.Contains(val),
         _ => false,
     };
     // Classe utilitária p/ marcar o elemento clicável e o estado ativo.
     private string XfCss(string dim, string val) => "xf" + (IsActive(dim, val) ? " xf-on" : "");
+
+    // Largura da faixa do funil (% do maior valor), com mínimo p/ legibilidade.
+    private string FunnelWidth(double v) =>
+        Math.Max(_funnelMax > 0 ? v / _funnelMax * 100 : 0, 14).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    // Gradiente do funil: tons da marca, do mais forte (topo) ao mais claro.
+    private static readonly string[] FunnelColors =
+        { "#0b4f6f", "#0a6285", "#007A9E", "#1092b0", "#2aa5c0", "#5bb0c9", "#86c4d8", "#aed7e5" };
+    private static string FunnelColor(int i) => FunnelColors[Math.Min(i, FunnelColors.Length - 1)];
 
     // Chamado pelo mapa (JS) ao clicar num país. Reentra no contexto do componente.
     [JSInvokable]
@@ -628,6 +680,8 @@
         if (_customer != "") q = q.Where(o => Eq(KeyCustomer(o), _customer));
         if (_bu != "") q = q.Where(o => Eq(KeyBu(o), _bu));
         if (_commercial != "") q = q.Where(o => Eq(KeyCommercial(o), _commercial));
+        if (_stage != "") q = q.Where(o => Eq(KeyStage(o), _stage));
+        if (_segment != "") q = q.Where(o => Eq(KeySegment(o), _segment));
         if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
         if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
         if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
@@ -638,7 +692,7 @@
 
     private void ClearFilters()
     {
-        _market = _catFilter = _country = _product = _customer = _bu = _commercial = "";
+        _market = _catFilter = _country = _product = _customer = _bu = _commercial = _stage = _segment = "";
         _kams.Clear();
         _monthFilter = 0; _dateFrom = _dateTo = null;
         _valMin = _valMax = null; _valMetric = "total";
@@ -649,13 +703,21 @@
     {
         _sym = _currency == "BRL" ? "R$" : "US$";
         _year = _today.Year; _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
-        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial }.Count(s => s != "")
+        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial, _stage, _segment }.Count(s => s != "")
             + (_kams.Count > 0 ? 1 : 0)
             + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
 
         var opps = Filtered().ToList();
         _filtered = opps;
+
+        // Funil de Vendas por Stage — valor = Amount (converted) em R$ (AmountBrl),
+        // sobre TODO o recorte filtrado, em ordem decrescente de valor.
+        _funnel = opps.GroupBy(KeyStage, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new FunnelRow(g.Key, g.Sum(o => o.AmountBrl), g.Count()))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+        _funnelTotal = Math.Max(_funnel.Sum(x => x.Value), 1);
+        _funnelMax = Math.Max(_funnel.Count > 0 ? _funnel.Max(x => x.Value) : 1, 1);
 
         // Hero: Meta × Realizado do REPORT HSA (guia Controle). Sem filtro de mês
         // mostra o total do ano; com filtro de mês mostra o mês selecionado.
