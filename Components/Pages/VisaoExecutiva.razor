@@ -213,24 +213,25 @@
             </div>
         </div>
         <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> of pipeline value is concentrated in the first @(_funnel.Count >= 2 ? "two stages" : "stage").</span></div>
-        <div class="mf @(DimActive("stage") ? "has-active" : "")">
+        <div class="mf2 @(DimActive("stage") ? "has-active" : "")">
             @for (var i = 0; i < _funnel.Count; i++)
             {
                 var f = _funnel[i];
                 var sh = f.Value / _funnelTotal * 100;
                 var conv = i < _funnel.Count - 1 && f.Value > 0 ? _funnel[i + 1].Value / f.Value * 100 : (double?)null;
                 // Trapézio: topo = largura desta etapa; base = largura da próxima (conecta o funil).
-                var frac = conv is { } cf ? Math.Clamp(cf / 100.0, 0.14, 1.0) : 0.5;
+                var frac = conv is { } cf ? Math.Clamp(cf / 100.0, 0.16, 1.0) : 0.55;
                 var inset = (1 - frac) / 2 * 100;
-                <div class="mf-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
-                    <div class="mf-stage">@f.Stage</div>
-                    <div class="mf-seg" style="width:@Share(f.Value, _funnelMax)%;clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
-                    <div class="mf-meta"><strong>@MoneyBrl(f.Value)</strong> · @Fmt.Pct(sh) · @f.Count opps</div>
+                <div class="mf2-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
+                    <div class="mf2-funnel">
+                        <div class="mf2-seg" style="width:@Share(f.Value, _funnelMax)%;clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
+                    </div>
+                    <div class="mf2-label">
+                        <div class="mf2-name">@f.Stage</div>
+                        <div class="mf2-metrics"><strong>@MoneyBrl(f.Value)</strong> · @Fmt.Pct(sh) of pipeline · @f.Count opps</div>
+                        @if (conv is { } c) { <div class="mf2-conv">↓ <b>@Fmt.Pct(c)</b> conversion to next stage</div> }
+                    </div>
                 </div>
-                @if (conv is { } c)
-                {
-                    <div class="mf-conv">↓ <b>@Fmt.Pct(c)</b> conversion</div>
-                }
             }
         </div>
     }
@@ -926,7 +927,8 @@
     private static string FunnelBar(int i, int n)
     {
         double t = n <= 1 ? 0 : (double)i / (n - 1);
-        int r = Lerp(0x0a, 0x1e, t), g = Lerp(0x5f, 0x9c, t), b = Lerp(0x7f, 0xbc, t);
+        // tons de azul distintos por etapa: navy escuro no topo → azul claro na base
+        int r = Lerp(0x09, 0x3f, t), g = Lerp(0x46, 0xa6, t), b = Lerp(0x66, 0xc6, t);
         return $"#{r:x2}{g:x2}{b:x2}";
     }
 

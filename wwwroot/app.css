@@ -1429,3 +1429,29 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 
 .mf-conv { font-size: 10.5px; color: var(--muted-2); font-weight: 600; text-align: center; padding: 0 0 1px; letter-spacing: .2px; }
 .mf-conv b { color: var(--teal-deep); font-weight: 750; }
+
+/* ==========================================================================
+   FUNNEL v2 — segmentos CONECTADOS (funil contínuo) + labels ao lado
+   ========================================================================== */
+@keyframes fadeInSeg { from { opacity: 0; } to { opacity: 1; } }
+.mf2 { width: 100%; max-width: 900px; margin: 0 auto; }
+.mf2-row {
+    display: flex; align-items: stretch; min-height: 56px; cursor: pointer; border-radius: 10px;
+    transition: background .14s ease, box-shadow .14s ease, opacity .18s ease, filter .18s ease;
+}
+.mf2-row:hover { background: #f1f7fb; }
+.mf2-row:hover .mf2-seg { filter: brightness(1.09) saturate(1.12); }
+.mf2-row.xf-on { background: var(--teal-050); box-shadow: inset 0 0 0 1.5px rgba(0,122,158,.42), 0 4px 14px rgba(0,122,158,.10); }
+.mf2.has-active .mf2-row:not(.xf-on) { opacity: .46; filter: saturate(.5); }
+.mf2.has-active .mf2-row:not(.xf-on):hover { opacity: .85; filter: saturate(.9); }
+
+.mf2-funnel { width: 460px; flex: none; display: flex; justify-content: center; }
+.mf2-seg { height: 100%; min-width: 22px; max-width: 100%; animation: fadeInSeg .45s ease; transition: filter .15s ease; box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
+
+.mf2-label { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 6px 4px 6px 28px; }
+.mf2-name { font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.2; letter-spacing: -.1px; }
+.mf2-metrics { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+.mf2-metrics strong { color: var(--text); font-weight: 780; letter-spacing: -.2px; }
+.mf2-conv { font-size: 11px; color: var(--muted-2); font-weight: 600; margin-top: 3px; }
+.mf2-conv b { color: var(--teal-deep); font-weight: 750; }
+@media (max-width: 1100px) { .mf2-funnel { width: 320px; } .mf2-label { padding-left: 20px; } }
