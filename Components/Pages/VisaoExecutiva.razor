@@ -213,21 +213,20 @@
             </div>
         </div>
         <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> of pipeline value is concentrated in the first @(_funnel.Count >= 2 ? "two stages" : "stage").</span></div>
-        <div class="pf @(DimActive("stage") ? "has-active" : "")">
+        <div class="mf @(DimActive("stage") ? "has-active" : "")">
             @for (var i = 0; i < _funnel.Count; i++)
             {
                 var f = _funnel[i];
                 var sh = f.Value / _funnelTotal * 100;
-                <div class="pf-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities">
-                    <div class="pf-stage">@f.Stage</div>
-                    <div class="pf-barcell"><span class="pf-track"><span class="pf-fill" style="width:@Share(f.Value, _funnelMax)%;background:@FunnelBar(i, _funnel.Count)"></span></span></div>
-                    <div class="pf-amount">@MoneyBrl(f.Value)</div>
-                    <div class="pf-meta">@Fmt.Pct(sh) of pipeline · @f.Count opportunities</div>
+                var conv = i < _funnel.Count - 1 && f.Value > 0 ? _funnel[i + 1].Value / f.Value * 100 : (double?)null;
+                <div class="mf-row @(IsActive("stage", f.Stage) ? "xf-on" : "")" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
+                    <div class="mf-stage">@f.Stage</div>
+                    <div class="mf-bar" style="width:@Share(f.Value, _funnelMax)%;background:@FunnelBar(i, _funnel.Count)"></div>
+                    <div class="mf-meta"><strong>@MoneyBrl(f.Value)</strong> · @Fmt.Pct(sh) · @f.Count opps</div>
                 </div>
-                @if (i < _funnel.Count - 1 && f.Value > 0)
+                @if (conv is { } c)
                 {
-                    var conv = _funnel[i + 1].Value / f.Value * 100;
-                    <div class="pf-conv">↓ <span class="pf-conv-txt">@Fmt.Pct(conv) conversion</span> to next stage</div>
+                    <div class="mf-conv">↓ <b>@Fmt.Pct(c)</b> conversion</div>
                 }
             }
         </div>
