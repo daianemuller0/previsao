@@ -181,12 +181,16 @@
     <span class="st-line"></span>
 </div>
 <div id="xf-charts">
+    @* Valor por Vendedor — barras horizontais, linha inteira *@
     <div class="g12">
-        <div class="c6"><div class="panel">
+        <div class="c12"><div class="panel">
             <div class="panel-head"><div class="panel-title">Valor por Vendedor <span class="hint">Outside Sales Rep · @_currency</span></div></div>
-            <div class="chart-body">@RenderXfLine(_byRep, "kam", 12)</div>
+            <div class="chart-body flow">@RenderXfHBars(_byRep, "kam", 0)</div>
         </div></div>
-        <div class="c6"><div class="panel">
+    </div>
+    @* Valor por mês — colunas, linha inteira abaixo *@
+    <div class="g12" style="margin-top:14px">
+        <div class="c12"><div class="panel">
             <div class="panel-head"><div class="panel-title">Valor por mês <span class="hint">Close Date · @_currency</span></div></div>
             <div class="chart-body">@RenderXfColumns(_monthAmt)</div>
         </div></div>
@@ -198,7 +202,7 @@
         </div></div>
         <div class="c6"><div class="panel">
             <div class="panel-head"><div class="panel-title">Valor por Market <span class="hint">participação · @_currency</span></div></div>
-            <div class="chart-body flow">@RenderXfHBars(_byMarketH, "market", 10)</div>
+            <div class="chart-body flow">@RenderXfHBars(_byMarketH, "market", 12)</div>
         </div></div>
     </div>
     <div class="g12" style="margin-top:14px">
