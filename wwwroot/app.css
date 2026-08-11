@@ -1294,3 +1294,65 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .scroll-y::-webkit-scrollbar-thumb { background: #cfdae6; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 .scroll-y::-webkit-scrollbar-thumb:hover { background: #b6c4d6; background-clip: padding-box; }
 .scroll-y::-webkit-scrollbar-track { background: transparent; }
+
+/* ==========================================================================
+   IBAR — barras interativas premium (Market / Sales Rep / Product + legados)
+   A barra é o elemento principal: grossa, viva, com hover/select/tooltip.
+   ========================================================================== */
+@keyframes ibarGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.ibar { display: flex; flex-direction: column; gap: 2px; }
+.ibar-item {
+    padding: 13px 12px 14px; border-radius: 13px; cursor: pointer;
+    transition: background .15s ease, box-shadow .15s ease, opacity .18s ease, filter .18s ease;
+}
+.ibar-item:hover { background: #f1f7fb; }
+.ibar-item:hover .ibar-fill { filter: brightness(1.06) saturate(1.12); }
+.ibar-item:hover .ibar-track { box-shadow: inset 0 1px 3px rgba(18,38,63,.09); }
+
+/* Estado selecionado — borda + glow sutil + fundo leve */
+.ibar-item.xf-on {
+    background: var(--teal-050);
+    box-shadow: inset 0 0 0 1.5px rgba(0,122,158,.45), 0 4px 14px rgba(0,122,158,.12);
+}
+.ibar-item.xf-on .ibar-fill { background: linear-gradient(90deg, #075f80, #12a2c4 65%, #23bcdd); }
+
+/* Quando há filtro ativo na dimensão, os demais itens desaturam levemente */
+.ibar.has-active .ibar-item:not(.xf-on) { opacity: .5; filter: saturate(.55); }
+.ibar.has-active .ibar-item:not(.xf-on):hover { opacity: .82; filter: saturate(.85); }
+
+.ibar-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.ibar-num {
+    width: 25px; height: 25px; flex: none; border-radius: 8px; display: grid; place-items: center;
+    font-size: 11.5px; font-weight: 800; color: var(--teal-deep); background: #e7f0f5;
+    align-self: center;
+}
+.ibar-item.top1 .ibar-num { background: linear-gradient(135deg, #0b6c8c, #1aa5c4); color: #fff; box-shadow: 0 2px 8px rgba(11,79,111,.34); }
+.ibar-item.top2 .ibar-num { background: #cfe6ef; }
+.ibar-item.top3 .ibar-num { background: #dceaf1; }
+.ibar-name {
+    font-size: 14px; font-weight: 650; color: var(--text); letter-spacing: -.1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.ibar-item.top1 .ibar-name { font-weight: 760; }
+.ibar-metrics { margin-left: auto; display: flex; align-items: center; gap: 12px; white-space: nowrap; padding-left: 12px; }
+.ibar-val { font-size: 15px; font-weight: 800; letter-spacing: -.3px; color: var(--text); font-variant-numeric: tabular-nums; }
+.ibar-share { font-size: 12.5px; font-weight: 650; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.ibar-sep { width: 1px; height: 13px; background: var(--exec-border); }
+
+/* A BARRA (herói) — grossa, viva, com track suave e cantos arredondados */
+.ibar-track {
+    height: 15px; border-radius: 999px; background: #e9eff6; overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(18,38,63,.06); transition: box-shadow .15s ease;
+}
+.ibar-fill {
+    height: 100%; border-radius: 999px; min-width: 9px;
+    background: linear-gradient(90deg, #0a6f92 0%, #159bbd 68%, #22b0d0 100%);
+    box-shadow: 0 1px 3px rgba(11,79,111,.22), inset 0 1px 0 rgba(255,255,255,.18);
+    transform-origin: left center; animation: ibarGrow .55s cubic-bezier(.22,.61,.36,1);
+    transition: filter .15s ease;
+}
+
+/* GM / Trend pills dentro do ibar */
+.ibar .gm-pill { padding: 3px 10px; font-size: 11px; }
+.ibar .trend-pill { font-size: 12px; font-weight: 780; min-width: 58px; justify-content: flex-end; }
