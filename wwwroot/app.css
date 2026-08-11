@@ -1078,3 +1078,11 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .funnel-val { font-weight: 800; font-size: 15.5px; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .funnel-meta { display: flex; gap: 14px; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
 .funnel-pct { font-weight: 700; color: var(--text-2); }
+
+/* ---- Cross-filter nos gráficos do funil (SVG/HTML) ---- */
+#xf-charts [data-xf-dim] { cursor: pointer; }
+#xf-charts .xf-mark { transition: opacity .12s ease; }
+#xf-charts .xf-mark:hover { opacity: .82; }
+.donut-legend li.xf-mark { border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
+.donut-legend li.xf-mark:hover { background: var(--panel-2); }
+.donut-legend li.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 3px 0 0 var(--primary, #007A9E); }

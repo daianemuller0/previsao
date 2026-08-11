@@ -19,6 +19,26 @@ window.appSidebarState = () => {
 };
 
 // ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
+// Cross-filter genérico: delega cliques de qualquer elemento com data-xf-dim
+// dentro de um container para o componente Blazor (ApplyCrossFilter).
+window.xfilter = (function () {
+    const bound = {};
+    function init(rootId, ref) {
+        const root = document.getElementById(rootId);
+        if (!root) return;
+        if (root._xfRef !== undefined) { root._xfRef = ref || root._xfRef; return; }
+        root._xfRef = ref || null;
+        root.addEventListener('click', e => {
+            const el = e.target.closest && e.target.closest('[data-xf-dim]');
+            if (!el || !root._xfRef) return;
+            const dim = el.getAttribute('data-xf-dim');
+            const val = el.getAttribute('data-xf-val');
+            if (dim && val !== null) root._xfRef.invokeMethodAsync('ApplyCrossFilter', dim, val);
+        });
+    }
+    return { init };
+})();
+
 window.worldMap = (function () {
     const S = {};
     function apply(s) { s.inner.style.transform = `translate(${s.tx}px, ${s.ty}px) scale(${s.scale})`; }
