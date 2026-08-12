@@ -166,6 +166,34 @@
     </div>
 </div>
 
+@* ---- Equivalência de etapas do funil (AFM → nosso funil) ---- *@
+<div class="section-head" style="margin-top:20px"><span class="st-title">Funil · equivalência de etapas</span><span class="st-sub">FunnelStage do AFM → etapa do nosso funil (NB)</span><span class="st-line"></span></div>
+<div class="table-wrap">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th class="no-sort">Etapa no AFM (FunnelStage)</th>
+                <th class="no-sort">Etapa no nosso funil (NB)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in FunilDePara)
+            {
+                <tr>
+                    <td>@s.Afm</td>
+                    <td class="col-strong">@s.Nb</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+<div class="panel" style="margin-top:12px">
+    <div class="cfg-callout">
+        <span class="badge fc-upside">Regra OTP</span>
+        <span>Se a coluna <strong>Status</strong> da planilha AFM estiver marcada <strong>OTP</strong>, a oportunidade entra direto na etapa <strong>E1 Order Entry</strong>, independentemente do FunnelStage.</span>
+    </div>
+</div>
+
 @* ---- Colunas sem correspondência ---- *@
 <div class="section-head" style="margin-top:20px"><span class="st-title">Colunas do CRM Aftermarket sem correspondência</span><span class="st-sub">não alimentam nenhum campo do sistema</span><span class="st-line"></span></div>
 <div class="panel">
@@ -234,7 +262,7 @@
         new("Outside Sales Rep (Vendedor)", "Outside Sales Rep", "", "AFM não possui vendedor externo mapeado (ContractorName não corresponde)."),
         new("Opportunity Number", "Opportunity Number", "QuoteNumber"),
         new("Gross Margin(%)", "Gross Margin(%)", "GM (inteiro → %)", "AFM: número inteiro convertido para percentual.", true),
-        new("Stage", "Stage", "FunnelStage"),
+        new("Stage", "Stage", "FunnelStage", "AFM: convertido para a etapa equivalente do funil (ver tabela abaixo)."),
         new("Chance", "Chance", "Chance"),
         new("Customer Ref#", "Customer Ref#", "ClientRef"),
         new("Business Unit", "Business Unit", "BU"),
@@ -242,10 +270,23 @@
         new("Categoria comercial (NB / AFM)", "NB/AFM da planilha", "Fixo: AFM", "Define se a oferta é New Business ou Aftermarket.", true),
     };
 
+    // Equivalência das etapas do funil: FunnelStage do AFM → etapa do nosso funil.
+    private record StageRow(string Afm, string Nb);
+    private static readonly StageRow[] FunilDePara =
+    {
+        new("qualification", "Qualification"),
+        new("Value Proposal", "Arrived at Agreement on Need"),
+        new("Quote submission", "Proposal Pending/Waiting"),
+        new("Quote clarification", "Negotiation Phase/Review"),
+        new("Closing", "Verbal Commitment"),
+        new("Status = OTP", "E1 Order Entry"),
+    };
+
     // Colunas do CRM Aftermarket que não têm campo equivalente no sistema.
+    // (Status passou a ser usado na regra OTP → E1 Order Entry.)
     private static readonly string[] SemDePara =
     {
-        "ContractorName", "Status", "ADDTOFORECAST", "Special", "Category",
+        "ContractorName", "ADDTOFORECAST", "Special", "Category",
     };
 
     // Célula de origem: mostra o traço quando não há correspondência.
