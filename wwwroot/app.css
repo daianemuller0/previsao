@@ -1603,3 +1603,17 @@ tr.row-ind td.col-strong { color: #9a6a12; }
 .cfg-callout { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12.5px; color: var(--text-2); }
 .cfg-foot { margin: 12px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 .cfg-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Sincronização AFM + editor de taxas (/configuracoes) */
+.cfg-kv { display: flex; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.cfg-kv:last-child { border-bottom: none; }
+.cfg-k { flex: 0 0 96px; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.cfg-path { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; font-size: 11.5px; word-break: break-all; }
+.rate-list { display: flex; flex-direction: column; gap: 8px; }
+.rate-row { display: flex; align-items: center; gap: 10px; }
+.rate-code { flex: 0 0 54px; font-weight: 700; font-size: 12.5px; color: var(--text); }
+.rate-in { flex: 1; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; font-variant-numeric: tabular-nums; }
+.rate-in:focus { outline: none; border-color: var(--primary); }
+.rate-row.rate-missing .rate-in { border-color: #f0c36b; background: #fdf7e8; }
+.rate-save { white-space: nowrap; }
+.badge-neg { background: var(--neg-bg); color: var(--neg); }

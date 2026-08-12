@@ -244,6 +244,54 @@ public class ControleRepository
     public void DeleteRegistro(string id) =>
         _store.WriteRow(EntReg, new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
 
+    // ---- taxas de conversão de moeda (importação AFM) ----------------------
+    // R$ por 1 unidade da moeda. Consolidação por id ("cm-<CODE>") = upsert.
+    private const string EntMoedas = "controle_moedas";
+
+    public List<CurrencyRate> CurrencyRates() =>
+        _store.ReadLatest(EntMoedas, "id, code, rate, updated_by, updated_at",
+            r => new CurrencyRate
+            {
+                Code = S(r, 1),
+                Rate = string.IsNullOrWhiteSpace(S(r, 2)) ? "0" : S(r, 2),
+                UpdatedBy = S(r, 3), UpdatedAt = S(r, 4),
+            })
+        .Where(m => !string.IsNullOrWhiteSpace(m.Code))
+        .OrderBy(m => m.Code, StringComparer.OrdinalIgnoreCase).ToList();
+
+    // Taxa vigente da moeda (null quando não cadastrada ou zero).
+    public double? RateFor(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return null;
+        var hit = CurrencyRates().FirstOrDefault(m => string.Equals(m.Code, code, StringComparison.OrdinalIgnoreCase));
+        return hit is { HasRate: true } ? hit.RateV : (double?)null;
+    }
+
+    // Garante uma linha (taxa 0) para a moeda aparecer no editor de Configurações.
+    public void EnsureCurrency(string code)
+    {
+        code = (code ?? "").Trim().ToUpperInvariant();
+        if (code is "" or "BRL") return;
+        if (CurrencyRates().Any(m => string.Equals(m.Code, code, StringComparison.OrdinalIgnoreCase))) return;
+        _store.WriteRow(EntMoedas, new KeyValuePair<string, object?>[]
+        {
+            new("id", "cm-" + code), new("code", code), new("rate", "0"),
+            new("updated_by", "Detecção automática (AFM)"), new("updated_at", Iso(DateTime.Now)),
+        });
+    }
+
+    public void SaveCurrencyRate(string code, double rate, string user)
+    {
+        code = (code ?? "").Trim().ToUpperInvariant();
+        if (code is "" or "BRL") return;
+        _store.WriteRow(EntMoedas, new KeyValuePair<string, object?>[]
+        {
+            new("id", "cm-" + code), new("code", code),
+            new("rate", rate.ToString(CultureInfo.InvariantCulture)),
+            new("updated_by", user), new("updated_at", Iso(DateTime.Now)),
+        });
+    }
+
     // ---- seed --------------------------------------------------------------
     public void SeedIfEmpty()
     {

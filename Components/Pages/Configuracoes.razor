@@ -1,6 +1,8 @@
 @page "/configuracoes"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject AfmSyncService AfmSync
+@inject ControleRepository Controle
 
 @* ===========================================================================
    Configurações de importação — De-Para das colunas das duas origens de dados
@@ -39,6 +41,66 @@
                 <span class="badge fc-upside">AFM</span>
             </div>
             <p class="cfg-lead">Nova planilha, vinda de outro CRM. Toda oferta desta base entra como <strong>Aftermarket</strong>. O valor vem na moeda de origem (coluna N) e é <strong>convertido para R$</strong> pela taxa cadastrada na aba Controle, gerando o <em>Amount (converted)</em>.</p>
+        </div>
+    </div>
+</div>
+
+@* ---- Sincronização automática (Aftermarket) ---- *@
+<div class="section-head" style="margin-top:20px"><span class="st-title">Sincronização automática · Aftermarket</span><span class="st-sub">lê a planilha do CRM na rede a cada abertura do programa</span><span class="st-line"></span></div>
+<div class="g12">
+    <div class="c7">
+        <div class="panel" style="height:100%">
+            <div class="panel-head">
+                <div class="panel-title">Status da sincronização</div>
+                <button class="btn-primary" @onclick="Sincronizar" disabled="@_sincronizando">
+                    @Icons.Svg("import")@(_sincronizando ? "Sincronizando…" : "Sincronizar agora")
+                </button>
+            </div>
+            <div class="cfg-kv"><span class="cfg-k">Caminho</span><code class="cfg-path">@(string.IsNullOrWhiteSpace(AfmSync.ConfiguredPath) ? "— não configurado" : AfmSync.ConfiguredPath)</code></div>
+            @if (_status.HasRun)
+            {
+                <div class="cfg-kv"><span class="cfg-k">Resultado</span><span><span class="badge @(_status.Ok ? "fc-commit" : "badge-neg")">@(_status.Ok ? "OK" : "Atenção")</span> @_status.Message</span></div>
+                @if (!string.IsNullOrWhiteSpace(_status.File))
+                {
+                    <div class="cfg-kv"><span class="cfg-k">Arquivo</span><span>@System.IO.Path.GetFileName(_status.File)</span></div>
+                }
+                <div class="cfg-kv"><span class="cfg-k">Oportunidades</span><span>@_status.Rows@(_status.Warnings > 0 ? $" · {_status.Warnings} aviso(s)" : "")</span></div>
+                @if (_status.Currencies.Count > 0)
+                {
+                    <div class="cfg-kv"><span class="cfg-k">Moedas</span><span class="cfg-chips" style="margin-top:0">@foreach (var c in _status.Currencies){<span class="chip" style="cursor:default">@c</span>}</span></div>
+                }
+                @if (_status.FinishedAt is { } fin)
+                {
+                    <div class="cfg-kv"><span class="cfg-k">Executado</span><span>@fin.ToString("dd/MM/yyyy 'às' HH:mm:ss")</span></div>
+                }
+            }
+            else
+            {
+                <p class="cfg-lead">Ainda não sincronizado nesta sessão. A leitura acontece automaticamente na abertura do programa; use o botão acima para atualizar agora.</p>
+            }
+        </div>
+    </div>
+    <div class="c5">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Taxas de conversão <span class="hint">R$ por 1 unidade da moeda</span></div></div>
+            @if (_rates.Count == 0)
+            {
+                <div class="empty">Nenhuma moeda estrangeira detectada ainda. As moedas encontradas na planilha AFM aparecem aqui para você informar a taxa.</div>
+            }
+            else
+            {
+                <div class="rate-list">
+                    @foreach (var m in _rates)
+                    {
+                        <div class="rate-row @(m.HasRate ? "" : "rate-missing")">
+                            <span class="rate-code">@m.Code</span>
+                            <input class="rate-in" @bind="m.Rate" placeholder="0,00" />
+                            <button class="btn-ghost rate-save" @onclick="() => SalvarTaxa(m)">@Icons.Svg("check")Salvar</button>
+                        </div>
+                    }
+                </div>
+                <p class="cfg-foot">Moedas sem taxa deixam o valor zerado até serem informadas. <strong>BRL</strong> não precisa de taxa. A conversão é reaplicada na próxima sincronização.</p>
+            }
         </div>
     </div>
 </div>
@@ -116,6 +178,37 @@
 </div>
 
 @code {
+    private bool _sincronizando;
+    private AfmSyncStatus _status = new();
+    private List<CurrencyRate> _rates = new();
+
+    protected override void OnInitialized()
+    {
+        _status = AfmSync.Last;
+        _rates = Controle.CurrencyRates();
+    }
+
+    private async Task Sincronizar()
+    {
+        if (_sincronizando) return;
+        _sincronizando = true;
+        try { await Task.Run(() => AfmSync.Sync()); }
+        finally
+        {
+            _status = AfmSync.Last;
+            _rates = Controle.CurrencyRates();
+            _sincronizando = false;
+        }
+    }
+
+    private void SalvarTaxa(CurrencyRate m)
+    {
+        var s = (m.Rate ?? "").Replace(",", ".").Trim();
+        if (double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) && v >= 0)
+            Controle.SaveCurrencyRate(m.Code, v, "Configurações");
+        _rates = Controle.CurrencyRates();
+    }
+
     private record MapRow(string Sistema, string Nb, string Afm, string Nota = "", bool Destaque = false);
 
     // Fonte única do De-Para. A mesma relação será usada para conectar a planilha

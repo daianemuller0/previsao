@@ -51,6 +51,8 @@ builder.Services.AddSingleton<ChartConfigRepository>();
 builder.Services.AddSingleton<BrandRepository>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
+// Sincronização da base de Aftermarket (planilha do CRM na rede).
+builder.Services.AddSingleton<AfmSyncService>();
 
 var app = builder.Build();
 
@@ -77,6 +79,11 @@ _ = Task.Run(() =>
         oppRepo.RemoveDemo();                 // remove oportunidades demo antigas
         store.Compact("opportunities");        // consolida e descarta os tombstones
         oppRepo.Refresh();
+
+        // Atualiza a base de Aftermarket a partir da planilha do CRM na rede.
+        // Os vendedores atualizam o CRM e a exportação cai nesse caminho; a cada
+        // abertura do programa reimportamos para refletir o estado mais recente.
+        app.Services.GetRequiredService<AfmSyncService>().Sync();
     }
     catch { /* pasta indisponível ou lenta: o app segue no ar */ }
 });

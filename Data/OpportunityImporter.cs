@@ -34,7 +34,14 @@ public sealed class OpportunityImporter
         // Layout legado
         "net value", "proposta", "customer", "quarter", "date", "product", "kam", "key account",
         "market variavel", "valor", "pm %",
+        // Aftermarket (novo CRM) — nomes de origem do De-Para de Configurações
+        "po esperado", "country", "plantname", "crs_market", "industry", "subindustry",
+        "producttype", "contractorname", "quotenumber", "moeda", "gm", "funnelstage",
+        "clientref", "bu", "addtoforecast", "special", "category",
     }.Select(Norm));
+
+    // Origem dos dados: New Business (planilha Funil HSA) ou Aftermarket (novo CRM).
+    public enum Source { Nb, Afm }
 
     private readonly Catalog _cat;
     public OpportunityImporter(Catalog cat) => _cat = cat;
@@ -52,13 +59,14 @@ public sealed class OpportunityImporter
         internal Dictionary<string, int> IdSeq { get; } = new();
     }
 
-    public Result Parse(string fileName, Stream stream)
+    public Result Parse(string fileName, Stream stream,
+        Source source = Source.Nb, Func<string, double?>? rate = null, Action<string>? onCurrency = null)
     {
         try
         {
             return fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
-                ? ParseCsv(stream)
-                : ParseXlsx(stream);
+                ? ParseCsv(stream, source, rate, onCurrency)
+                : ParseXlsx(stream, source, rate, onCurrency);
         }
         catch (Exception ex)
         {
@@ -69,7 +77,7 @@ public sealed class OpportunityImporter
     }
 
     // ---- Excel ------------------------------------------------------------
-    private Result ParseXlsx(Stream stream)
+    private Result ParseXlsx(Stream stream, Source source, Func<string, double?>? rate, Action<string>? onCurrency)
     {
         var r = new Result();
         using var wb = new XLWorkbook(stream);
@@ -121,13 +129,14 @@ public sealed class OpportunityImporter
             // Região de TOTAIS/rodapé no fim da planilha (posição varia): dessa
             // linha para baixo nada é importado.
             if (IsStopRow(row.CellsUsed().Select(c => c.GetString()), Get)) break;
-            BuildRow(r, Get, GetN);
+            if (source == Source.Afm) BuildAfmRow(r, Get, GetN, rate, onCurrency);
+            else BuildRow(r, Get, GetN);
         }
         return r;
     }
 
     // ---- CSV --------------------------------------------------------------
-    private Result ParseCsv(Stream stream)
+    private Result ParseCsv(Stream stream, Source source, Func<string, double?>? rate, Action<string>? onCurrency)
     {
         var r = new Result();
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
@@ -164,7 +173,8 @@ public sealed class OpportunityImporter
                 return "";
             }
             if (IsStopRow(cells, Get)) break;
-            BuildRow(r, Get, _ => null);
+            if (source == Source.Afm) BuildAfmRow(r, Get, _ => null, rate, onCurrency);
+            else BuildRow(r, Get, _ => null);
         }
         return r;
     }
@@ -204,8 +214,8 @@ public sealed class OpportunityImporter
                 || n.Contains("salesforce.com") || n.Contains("copyright")) return true;
         }
         // Linha de grande total: tem valor, mas sem identificadores (proposta/cliente).
-        var prop = get(new[] { "Opportunity Number", "Proposta" });
-        var acc = get(new[] { "Account Name", "Customer", "Cliente" });
+        var prop = get(new[] { "Opportunity Number", "Proposta", "QuoteNumber" });
+        var acc = get(new[] { "Account Name", "Customer", "Cliente", "PlantName", "ContractorName" });
         if (prop == "" && acc == "")
         {
             var val = getNumStub(get, "Amount (converted)", "Net Value", "Valor", "Amount");
@@ -320,6 +330,104 @@ public sealed class OpportunityImporter
         if (netBrl <= 0) r.Warnings.Add($"Oportunidade {Show(proposta)}: valor (Amount converted) ausente ou zero.");
 
         r.Rows.Add(o);
+    }
+
+    // ---- Monta uma oportunidade de AFTERMARKET (novo CRM) ------------------
+    // Segue o De-Para de Configurações. Converte a moeda de origem (col Moeda +
+    // Valor) para R$ pela taxa da aba Controle; BRL mantém. GM inteiro → %.
+    private void BuildAfmRow(Result r, Func<string[], string> get, Func<string[], double?> getNum,
+        Func<string, double?>? rate, Action<string>? onCurrency)
+    {
+        double? Num(params string[] names) => getNum(names) ?? ParseNum(get(names));
+        double PctOf(params string[] names) => PctField(getNum(names), get(names));
+
+        var quote = get(new[] { "QuoteNumber", "Quote Number", "Opportunity Number" });
+        var plant = get(new[] { "PlantName", "Parent Opportunity: End User Site" });
+        var value = Num("Valor", "Amount", "Net Value", "Amount (converted)") ?? 0;
+
+        // Linha totalmente vazia: ignora silenciosamente.
+        if (quote == "" && plant == "" && value == 0) return;
+        r.Read++;
+
+        var country = Match(_cat.Countries, c => c.Name, c => c.Id, get(new[] { "Country", "Installation Location" }));
+        var market = Match(_cat.Markets, m => m.Name, m => m.Id, get(new[] { "Industry", "Market" }));
+        var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "SubIndustry", "Sub-Market" }));
+        var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "ProductType", "Product Type" }));
+        var puv = MatchBu(get(new[] { "BU", "Business Unit" }));
+
+        // Moeda (col M) + Valor (col N) → R$. BRL mantém; demais usam a taxa da
+        // aba Controle. Sem taxa cadastrada → valor zerado + aviso.
+        var cur = NormCurrency(get(new[] { "Moeda", "Currency", "Moeda da Proposta" }));
+        double taxa;
+        if (cur == "BRL") { taxa = 1; }
+        else
+        {
+            onCurrency?.Invoke(cur);
+            taxa = rate?.Invoke(cur) ?? 0;
+            if (taxa <= 0)
+                r.Warnings.Add($"Oportunidade {Show(quote)}: moeda {cur} sem taxa cadastrada na aba Controle — valor ficará zerado até cadastrar.");
+        }
+
+        var dateIso = ResolveDate(get(new[] { "PO Esperado", "Close Date", "Data" }), "");
+
+        // Id-base pela QuoteNumber (namespace "afm-" separado do New Business).
+        var baseId = quote != "" ? "afm-" + Norm(quote) : "afm-" + Guid.NewGuid().ToString("N");
+        var seq = r.IdSeq.TryGetValue(baseId, out var nseq) ? nseq + 1 : 1;
+        r.IdSeq[baseId] = seq;
+        var id = seq == 1 ? baseId : baseId + "-" + seq.ToString(Inv);
+
+        var descr = get(new[] { "Description" });
+        var o = new Opportunity
+        {
+            Id = id,
+            Name = descr != "" ? descr : (quote != "" ? quote : "Oportunidade Aftermarket"),
+            ProposalNumber = quote,
+            CountryId = country,
+            MarketId = market,
+            SubMarketId = submarket,
+            ProductId = product,
+            CommercialCategory = "AFM",         // esta base é sempre Aftermarket
+            PvBusinessUnitId = puv,
+            CurrencyCode = cur,                  // moeda de origem preservada
+            AmountOriginal = value.ToString(Inv),
+            ExchangeRate = taxa.ToString(Inv),   // AmountBrl = valor × taxa (0 se sem taxa)
+            GmPercent = PctOf("GM", "Gross Margin(%)", "Gross Margin (%)").ToString(Inv),
+            ForecastCategory = "Pipeline",
+            PipelineStageId = "st-qual",
+            ExpectedDate = dateIso,
+            CreatedAt = DateTime.Today.ToString("yyyy-MM-dd"),
+            UpdatedAt = DateTime.Today.ToString("yyyy-MM-dd"),
+            UpdatedBy = "Importação AFM",
+
+            // ---- Colunas do Funil (via De-Para do Aftermarket) ----
+            Stage = get(new[] { "FunnelStage", "Stage" }),
+            CommercialSegment = get(new[] { "CRS_Market" }),
+            Process = get(new[] { "Process" }),
+            EndUserSite = plant,
+            Chance = get(new[] { "Chance" }),
+            CustomerRef = get(new[] { "ClientRef", "Customer Ref#" }),
+            Description = descr,
+            AmountRaw = cur + " " + value.ToString(Inv),
+        };
+
+        if (dateIso == "") r.Warnings.Add($"Oportunidade {Show(quote)}: data (PO Esperado) inválida ou ausente.");
+        if (value <= 0) r.Warnings.Add($"Oportunidade {Show(quote)}: valor (col Valor) ausente ou zero.");
+
+        r.Rows.Add(o);
+    }
+
+    // Normaliza o código da moeda: símbolos e nomes → ISO (USD, EUR, GBP, BRL).
+    private static string NormCurrency(string raw)
+    {
+        var n = Norm(raw).Replace("$", "").Replace(" ", "");
+        return n switch
+        {
+            "" or "brl" or "r" or "real" or "reais" => "BRL",
+            "usd" or "us" or "dolar" or "dollar" or "dolares" or "dollars" => "USD",
+            "eur" or "euro" or "euros" => "EUR",
+            "gbp" or "libra" or "libras" or "pound" or "pounds" => "GBP",
+            _ => n.ToUpperInvariant(),
+        };
     }
 
     private static string Show(string s) => string.IsNullOrWhiteSpace(s) ? "(sem número)" : s;
