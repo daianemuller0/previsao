@@ -50,6 +50,7 @@ public class Opportunity
     public string Description { get; set; } = "";           // Description
     public string StatusDescription { get; set; } = "";     // Status Description
     public string AmountRaw { get; set; } = "";             // Amount (moeda de origem, não convertido)
+    public string Indicada { get; set; } = "";              // Indicada na Previsão pelo vendedor (Sim)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
@@ -98,6 +99,9 @@ public class Opportunity
     public int PostponeCountValue => (int)Num(PostponeCount);
 
     public ForecastCategory Category => ForecastCategories.Parse(ForecastCategory);
+
+    // Indicada na Previsão de Vendas (marcador do vendedor).
+    public bool IndicadaValue => string.Equals(Indicada, "Sim", StringComparison.OrdinalIgnoreCase);
 
     private bool IsBrl => CurrencyCode.Equals("BRL", StringComparison.OrdinalIgnoreCase);
     private bool IsUsd => CurrencyCode.Equals("USD", StringComparison.OrdinalIgnoreCase);

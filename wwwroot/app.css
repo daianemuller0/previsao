@@ -1548,3 +1548,36 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
     font-size: 11px; font-weight: 600; color: rgba(255,255,255,.9); margin-top: 2px;
     white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,20,35,.26);
 }
+
+/* ---- Indicar na Previsão (marcador do vendedor) ---- */
+.row-act.ind-btn.on { color: #e0a021; }
+.row-act.ind-btn.on svg { fill: rgba(224,160,33,.18); }
+tr.row-ind { background: #fff8e6; }
+tr.row-ind:hover { background: #fdf0cf; }
+tr.row-ind td.col-strong { color: #9a6a12; }
+
+/* ==========================================================================
+   PREVISÃO INDICADA — seção dedicada às oportunidades sinalizadas
+   ========================================================================== */
+.ind-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #9a6a12; background: #fdf3dc; border: 1px solid #f0dfb0; border-radius: 999px; padding: 4px 12px; }
+.ind-badge svg { width: 13px; height: 13px; }
+.ind-card { box-shadow: var(--exec-shadow); }
+.ind-ico { background: #fdf3dc !important; color: #c98a12 !important; }
+.ind-empty { display: flex; align-items: center; gap: 16px; padding: 8px 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.ind-empty-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: #fdf3dc; color: #c98a12; flex: none; }
+.ind-empty-ico svg { width: 22px; height: 22px; }
+.ind-empty strong { color: var(--text); }
+.ind-hint { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #9a6a12; }
+.ind-hint svg { width: 12px; height: 12px; }
+
+.ind-list-head, .ind-row { display: grid; grid-template-columns: 1fr 200px 160px 130px; gap: 14px; align-items: center; }
+.ind-list-head { padding: 0 10px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted-2); border-bottom: 1px solid var(--exec-border); }
+.ind-row { padding: 10px 10px; border-radius: 9px; cursor: pointer; transition: background .12s ease; }
+.ind-row + .ind-row { border-top: 1px solid #f1f4f9; }
+.ind-row:hover { background: #fff8e6; }
+.ind-cust { font-size: 13px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ind-stage { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ind-rep { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ind-amt { font-size: 13px; font-weight: 750; color: var(--text); font-variant-numeric: tabular-nums; }
+.ind-row .right, .ind-list-head .right { text-align: right; }
+@media (max-width: 1100px) { .ind-list-head, .ind-row { grid-template-columns: 1fr 140px 120px 110px; } }

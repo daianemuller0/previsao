@@ -81,8 +81,9 @@
             @foreach (var o in Rows)
             {
                 var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
-                <tr class="clickable" @onclick="() => Goto(o.Id)">
+                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "")" @onclick="() => Goto(o.Id)">
                     <td class="center actions-col">
+                        <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? "Remover da Previsão" : "Indicar na Previsão")" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
                         <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
                         <button class="row-act del" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
@@ -502,6 +503,17 @@
 
     // ---- exclusão de uma oportunidade ----
     private void AskDelete(Opportunity o) => _delTarget = o;
+
+    // Indicar / remover da Previsão (marcador do vendedor), persiste e recarrega.
+    private void ToggleIndicada(Opportunity o)
+    {
+        var full = Repo.Get(o.Id) ?? o;
+        full.Indicada = full.IndicadaValue ? "" : "Sim";
+        full.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        Repo.Save(full);
+        _all = Repo.All();
+        Recompute();
+    }
 
     private void ConfirmDelete()
     {
