@@ -219,11 +219,14 @@
                 var f = _funnel[i];
                 var sh = f.Value / _funnelTotal * 100;
                 var conv = i < _funnel.Count - 1 && f.Value > 0 ? _funnel[i + 1].Value / f.Value * 100 : (double?)null;
-                // Retângulos empilhados (sem afunilamento em ângulo): largura
-                // proporcional ao valor, piso de 62% para as etapas pequenas.
+                // Largura com piso alto (62%) e estreitamento suave: funil largo,
+                // pouco pontudo. Base com boa largura mínima.
                 var dw = 62 + 38 * (f.Value / _funnelMax);
+                var dwN = i < _funnel.Count - 1 ? 62 + 38 * (_funnel[i + 1].Value / _funnelMax) : dw * 0.9;
+                var frac = Math.Clamp(dwN / dw, 0.74, 1.0);
+                var inset = (1 - frac) / 2 * 100;
                 <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
-                    <div class="fn5-shape" style="background:@FunnelBar(i, _funnel.Count)"></div>
+                    <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
                     <div class="fn5-text">
                         <div class="fn5-name">@f.Stage</div>
                         <div class="fn5-amt">@MoneyBrl(f.Value)</div>
