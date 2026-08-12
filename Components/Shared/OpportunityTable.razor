@@ -46,8 +46,9 @@
             @foreach (var o in Rows)
             {
                 var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
-                <tr class="clickable" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
+                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "")" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
                     <td class="center actions-col">
+                        <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? "Remover da Previsão" : "Indicar na Previsão")" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
                         <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
                         <button class="row-act del" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
@@ -280,6 +281,16 @@
         if (_edit is null) return;
         _delTarget = _edit;
         _edit = null;
+    }
+
+    // ---- Indicar na Previsão (marcador do vendedor) ----
+    private async Task ToggleIndicada(Opportunity o)
+    {
+        var full = Repo.Get(o.Id) ?? o;
+        full.Indicada = full.IndicadaValue ? "" : "Sim";
+        full.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        Repo.Save(full);
+        await OnChanged.InvokeAsync();
     }
 
     // ---- exclusão de uma oportunidade ----
