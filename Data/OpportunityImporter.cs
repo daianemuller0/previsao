@@ -371,6 +371,11 @@ public sealed class OpportunityImporter
 
         var dateIso = ResolveDate(get(new[] { "PO Esperado", "Close Date", "Data" }), "");
 
+        // Etapa do funil: converte o FunnelStage do AFM para o nome equivalente do
+        // nosso funil (NB). Se o Status estiver marcado OTP, entra em E1 Order Entry.
+        var status = get(new[] { "Status", "Status Description" });
+        var stage = MapAfmStage(get(new[] { "FunnelStage", "Stage" }), status);
+
         // Id-base pela QuoteNumber (namespace "afm-" separado do New Business).
         var baseId = quote != "" ? "afm-" + Norm(quote) : "afm-" + Guid.NewGuid().ToString("N");
         var seq = r.IdSeq.TryGetValue(baseId, out var nseq) ? nseq + 1 : 1;
@@ -401,13 +406,14 @@ public sealed class OpportunityImporter
             UpdatedBy = "Importação AFM",
 
             // ---- Colunas do Funil (via De-Para do Aftermarket) ----
-            Stage = get(new[] { "FunnelStage", "Stage" }),
+            Stage = stage,                // FunnelStage AFM → etapa equivalente do funil
             CommercialSegment = get(new[] { "CRS_Market" }),
             Process = get(new[] { "Process" }),
             EndUserSite = plant,
             Chance = get(new[] { "Chance" }),
             CustomerRef = get(new[] { "ClientRef", "Customer Ref#" }),
             Description = descr,
+            StatusDescription = status,
             AmountRaw = cur + " " + value.ToString(Inv),
             Setor = "AFM",                // origem: planilha de Aftermarket
         };
@@ -416,6 +422,23 @@ public sealed class OpportunityImporter
         if (value <= 0) r.Warnings.Add($"Oportunidade {Show(quote)}: valor (col Valor) ausente ou zero.");
 
         r.Rows.Add(o);
+    }
+
+    // Converte a etapa do funil do AFM para o nome equivalente do nosso funil (NB).
+    // Regra especial: Status marcado OTP entra direto em "E1 Order Entry".
+    private static string MapAfmStage(string afmStage, string status)
+    {
+        if (Norm(status).Split(' ').Contains("otp")) return "E1 Order Entry";
+        return Norm(afmStage) switch
+        {
+            "qualification" => "Qualification",
+            "value proposal" => "Arrived at Agreement on Need",
+            "quote submission" => "Proposal Pending/Waiting",
+            "quote clarification" => "Negotiation Phase/Review",
+            "closing" => "Verbal Commitment",
+            "" => "",
+            _ => afmStage.Trim(),   // etapa desconhecida: preserva o texto original
+        };
     }
 
     // Normaliza o código da moeda: símbolos e nomes → ISO (USD, EUR, GBP, BRL).
