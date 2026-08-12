@@ -37,7 +37,7 @@ public sealed class OpportunityImporter
         // Aftermarket (novo CRM) — nomes de origem do De-Para de Configurações
         "po esperado", "country", "plantname", "crs_market", "industry", "subindustry",
         "producttype", "contractorname", "quotenumber", "moeda", "gm", "funnelstage",
-        "clientref", "bu", "addtoforecast", "special", "category",
+        "clientref", "bu", "addtoforecast", "special", "category", "sales person", "salesperson",
     }.Select(Norm));
 
     // Origem dos dados: New Business (planilha Funil HSA) ou Aftermarket (novo CRM).
@@ -355,10 +355,10 @@ public sealed class OpportunityImporter
         var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "SubIndustry", "Sub-Market" }));
         var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "ProductType", "Product Type" }));
         var puv = MatchBu(get(new[] { "BU", "Business Unit" }));
-        // Vendedor do AFM: a coluna de origem ainda não foi confirmada — ContractorName
-        // trazia contatos de cliente/planta (não o vendedor), então não populamos o
-        // KAM a partir dela para não poluir o filtro/gráfico de vendedores.
-        var vendedor = CanonicalVendedor(get(new[] { "Vendedor", "Salesperson", "Sales Rep", "SalesRep", "Sales Representative", "Outside Sales Rep" }));
+        // Vendedor do AFM: coluna "Sales person" (equivalente ao "Outside Sales Rep"
+        // do NB). Converte para o contato equivalente do NB e casa com o catálogo.
+        // NÃO usar ContractorName: ela traz contatos de cliente/planta, não o vendedor.
+        var vendedor = CanonicalVendedor(get(new[] { "Sales person", "Salesperson", "Sales Person", "Vendedor", "Outside Sales Rep" }));
         var kam = Match(_cat.Kams, k => k.Name, k => k.Id, vendedor);
 
         // Moeda (col M) + Valor (col N) → R$. BRL mantém; demais usam a taxa da
