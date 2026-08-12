@@ -19,25 +19,30 @@ window.appSidebarState = () => {
 };
 
 // ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
-// Modo apresentação: tela cheia + rolagem automática (desce até o fim, sobe
-// e repete). Ideal para exibir o dashboard numa TV. Sai com Esc ou toggle.
+// Modo apresentação: tela cheia + troca de tela automática. Em vez de rolar
+// devagar, salta uma tela inteira por vez (como slides), fica parado alguns
+// segundos em cada uma, e ao chegar no fim volta ao topo e repete. Ideal para
+// exibir o dashboard numa TV. Sai com Esc, ao fechar a tela cheia ou no toggle.
 window.presentation = (function () {
-    let raf = null, dir = 1, pauseUntil = 0, running = false;
-    const SPEED = 1.0;     // px por frame (~60 px/s) — rolagem lenta
-    const PAUSE = 2800;    // ms de pausa no topo e no fim
+    let timer = null, running = false, page = 0;
+    const DWELL = 7000;    // ms parado em cada tela antes de trocar
 
-    function step(ts) {
-        if (!running) return;
-        const now = ts || performance.now();
+    function maxScroll() {
         const doc = document.scrollingElement || document.documentElement;
-        const max = doc.scrollHeight - window.innerHeight;
-        if (max > 0 && now >= pauseUntil) {
-            let y = window.scrollY + dir * SPEED;
-            if (y >= max) { y = max; dir = -1; pauseUntil = now + PAUSE; }
-            else if (y <= 0) { y = 0; dir = 1; pauseUntil = now + PAUSE; }
-            window.scrollTo(0, y);
-        }
-        raf = requestAnimationFrame(step);
+        return Math.max(0, doc.scrollHeight - window.innerHeight);
+    }
+    // Nº de telas (uma altura de viewport cada), incluindo o resto final.
+    function pageCount() {
+        return Math.max(1, Math.ceil(maxScroll() / window.innerHeight) + 1);
+    }
+    function show(i) {
+        const y = Math.min(i * window.innerHeight, maxScroll());
+        window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+    function tick() {
+        if (!running) return;
+        page = (page + 1) % pageCount();   // avança; ao passar do fim, volta ao topo
+        show(page);
     }
     function onFsChange() { if (!document.fullscreenElement) stop(); }
     function onKey(e) { if (e.key === 'Escape') stop(); }
@@ -45,15 +50,15 @@ window.presentation = (function () {
         if (running) { stop(); return; }
         const el = document.documentElement;
         if (el.requestFullscreen) { try { el.requestFullscreen(); } catch (e) {} }
-        running = true; dir = 1; pauseUntil = performance.now() + 900;
-        window.scrollTo(0, 0);
+        running = true; page = 0;
+        window.scrollTo({ top: 0, behavior: 'auto' });
         document.addEventListener('fullscreenchange', onFsChange);
         document.addEventListener('keydown', onKey);
-        raf = requestAnimationFrame(step);
+        timer = setInterval(tick, DWELL);
     }
     function stop() {
         running = false;
-        if (raf) { cancelAnimationFrame(raf); raf = null; }
+        if (timer) { clearInterval(timer); timer = null; }
         document.removeEventListener('fullscreenchange', onFsChange);
         document.removeEventListener('keydown', onKey);
         if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) {} }
