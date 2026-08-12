@@ -820,7 +820,7 @@
     private string KeyProduct(Opportunity o)  => DisplayKey(o.ProductId, Cat.ProductName);
     private string KeyCustomer(Opportunity o) => DisplayKey(o.CustomerId, Cat.CustomerName);
     private string KeyBu(Opportunity o)       => NormBu(DisplayKey(o.PvBusinessUnitId, Cat.BuCode));
-    private string KeyKam(Opportunity o)      => DisplayKey(o.KamId, Cat.KamName);
+    private string KeyKam(Opportunity o)      => OpportunityImporter.CanonicalVendedor(DisplayKey(o.KamId, Cat.KamName));
     private static string KeyCommercial(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim();
 
     // Une variações da mesma unidade ("HSA: Howden South America" e "HSA") pelo

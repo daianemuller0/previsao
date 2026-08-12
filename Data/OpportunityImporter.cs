@@ -355,6 +355,14 @@ public sealed class OpportunityImporter
         var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "SubIndustry", "Sub-Market" }));
         var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "ProductType", "Product Type" }));
         var puv = MatchBu(get(new[] { "BU", "Business Unit" }));
+        // Vendedor do AFM (ContractorName) → contato equivalente no NB, depois casa
+        // com o catálogo (mesma dimensão "Vendedor"/KAM do New Business).
+        var vendedor = CanonicalVendedor(get(new[]
+        {
+            "ContractorName", "Vendedor", "Salesperson", "Sales Rep", "SalesRep",
+            "Sales Representative", "Owner", "Seller", "Outside Sales Rep",
+        }));
+        var kam = Match(_cat.Kams, k => k.Name, k => k.Id, vendedor);
 
         // Moeda (col M) + Valor (col N) → R$. BRL mantém; demais usam a taxa da
         // aba Controle. Sem taxa cadastrada → valor zerado + aviso.
@@ -392,6 +400,7 @@ public sealed class OpportunityImporter
             MarketId = market,
             SubMarketId = submarket,
             ProductId = product,
+            KamId = kam,                        // Vendedor (equivalência AFM → NB)
             CommercialCategory = "AFM",         // esta base é sempre Aftermarket
             PvBusinessUnitId = puv,
             CurrencyCode = cur,                  // moeda de origem preservada
@@ -447,6 +456,30 @@ public sealed class OpportunityImporter
             "" => "",
             _ => afmStage.Trim(),   // etapa desconhecida: preserva o texto original
         };
+    }
+
+    // Equivalência de vendedores entre os dois CRMs: o nome do vendedor no AFM é
+    // convertido para o contato equivalente no NB. Nomes fora desta lista passam
+    // direto (entram no filtro como estão) — nunca são descartados.
+    private static readonly (string Afm, string Nb)[] VendedorPairs =
+    {
+        ("Andre Luis de Carvalho", "Andre Carvalho"),
+        ("Jose Ovidio de Moura",   "Jose Moura"),
+        ("Leonardo Machachero",    "Leonardo Macachero"),
+        ("Paulo Sergio Agostinho", "Paulo Agostinho"),
+        ("Rafael Ribeiro Toledo",  "Rafael Toledo"),
+        ("Thiago Cesar Veiga",     "Thiago Veiga"),
+    };
+
+    // Converte o nome do vendedor para o contato canônico (NB). Sem equivalência,
+    // devolve o próprio nome aparado. Idempotente: nomes NB não casam e ficam iguais.
+    public static string CanonicalVendedor(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "";
+        var n = Norm(name);
+        foreach (var (afm, nb) in VendedorPairs)
+            if (Norm(afm) == n) return nb;
+        return name.Trim();
     }
 
     // Normaliza o código da moeda: símbolos e nomes → ISO (USD, EUR, GBP, BRL).
