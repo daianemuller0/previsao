@@ -305,9 +305,9 @@
         </div></div>
     </div>
 
-    @* ---- Sales Rep Performance (barras interativas, todos, scroll) ---- *@
+    @* ---- Sales Rep Performance | Forecast by Product (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
-        <div class="c12"><div class="xcard">
+        <div class="c6"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Sales Rep Performance</div><div class="xcard-sub">@_byRep.Count vendedores · todos exibidos · maior → menor</div></div></div>
             @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -330,11 +330,7 @@
                 </div>
             }
         </div></div>
-    </div>
-
-    @* ---- Forecast by Product (ranking + GM) ---- *@
-    <div class="g12" style="margin-top:16px">
-        <div class="c12"><div class="xcard">
+        <div class="c6"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Forecast by Product</div><div class="xcard-sub">@_byProduct.Count produtos · Gross Margin em destaque</div></div></div>
             @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
