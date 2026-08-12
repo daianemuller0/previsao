@@ -424,14 +424,20 @@ public sealed class OpportunityImporter
         r.Rows.Add(o);
     }
 
+    // Numeração inicial da etapa na planilha AFM ("5.", "6)", "3 -" etc.).
+    private static readonly System.Text.RegularExpressions.Regex StageNumPrefix =
+        new(@"^\d+\s*[\.\)\-]?\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // Converte a etapa do funil do AFM para o nome equivalente do nosso funil (NB).
     // Regra especial: Status marcado OTP entra direto em "E1 Order Entry".
+    // Ignora numeração inicial da etapa ("5. Quote Clarification" → clarification).
     // Idempotente: um nome já convertido (NB) não casa no switch e é preservado —
     // por isso serve também para normalizar no momento da exibição do funil.
     public static string MapAfmStage(string afmStage, string status)
     {
         if (Norm(status).Split(' ').Contains("otp")) return "E1 Order Entry";
-        return Norm(afmStage) switch
+        var n = StageNumPrefix.Replace(Norm(afmStage), "");
+        return n switch
         {
             "qualification" => "Qualification",
             "value proposal" => "Arrived at Agreement on Need",
