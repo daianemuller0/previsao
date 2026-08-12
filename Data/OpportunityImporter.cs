@@ -355,13 +355,10 @@ public sealed class OpportunityImporter
         var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "SubIndustry", "Sub-Market" }));
         var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "ProductType", "Product Type" }));
         var puv = MatchBu(get(new[] { "BU", "Business Unit" }));
-        // Vendedor do AFM (ContractorName) → contato equivalente no NB, depois casa
-        // com o catálogo (mesma dimensão "Vendedor"/KAM do New Business).
-        var vendedor = CanonicalVendedor(get(new[]
-        {
-            "ContractorName", "Vendedor", "Salesperson", "Sales Rep", "SalesRep",
-            "Sales Representative", "Owner", "Seller", "Outside Sales Rep",
-        }));
+        // Vendedor do AFM: a coluna de origem ainda não foi confirmada — ContractorName
+        // trazia contatos de cliente/planta (não o vendedor), então não populamos o
+        // KAM a partir dela para não poluir o filtro/gráfico de vendedores.
+        var vendedor = CanonicalVendedor(get(new[] { "Vendedor", "Salesperson", "Sales Rep", "SalesRep", "Sales Representative", "Outside Sales Rep" }));
         var kam = Match(_cat.Kams, k => k.Name, k => k.Id, vendedor);
 
         // Moeda (col M) + Valor (col N) → R$. BRL mantém; demais usam a taxa da
