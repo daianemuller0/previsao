@@ -19,6 +19,48 @@ window.appSidebarState = () => {
 };
 
 // ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
+// Modo apresentação: tela cheia + rolagem automática (desce até o fim, sobe
+// e repete). Ideal para exibir o dashboard numa TV. Sai com Esc ou toggle.
+window.presentation = (function () {
+    let raf = null, dir = 1, pauseUntil = 0, running = false;
+    const SPEED = 1.0;     // px por frame (~60 px/s) — rolagem lenta
+    const PAUSE = 2800;    // ms de pausa no topo e no fim
+
+    function step(ts) {
+        if (!running) return;
+        const now = ts || performance.now();
+        const doc = document.scrollingElement || document.documentElement;
+        const max = doc.scrollHeight - window.innerHeight;
+        if (max > 0 && now >= pauseUntil) {
+            let y = window.scrollY + dir * SPEED;
+            if (y >= max) { y = max; dir = -1; pauseUntil = now + PAUSE; }
+            else if (y <= 0) { y = 0; dir = 1; pauseUntil = now + PAUSE; }
+            window.scrollTo(0, y);
+        }
+        raf = requestAnimationFrame(step);
+    }
+    function onFsChange() { if (!document.fullscreenElement) stop(); }
+    function onKey(e) { if (e.key === 'Escape') stop(); }
+    function start() {
+        if (running) { stop(); return; }
+        const el = document.documentElement;
+        if (el.requestFullscreen) { try { el.requestFullscreen(); } catch (e) {} }
+        running = true; dir = 1; pauseUntil = performance.now() + 900;
+        window.scrollTo(0, 0);
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('keydown', onKey);
+        raf = requestAnimationFrame(step);
+    }
+    function stop() {
+        running = false;
+        if (raf) { cancelAnimationFrame(raf); raf = null; }
+        document.removeEventListener('fullscreenchange', onFsChange);
+        document.removeEventListener('keydown', onKey);
+        if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) {} }
+    }
+    return { start, stop };
+})();
+
 // Cross-filter genérico: delega cliques de qualquer elemento com data-xf-dim
 // dentro de um container para o componente Blazor (ApplyCrossFilter).
 window.xfilter = (function () {
