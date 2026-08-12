@@ -1,7 +1,7 @@
 @page "/configuracoes"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject AfmSyncService AfmSync
+@inject DataSyncService Sync
 @inject ControleRepository Controle
 
 @* ===========================================================================
@@ -31,7 +31,7 @@
                 <div class="panel-title">Origem 1 · New Business <span class="hint">planilha Funil de Vendas HSA (atual)</span></div>
                 <span class="badge fc-best">NB</span>
             </div>
-            <p class="cfg-lead">Planilha que já usamos hoje. Vem do CRM Salesforce (Funil de Vendas HSA). Toda oferta desta base entra como <strong>New Business</strong> e o valor já chega em R$ na coluna <em>Amount (converted)</em> — sem conversão.</p>
+            <p class="cfg-lead">Vem do CRM Salesforce (Funil de Vendas HSA). Lida automaticamente da pasta de rede a cada abertura do programa. Toda oferta desta base entra como <strong>New Business</strong> e o valor já chega em R$ na coluna <em>Amount (converted)</em> — sem conversão.</p>
         </div>
     </div>
     <div class="c6">
@@ -40,52 +40,53 @@
                 <div class="panel-title">Origem 2 · Aftermarket <span class="hint">novo CRM · planilha AFM</span></div>
                 <span class="badge fc-upside">AFM</span>
             </div>
-            <p class="cfg-lead">Nova planilha, vinda de outro CRM. Toda oferta desta base entra como <strong>Aftermarket</strong>. O valor vem na moeda de origem (coluna N) e é <strong>convertido para R$</strong> pela taxa cadastrada na aba Controle, gerando o <em>Amount (converted)</em>.</p>
+            <p class="cfg-lead">Vinda de outro CRM. Lida automaticamente da pasta de rede a cada abertura do programa. Toda oferta desta base entra como <strong>Aftermarket</strong>. O valor vem na moeda de origem (coluna N) e é <strong>convertido para R$</strong> pela taxa cadastrada na aba Controle, gerando o <em>Amount (converted)</em>.</p>
         </div>
     </div>
 </div>
 
-@* ---- Sincronização automática (Aftermarket) ---- *@
-<div class="section-head" style="margin-top:20px"><span class="st-title">Sincronização automática · Aftermarket</span><span class="st-sub">lê a planilha do CRM na rede a cada abertura do programa</span><span class="st-line"></span></div>
+@* ---- Sincronização automática (New Business + Aftermarket) ---- *@
+<div class="section-head" style="margin-top:20px"><span class="st-title">Sincronização automática</span><span class="st-sub">lê as planilhas do CRM na rede a cada abertura do programa</span><span class="st-line"></span></div>
 <div class="g12">
-    <div class="c7">
+    <div class="c4">
         <div class="panel" style="height:100%">
             <div class="panel-head">
-                <div class="panel-title">Status da sincronização</div>
-                <button class="btn-primary" @onclick="Sincronizar" disabled="@_sincronizando">
-                    @Icons.Svg("import")@(_sincronizando ? "Sincronizando…" : "Sincronizar agora")
-                </button>
+                <div class="panel-title">New Business <span class="badge fc-best">NB</span></div>
+                <button class="btn-ghost" @onclick="SincronizarNb" disabled="@_sincronizando">@Icons.Svg("import")Sincronizar</button>
             </div>
-            <div class="cfg-kv"><span class="cfg-k">Caminho</span><code class="cfg-path">@(string.IsNullOrWhiteSpace(AfmSync.ConfiguredPath) ? "— não configurado" : AfmSync.ConfiguredPath)</code></div>
-            @if (_status.HasRun)
+            <div class="cfg-kv"><span class="cfg-k">Caminho</span><code class="cfg-path">@(string.IsNullOrWhiteSpace(Sync.NbPath) ? "— não configurado" : Sync.NbPath)</code></div>
+            @if (_nb.HasRun)
             {
-                <div class="cfg-kv"><span class="cfg-k">Resultado</span><span><span class="badge @(_status.Ok ? "fc-commit" : "badge-neg")">@(_status.Ok ? "OK" : "Atenção")</span> @_status.Message</span></div>
-                @if (!string.IsNullOrWhiteSpace(_status.File))
-                {
-                    <div class="cfg-kv"><span class="cfg-k">Arquivo</span><span>@System.IO.Path.GetFileName(_status.File)</span></div>
-                }
-                <div class="cfg-kv"><span class="cfg-k">Oportunidades</span><span>@_status.Rows@(_status.Warnings > 0 ? $" · {_status.Warnings} aviso(s)" : "")</span></div>
-                @if (_status.Currencies.Count > 0)
-                {
-                    <div class="cfg-kv"><span class="cfg-k">Moedas</span><span class="cfg-chips" style="margin-top:0">@foreach (var c in _status.Currencies){<span class="chip" style="cursor:default">@c</span>}</span></div>
-                }
-                @if (_status.FinishedAt is { } fin)
-                {
-                    <div class="cfg-kv"><span class="cfg-k">Executado</span><span>@fin.ToString("dd/MM/yyyy 'às' HH:mm:ss")</span></div>
-                }
+                <div class="cfg-kv"><span class="cfg-k">Resultado</span><span><span class="badge @(_nb.Ok ? "fc-commit" : "badge-neg")">@(_nb.Ok ? "OK" : "Atenção")</span> @_nb.Message</span></div>
+                <div class="cfg-kv"><span class="cfg-k">Oportunidades</span><span>@_nb.Rows@(_nb.Warnings > 0 ? $" · {_nb.Warnings} aviso(s)" : "")</span></div>
+                @if (_nb.FinishedAt is { } fin) { <div class="cfg-kv"><span class="cfg-k">Executado</span><span>@fin.ToString("dd/MM HH:mm:ss")</span></div> }
             }
-            else
-            {
-                <p class="cfg-lead">Ainda não sincronizado nesta sessão. A leitura acontece automaticamente na abertura do programa; use o botão acima para atualizar agora.</p>
-            }
+            else { <p class="cfg-lead">Sincroniza na abertura do programa. Use o botão para atualizar agora.</p> }
         </div>
     </div>
-    <div class="c5">
+    <div class="c4">
         <div class="panel" style="height:100%">
-            <div class="panel-head"><div class="panel-title">Taxas de conversão <span class="hint">R$ por 1 unidade da moeda</span></div></div>
+            <div class="panel-head">
+                <div class="panel-title">Aftermarket <span class="badge fc-upside">AFM</span></div>
+                <button class="btn-ghost" @onclick="SincronizarAfm" disabled="@_sincronizando">@Icons.Svg("import")Sincronizar</button>
+            </div>
+            <div class="cfg-kv"><span class="cfg-k">Caminho</span><code class="cfg-path">@(string.IsNullOrWhiteSpace(Sync.AfmPath) ? "— não configurado" : Sync.AfmPath)</code></div>
+            @if (_afm.HasRun)
+            {
+                <div class="cfg-kv"><span class="cfg-k">Resultado</span><span><span class="badge @(_afm.Ok ? "fc-commit" : "badge-neg")">@(_afm.Ok ? "OK" : "Atenção")</span> @_afm.Message</span></div>
+                <div class="cfg-kv"><span class="cfg-k">Oportunidades</span><span>@_afm.Rows@(_afm.Warnings > 0 ? $" · {_afm.Warnings} aviso(s)" : "")</span></div>
+                @if (_afm.Currencies.Count > 0) { <div class="cfg-kv"><span class="cfg-k">Moedas</span><span class="cfg-chips" style="margin-top:0">@foreach (var c in _afm.Currencies){<span class="chip" style="cursor:default">@c</span>}</span></div> }
+                @if (_afm.FinishedAt is { } fin) { <div class="cfg-kv"><span class="cfg-k">Executado</span><span>@fin.ToString("dd/MM HH:mm:ss")</span></div> }
+            }
+            else { <p class="cfg-lead">Sincroniza na abertura do programa. Use o botão para atualizar agora.</p> }
+        </div>
+    </div>
+    <div class="c4">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Taxas de conversão <span class="hint">R$ por unidade · AFM</span></div></div>
             @if (_rates.Count == 0)
             {
-                <div class="empty">Nenhuma moeda estrangeira detectada ainda. As moedas encontradas na planilha AFM aparecem aqui para você informar a taxa.</div>
+                <div class="empty">Nenhuma moeda estrangeira detectada ainda. As moedas encontradas na planilha AFM aparecem aqui para informar a taxa.</div>
             }
             else
             {
@@ -99,7 +100,7 @@
                         </div>
                     }
                 </div>
-                <p class="cfg-foot">Moedas sem taxa deixam o valor zerado até serem informadas. <strong>BRL</strong> não precisa de taxa. A conversão é reaplicada na próxima sincronização.</p>
+                <p class="cfg-foot">Moedas sem taxa deixam o valor zerado até serem informadas. <strong>BRL</strong> não precisa de taxa.</p>
             }
         </div>
     </div>
@@ -179,23 +180,29 @@
 
 @code {
     private bool _sincronizando;
-    private AfmSyncStatus _status = new();
+    private DataSyncStatus _nb = new();
+    private DataSyncStatus _afm = new();
     private List<CurrencyRate> _rates = new();
 
     protected override void OnInitialized()
     {
-        _status = AfmSync.Last;
+        _nb = Sync.LastNb;
+        _afm = Sync.LastAfm;
         _rates = Controle.CurrencyRates();
     }
 
-    private async Task Sincronizar()
+    private Task SincronizarNb() => Sincronizar(() => Sync.SyncNb());
+    private Task SincronizarAfm() => Sincronizar(() => Sync.SyncAfm());
+
+    private async Task Sincronizar(Action run)
     {
         if (_sincronizando) return;
         _sincronizando = true;
-        try { await Task.Run(() => AfmSync.Sync()); }
+        try { await Task.Run(run); }
         finally
         {
-            _status = AfmSync.Last;
+            _nb = Sync.LastNb;
+            _afm = Sync.LastAfm;
             _rates = Controle.CurrencyRates();
             _sincronizando = false;
         }
