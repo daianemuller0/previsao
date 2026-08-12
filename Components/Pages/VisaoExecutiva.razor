@@ -187,14 +187,16 @@
     }
 </div>
 
-@* ===================== SALES FUNNEL BY STAGE (pipeline horizontal) ===================== *@
+@* ============ SALES FUNNEL + PREVISÃO INDICADA (lado a lado) ============ *@
 <div class="xsec">
     <span class="xsec-t">Sales Funnel by Stage</span>
-    <span class="xsec-s">how the pipeline concentrates · @_currency</span>
+    <span class="xsec-s">sequência do pipeline · @_currency</span>
     <span class="xsec-line"></span>
+    @if (_indicadas.Count > 0) { <span class="ind-badge">@Icons.Svg("flag")@_indicadas.Count indicadas · @MoneyBrl(_indTotal)</span> }
     @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Stage</button> }
 </div>
-<div class="xcard pf-card">
+<div class="g12">
+    <div class="c6"><div class="xcard pf-card">
     @if (_funnel.Count == 0)
     {
         <div class="empty">Sem dados no recorte. Importe a base do Funil de Vendas HSA na guia <a href="/oportunidades">Oportunidades</a>.</div>
@@ -237,28 +239,20 @@
             }
         </div>
     }
-</div>
-
-@* ===================== PREVISÃO INDICADA (oportunidades sinalizadas) ===================== *@
-<div class="xsec">
-    <span class="xsec-t">Previsão Indicada</span>
-    <span class="xsec-s">oportunidades sinalizadas pelos vendedores para a previsão de vendas</span>
-    <span class="xsec-line"></span>
-    @if (_indicadas.Count > 0) { <span class="ind-badge">@Icons.Svg("flag")@_indicadas.Count · @MoneyBrl(_indTotal)</span> }
-</div>
-@if (_indicadas.Count == 0)
-{
-    <div class="xcard"><div class="ind-empty">
-        <span class="ind-empty-ico">@Icons.Svg("flag")</span>
-        <div><strong>Nenhuma oportunidade indicada ainda.</strong><br />
-            Use o botão <span class="ind-hint">@Icons.Svg("flag")Indicar na Previsão</span> na aba <a href="/oportunidades">Oportunidades</a> ou no Top 10 para marcar as oportunidades que entram na previsão de vendas — elas aparecem aqui com funil, gráfico e lista próprios.</div>
     </div></div>
-}
-else
-{
-    <div class="g12">
+    <div class="c6">
+    @if (_indicadas.Count == 0)
+    {
+        <div class="xcard ind-card"><div class="ind-empty">
+            <span class="ind-empty-ico">@Icons.Svg("flag")</span>
+            <div><strong>Nenhuma oportunidade indicada ainda.</strong><br />
+                Use o botão <span class="ind-hint">@Icons.Svg("flag")Indicar na Previsão</span> na aba <a href="/oportunidades">Oportunidades</a> ou no Top 10 — as indicadas aparecem aqui com funil, gráfico e lista próprios.</div>
+        </div></div>
+    }
+    else
+    {
         @* Funil só das indicadas *@
-        <div class="c6"><div class="xcard ind-card">
+        <div class="xcard ind-card">
             <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Funil das indicadas · por Stage</div><div class="xcard-sub">@_indicadas.Count oport. · @MoneyBrl(_indTotal) · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) do pipeline</div></div></div>
             <div class="fn5">
                 @for (var i = 0; i < _indFunnel.Count; i++)
@@ -280,13 +274,13 @@ else
                     </div>
                 }
             </div>
-        </div></div>
+        </div>
 
         @* Indicadas por vendedor *@
-        <div class="c6"><div class="xcard ind-card">
+        <div class="xcard ind-card" style="margin-top:16px">
             <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Indicadas por Vendedor</div><div class="xcard-sub">@_indByRep.Count vendedor(es) · valor indicado</div></div></div>
             @{ var _indRepMax = _indByRep.Count > 0 ? _indByRep.Max(x => x.Value) : 1; }
-            <div class="ibar scroll-y" style="max-height:360px">
+            <div class="ibar scroll-y" style="max-height:300px">
                 @foreach (var s in _indByRep)
                 {
                     var sh = s.Value / Math.Max(_indTotal, 1) * 100;
@@ -299,10 +293,14 @@ else
                     </div>
                 }
             </div>
-        </div></div>
+        </div>
+    }
     </div>
+</div>
 
-    @* Lista das indicadas *@
+@* Lista das indicadas (linha inteira) *@
+@if (_indicadas.Count > 0)
+{
     <div class="g12" style="margin-top:16px">
         <div class="c12"><div class="xcard ind-card">
             <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div></div>
@@ -545,45 +543,10 @@ else
 <OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
                   EmptyText="Sem oportunidades acima de R$ 1 mi no recorte." OnChanged="ReloadOpps" />
 
-@* ===================== KPIs SECUNDÁRIOS (2 níveis) ===================== *@
-<div class="section-head"><span class="st-title">Indicadores estratégicos</span><span class="st-line"></span></div>
-<div class="exec-grid cols-2">
-    <StatCard Label="Previsão do trimestre" Value="@Money(_fcQuarter)" Context="@($"Meta {MoneyBrl(_metaQuarter)}")" AccentLeft="true">
-        <div class="spark"><Sparkline Values="@_evoQuarter" Stroke="#007A9E" /></div>
-    </StatCard>
-    <StatCard Label="Previsão anual" Value="@Money(_fcYear)" Context="@($"Meta {MoneyBrl(_metaYear)}")" AccentLeft="true">
-        <div class="spark"><Sparkline Values="@_evoYear" Stroke="#009496" /></div>
-    </StatCard>
-</div>
-
-@* ===================== 3 · INSIGHTS EXECUTIVOS ===================== *@
-<div class="section-head">
-    <span class="st-title">@Icons.Svg("trend", "nav-ico") Insights executivos</span>
-    <span class="st-sub">principais sinais</span>
-    <span class="st-line"></span>
-    <a class="btn-link" href="/oportunidades">Ver todas</a>
-</div>
-<div class="panel">
-    <div class="insights insights-grid">
-        @foreach (var i in _insights.Take(6))
-        {
-            <div class="insight sev-@i.Sev">
-                <div class="insight-head"><span class="insight-cat">@i.Category</span><span class="insight-val" style="color:@SevColor(i.Sev)">@i.Value</span></div>
-                <div class="insight-title">@i.Title</div>
-                <div class="insight-detail">@i.Detail</div>
-                <div class="insight-foot">
-                    <span class="insight-action">@Icons.Svg("arrow-right")@i.Action</span>
-                    <a class="insight-link" href="@i.Link">Detalhes</a>
-                </div>
-            </div>
-        }
-    </div>
-</div>
-
 @* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
 <div class="section-head"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
 <div class="g12">
-    <div class="c5">
+    <div class="c12">
         <div class="panel">
             <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por confiança · (% ganho + % período) ÷ 2</span></div></div>
             <div class="comp-bar">
@@ -611,70 +574,11 @@ else
             </div>
         </div>
     </div>
-    <div class="c7">
-        <div class="panel">
-            <div class="panel-head"><div class="panel-title">Previsão x Meta por Vendedor</div><a class="btn-link" href="/oportunidades">Ver oportunidades</a></div>
-            <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
-                <table class="grid-tbl">
-                    <thead><tr><th>Vendedor</th><th class="right">Previsão</th><th class="right">Meta</th><th class="right">Gap</th><th class="right">Cobertura</th><th class="center">Status</th></tr></thead>
-                    <tbody>
-                        @foreach (var k in _byKam)
-                        {
-                            <tr class="clickable @(IsActive("kam", k.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", k.Name)' title="Filtrar por @k.Name">
-                                <td class="col-strong">@k.Name</td>
-                                <td class="right num">@Money(k.Forecast)</td>
-                                <td class="right num">@Money(k.Target)</td>
-                                <td class="right num" style="color:@(k.Gap > 0 ? "var(--neg)" : "var(--pos)")">@Money(k.Gap)</td>
-                                <td class="right num">@k.Coverage.ToString("0.0", _pt)x</td>
-                                <td class="center"><span class="badge @k.StatusCss">@k.Status</span></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 </div>
 
+@* ---- Comparativo AFM × NB ---- *@
 <div class="g12" style="margin-top:14px">
-    <div class="c6"><div class="xcard">
-        <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por mercado</div><div class="xcard-sub">@_byMarket.Count mercados · participação · tendência</div></div></div>
-        <div class="ibar @(DimActive("market") ? "has-active" : "") scroll-y" style="max-height:340px">
-            @foreach (var m in _byMarket)
-            {
-                var sh = m.Value / _marketTotal * 100;
-                <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Forecast @Money(m.Value) · Share @Fmt.Pct(sh) · Trend @Fmt.Signed(m.Trend)">
-                    <div class="ibar-head">
-                        <span class="ibar-name">@m.Name</span>
-                        <span class="ibar-metrics"><span class="ibar-val">@Money(m.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="trend-pill @(m.Trend >= 0 ? "pos" : "neg")">@(m.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(m.Trend))</span></span>
-                    </div>
-                    <div class="ibar-track"><span class="ibar-fill" style="width:@Share(m.Value, _maxMarket)%"></span></div>
-                </div>
-            }
-        </div>
-    </div></div>
-    <div class="c6"><div class="xcard">
-        <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por produto</div><div class="xcard-sub">@_byProduct.Count produtos · participação · margem · tendência</div></div></div>
-        <div class="ibar @(DimActive("product") ? "has-active" : "") scroll-y" style="max-height:340px">
-            @foreach (var p in _byProduct)
-            {
-                var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
-                var sh = p.Value / _productTotal * 100;
-                <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Forecast @Money(p.Value) · Share @Fmt.Pct(sh) · GM @Fmt.Pct(p.Margin) · Trend @Fmt.Signed(p.Trend)">
-                    <div class="ibar-head">
-                        <span class="ibar-name">@p.Name</span>
-                        <span class="ibar-metrics"><span class="ibar-val">@Money(p.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span><span class="trend-pill @(p.Trend >= 0 ? "pos" : "neg")">@(p.Trend >= 0 ? "▲" : "▼") @Fmt.Pct(Math.Abs(p.Trend))</span></span>
-                    </div>
-                    <div class="ibar-track"><span class="ibar-fill" style="width:@Share(p.Value, _maxProduct)%"></span></div>
-                </div>
-            }
-        </div>
-    </div></div>
-</div>
-
-@* ---- Comparativo AFM × NB + Previsão mensal ---- *@
-<div class="g12" style="margin-top:14px">
-    <div class="c5">
+    <div class="c12">
         <div class="panel" style="height:100%">
             <div class="panel-head"><div class="panel-title">Aftermarket × New Business <span class="hint">por categoria comercial</span></div></div>
             @foreach (var cc in _byCommercial)
@@ -689,30 +593,12 @@ else
             <div class="muted" style="font-size:11px;margin-top:8px">Comparativo do forecast ponderado por categoria comercial (NB · RT · AFM · SV).</div>
         </div>
     </div>
-    <div class="c7">
-        <div class="panel" style="height:100%">
-            <div class="panel-head">
-                <div class="panel-title">Previsão mensal <span class="hint">realizado + @MetricLabel por mês · @_currency</span></div>
-                <div class="total-box">
-                    <span class="tb-l">Valor total</span>
-                    <span class="tb-v">@Money(Enumerable.Range(0, 12).Sum(m => _mReal[m] + _mForecast[m]))</span>
-                </div>
-            </div>
-            <div class="chart-body">@RenderMonthlyLine()</div>
-        </div>
-    </div>
 </div>
 
-@* ---- Distribuição da carteira: unidade · trimestre · país · GM ---- *@
+@* ---- Distribuição da carteira: trimestre · país · GM ---- *@
 <div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
 <div class="g12 top">
-    <div class="c6">
-        <div class="panel">
-            <div class="panel-head"><div class="panel-title">Por unidade <span class="hint">BU do PV</span></div></div>
-            @if (_byBu.Count > 0) { <div class="chart-body donut">@RenderDonut(_byBu)</div> } else { <div class="empty">Sem dados no recorte.</div> }
-        </div>
-    </div>
-    <div class="c6">
+    <div class="c12">
         <div class="panel">
             <div class="panel-head"><div class="panel-title">Valor por trimestre <span class="hint">1º a 4º tri</span></div></div>
             @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
