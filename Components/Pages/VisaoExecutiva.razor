@@ -589,17 +589,10 @@
     @* ---- Comparativo AFM × NB (ao lado da composição) ---- *@
     <div class="c6">
         <div class="panel" style="height:100%">
-            <div class="panel-head"><div class="panel-title">Aftermarket × New Business <span class="hint">por categoria comercial</span></div></div>
-            @foreach (var cc in _byCommercial)
-            {
-                var destaque = cc.Code is "AFM" or "NB" ? "strong" : "";
-                <div class="bar-row @XfCss("commercial", cc.Code)" @onclick='() => CrossFilter("commercial", cc.Code)' title="Filtrar por @cc.Name">
-                    <span class="bar-label @destaque">@cc.Name <span class="muted" style="font-weight:400">· @cc.Code</span></span>
-                    <span class="bar-track"><span class="bar-fill @(cc.Code == "AFM" ? "afm" : "c-primary")" style="width:@Share(cc.Value, _maxComm)%"></span></span>
-                    <span class="bar-value">@Money(cc.Value)</span>
-                </div>
-            }
-            <div class="muted" style="font-size:11px;margin-top:8px">Comparativo do forecast ponderado por categoria comercial (NB · RT · AFM · SV).</div>
+            <div class="panel-head"><div class="panel-title">Aftermarket × New Business <span class="hint">participação no pipeline · por setor</span></div></div>
+            @if (_bySetor.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else { <div class="chart-body donut">@RenderDonut(_bySetor)</div> }
+            <div class="muted" style="font-size:11px;margin-top:8px">Divisão do pipeline entre Aftermarket e New Business (origem da oferta).</div>
         </div>
     </div>
 </div>
@@ -741,8 +734,6 @@
     private record Attn(string Category, string Sev, string Icon, string Title, string Meta, string Value, string Reason, string Rec, string OppId);
     private List<Opportunity> _top10Opps = new();
     private record CommRow(string Code, string Name, double Value);
-    private List<CommRow> _byCommercial = new();
-    private double _maxComm = 1;
     private record SliceRow(string Label, double Value);
     // Funil de Vendas (por Stage), ordenado decrescente por valor.
     private record FunnelRow(string Stage, double Value, int Count);
@@ -756,6 +747,7 @@
     private List<SliceRow> _indByRep = new();
     // Gráficos do funil (base nova). Valores em R$ nativo (Amount converted).
     private List<SliceRow> _byRep = new(), _bySegment = new(), _byMarketH = new(), _bySubMarket = new(), _byBu2 = new();
+    private List<SliceRow> _bySetor = new();   // pizza AFM × NB (por setor de origem)
     private double[] _monthAmt = new double[12];
     private List<SliceRow> _byBu = new();
     private List<SliceRow> _byCountry = new();
@@ -827,9 +819,25 @@
     private string KeyCountry(Opportunity o)  => DisplayKey(o.CountryId, Cat.CountryName);
     private string KeyProduct(Opportunity o)  => DisplayKey(o.ProductId, Cat.ProductName);
     private string KeyCustomer(Opportunity o) => DisplayKey(o.CustomerId, Cat.CustomerName);
-    private string KeyBu(Opportunity o)       => DisplayKey(o.PvBusinessUnitId, Cat.BuCode);
+    private string KeyBu(Opportunity o)       => NormBu(DisplayKey(o.PvBusinessUnitId, Cat.BuCode));
     private string KeyKam(Opportunity o)      => DisplayKey(o.KamId, Cat.KamName);
     private static string KeyCommercial(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim();
+
+    // Une variações da mesma unidade ("HSA: Howden South America" e "HSA") pelo
+    // código (parte antes do ":"), para não virarem fatias separadas no gráfico.
+    private static string NormBu(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label)) return "—";
+        var i = label.IndexOf(':');
+        var code = (i >= 0 ? label.Substring(0, i) : label).Trim();
+        return code == "" ? label.Trim() : code;
+    }
+
+    // Setor de origem: Aftermarket (id "afm-" ou Setor="AFM") vs. New Business.
+    private static string KeySetor(Opportunity o) =>
+        string.Equals(o.Setor, "AFM", StringComparison.OrdinalIgnoreCase)
+        || o.Id.StartsWith("afm-", StringComparison.OrdinalIgnoreCase)
+            ? "Aftermarket" : "New Business";
     private static string KeyStage(Opportunity o)
     {
         // Ofertas de Aftermarket têm a etapa alocada na etapa equivalente do nosso
@@ -1068,6 +1076,9 @@
         _byMarketH = GroupBrl(opps, KeyMarket);          // barras horizontais por Market
         _bySubMarket = GroupBrl(opps, KeySubMarket);     // linha por Sub-Market
         _byBu2 = GroupBrl(opps, KeyBu);                  // pizza por Business Unit
+        _bySetor = opps.GroupBy(KeySetor)                // pizza AFM × NB (por setor)
+            .Select(g => new SliceRow(g.Key, g.Sum(Metric)))
+            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
         _monthAmt = new double[12];                       // colunas por mês (Close Date)
         foreach (var o in opps)
             if (o.ExpectedDateValue is { } d && d.Month is >= 1 and <= 12)
@@ -1175,13 +1186,6 @@
         }).ToList();
         _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
         _comp = compRaw.Select(x => new CompRow(x.Band, x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
-
-        // Aftermarket × New Business — agrupa pela categoria comercial real (NB/AFM/…).
-        _byCommercial = opps.Where(o => InYear(o) && Eligible(o))
-            .GroupBy(o => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim())
-            .Select(g => new CommRow(g.Key, CommName(g.Key), g.Sum(Metric)))
-            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
-        _maxComm = Math.Max(_byCommercial.Count > 0 ? _byCommercial.Max(x => x.Value) : 1, 1);
 
         // Distribuição da carteira — agrupa pelos VALORES reais dos campos das
         // oportunidades (com nome do catálogo quando houver), não iterando o
