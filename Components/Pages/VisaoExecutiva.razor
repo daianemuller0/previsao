@@ -63,6 +63,7 @@
         }
     </div>
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
+    <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     @if (_showMore)
     {
         <div class="flt"><span class="flt-label">País</span><select @bind="_country"><option value="">Todos</option>@foreach (var nm in CountryOptions){<option value="@nm">@nm</option>}</select></div>
@@ -205,7 +206,7 @@
         <div class="pf-head">
             <div>
                 <div class="xcard-title">Sales Funnel by Stage</div>
-                <div class="xcard-sub">Amount · @_currency · @_funnel.Count stages · maior → menor</div>
+                <div class="xcard-sub">Amount · @_currency · @_funnel.Count stages · sequência do pipeline</div>
             </div>
             <div class="pf-totals">
                 <div class="pf-tot"><div class="pf-tot-l">Total Pipeline</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
@@ -819,6 +820,7 @@ else
     private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
     private int _monthFilter;              // 0 = todos
     private int _yearFilter;               // 0 = todos os anos
+    private bool _onlyIndicated;           // mostrar só as oportunidades indicadas na previsão
     private IEnumerable<int> YearOptions => _opps.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
     private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
     private string _valMetric = "total";   // total (Net Value) | conv (Chance de conversão)
@@ -1012,6 +1014,21 @@ else
     // Tonalidade da barra do funil: teal escuro no topo → teal médio na base
     // (variação MUITO sutil, sempre dentro da identidade — não é cor por stage).
     private static int Lerp(int a, int b, double t) => (int)Math.Round(a + (b - a) * t);
+    // Ordem canônica das etapas do pipeline (sequência do funil, não por valor).
+    private static readonly string[] StageOrder =
+    {
+        "Qualification", "Arrived at Agreement on Need", "Proposal Pending/Waiting",
+        "Outstanding Quote--No Formal Negotiation", "Negotiation Phase/Review",
+        "Verbal Commitment", "Letter of Intent", "T&C's stage", "E1 Order Entry",
+    };
+    private static int StageRank(string s)
+    {
+        var t = (s ?? "").Trim();
+        for (var i = 0; i < StageOrder.Length; i++)
+            if (string.Equals(StageOrder[i], t, StringComparison.OrdinalIgnoreCase)) return i;
+        return 999;
+    }
+
     private static string FunnelBar(int i, int n)
     {
         double t = n <= 1 ? 0 : (double)i / (n - 1);
@@ -1096,6 +1113,7 @@ else
         if (_segment != "") q = q.Where(o => Eq(KeySegment(o), _segment));
         if (_submarket != "") q = q.Where(o => Eq(KeySubMarket(o), _submarket));
         if (_yearFilter > 0) q = q.Where(o => o.ExpectedDateValue?.Year == _yearFilter);
+        if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
         if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
         if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
         if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
@@ -1109,6 +1127,7 @@ else
         _market = _catFilter = _country = _product = _customer = _bu = _commercial = _stage = _segment = _submarket = "";
         _kams.Clear();
         _yearFilter = 0; _monthFilter = 0; _dateFrom = _dateTo = null;
+        _onlyIndicated = false;
         _valMin = _valMax = null; _valMetric = "total";
     }
     private void SaveView() { _savedMsg = true; }
@@ -1121,7 +1140,7 @@ else
         _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
         _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial, _stage, _segment, _submarket }.Count(s => s != "")
             + (_kams.Count > 0 ? 1 : 0)
-            + (_yearFilter > 0 ? 1 : 0)
+            + (_yearFilter > 0 ? 1 : 0) + (_onlyIndicated ? 1 : 0)
             + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
 
@@ -1132,7 +1151,7 @@ else
         // sobre TODO o recorte filtrado, em ordem decrescente de valor.
         _funnel = opps.GroupBy(KeyStage, StringComparer.OrdinalIgnoreCase)
             .Select(g => new FunnelRow(g.Key, g.Sum(o => o.AmountBrl), g.Count()))
-            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+            .Where(x => x.Value > 0).OrderBy(x => StageRank(x.Stage)).ThenByDescending(x => x.Value).ToList();
         _funnelTotal = Math.Max(_funnel.Sum(x => x.Value), 1);
         _funnelMax = Math.Max(_funnel.Count > 0 ? _funnel.Max(x => x.Value) : 1, 1);
 
@@ -1141,7 +1160,7 @@ else
         _indTotal = _indicadas.Sum(o => o.AmountBrl);
         _indFunnel = _indicadas.GroupBy(KeyStage, StringComparer.OrdinalIgnoreCase)
             .Select(g => new FunnelRow(g.Key, g.Sum(o => o.AmountBrl), g.Count()))
-            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
+            .Where(x => x.Value > 0).OrderBy(x => StageRank(x.Stage)).ThenByDescending(x => x.Value).ToList();
         _indFunnelMax = Math.Max(_indFunnel.Count > 0 ? _indFunnel.Max(x => x.Value) : 1, 1);
         _indByRep = GroupBrl(_indicadas, KeyKam);
 

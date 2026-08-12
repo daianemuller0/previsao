@@ -1581,3 +1581,10 @@ tr.row-ind td.col-strong { color: #9a6a12; }
 .ind-amt { font-size: 13px; font-weight: 750; color: var(--text); font-variant-numeric: tabular-nums; }
 .ind-row .right, .ind-list-head .right { text-align: right; }
 @media (max-width: 1100px) { .ind-list-head, .ind-row { grid-template-columns: 1fr 140px 120px 110px; } }
+
+/* ---- Toggle "Somente indicadas" na barra de filtros ---- */
+.flt-toggle { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+.flt-toggle svg { width: 14px; height: 14px; }
+.flt-toggle input { margin: 0; cursor: pointer; }
+.flt-toggle:hover { border-color: #f0dfb0; }
+.flt-toggle.on { background: #fdf3dc; border-color: #f0dfb0; color: #9a6a12; }
