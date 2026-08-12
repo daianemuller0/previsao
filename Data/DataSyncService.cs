@@ -113,10 +113,16 @@ public sealed class DataSyncService
                     var newIds = result.Rows.Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
                     var existing = _repo.All()
                         .Where(o => o.Id.StartsWith(p.Prefix, StringComparison.Ordinal))
-                        .Select(o => o.Id).ToList();
+                        .ToDictionary(o => o.Id, StringComparer.Ordinal);
+
+                    // Preserva marcações feitas no app (não vêm da planilha) para não
+                    // se perderem ao re-sincronizar: flag "Indicar na Previsão".
+                    foreach (var row in result.Rows)
+                        if (existing.TryGetValue(row.Id, out var prev) && !string.IsNullOrEmpty(prev.Indicada))
+                            row.Indicada = prev.Indicada;
 
                     _repo.SaveMany(result.Rows);
-                    foreach (var id in existing)
+                    foreach (var id in existing.Keys)
                         if (!newIds.Contains(id)) _repo.Delete(id);
                     _repo.Refresh();
                 }
