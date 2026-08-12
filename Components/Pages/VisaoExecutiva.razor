@@ -64,6 +64,7 @@
         }
     </div>
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
+    <div class="flt"><span class="flt-label">Setor</span><select @bind="_setorFilter"><option value="">Ambos</option><option value="NB">New Business</option><option value="AFM">Aftermarket</option></select></div>
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     @if (_showMore)
     {
@@ -698,6 +699,7 @@
     // Filtros por NOME resolvido (mesmo rótulo mostrado nos gráficos), para que o
     // clique num elemento (cross-filter estilo Power BI) case com o agrupamento.
     private string _market = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "", _commercial = "", _stage = "", _segment = "", _submarket = "";
+    private string _setorFilter = "";      // "" = ambos · "NB" · "AFM" (origem da planilha)
     private HashSet<string> _kams = new(StringComparer.OrdinalIgnoreCase);   // KAM é multi-seleção (por nome)
     private bool _kamOpen;
     private void ToggleKam(string name) { if (!_kams.Remove(name)) _kams.Add(name); }
@@ -989,6 +991,7 @@
         if (_market != "") q = q.Where(o => Eq(KeyMarket(o), _market));
         if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KeyKam(o)));
         if (_catFilter != "") q = q.Where(o => o.ForecastCategory == _catFilter);
+        if (_setorFilter != "") q = q.Where(o => string.Equals(o.Setor, _setorFilter, StringComparison.OrdinalIgnoreCase));
         if (_country != "") q = q.Where(o => Eq(KeyCountry(o), _country));
         if (_product != "") q = q.Where(o => Eq(KeyProduct(o), _product));
         if (_customer != "") q = q.Where(o => Eq(KeyCustomer(o), _customer));
@@ -1010,6 +1013,7 @@
     private void ClearFilters()
     {
         _market = _catFilter = _country = _product = _customer = _bu = _commercial = _stage = _segment = _submarket = "";
+        _setorFilter = "";
         _kams.Clear();
         _yearFilter = 0; _monthFilter = 0; _dateFrom = _dateTo = null;
         _onlyIndicated = false;
@@ -1023,7 +1027,7 @@
         // Ano de referência: o selecionado no filtro, ou o ano atual quando "Todos".
         _year = _yearFilter > 0 ? _yearFilter : _today.Year;
         _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
-        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial, _stage, _segment, _submarket }.Count(s => s != "")
+        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial, _stage, _segment, _submarket, _setorFilter }.Count(s => s != "")
             + (_kams.Count > 0 ? 1 : 0)
             + (_yearFilter > 0 ? 1 : 0) + (_onlyIndicated ? 1 : 0)
             + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)

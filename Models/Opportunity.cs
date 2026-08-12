@@ -51,6 +51,7 @@ public class Opportunity
     public string StatusDescription { get; set; } = "";     // Status Description
     public string AmountRaw { get; set; } = "";             // Amount (moeda de origem, não convertido)
     public string Indicada { get; set; } = "";              // Indicada na Previsão pelo vendedor (Sim)
+    public string Setor { get; set; } = "";                 // Origem: NB (planilha NB) ou AFM (planilha AFM)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
