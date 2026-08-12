@@ -28,6 +28,7 @@
             <button class="@(_currency == "USD" ? "active" : "")" @onclick='() => _currency = "USD"'>USD</button>
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
+        <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (Esc para sair)">@Icons.Svg("play")Apresentação</button>
         <a class="btn-ghost" href="/forecast/export" target="_blank" title="Exportar CSV">@Icons.Svg("download")Exportar</a>
         <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
     </div>
