@@ -426,7 +426,9 @@ public sealed class OpportunityImporter
 
     // Converte a etapa do funil do AFM para o nome equivalente do nosso funil (NB).
     // Regra especial: Status marcado OTP entra direto em "E1 Order Entry".
-    private static string MapAfmStage(string afmStage, string status)
+    // Idempotente: um nome já convertido (NB) não casa no switch e é preservado —
+    // por isso serve também para normalizar no momento da exibição do funil.
+    public static string MapAfmStage(string afmStage, string status)
     {
         if (Norm(status).Split(' ').Contains("otp")) return "E1 Order Entry";
         return Norm(afmStage) switch

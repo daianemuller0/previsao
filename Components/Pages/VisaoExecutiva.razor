@@ -830,7 +830,15 @@
     private string KeyBu(Opportunity o)       => DisplayKey(o.PvBusinessUnitId, Cat.BuCode);
     private string KeyKam(Opportunity o)      => DisplayKey(o.KamId, Cat.KamName);
     private static string KeyCommercial(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialCategory) ? "—" : o.CommercialCategory.Trim();
-    private static string KeyStage(Opportunity o)   => string.IsNullOrWhiteSpace(o.Stage) ? "—" : o.Stage.Trim();
+    private static string KeyStage(Opportunity o)
+    {
+        // Ofertas de Aftermarket têm a etapa alocada na etapa equivalente do nosso
+        // funil (NB) — aplicado também aqui para valer mesmo em dados já importados.
+        var stage = string.Equals(o.Setor, "AFM", StringComparison.OrdinalIgnoreCase)
+            ? OpportunityImporter.MapAfmStage(o.Stage, o.StatusDescription)
+            : o.Stage;
+        return string.IsNullOrWhiteSpace(stage) ? "—" : stage.Trim();
+    }
     private static string KeySegment(Opportunity o) => string.IsNullOrWhiteSpace(o.CommercialSegment) ? "—" : o.CommercialSegment.Trim();
     private string KeySubMarket(Opportunity o) => DisplayKey(o.SubMarketId, Cat.SubMarketName);
 
