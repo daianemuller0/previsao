@@ -1622,3 +1622,8 @@ tr.row-ind td.col-strong { color: #9a6a12; }
 .setor-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; }
 .setor-nb { background: #e7f1fb; color: #1665a8; }
 .setor-afm { background: #e5f4f2; color: #0f766e; }
+
+/* Total no canto do cabeçalho dos gráficos (xcard) */
+.xcard-total { margin-left: auto; text-align: right; line-height: 1.15; white-space: nowrap; padding-left: 10px; }
+.xcard-total span { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.xcard-total b { font-size: 14.5px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
