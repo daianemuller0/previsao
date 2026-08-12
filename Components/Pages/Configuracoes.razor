@@ -1,0 +1,157 @@
+@page "/configuracoes"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@* ===========================================================================
+   Configurações de importação — De-Para das colunas das duas origens de dados
+   (New Business = planilha Funil de Vendas HSA · Aftermarket = novo CRM). Página
+   de referência: deixa claro qual coluna de cada origem alimenta cada campo do
+   sistema, além das regras de conversão de moeda e de margem (GM).
+   =========================================================================== *@
+
+<div class="breadcrumbs"><span>Sistema</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Configurações</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Configurações de importação</h1>
+        <p class="subtitle">
+            De-Para das colunas das duas origens de dados · como cada planilha conversa com os campos do sistema<br />
+            O valor final usado em todo o sistema é o <strong>Amount (converted)</strong>, sempre em R$.
+        </p>
+    </div>
+</div>
+
+@* ---- As duas origens ---- *@
+<div class="g12 top">
+    <div class="c6">
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-title">Origem 1 · New Business <span class="hint">planilha Funil de Vendas HSA (atual)</span></div>
+                <span class="badge fc-best">NB</span>
+            </div>
+            <p class="cfg-lead">Planilha que já usamos hoje. Vem do CRM Salesforce (Funil de Vendas HSA). Toda oferta desta base entra como <strong>New Business</strong> e o valor já chega em R$ na coluna <em>Amount (converted)</em> — sem conversão.</p>
+        </div>
+    </div>
+    <div class="c6">
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-title">Origem 2 · Aftermarket <span class="hint">novo CRM · planilha AFM</span></div>
+                <span class="badge fc-upside">AFM</span>
+            </div>
+            <p class="cfg-lead">Nova planilha, vinda de outro CRM. Toda oferta desta base entra como <strong>Aftermarket</strong>. O valor vem na moeda de origem (coluna N) e é <strong>convertido para R$</strong> pela taxa cadastrada na aba Controle, gerando o <em>Amount (converted)</em>.</p>
+        </div>
+    </div>
+</div>
+
+@* ---- De-Para de colunas ---- *@
+<div class="section-head" style="margin-top:20px"><span class="st-title">De-Para de colunas</span><span class="st-sub">campo do sistema ← coluna de cada origem</span><span class="st-line"></span></div>
+<div class="table-wrap">
+    <table class="grid-tbl">
+        <thead>
+            <tr>
+                <th class="no-sort">Campo no sistema (Funil HSA)</th>
+                <th class="no-sort">Origem NB · Funil de Vendas HSA</th>
+                <th class="no-sort">Origem AFM · novo CRM</th>
+                <th class="no-sort">Observação</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in Mapa)
+            {
+                <tr class="@(m.Destaque ? "cfg-hi" : "")">
+                    <td class="col-strong">@m.Sistema</td>
+                    <td>@Src(m.Nb)</td>
+                    <td>@Src(m.Afm)</td>
+                    <td class="cfg-note">@m.Nota</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* ---- Regras especiais ---- *@
+<div class="g12" style="margin-top:20px">
+    @* Conversão de moeda (AFM) *@
+    <div class="c6">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Conversão de moeda <span class="hint">somente Aftermarket</span></div></div>
+            <ol class="cfg-steps">
+                <li>Lê a <strong>moeda</strong> da proposta na <strong>coluna M</strong> e o <strong>valor</strong> na <strong>coluna N</strong>.</li>
+                <li>Se a moeda for <strong>BRL</strong>, mantém o valor como está.</li>
+                <li>Para as demais moedas, multiplica o valor pela <strong>taxa cadastrada na aba Controle</strong> para chegar ao valor em R$.</li>
+                <li>O resultado em R$ vira o <strong>Amount (converted)</strong> — o valor usado em todo o sistema.</li>
+            </ol>
+            <div class="cfg-callout">
+                <span class="badge fc-pipe">Exemplo</span>
+                <span>Valor <strong>USD 100.000</strong> · taxa Controle <strong>5,42</strong> → Amount (converted) = <strong>R$ 542.000</strong>.</span>
+            </div>
+            <p class="cfg-foot">As taxas por moeda ficam na aba <a href="/controle">Controle</a>. New Business não passa por conversão — já chega em R$.</p>
+        </div>
+    </div>
+
+    @* Margem GM (AFM) *@
+    <div class="c6">
+        <div class="panel" style="height:100%">
+            <div class="panel-head"><div class="panel-title">Margem bruta (GM) <span class="hint">somente Aftermarket</span></div></div>
+            <p class="cfg-lead">No CRM do Aftermarket a coluna <strong>GM</strong> vem como <strong>número inteiro</strong> (ex.: <code>25</code>). O sistema interpreta esse número como <strong>percentual</strong> e grava em <em>Gross Margin(%)</em>.</p>
+            <div class="cfg-callout">
+                <span class="badge fc-pipe">Exemplo</span>
+                <span>GM <strong>25</strong> no CRM → <strong>25%</strong> de margem no sistema.</span>
+            </div>
+            <p class="cfg-foot">New Business já traz a margem em <em>Gross Margin(%)</em>, sem ajuste.</p>
+        </div>
+    </div>
+</div>
+
+@* ---- Colunas sem correspondência ---- *@
+<div class="section-head" style="margin-top:20px"><span class="st-title">Colunas do CRM Aftermarket sem correspondência</span><span class="st-sub">não alimentam nenhum campo do sistema</span><span class="st-line"></span></div>
+<div class="panel">
+    <p class="cfg-lead">Estas colunas existem na planilha do Aftermarket mas <strong>não têm campo equivalente</strong> no sistema hoje — são ignoradas na importação. Se alguma precisar ser aproveitada, é só avisar.</p>
+    <div class="cfg-chips">
+        @foreach (var c in SemDePara)
+        {
+            <span class="chip" style="cursor:default">@c</span>
+        }
+    </div>
+</div>
+
+@code {
+    private record MapRow(string Sistema, string Nb, string Afm, string Nota = "", bool Destaque = false);
+
+    // Fonte única do De-Para. A mesma relação será usada para conectar a planilha
+    // do Aftermarket aos campos do sistema quando o arquivo for importado.
+    private static readonly MapRow[] Mapa =
+    {
+        new("Amount (converted) · valor usado no sistema", "Amount (converted) — já em R$", "Valor (col N) convertido de Moeda (col M) para R$", "Valor principal. AFM: conversão pela taxa da aba Controle.", true),
+        new("Close Date", "Close Date", "PO Esperado"),
+        new("Installation Location (País)", "Installation Location", "Country"),
+        new("Parent Opportunity: End User Site", "Parent Opportunity: End User Site", "PlantName"),
+        new("Commercial Segment", "Commercial Segment", "CRS_Market"),
+        new("Market", "Market", "Industry"),
+        new("Sub-Market", "Sub-Market", "SubIndustry"),
+        new("Process", "Process", "Process"),
+        new("Product Type", "Product Type", "ProductType"),
+        new("Outside Sales Rep (Vendedor)", "Outside Sales Rep", "", "AFM não possui vendedor externo mapeado (ContractorName não corresponde)."),
+        new("Opportunity Number", "Opportunity Number", "QuoteNumber"),
+        new("Gross Margin(%)", "Gross Margin(%)", "GM (inteiro → %)", "AFM: número inteiro convertido para percentual.", true),
+        new("Stage", "Stage", "FunnelStage"),
+        new("Chance", "Chance", "Chance"),
+        new("Customer Ref#", "Customer Ref#", "ClientRef"),
+        new("Business Unit", "Business Unit", "BU"),
+        new("Description", "Description", "Description"),
+        new("Categoria comercial (NB / AFM)", "NB/AFM da planilha", "Fixo: AFM", "Define se a oferta é New Business ou Aftermarket.", true),
+    };
+
+    // Colunas do CRM Aftermarket que não têm campo equivalente no sistema.
+    private static readonly string[] SemDePara =
+    {
+        "ContractorName", "Status", "ADDTOFORECAST", "Special", "Category",
+    };
+
+    // Célula de origem: mostra o traço quando não há correspondência.
+    private static RenderFragment Src(string v) => builder =>
+    {
+        if (string.IsNullOrEmpty(v)) { builder.AddMarkupContent(0, "<span class=\"cfg-none\">— sem correspondência</span>"); }
+        else { builder.AddContent(1, v); }
+    };
+}
