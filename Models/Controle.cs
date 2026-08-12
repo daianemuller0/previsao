@@ -67,6 +67,23 @@ public class ControleRegistro
         double.TryParse(ValorLiquido, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
 }
 
+// Taxa de conversão de moeda usada na importação do Aftermarket.
+// Rate = quantos R$ por 1 unidade da moeda (ex.: USD 5,42 = R$ por 1 dólar).
+// Cadastrada na aba Controle / Configurações. BRL não precisa de taxa.
+public class CurrencyRate
+{
+    public string Code { get; set; } = "";       // USD, EUR, GBP …
+    public string Rate { get; set; } = "0";       // R$ por 1 unidade
+    public string UpdatedBy { get; set; } = "";
+    public string UpdatedAt { get; set; } = "";
+
+    public double RateV =>
+        double.TryParse(Rate, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    public bool HasRate => RateV > 0;
+    public DateTime? UpdatedAtValue =>
+        DateTime.TryParse(UpdatedAt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+}
+
 // Observação de fechamento.
 public class ControleObs
 {
