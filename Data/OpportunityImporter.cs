@@ -324,6 +324,7 @@ public sealed class OpportunityImporter
             Description = get(new[] { "Description" }),
             StatusDescription = get(new[] { "Status Description" }),
             AmountRaw = get(new[] { "Amount" }),
+            Setor = "NB",                 // origem: planilha de New Business
         };
 
         if (dateIso == "") r.Warnings.Add($"Oportunidade {Show(proposta)}: data (Close Date) inválida ou ausente.");
@@ -408,6 +409,7 @@ public sealed class OpportunityImporter
             CustomerRef = get(new[] { "ClientRef", "Customer Ref#" }),
             Description = descr,
             AmountRaw = cur + " " + value.ToString(Inv),
+            Setor = "AFM",                // origem: planilha de Aftermarket
         };
 
         if (dateIso == "") r.Warnings.Add($"Oportunidade {Show(quote)}: data (PO Esperado) inválida ou ausente.");
