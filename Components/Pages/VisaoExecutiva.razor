@@ -280,7 +280,7 @@
 
         @* Indicadas por vendedor *@
         <div class="xcard ind-card" style="margin-top:16px">
-            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Indicadas por Vendedor</div><div class="xcard-sub">@_indByRep.Count vendedor(es) · valor indicado</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Indicadas por Vendedor</div><div class="xcard-sub">@_indByRep.Count vendedor(es) · valor indicado</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indByRep.Sum(x => x.Value))</b></span></div>
             @{ var _indRepMax = _indByRep.Count > 0 ? _indByRep.Max(x => x.Value) : 1; }
             <div class="ibar scroll-y" style="max-height:300px">
                 @foreach (var s in _indByRep)
@@ -368,7 +368,7 @@
 
         @* ---- Forecast by Market (ranking) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Forecast by Market</div><div class="xcard-sub">@_byMarket.Count mercados · maior → menor</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Forecast by Market</div><div class="xcard-sub">@_byMarket.Count mercados · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span></div>
             @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -392,7 +392,7 @@
     @* ---- Sales Rep Performance | Forecast by Product (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Sales Rep Performance</div><div class="xcard-sub">@_byRep.Count vendedores · todos exibidos · maior → menor</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Sales Rep Performance</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span></div>
             @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -415,7 +415,7 @@
             }
         </div></div>
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Forecast by Product</div><div class="xcard-sub">@_byProduct.Count produtos · Gross Margin em destaque</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Forecast by Product</div><div class="xcard-sub">@_byProduct.Count produtos · Gross Margin em destaque</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span></div>
             @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -446,7 +446,7 @@
     <div class="g12">
         @* ---- Sub-Market Performance (lollipop) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Sub-Market Performance</div><div class="xcard-sub">@_bySubMarket.Count sub-markets · todos exibidos</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Sub-Market Performance</div><div class="xcard-sub">@_bySubMarket.Count sub-markets · todos exibidos</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span></div>
             @if (_bySubMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -504,7 +504,7 @@
     @* ---- Forecast by Month (timing) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c12"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Forecast by Month</div><div class="xcard-sub">Close Date · clique num mês para filtrar</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Forecast by Month</div><div class="xcard-sub">Close Date · clique num mês para filtrar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_monthAmt.Sum())</b></span></div>
             <div class="chart-body">@RenderXfColumns(_monthAmt)</div>
         </div></div>
     </div>
