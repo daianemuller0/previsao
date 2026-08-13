@@ -66,7 +66,7 @@
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
     <div class="flt"><span class="flt-label">Setor</span><select @bind="_setorFilter"><option value="">Ambos</option><option value="NB">New Business</option><option value="AFM">Aftermarket</option></select></div>
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
-    <button class="flt-voice @(_voiceStatus == "listening" ? "on" : "")" @onclick='() => JS.InvokeVoidAsync("voicefilter.start", _ref)' title="Comando por voz — clique, ou segure a BARRA DE ESPAÇO e fale. Ex.: &quot;Brasil&quot;, &quot;aftermarket&quot;, &quot;vendedor Bruno Castro&quot;, &quot;ano 2027&quot;, &quot;somente indicadas&quot;, &quot;limpar filtros&quot;.">@Icons.Svg("mic")<span>@(_voiceStatus == "listening" ? "Ouvindo…" : "Voz (espaço)")</span></button>
+    <button class="flt-voice @(_voiceStatus == "listening" ? "on" : "") @(_voiceStatus == "arming" ? "arming" : "")" @onclick='() => JS.InvokeVoidAsync("voicefilter.start", _ref)' title="Comando por voz — clique, ou segure a BARRA DE ESPAÇO por 3 segundos e fale. Ex.: &quot;Brasil&quot;, &quot;aftermarket&quot;, &quot;vendedor Bruno Castro&quot;, &quot;ano 2027&quot;, &quot;somente indicadas&quot;, &quot;limpar filtros&quot;.">@Icons.Svg("mic")<span>@(_voiceStatus switch { "listening" => "Ouvindo…", "arming" => "Segure…", _ => "Voz (espaço 3s)" })</span></button>
     @if (!string.IsNullOrEmpty(_voiceHeard) || !string.IsNullOrEmpty(_voiceApplied))
     {
         <span class="flt-voice-echo">@(!string.IsNullOrEmpty(_voiceApplied) ? _voiceApplied : "“" + _voiceHeard + "”")</span>
@@ -965,7 +965,8 @@
     public Task VoiceStatus(string status) => InvokeAsync(() =>
     {
         _voiceStatus = status ?? "idle";
-        if (_voiceStatus == "listening") { _voiceHeard = ""; _voiceApplied = ""; }
+        if (_voiceStatus == "arming") { _voiceHeard = ""; _voiceApplied = "Segure a barra de espaço para ativar…"; }
+        else if (_voiceStatus == "listening") { _voiceHeard = ""; _voiceApplied = ""; }
         else if (_voiceStatus == "unsupported") { _voiceApplied = "Voz não suportada neste navegador (use Edge ou Chrome)."; }
         else if (_voiceStatus.StartsWith("error")) { _voiceApplied = "Não consegui ouvir. Tente de novo."; }
         StateHasChanged();

@@ -106,21 +106,32 @@ window.voicefilter = (function () {
         const tag = (el.tagName || '').toLowerCase();
         return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
     }
-    // Aperte-para-falar: segura a tecla (padrão: barra de espaço) e fala; solta p/ aplicar.
-    let pttKey = 'Space', pttDown = false, pttBound = false;
+    // Segure a tecla (padrão: barra de espaço) por HOLD_MS para ATIVAR a voz.
+    // Soltar antes disso cancela; depois de ativada, o reconhecimento roda sozinho.
+    const HOLD_MS = 3000;
+    let pttKey = 'Space', pttTimer = null, pttArmed = false, pttBound = false;
     function pushToTalk(key, dotref) {
         ref = dotref || ref;
         if (key) pttKey = key;
         if (pttBound) return;
         pttBound = true;
         window.addEventListener('keydown', e => {
-            if (e.repeat || (e.key !== pttKey && e.code !== pttKey) || inField()) return;
-            e.preventDefault();
-            if (!pttDown) { pttDown = true; start(ref); }
+            if ((e.key !== pttKey && e.code !== pttKey) || inField()) return;
+            e.preventDefault();                       // impede a rolagem enquanto segura
+            if (e.repeat || pttTimer || pttArmed) return;
+            if (ref) ref.invokeMethodAsync('VoiceStatus', 'arming');
+            pttTimer = setTimeout(() => {
+                pttTimer = null; pttArmed = true;
+                start(ref);                           // ativa após 3s de tecla segurada
+            }, HOLD_MS);
         });
         window.addEventListener('keyup', e => {
             if (e.key !== pttKey && e.code !== pttKey) return;
-            if (pttDown) { pttDown = false; stop(); }
+            if (pttTimer) {                           // soltou antes dos 3s → cancela
+                clearTimeout(pttTimer); pttTimer = null;
+                if (ref) ref.invokeMethodAsync('VoiceStatus', 'idle');
+            }
+            pttArmed = false;
         });
     }
     return { start, stop, supported, pushToTalk };
