@@ -985,17 +985,19 @@
         _voiceStatus = "idle";
         var t = NormV(transcript);
         if (t == "") { _voiceApplied = "Não entendi."; return; }
+        // Traduz termos pt→inglês (os dados são em inglês) e casa por palavras.
+        var te = ExpandSyn(t);
 
         // Limpar tudo.
-        if (t.Contains("limpar") || t.Contains("limpa") || t.Contains("resetar") || t.Contains("reseta") || t.Contains("remover filtro") || t.Contains("remove filtro") || t.Contains("tirar filtro"))
+        if (t.Contains("limpar") || t.Contains("limpa") || t.Contains("resetar") || t.Contains("reseta") || t.Contains("remover filtro") || t.Contains("remove filtro") || t.Contains("tirar filtro") || t.Contains("zerar"))
         { ClearFilters(); _voiceApplied = "Filtros limpos"; return; }
 
         var applied = new List<string>();
 
         // Setor (NB × AFM).
         if (t.Contains("ambos") || t.Contains("todos os setores")) { _setorFilter = ""; applied.Add("Setor: ambos"); }
-        else if (t.Contains("aftermarket") || VWord(t, "afm")) { _setorFilter = "AFM"; applied.Add("Setor: Aftermarket"); }
-        else if (t.Contains("new business") || t.Contains("niu business") || VWord(t, "nb")) { _setorFilter = "NB"; applied.Add("Setor: New Business"); }
+        else if (t.Contains("aftermarket") || t.Contains("after market") || t.Contains("afta market") || t.Contains("pos venda") || t.Contains("posvenda") || VWord(t, "afm")) { _setorFilter = "AFM"; applied.Add("Setor: Aftermarket"); }
+        else if (t.Contains("new business") || t.Contains("niu business") || t.Contains("novo negocio") || VWord(t, "nb")) { _setorFilter = "NB"; applied.Add("Setor: New Business"); }
 
         // Somente indicadas.
         if (t.Contains("somente indicada") || t.Contains("so indicada") || t.Contains("apenas indicada") || t.Contains("indicada na previsao") || t.Contains("indicadas na previsao"))
@@ -1007,37 +1009,79 @@
         if (t.Contains("todos os anos")) { _yearFilter = 0; applied.Add("Ano: todos"); }
         else { var ym = System.Text.RegularExpressions.Regex.Match(t, "20\\d{2}"); if (ym.Success && int.TryParse(ym.Value, out var yy)) { _yearFilter = yy; applied.Add("Ano: " + yy); } }
 
-        // Dimensões por nome (casa o maior rótulo contido na frase).
-        TryName(CountryOptions, v => _country = v, t, "País", applied);
-        TryName(MarketOptions, v => _market = v, t, "Market", applied);
-        TryName(SubMarketOptions, v => _submarket = v, t, "Sub-Market", applied);
-        TryName(ProductOptions, v => _product = v, t, "Produto", applied);
-        TryName(SegmentOptions, v => _segment = v, t, "Segmento", applied);
-        TryName(BuOptions, v => _bu = v, t, "Unidade", applied);
-        TryName(StageOptions, v => _stage = v, t, "Stage", applied);
-        TryName(CustomerOptions, v => _customer = v, t, "Cliente", applied);
+        // Mês.
+        var meses = new[] { "janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro" };
+        if (t.Contains("todos os meses")) { _monthFilter = 0; applied.Add("Mês: todos"); }
+        else { for (var mi = 0; mi < 12; mi++) if (t.Contains(meses[mi])) { _monthFilter = mi + 1; applied.Add("Mês: " + Fmt.MonthLong(mi + 1)); break; } }
+
+        // Dimensões por nome — casa por PALAVRAS (não substring exato).
+        var toks = Tokens(te);
+        TryName(CountryOptions, v => _country = v, toks, "País", applied);
+        TryName(MarketOptions, v => _market = v, toks, "Market", applied);
+        TryName(SubMarketOptions, v => _submarket = v, toks, "Sub-Market", applied);
+        TryName(ProductOptions, v => _product = v, toks, "Produto", applied);
+        TryName(SegmentOptions, v => _segment = v, toks, "Segmento", applied);
+        TryName(BuOptions, v => _bu = v, toks, "Unidade", applied);
+        TryName(StageOptions, v => _stage = v, toks, "Stage", applied);
+        TryName(CustomerOptions, v => _customer = v, toks, "Cliente", applied);
 
         // Vendedor (multi-seleção): adiciona os que forem citados.
         foreach (var k in KamOptions)
-            if (VContains(t, k)) { if (!_kams.Contains(k)) _kams.Add(k); applied.Add("Vendedor: " + k); }
+            if (WordMatch(k, toks)) { if (!_kams.Contains(k)) _kams.Add(k); applied.Add("Vendedor: " + k); }
 
-        _voiceApplied = applied.Count > 0 ? string.Join(" · ", applied.Distinct()) : "Não entendi o comando";
+        _voiceApplied = applied.Count > 0 ? string.Join(" · ", applied.Distinct()) : "Não entendi. Repita mais devagar.";
     }
 
-    private void TryName(IEnumerable<string> options, Action<string> set, string t, string label, List<string> applied)
+    // Aplica ao filtro a opção cujas palavras estejam TODAS presentes na fala.
+    // Desempata pela opção com mais palavras (mais específica).
+    private void TryName(IEnumerable<string> options, Action<string> set, string[] toks, string label, List<string> applied)
     {
-        var hit = options.Where(o => VContains(t, o)).OrderByDescending(o => o.Length).FirstOrDefault();
-        if (hit != null) { set(hit); applied.Add(label + ": " + hit); }
+        string best = null; var bestWords = 0;
+        foreach (var o in options)
+        {
+            var ow = SignWords(o);
+            if (ow.Length == 0) continue;
+            if (ow.All(w => toks.Contains(w)) && ow.Length > bestWords) { best = o; bestWords = ow.Length; }
+        }
+        if (best != null) { set(best); applied.Add(label + ": " + best); }
     }
+
+    private static bool WordMatch(string option, string[] toks)
+    {
+        var ow = SignWords(option);
+        return ow.Length > 0 && ow.All(w => toks.Contains(w));
+    }
+
+    // Palavras significativas (≥3 letras) de um rótulo, normalizadas.
+    private static string[] SignWords(string label) =>
+        Tokens(NormV(label)).Where(w => w.Length >= 3).ToArray();
+
+    private static string[] Tokens(string s) =>
+        System.Text.RegularExpressions.Regex.Split(s ?? "", "[^a-z0-9]+").Where(w => w.Length > 0).ToArray();
 
     // Palavra inteira (evita "nb" casar dentro de outra palavra).
     private static bool VWord(string t, string w) =>
         System.Text.RegularExpressions.Regex.IsMatch(t, "\\b" + System.Text.RegularExpressions.Regex.Escape(w) + "\\b");
 
-    private static bool VContains(string normalizedTranscript, string candidate)
+    // Sinônimos pt→inglês (dados em inglês): acrescenta o termo-alvo à fala.
+    private static readonly (string From, string To)[] VSyn =
     {
-        var c = NormV(candidate);
-        return c.Length >= 3 && c != "—" && normalizedTranscript.Contains(c);
+        ("brasil", "brazil"), ("uruguai", "uruguay"), ("equador", "ecuador"),
+        ("mineracao", "mining"), ("minerio", "mining"), ("agua", "water"),
+        ("cimento", "cement"), ("aco", "steel"), ("siderurgia", "steel"),
+        ("petroleo", "oil gas"), ("oleo e gas", "oil gas"), ("gas", "gas"),
+        ("petroquimica", "petrochemical"), ("hidrogenio", "hydrogen"),
+        ("tunel", "tunnel"), ("mobilidade", "mobility"), ("papel", "paper"),
+        ("celulose", "pulp"), ("energia", "power"), ("saneamento", "water"),
+        ("residuo", "waste"), ("esgoto", "wastewater"), ("offshore", "offshore"),
+    };
+
+    private static string ExpandSyn(string t)
+    {
+        var extra = new System.Text.StringBuilder(t);
+        foreach (var (from, to) in VSyn)
+            if (t.Contains(from)) { extra.Append(' '); extra.Append(to); }
+        return extra.ToString();
     }
 
     // Normaliza p/ casar: minúsculas, sem acentos, espaços colapsados.
