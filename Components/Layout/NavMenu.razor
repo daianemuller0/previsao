@@ -71,6 +71,7 @@
         new("Comercial", new[]
         {
             new NavItem("oportunidades", "/oportunidades", "opportunity", "Oportunidades"),
+            new NavItem("followup", "/followup", "bell", "Follow-up"),
             new NavItem("controle", "/controle", "review", "Controle"),
         }),
         new("Dados", new[]
@@ -88,9 +89,9 @@
     // Visibilidade por perfil (Seção 17). Admin/Diretoria/Gestor veem tudo.
     private static readonly Dictionary<string, string[]> RoleMenus = new()
     {
-        [Roles.Kam] = new[] { "oportunidades", "controle" },
-        [Roles.Financeiro] = new[] { "executivo", "controle", "listas" },
-        [Roles.Viewer] = new[] { "executivo", "controle" },
+        [Roles.Kam] = new[] { "oportunidades", "followup", "controle" },
+        [Roles.Financeiro] = new[] { "executivo", "followup", "controle", "listas" },
+        [Roles.Viewer] = new[] { "executivo", "followup", "controle" },
     };
 
     protected override async Task OnInitializedAsync()

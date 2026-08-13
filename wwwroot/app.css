@@ -1636,3 +1636,18 @@ tr.row-ind td.col-strong { color: #9a6a12; }
 @keyframes voicepulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,.28); } 50% { box-shadow: 0 0 0 5px rgba(192,57,43,0); } }
 .flt-voice-echo { display: inline-flex; align-items: center; height: 34px; padding: 0 10px; font-size: 12px; color: var(--muted); font-style: italic; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flt-voice.arming { background: #fdf3dc; border-color: #f0dfb0; color: #9a6a12; }
+
+/* Follow-up (/followup) */
+.fu-sub { font-size: 11px; color: var(--muted); font-weight: 500; }
+.fu-due { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.due-late { background: var(--neg-bg); color: var(--neg); }
+.due-today { background: #fdf3dc; color: #9a6a12; }
+.due-week { background: #e7f1fb; color: #1665a8; }
+.due-future { background: #eef2f7; color: var(--text-2); }
+.grid-tbl tr.fu-urgent td { background: #fff6f5; }
+.fu-hist { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.fu-hist-h { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.fu-hist-row { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.fu-hist-row:last-child { border-bottom: none; }
+.fu-hist-date { flex: 0 0 62px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fu-hist-body { color: var(--text-2); }
