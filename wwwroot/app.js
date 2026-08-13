@@ -98,7 +98,32 @@ window.voicefilter = (function () {
         try { rec.start(); } catch (err) { active = false; }
     }
     function stop() { active = false; if (rec) { try { rec.stop(); } catch (e) { } } }
-    return { start, stop, supported };
+
+    // Não dispara push-to-talk enquanto o foco está num campo de digitação.
+    function inField() {
+        const el = document.activeElement;
+        if (!el) return false;
+        const tag = (el.tagName || '').toLowerCase();
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+    }
+    // Aperte-para-falar: segura a tecla (padrão: barra de espaço) e fala; solta p/ aplicar.
+    let pttKey = 'Space', pttDown = false, pttBound = false;
+    function pushToTalk(key, dotref) {
+        ref = dotref || ref;
+        if (key) pttKey = key;
+        if (pttBound) return;
+        pttBound = true;
+        window.addEventListener('keydown', e => {
+            if (e.repeat || (e.key !== pttKey && e.code !== pttKey) || inField()) return;
+            e.preventDefault();
+            if (!pttDown) { pttDown = true; start(ref); }
+        });
+        window.addEventListener('keyup', e => {
+            if (e.key !== pttKey && e.code !== pttKey) return;
+            if (pttDown) { pttDown = false; stop(); }
+        });
+    }
+    return { start, stop, supported, pushToTalk };
 })();
 
 // Cross-filter genérico: delega cliques de qualquer elemento com data-xf-dim
