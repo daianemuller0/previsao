@@ -492,12 +492,18 @@
         </div></div>
     </div>
 
-    @* ---- Valor por trimestre (abaixo do Business Unit Performance) ---- *@
+    @* ---- Valor por trimestre + Aftermarket × New Business (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
-        <div class="c12"><div class="xcard">
+        <div class="c6"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Valor por trimestre</div><div class="xcard-sub">1º a 4º tri · @_currency</div></div></div>
             @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
             @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">Sem dados no recorte.</div> }
+        </div></div>
+        <div class="c6"><div class="xcard">
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Aftermarket × New Business</div><div class="xcard-sub">participação no pipeline · por setor</div></div></div>
+            @if (_bySetor.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            else { <div class="chart-body donut">@RenderDonut(_bySetor)</div> }
+            <div class="muted" style="font-size:11px;margin-top:8px">Divisão do pipeline entre Aftermarket e New Business (origem da oferta).</div>
         </div></div>
     </div>
 
@@ -557,7 +563,7 @@
 @* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
 <div class="section-head"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
 <div class="g12">
-    <div class="c6">
+    <div class="c12">
         <div class="panel" style="height:100%">
             <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por confiança · (% ganho + % período) ÷ 2</span></div></div>
             <div class="comp-bar">
@@ -583,16 +589,6 @@
                 <div class="cs"><div class="cs-l">Meta restante</div><div class="cs-v">@Money(_remainingTarget)</div></div>
                 <div class="cs"><div class="cs-l">Índice de cobertura</div><div class="cs-v">@_coverageLabel</div></div>
             </div>
-        </div>
-    </div>
-
-    @* ---- Comparativo AFM × NB (ao lado da composição) ---- *@
-    <div class="c6">
-        <div class="panel" style="height:100%">
-            <div class="panel-head"><div class="panel-title">Aftermarket × New Business <span class="hint">participação no pipeline · por setor</span></div></div>
-            @if (_bySetor.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
-            else { <div class="chart-body donut">@RenderDonut(_bySetor)</div> }
-            <div class="muted" style="font-size:11px;margin-top:8px">Divisão do pipeline entre Aftermarket e New Business (origem da oferta).</div>
         </div>
     </div>
 </div>
