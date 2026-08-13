@@ -1025,31 +1025,71 @@
         TryName(StageOptions, v => _stage = v, toks, "Stage", applied);
         TryName(CustomerOptions, v => _customer = v, toks, "Cliente", applied);
 
-        // Vendedor (multi-seleção): adiciona os que forem citados.
+        // Vendedor (multi-seleção): adiciona os que casarem com a fala (fuzzy).
         foreach (var k in KamOptions)
-            if (WordMatch(k, toks)) { if (!_kams.Contains(k)) _kams.Add(k); applied.Add("Vendedor: " + k); }
+            if (MatchScore(k, toks) >= 0.80) { if (!_kams.Contains(k)) _kams.Add(k); applied.Add("Vendedor: " + k); }
 
         _voiceApplied = applied.Count > 0 ? string.Join(" · ", applied.Distinct()) : "Não entendi. Repita mais devagar.";
     }
 
-    // Aplica ao filtro a opção cujas palavras estejam TODAS presentes na fala.
-    // Desempata pela opção com mais palavras (mais específica).
+    // Aplica a opção que melhor casa com a fala (casamento aproximado, tolera erros
+    // de transcrição/sotaque). Só aplica se a pontuação passar do limiar.
     private void TryName(IEnumerable<string> options, Action<string> set, string[] toks, string label, List<string> applied)
     {
-        string best = null; var bestWords = 0;
+        string best = null; double bestScore = 0;
         foreach (var o in options)
         {
-            var ow = SignWords(o);
-            if (ow.Length == 0) continue;
-            if (ow.All(w => toks.Contains(w)) && ow.Length > bestWords) { best = o; bestWords = ow.Length; }
+            var s = MatchScore(o, toks);
+            if (s > bestScore) { bestScore = s; best = o; }
         }
-        if (best != null) { set(best); applied.Add(label + ": " + best); }
+        if (best != null && bestScore >= 0.74) { set(best); applied.Add(label + ": " + best); }
     }
 
-    private static bool WordMatch(string option, string[] toks)
+    // Pontuação [0..1]: média da melhor similaridade de cada palavra do rótulo
+    // contra as palavras faladas.
+    private static double MatchScore(string option, string[] toks)
     {
         var ow = SignWords(option);
-        return ow.Length > 0 && ow.All(w => toks.Contains(w));
+        if (ow.Length == 0 || toks.Length == 0) return 0;
+        double sum = 0;
+        foreach (var w in ow)
+        {
+            double bw = 0;
+            foreach (var tk in toks) { var s = Sim(w, tk); if (s > bw) bw = s; }
+            sum += bw;
+        }
+        return sum / ow.Length;
+    }
+
+    // Similaridade entre duas palavras (1 = igual). Conta alto quando uma contém a
+    // outra; senão usa a distância de edição (Levenshtein) normalizada.
+    private static double Sim(string a, string b)
+    {
+        if (a == b) return 1;
+        if (a.Length >= 3 && b.Length >= 3 && (a.Contains(b) || b.Contains(a))) return 0.92;
+        var max = Math.Max(a.Length, b.Length);
+        return max == 0 ? 0 : 1.0 - (double)Lev(a, b) / max;
+    }
+
+    private static int Lev(string a, string b)
+    {
+        int n = a.Length, m = b.Length;
+        if (n == 0) return m;
+        if (m == 0) return n;
+        var prev = new int[m + 1];
+        var cur = new int[m + 1];
+        for (var j = 0; j <= m; j++) prev[j] = j;
+        for (var i = 1; i <= n; i++)
+        {
+            cur[0] = i;
+            for (var j = 1; j <= m; j++)
+            {
+                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                cur[j] = Math.Min(Math.Min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            (prev, cur) = (cur, prev);
+        }
+        return prev[m];
     }
 
     // Palavras significativas (≥3 letras) de um rótulo, normalizadas.
@@ -1074,6 +1114,10 @@
         ("tunel", "tunnel"), ("mobilidade", "mobility"), ("papel", "paper"),
         ("celulose", "pulp"), ("energia", "power"), ("saneamento", "water"),
         ("residuo", "waste"), ("esgoto", "wastewater"), ("offshore", "offshore"),
+        ("estrada", "road"), ("rodovia", "road"), ("subterraneo", "underground"),
+        ("metais", "metal"), ("metal", "metal"), ("ferro", "iron"), ("carvao", "coal"),
+        ("quimica", "chemical"), ("refinaria", "refinery"), ("fertilizante", "fertilizer"),
+        ("acucar", "sugar"), ("etanol", "ethanol"), ("naval", "marine"), ("defesa", "defense"),
     };
 
     private static string ExpandSyn(string t)
