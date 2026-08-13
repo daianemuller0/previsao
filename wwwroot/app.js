@@ -66,6 +66,41 @@ window.presentation = (function () {
     return { start, stop };
 })();
 
+// Comando por voz (Web Speech API · Edge/Chrome). Escuta em pt-BR e manda o
+// texto reconhecido para o componente Blazor (ApplyVoiceCommand), que interpreta
+// e aplica os filtros. Callbacks de status/parcial alimentam o indicador na tela.
+window.voicefilter = (function () {
+    let rec = null, ref = null, active = false;
+    function supported() { return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window; }
+    function start(dotref) {
+        ref = dotref || ref;
+        if (!supported()) { if (ref) ref.invokeMethodAsync('VoiceStatus', 'unsupported'); return; }
+        if (active) { stop(); return; }
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        rec = new SR();
+        rec.lang = 'pt-BR';
+        rec.interimResults = true;
+        rec.continuous = false;
+        rec.maxAlternatives = 1;
+        active = true;
+        if (ref) ref.invokeMethodAsync('VoiceStatus', 'listening');
+        rec.onresult = e => {
+            let fin = '', interim = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const r = e.results[i];
+                if (r.isFinal) fin += r[0].transcript; else interim += r[0].transcript;
+            }
+            if (interim && ref) ref.invokeMethodAsync('VoiceInterim', interim);
+            if (fin && ref) ref.invokeMethodAsync('ApplyVoiceCommand', fin);
+        };
+        rec.onerror = e => { if (ref) ref.invokeMethodAsync('VoiceStatus', 'error:' + (e && e.error ? e.error : '')); };
+        rec.onend = () => { active = false; if (ref) ref.invokeMethodAsync('VoiceStatus', 'idle'); };
+        try { rec.start(); } catch (err) { active = false; }
+    }
+    function stop() { active = false; if (rec) { try { rec.stop(); } catch (e) { } } }
+    return { start, stop, supported };
+})();
+
 // Cross-filter genérico: delega cliques de qualquer elemento com data-xf-dim
 // dentro de um container para o componente Blazor (ApplyCrossFilter).
 window.xfilter = (function () {
