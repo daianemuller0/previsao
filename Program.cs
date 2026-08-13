@@ -45,6 +45,8 @@ builder.Services.AddScoped<OpportunityImporter>();
 builder.Services.AddSingleton<ListRepository>();
 // Controle Orçamentário (valores, auditoria e observações).
 builder.Services.AddSingleton<ControleRepository>();
+// Follow-up das propostas em aberto (estado + histórico de interações).
+builder.Services.AddSingleton<FollowUpRepository>();
 // Gráficos personalizados do estúdio da Visão Executiva.
 builder.Services.AddSingleton<ChartConfigRepository>();
 // Identidade visual (logos da capa e da página interna).
