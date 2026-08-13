@@ -1627,3 +1627,11 @@ tr.row-ind td.col-strong { color: #9a6a12; }
 .xcard-total { margin-left: auto; text-align: right; line-height: 1.15; white-space: nowrap; padding-left: 10px; }
 .xcard-total span { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .xcard-total b { font-size: 14.5px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Comando por voz na barra de filtros */
+.flt-voice { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; white-space: nowrap; font-family: inherit; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+.flt-voice svg { width: 15px; height: 15px; }
+.flt-voice:hover { border-color: var(--border-strong); background: var(--panel-2); }
+.flt-voice.on { background: #fdeaea; border-color: #f2b8b8; color: #c0392b; animation: voicepulse 1.2s ease-in-out infinite; }
+@keyframes voicepulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,.28); } 50% { box-shadow: 0 0 0 5px rgba(192,57,43,0); } }
+.flt-voice-echo { display: inline-flex; align-items: center; height: 34px; padding: 0 10px; font-size: 12px; color: var(--muted); font-style: italic; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

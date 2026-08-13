@@ -66,6 +66,11 @@
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
     <div class="flt"><span class="flt-label">Setor</span><select @bind="_setorFilter"><option value="">Ambos</option><option value="NB">New Business</option><option value="AFM">Aftermarket</option></select></div>
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
+    <button class="flt-voice @(_voiceStatus == "listening" ? "on" : "")" @onclick='() => JS.InvokeVoidAsync("voicefilter.start", _ref)' title="Comando por voz — clique e fale. Ex.: &quot;Brasil&quot;, &quot;aftermarket&quot;, &quot;vendedor Bruno Castro&quot;, &quot;ano 2027&quot;, &quot;somente indicadas&quot;, &quot;limpar filtros&quot;.">@Icons.Svg("mic")<span>@(_voiceStatus == "listening" ? "Ouvindo…" : "Voz")</span></button>
+    @if (!string.IsNullOrEmpty(_voiceHeard) || !string.IsNullOrEmpty(_voiceApplied))
+    {
+        <span class="flt-voice-echo">@(!string.IsNullOrEmpty(_voiceApplied) ? _voiceApplied : "“" + _voiceHeard + "”")</span>
+    }
     @if (_showMore)
     {
         <div class="flt"><span class="flt-label">País</span><select @bind="_country"><option value="">Todos</option>@foreach (var nm in CountryOptions){<option value="@nm">@nm</option>}</select></div>
@@ -951,6 +956,101 @@
     public Task ApplyCrossFilter(string dim, string val) =>
         InvokeAsync(() => { CrossFilter(dim, val); StateHasChanged(); });
 
+    // ---- Comando por voz (Web Speech API) --------------------------------------
+    private string _voiceStatus = "idle";   // idle · listening · unsupported · error
+    private string _voiceHeard = "";         // texto reconhecido (parcial/final)
+    private string _voiceApplied = "";       // resumo do que foi aplicado
+
+    [JSInvokable]
+    public Task VoiceStatus(string status) => InvokeAsync(() =>
+    {
+        _voiceStatus = status ?? "idle";
+        if (_voiceStatus == "listening") { _voiceHeard = ""; _voiceApplied = ""; }
+        else if (_voiceStatus == "unsupported") { _voiceApplied = "Voz não suportada neste navegador (use Edge ou Chrome)."; }
+        else if (_voiceStatus.StartsWith("error")) { _voiceApplied = "Não consegui ouvir. Tente de novo."; }
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task VoiceInterim(string text) => InvokeAsync(() => { _voiceHeard = text ?? ""; StateHasChanged(); });
+
+    [JSInvokable]
+    public Task ApplyVoiceCommand(string transcript) => InvokeAsync(() => { RunVoice(transcript); StateHasChanged(); });
+
+    // Interpreta a frase falada e aplica os filtros correspondentes.
+    private void RunVoice(string transcript)
+    {
+        _voiceHeard = transcript ?? "";
+        _voiceStatus = "idle";
+        var t = NormV(transcript);
+        if (t == "") { _voiceApplied = "Não entendi."; return; }
+
+        // Limpar tudo.
+        if (t.Contains("limpar") || t.Contains("limpa") || t.Contains("resetar") || t.Contains("reseta") || t.Contains("remover filtro") || t.Contains("remove filtro") || t.Contains("tirar filtro"))
+        { ClearFilters(); _voiceApplied = "Filtros limpos"; return; }
+
+        var applied = new List<string>();
+
+        // Setor (NB × AFM).
+        if (t.Contains("ambos") || t.Contains("todos os setores")) { _setorFilter = ""; applied.Add("Setor: ambos"); }
+        else if (t.Contains("aftermarket") || VWord(t, "afm")) { _setorFilter = "AFM"; applied.Add("Setor: Aftermarket"); }
+        else if (t.Contains("new business") || t.Contains("niu business") || VWord(t, "nb")) { _setorFilter = "NB"; applied.Add("Setor: New Business"); }
+
+        // Somente indicadas.
+        if (t.Contains("somente indicada") || t.Contains("so indicada") || t.Contains("apenas indicada") || t.Contains("indicada na previsao") || t.Contains("indicadas na previsao"))
+        { _onlyIndicated = true; applied.Add("Somente indicadas"); }
+        else if (t.Contains("todas as oportunidades") || t.Contains("tirar indicada") || t.Contains("remover indicada") || t.Contains("nao indicada"))
+        { _onlyIndicated = false; applied.Add("Todas as oportunidades"); }
+
+        // Ano.
+        if (t.Contains("todos os anos")) { _yearFilter = 0; applied.Add("Ano: todos"); }
+        else { var ym = System.Text.RegularExpressions.Regex.Match(t, "20\\d{2}"); if (ym.Success && int.TryParse(ym.Value, out var yy)) { _yearFilter = yy; applied.Add("Ano: " + yy); } }
+
+        // Dimensões por nome (casa o maior rótulo contido na frase).
+        TryName(CountryOptions, v => _country = v, t, "País", applied);
+        TryName(MarketOptions, v => _market = v, t, "Market", applied);
+        TryName(SubMarketOptions, v => _submarket = v, t, "Sub-Market", applied);
+        TryName(ProductOptions, v => _product = v, t, "Produto", applied);
+        TryName(SegmentOptions, v => _segment = v, t, "Segmento", applied);
+        TryName(BuOptions, v => _bu = v, t, "Unidade", applied);
+        TryName(StageOptions, v => _stage = v, t, "Stage", applied);
+        TryName(CustomerOptions, v => _customer = v, t, "Cliente", applied);
+
+        // Vendedor (multi-seleção): adiciona os que forem citados.
+        foreach (var k in KamOptions)
+            if (VContains(t, k)) { if (!_kams.Contains(k)) _kams.Add(k); applied.Add("Vendedor: " + k); }
+
+        _voiceApplied = applied.Count > 0 ? string.Join(" · ", applied.Distinct()) : "Não entendi o comando";
+    }
+
+    private void TryName(IEnumerable<string> options, Action<string> set, string t, string label, List<string> applied)
+    {
+        var hit = options.Where(o => VContains(t, o)).OrderByDescending(o => o.Length).FirstOrDefault();
+        if (hit != null) { set(hit); applied.Add(label + ": " + hit); }
+    }
+
+    // Palavra inteira (evita "nb" casar dentro de outra palavra).
+    private static bool VWord(string t, string w) =>
+        System.Text.RegularExpressions.Regex.IsMatch(t, "\\b" + System.Text.RegularExpressions.Regex.Escape(w) + "\\b");
+
+    private static bool VContains(string normalizedTranscript, string candidate)
+    {
+        var c = NormV(candidate);
+        return c.Length >= 3 && c != "—" && normalizedTranscript.Contains(c);
+    }
+
+    // Normaliza p/ casar: minúsculas, sem acentos, espaços colapsados.
+    private static string NormV(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var d = s.Trim().ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder(d.Length);
+        foreach (var c in d)
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        return System.Text.RegularExpressions.Regex.Replace(sb.ToString().Normalize(System.Text.NormalizationForm.FormC), "\\s+", " ").Trim();
+    }
+
     protected override void OnInitialized()
     {
         _opps = Repo.All();
@@ -997,6 +1097,9 @@
     private IEnumerable<string> ProductOptions => NameOptions(KeyProduct);
     private IEnumerable<string> CustomerOptions => NameOptions(KeyCustomer);
     private IEnumerable<string> BuOptions => NameOptions(KeyBu);
+    private IEnumerable<string> SegmentOptions => NameOptions(KeySegment);
+    private IEnumerable<string> SubMarketOptions => NameOptions(KeySubMarket);
+    private IEnumerable<string> StageOptions => NameOptions(KeyStage);
 
     private IEnumerable<Opportunity> Filtered()
     {
