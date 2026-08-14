@@ -235,8 +235,8 @@
                 var frac = dwN / dw;
                 var inset = (1 - frac) / 2 * 100;
                 <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
-                    <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(f.Value, _funnelMax)"></div>
-                    <div class="fn5-text @(FunnelDark(f.Value, _funnelMax) ? "dark" : "")">
+                    <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
+                    <div class="fn5-text @(FunnelDark(i, _funnel.Count) ? "dark" : "")">
                         <div class="fn5-name">@f.Stage</div>
                         <div class="fn5-amt">@MoneyBrl(f.Value)</div>
                         <div class="fn5-sub">@Fmt.Pct(sh) of pipeline · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " to next" : "")</div>
@@ -261,7 +261,6 @@
         <div class="xcard ind-card">
             <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Funil das indicadas · por Stage</div><div class="xcard-sub">@_indicadas.Count oport. · @MoneyBrl(_indTotal) · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) do pipeline</div></div></div>
             <div class="fn5">
-                @{ var indMax = _indFunnel.Count > 0 ? _indFunnel.Max(x => x.Value) : 1; }
                 @for (var i = 0; i < _indFunnel.Count; i++)
                 {
                     var f = _indFunnel[i];
@@ -272,8 +271,8 @@
                     var frac = dwN / dw;
                     var inset = (1 - frac) / 2 * 100;
                     <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) · @f.Count opps">
-                        <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(f.Value, indMax)"></div>
-                        <div class="fn5-text @(FunnelDark(f.Value, indMax) ? "dark" : "")">
+                        <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _indFunnel.Count)"></div>
+                        <div class="fn5-text @(FunnelDark(i, _indFunnel.Count) ? "dark" : "")">
                             <div class="fn5-name">@f.Stage</div>
                             <div class="fn5-amt">@MoneyBrl(f.Value)</div>
                             <div class="fn5-sub">@Fmt.Pct(sh) · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) : "")</div>
@@ -933,25 +932,22 @@
         return 999;
     }
 
-    // Cor por VALOR: azul-royal vivo nos menores → azul-marinho profundo nos
-    // maiores, com leve gradiente vertical para profundidade (visual premium).
-    private static double FnT(double value, double max) =>
-        max > 0 ? Math.Pow(Math.Clamp(value / max, 0, 1), 0.85) : 0;
+    private static int Darker(int c) => (int)Math.Round(c * 0.84);
 
-    private static int Darker(int c) => (int)Math.Round(c * 0.80);
-
-    private static string FunnelBar(double value, double max)
+    // Gradiente do funil por POSIÇÃO: topo azul-royal → base azul-marinho profundo.
+    // Look coeso e premium (fluxo contínuo); o valor de cada etapa fica no rótulo.
+    private static string FunnelBar(int i, int n)
     {
-        double t = FnT(value, max);
-        // #2d74d6 (royal vivo) → #0a2452 (marinho profundo). Azul dominante, saturado.
-        int r = Lerp(0x2d, 0x0a, t), g = Lerp(0x74, 0x24, t), b = Lerp(0xd6, 0x52, t);
+        double t = n <= 1 ? 0 : (double)i / (n - 1);
+        // #2f74e0 (royal) → #071d40 (marinho profundo).
+        int r = Lerp(0x2f, 0x07, t), g = Lerp(0x74, 0x1d, t), b = Lerp(0xe0, 0x40, t);
         var top = $"#{r:x2}{g:x2}{b:x2}";
         var bot = $"#{Darker(r):x2}{Darker(g):x2}{Darker(b):x2}";
         return $"linear-gradient(180deg,{top} 0%,{bot} 100%)";
     }
 
     // Paleta escura o bastante para texto branco em todas as faixas.
-    private static bool FunnelDark(double value, double max) => false;
+    private static bool FunnelDark(int i, int n) => false;
 
     // Largura da faixa do funil por POSIÇÃO (não pelo valor): estreita de forma
     // uniforme do topo à base, sempre afunilando — geometria limpa e simétrica.
