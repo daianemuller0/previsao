@@ -933,18 +933,21 @@
         return 999;
     }
 
-    // Cor por VALOR: forte/vibrante nos maiores, clara/fraca nos menores.
+    // Cor por VALOR: azul vivo e saturado — azul-céu nos menores, azul profundo
+    // nos maiores (sem tons acinzentados).
+    private static double FnT(double value, double max) =>
+        max > 0 ? Math.Pow(Math.Clamp(value / max, 0, 1), 0.85) : 0;
+
     private static string FunnelBar(double value, double max)
     {
-        double t = max > 0 ? Math.Pow(Math.Clamp(value / max, 0, 1), 0.72) : 0;
-        // teal claro (valor baixo) → teal-navy forte (valor alto).
-        int r = Lerp(0xc6, 0x0b, t), g = Lerp(0xdd, 0x4f, t), b = Lerp(0xe8, 0x6f, t);
+        double t = FnT(value, max);
+        // #9cc9f0 (azul-céu) → #0a468f (azul profundo). b sempre dominante = azul real.
+        int r = Lerp(0x9c, 0x0a, t), g = Lerp(0xc9, 0x46, t), b = Lerp(0xf0, 0x8f, t);
         return $"#{r:x2}{g:x2}{b:x2}";
     }
 
     // Fundo claro (valor baixo) → texto escuro para manter a legibilidade.
-    private static bool FunnelDark(double value, double max) =>
-        (max > 0 ? Math.Pow(Math.Clamp(value / max, 0, 1), 0.72) : 0) < 0.45;
+    private static bool FunnelDark(double value, double max) => FnT(value, max) < 0.40;
 
     // Largura da faixa do funil por POSIÇÃO (não pelo valor): estreita de forma
     // uniforme do topo à base, sempre afunilando — geometria limpa e simétrica.
