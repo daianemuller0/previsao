@@ -4,11 +4,12 @@
 @inject OpportunityRepository Repo
 @inject Catalog Cat
 @inject FollowUpRepository FUp
+@inject IJSRuntime JS
 
 @* ===========================================================================
    Follow-up das propostas em aberto. Puxa as oportunidades em aberto do forecast
-   e organiza a rotina de acompanhamento: último contato, próximo follow-up
-   (cadência), status e histórico de interações por proposta.
+   e organiza a ROTINA de acompanhamento em 4 marcos de contato (pós-envio, 15
+   dias antes, 1 semana antes e no fechamento), com modelos de e-mail em 3 idiomas.
    =========================================================================== *@
 
 <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Follow-up</span></div>
@@ -18,88 +19,119 @@
         <h1>Follow-up de propostas</h1>
         <p class="subtitle">Rotina de acompanhamento das propostas em aberto · @_rows.Count proposta(s) · @Fmt.Brl(_rows.Sum(r => r.Opp.AmountBrl)) em pipeline</p>
     </div>
+    <div class="page-actions">
+        <button class="btn-ghost" @onclick="() => _showTpl = true">@Icons.Svg("edit")Modelo de e-mail</button>
+        <button class="btn-primary" @onclick="IniciarRotina">@Icons.Svg("play")Iniciar rotina</button>
+    </div>
 </div>
 
-@* ---- KPIs ---- *@
-<div class="g12 top">
-    <div class="c3"><div class="kpi"><div class="kpi-l">Em aberto</div><div class="kpi-v">@_rows.Count</div><div class="kpi-s">@Fmt.Brl(_rows.Sum(r => r.Opp.AmountBrl))</div></div></div>
-    <div class="c3"><div class="kpi"><div class="kpi-l">Follow-up atrasado</div><div class="kpi-v" style="color:var(--neg)">@_rows.Count(r => r.Rank == 0)</div><div class="kpi-s">vencidos ou sem contato</div></div></div>
-    <div class="c3"><div class="kpi"><div class="kpi-l">Para hoje</div><div class="kpi-v">@_rows.Count(r => r.Rank == 1)</div><div class="kpi-s">agendados para hoje</div></div></div>
-    <div class="c3"><div class="kpi"><div class="kpi-l">Esta semana</div><div class="kpi-v">@_rows.Count(r => r.Rank == 2)</div><div class="kpi-s">próximos 7 dias</div></div></div>
+@* ---- Rotina de Follow-up (marcos) ---- *@
+<div class="fu-routine">
+    <div class="fu-routine-top">
+        <div class="fu-routine-title">Rotina de Follow-up <span class="fu-routine-tag">@_rows.Count(r => r.Rank == 0) em atraso</span></div>
+    </div>
+    <p class="fu-routine-sub">Cobre os clientes por e-mail, na ordem de prioridade (mais atrasado primeiro). Marcos: <strong>3 dias úteis após o envio</strong>, <strong>15 dias</strong> e <strong>1 semana antes do fechamento</strong>, e <strong>no dia do fechamento</strong>.</p>
+    <div class="fu-chips">
+        <span class="fu-chip late">@_rows.Count(r => r.Rank == 0) em atraso</span>
+        <span class="fu-chip">@_rows.Count(r => r.Cur?.Num == 1) · 1º pós-envio</span>
+        <span class="fu-chip">@_rows.Count(r => r.Cur?.Num == 2) · 2º −15 dias</span>
+        <span class="fu-chip">@_rows.Count(r => r.Cur?.Num == 3) · 3º −7 dias</span>
+        <span class="fu-chip">@_rows.Count(r => r.Cur?.Num == 4) · 4º fechamento</span>
+        <span class="fu-chip done">@_rows.Count(r => r.Cur is null) · concluídas</span>
+    </div>
 </div>
 
 @* ---- Filtros ---- *@
 <div class="filterbar" style="margin-top:14px">
     <div class="flt"><span class="flt-label">Vendedor</span><select @bind="_kam"><option value="">Todos</option>@foreach (var v in _kamOptions){<option value="@v">@v</option>}</select></div>
     <div class="flt"><span class="flt-label">Status</span><select @bind="_status"><option value="">Todos</option>@foreach (var s in FollowUpStatus.All){<option value="@s">@s</option>}</select></div>
-    <label class="flt-toggle @(_onlyDue ? "on" : "")" title="Só os que precisam de follow-up agora"><input type="checkbox" @bind="_onlyDue" />@Icons.Svg("clock")<span>Só pendentes de contato</span></label>
+    <label class="flt-toggle @(_onlyDue ? "on" : "")" title="Só os que precisam de contato agora (em atraso ou hoje)"><input type="checkbox" @bind="_onlyDue" />@Icons.Svg("clock")<span>Só pendentes de contato</span></label>
     <div class="filterbar-spacer"></div>
-    <span class="tag">Cadência padrão @_defaultCadence dias</span>
+    <span class="tag">@Filtered().Count() proposta(s)</span>
 </div>
 
 @* ---- Lista ---- *@
-<div class="table-wrap tbl-compact" style="max-height:720px;overflow:auto;margin-top:12px">
+<div class="table-wrap tbl-compact" style="max-height:700px;overflow:auto;margin-top:12px">
     <table class="grid-tbl">
         <thead>
             <tr>
-                <th class="no-sort">Follow-up</th>
+                <th class="no-sort">Marco / prazo</th>
                 <th class="no-sort">Cliente / Proposta</th>
                 <th class="no-sort">Vendedor</th>
-                <th class="no-sort">Stage</th>
                 <th class="no-sort right">Valor</th>
                 <th class="no-sort">Fechamento</th>
                 <th class="no-sort">Último contato</th>
-                <th class="no-sort">Próximo</th>
                 <th class="no-sort">Status</th>
-                <th class="no-sort center">Ações</th>
+                <th class="no-sort center">Ação</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var r in Filtered())
             {
                 <tr class="@(r.Rank == 0 ? "fu-urgent" : "")">
-                    <td><span class="fu-due @DueCss(r)">@DueLabel(r)</span></td>
-                    <td class="col-strong">@Cat.CustomerName(r.Opp.CustomerId)<div class="fu-sub">@(string.IsNullOrWhiteSpace(r.Opp.ProposalNumber) ? r.Opp.Name : r.Opp.ProposalNumber)</div></td>
+                    <td>
+                        <span class="fu-due @DueCss(r)">@DueLabel(r)</span>
+                        <div class="fu-sub">@(r.Cur?.Label ?? "rotina concluída")</div>
+                    </td>
+                    <td class="col-strong">@Cat.CustomerName(r.Opp.CustomerId)<div class="fu-sub">@Proposta(r.Opp)</div></td>
                     <td>@Vendedor(r.Opp)</td>
-                    <td>@(string.IsNullOrWhiteSpace(r.Opp.Stage) ? "—" : r.Opp.Stage)</td>
                     <td class="right num">@Fmt.Brl(r.Opp.AmountBrl)</td>
                     <td class="nowrap">@Fmt.Date(r.Opp.ExpectedDate)</td>
                     <td class="nowrap">@(r.Fu.LastContactValue is { } lc ? lc.ToString("dd/MM/yy") : "—")</td>
-                    <td class="nowrap">@(r.Next is { } nx ? nx.ToString("dd/MM/yy") : "—")</td>
                     <td><span class="badge @StatusCss(r.Fu.Status)">@r.Fu.Status</span></td>
                     <td class="center nowrap">
-                        <button class="btn-ghost" style="padding:3px 9px" @onclick="() => OpenRegister(r)">@Icons.Svg("check")Registrar</button>
-                        <button class="row-act" title="Adiar 7 dias" @onclick="() => Adiar(r, 7)">@Icons.Svg("clock")</button>
+                        <button class="btn-ghost" style="padding:3px 9px" @onclick="() => OpenRegister(r, false)">@Icons.Svg("check")Contatar</button>
                     </td>
                 </tr>
             }
             @if (!Filtered().Any())
             {
-                <tr><td colspan="10" class="empty">Nenhuma proposta em aberto no filtro.</td></tr>
+                <tr><td colspan="8" class="empty">Nenhuma proposta em aberto no filtro.</td></tr>
             }
         </tbody>
     </table>
 </div>
 
-@* ---- Registrar follow-up (drawer) ---- *@
-@if (_edit is not null && _editOpp is not null)
+@* ---- Registrar contato (drawer) ---- *@
+@if (_edit is not null && _editOpp is not null && _editRow is not null)
 {
-    <div class="drawer-backdrop" @onclick="() => _edit = null"></div>
-    <div class="drawer">
+    <div class="drawer-backdrop" @onclick="CloseDrawer"></div>
+    <div class="drawer drawer-wide">
         <div class="page-head">
             <div>
-                <h2 style="color:var(--primary)">Registrar follow-up</h2>
-                <p class="subtitle">@Cat.CustomerName(_editOpp.CustomerId) · @(string.IsNullOrWhiteSpace(_editOpp.ProposalNumber) ? _editOpp.Name : _editOpp.ProposalNumber)</p>
+                <h2 style="color:var(--primary)">Registrar contato@(_routineMode ? $" · {_queueIdx + 1} de {_queue.Count}" : "")</h2>
+                <p class="subtitle">@Cat.CustomerName(_editOpp.CustomerId) · @Proposta(_editOpp) · marco: @(_editRow.Cur?.Label ?? "concluído")</p>
             </div>
-            <button class="icon-btn" @onclick="() => _edit = null">@Icons.Svg("x")</button>
+            <button class="icon-btn" @onclick="CloseDrawer">@Icons.Svg("x")</button>
         </div>
+
+        @* Modelo de e-mail do marco atual, nos 3 idiomas *@
+        <div class="fu-mail">
+            <div class="fu-mail-head">
+                <span class="fu-mail-t">Modelo de e-mail — @(_editRow.Cur?.Label ?? "—")</span>
+                <div class="seg-tabs">
+                    @for (var i = 0; i < FollowUpRoutine.Langs.Length; i++)
+                    {
+                        var li = i;
+                        <button class="seg-tab @(_lang == li ? "on" : "")" @onclick="() => _lang = li">@FollowUpRoutine.Langs[li]</button>
+                    }
+                </div>
+            </div>
+            <textarea class="field fu-mail-body" rows="9" readonly>@CurrentEmail()</textarea>
+            <div class="fu-mail-actions">
+                <button class="btn-ghost" @onclick="CopyEmail">@Icons.Svg("copy")Copiar e-mail</button>
+                @if (_copyOk) { <span class="fu-copied">Copiado!</span> }
+            </div>
+        </div>
+
         <div class="form-grid">
+            <label class="fld">Data de envio da proposta<input class="field" type="date" @bind="_regSent" /></label>
             <label class="fld">Data do contato<input class="field" type="date" @bind="_regDate" /></label>
             <label class="fld">Canal<select class="field" @bind="_regChannel">@foreach (var c in FollowUpChannel.All){<option value="@c">@c</option>}</select></label>
             <label class="fld">Resultado / Status<select class="field" @bind="_regStatus">@foreach (var s in FollowUpStatus.All){<option value="@s">@s</option>}</select></label>
-            <label class="fld">Próximo follow-up<input class="field" type="date" @bind="_regNext" /></label>
-            <label class="fld full">Observação<textarea class="field" rows="3" @bind="_regNote" placeholder="O que foi tratado, próximos passos…"></textarea></label>
+            <label class="fld full">Observação<textarea class="field" rows="2" @bind="_regNote" placeholder="O que foi tratado, próximos passos…"></textarea></label>
         </div>
+
         <div class="fu-hist">
             <div class="fu-hist-h">Histórico</div>
             @if (_editLogs.Count == 0) { <div class="muted" style="font-size:12px">Nenhuma interação registrada ainda.</div> }
@@ -114,33 +146,82 @@
                 }
             }
         </div>
+
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _edit = null">Cancelar</button>
-            <button class="btn-primary" @onclick="SaveRegister">@Icons.Svg("check")Salvar follow-up</button>
+            <button class="btn-ghost" @onclick="CloseDrawer">Fechar</button>
+            @if (_routineMode && _queueIdx < _queue.Count - 1)
+            {
+                <button class="btn-ghost" @onclick="() => SaveRegister(true)">Registrar e próximo</button>
+            }
+            <button class="btn-primary" @onclick="() => SaveRegister(false)">@Icons.Svg("check")Registrar contato</button>
         </div>
+    </div>
+}
+
+@* ---- Modelos de e-mail (referência) ---- *@
+@if (_showTpl)
+{
+    <div class="drawer-backdrop" @onclick="() => _showTpl = false"></div>
+    <div class="drawer drawer-wide">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">Modelos de e-mail</h2>
+                <p class="subtitle">Um modelo por marco de contato · três idiomas · use {cliente} {proposta} {valor} {fechamento} {vendedor}</p>
+            </div>
+            <button class="icon-btn" @onclick="() => _showTpl = false">@Icons.Svg("x")</button>
+        </div>
+        <div class="seg-tabs" style="margin-bottom:12px">
+            @for (var i = 0; i < FollowUpRoutine.Langs.Length; i++)
+            {
+                var li = i;
+                <button class="seg-tab @(_tplLang == li ? "on" : "")" @onclick="() => _tplLang = li">@FollowUpRoutine.Langs[li]</button>
+            }
+        </div>
+        @for (var m = 1; m <= 4; m++)
+        {
+            var mm = m;
+            <div class="fu-tpl">
+                <div class="fu-tpl-h">@MarcoNome(mm)</div>
+                <textarea class="field fu-mail-body" rows="8" readonly>@FollowUpRoutine.Email(mm, _tplLang, _sampleCtx)</textarea>
+                <button class="btn-ghost" style="margin-top:6px" @onclick="async () => await CopyText(FollowUpRoutine.Email(mm, _tplLang, _sampleCtx))">@Icons.Svg("copy")Copiar</button>
+            </div>
+        }
     </div>
 }
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private string _user = "—";
+    private readonly DateTime _today = DateTime.Today;
 
-    private record Row(Opportunity Opp, FollowUp Fu, DateTime? Next, int Rank);
+    private record Row(Opportunity Opp, FollowUp Fu, List<FollowUpRoutine.Milestone> Ms, FollowUpRoutine.Milestone? Cur, int Rank);
 
     private List<Row> _rows = new();
     private IEnumerable<string> _kamOptions = Array.Empty<string>();
-    private const int _defaultCadence = 14;
 
     // Filtros.
     private string _kam = "", _status = "";
     private bool _onlyDue;
 
-    // Drawer de registro.
+    // Drawer de contato.
     private FollowUp? _edit;
     private Opportunity? _editOpp;
-    private DateTime? _regDate, _regNext;
-    private string _regChannel = "Ligação", _regStatus = FollowUpStatus.Pendente, _regNote = "";
+    private Row? _editRow;
+    private DateTime? _regDate, _regNext, _regSent;
+    private string _regChannel = "Ligação", _regStatus = FollowUpStatus.EmContato, _regNote = "";
+    private int _lang;
+    private bool _copyOk;
     private List<FollowUpLog> _editLogs = new();
+
+    // Rotina guiada.
+    private bool _routineMode;
+    private List<Row> _queue = new();
+    private int _queueIdx;
+
+    // Modelos de e-mail (modal).
+    private bool _showTpl;
+    private int _tplLang;
+    private readonly FollowUpRoutine.EmailCtx _sampleCtx = new("{cliente}", "{proposta}", "{valor}", "{fechamento}", "{vendedor}");
 
     protected override async Task OnInitializedAsync()
     {
@@ -150,21 +231,22 @@
 
     private void Load()
     {
-        var today = DateTime.Today;
         var fu = FUp.All();
         var open = Repo.All().Where(o => ForecastCategories.IsOpen(o.Category)).ToList();
 
         _rows = open.Select(o =>
         {
-            var f = fu.TryGetValue(o.Id, out var x) ? x : new FollowUp { Id = o.Id, Status = FollowUpStatus.Pendente, CadenceDays = _defaultCadence.ToString() };
-            var next = f.NextFollowUpValue;
+            var f = fu.TryGetValue(o.Id, out var x) ? x : new FollowUp { Id = o.Id, Status = FollowUpStatus.Pendente };
+            var sent = f.SentDateValue ?? ParseDate(o.CreatedAt);
+            var ms = FollowUpRoutine.Milestones(sent, o.ExpectedDateValue);
+            var cur = FollowUpRoutine.Current(ms, f.LastContactValue);
             int rank;
-            if (next is null) rank = 0;                                   // sem próximo agendado → precisa iniciar
-            else { var days = (next.Value.Date - today).Days; rank = days < 0 ? 0 : days == 0 ? 1 : days <= 7 ? 2 : 3; }
-            return new Row(o, f, next, rank);
+            if (cur is null) rank = 5;                                            // rotina concluída
+            else { var days = (cur.Date.Date - _today).Days; rank = days < 0 ? 0 : days == 0 ? 1 : days <= 7 ? 2 : 3; }
+            return new Row(o, f, ms, cur, rank);
         })
         .OrderBy(r => r.Rank)
-        .ThenBy(r => r.Next ?? DateTime.MinValue)
+        .ThenBy(r => r.Cur?.Date ?? DateTime.MaxValue)
         .ThenByDescending(r => r.Opp.AmountBrl)
         .ToList();
 
@@ -182,32 +264,68 @@
     }
 
     private string Vendedor(Opportunity o) => OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId));
+    private string Proposta(Opportunity o) => string.IsNullOrWhiteSpace(o.ProposalNumber) ? o.Name : o.ProposalNumber;
+    private static DateTime? ParseDate(string s) =>
+        DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
 
-    // ---- ações ----
-    private void OpenRegister(Row r)
+    // ---- rotina guiada ----
+    private void IniciarRotina()
     {
+        _queue = _rows.Where(r => r.Rank <= 1).ToList();   // em atraso + para hoje
+        if (_queue.Count == 0) { _queue = _rows.Where(r => r.Cur is not null).ToList(); }
+        if (_queue.Count == 0) return;
+        _routineMode = true; _queueIdx = 0;
+        OpenRegister(_queue[0], true);
+    }
+
+    // ---- drawer ----
+    private void OpenRegister(Row r, bool routine)
+    {
+        _routineMode = routine;
+        _editRow = r;
         _editOpp = r.Opp;
         _edit = new FollowUp
         {
-            Id = r.Fu.Id, Status = r.Fu.Status, LastContact = r.Fu.LastContact,
+            Id = r.Fu.Id, Status = r.Fu.Status, SentDate = r.Fu.SentDate, LastContact = r.Fu.LastContact,
             NextFollowUp = r.Fu.NextFollowUp, CadenceDays = r.Fu.CadenceDays, Notes = r.Fu.Notes,
         };
-        _regDate = DateTime.Today;
-        _regChannel = "Ligação";
-        _regStatus = string.IsNullOrWhiteSpace(r.Fu.Status) ? FollowUpStatus.EmContato : r.Fu.Status;
-        _regNext = DateTime.Today.AddDays(r.Fu.CadenceDaysValue);
+        _regSent = r.Fu.SentDateValue ?? ParseDate(r.Opp.CreatedAt) ?? _today;
+        _regDate = _today;
+        _regChannel = "E-mail";
+        _regStatus = FollowUpStatus.IsActive(r.Fu.Status) && r.Fu.Status != FollowUpStatus.Pendente ? r.Fu.Status : FollowUpStatus.EmContato;
         _regNote = "";
+        _lang = 0;
+        _copyOk = false;
         _editLogs = FUp.Logs(r.Opp.Id);
     }
 
-    private void SaveRegister()
+    private void CloseDrawer() { _edit = null; _editOpp = null; _editRow = null; _routineMode = false; }
+
+    private string CurrentEmail()
+    {
+        if (_editOpp is null || _editRow is null) return "";
+        var o = _editOpp;
+        var ctx = new FollowUpRoutine.EmailCtx(Cat.CustomerName(o.CustomerId), Proposta(o), Fmt.Brl(o.AmountBrl), Fmt.Date(o.ExpectedDate), Vendedor(o));
+        return FollowUpRoutine.Email(_editRow.Cur?.Num ?? 1, _lang, ctx);
+    }
+
+    private async Task CopyEmail() { _copyOk = await CopyText(CurrentEmail()); }
+
+    private async Task<bool> CopyText(string text)
+    {
+        try { var ok = await JS.InvokeAsync<bool>("copyText", text); _copyOk = ok; return ok; }
+        catch { return false; }
+    }
+
+    private void SaveRegister(bool next)
     {
         if (_edit is null || _editOpp is null) return;
-        var contato = _regDate ?? DateTime.Today;
+        var contato = _regDate ?? _today;
+        _edit.SentDate = _regSent?.ToString("yyyy-MM-dd") ?? _edit.SentDate;
         _edit.Status = _regStatus;
         _edit.LastContact = contato.ToString("yyyy-MM-dd");
-        // Ganho/Perdido encerram a rotina (sem próximo follow-up).
-        _edit.NextFollowUp = FollowUpStatus.IsActive(_regStatus) && _regNext is { } nx ? nx.ToString("yyyy-MM-dd") : "";
+        // Próximo follow-up = próximo marco após este contato (recalculado no Load).
+        _edit.NextFollowUp = "";
         _edit.Notes = _regNote;
         FUp.Save(_edit, _user);
         FUp.AddLog(new FollowUpLog
@@ -215,31 +333,33 @@
             OppId = _editOpp.Id, User = _user, Channel = _regChannel, Outcome = _regStatus,
             Note = _regNote, Ts = contato.ToString("yyyy-MM-ddTHH:mm:ss"),
         });
-        _edit = null; _editOpp = null;
         Load();
-    }
 
-    private void Adiar(Row r, int dias)
-    {
-        var baseDate = r.Next ?? DateTime.Today;
-        var f = new FollowUp
+        if (next && _routineMode && _queueIdx < _queue.Count - 1)
         {
-            Id = r.Fu.Id, Status = string.IsNullOrWhiteSpace(r.Fu.Status) ? FollowUpStatus.Pendente : r.Fu.Status,
-            LastContact = r.Fu.LastContact, CadenceDays = r.Fu.CadenceDays, Notes = r.Fu.Notes,
-            NextFollowUp = baseDate.AddDays(dias).ToString("yyyy-MM-dd"),
-        };
-        FUp.Save(f, _user);
-        Load();
+            _queueIdx++;
+            var nextRow = _rows.FirstOrDefault(r => r.Opp.Id == _queue[_queueIdx].Opp.Id) ?? _queue[_queueIdx];
+            OpenRegister(nextRow, true);
+        }
+        else { CloseDrawer(); }
     }
 
     // ---- rótulos / cores ----
-    private static string DueLabel(Row r)
+    private static string MarcoNome(int m) => m switch
     {
-        if (r.Next is null) return "A iniciar";
-        var days = (r.Next.Value.Date - DateTime.Today).Days;
-        return days < 0 ? $"Atrasado {-days}d" : days == 0 ? "Hoje" : days <= 7 ? $"Em {days}d" : r.Next.Value.ToString("dd/MM");
+        1 => "1º · pós-envio (3 dias úteis após o envio)",
+        2 => "2º · 15 dias antes do fechamento",
+        3 => "3º · 1 semana antes do fechamento",
+        _ => "4º · no dia do fechamento",
+    };
+
+    private string DueLabel(Row r)
+    {
+        if (r.Cur is null) return "Concluída";
+        var days = (r.Cur.Date.Date - _today).Days;
+        return days < 0 ? $"Atrasado {-days}d" : days == 0 ? "Hoje" : days <= 7 ? $"Em {days}d" : r.Cur.Date.ToString("dd/MM");
     }
-    private static string DueCss(Row r) => r.Rank switch { 0 => "due-late", 1 => "due-today", 2 => "due-week", _ => "due-future" };
+    private static string DueCss(Row r) => r.Rank switch { 0 => "due-late", 1 => "due-today", 2 => "due-week", 5 => "due-done", _ => "due-future" };
 
     private static string StatusCss(string s) => s switch
     {
