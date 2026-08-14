@@ -235,8 +235,8 @@
                 var frac = dwN / dw;
                 var inset = (1 - frac) / 2 * 100;
                 <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
-                    <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
-                    <div class="fn5-text">
+                    <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(f.Value, _funnelMax)"></div>
+                    <div class="fn5-text @(FunnelDark(f.Value, _funnelMax) ? "dark" : "")">
                         <div class="fn5-name">@f.Stage</div>
                         <div class="fn5-amt">@MoneyBrl(f.Value)</div>
                         <div class="fn5-sub">@Fmt.Pct(sh) of pipeline · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " to next" : "")</div>
@@ -261,6 +261,7 @@
         <div class="xcard ind-card">
             <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Funil das indicadas · por Stage</div><div class="xcard-sub">@_indicadas.Count oport. · @MoneyBrl(_indTotal) · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) do pipeline</div></div></div>
             <div class="fn5">
+                @{ var indMax = _indFunnel.Count > 0 ? _indFunnel.Max(x => x.Value) : 1; }
                 @for (var i = 0; i < _indFunnel.Count; i++)
                 {
                     var f = _indFunnel[i];
@@ -271,8 +272,8 @@
                     var frac = dwN / dw;
                     var inset = (1 - frac) / 2 * 100;
                     <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) · @f.Count opps">
-                        <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _indFunnel.Count)"></div>
-                        <div class="fn5-text">
+                        <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(f.Value, indMax)"></div>
+                        <div class="fn5-text @(FunnelDark(f.Value, indMax) ? "dark" : "")">
                             <div class="fn5-name">@f.Stage</div>
                             <div class="fn5-amt">@MoneyBrl(f.Value)</div>
                             <div class="fn5-sub">@Fmt.Pct(sh) · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) : "")</div>
@@ -932,14 +933,18 @@
         return 999;
     }
 
-    private static string FunnelBar(int i, int n)
+    // Cor por VALOR: forte/vibrante nos maiores, clara/fraca nos menores.
+    private static string FunnelBar(double value, double max)
     {
-        double t = n <= 1 ? 0 : (double)i / (n - 1);
-        // teal/azul da mesma família: navy escuro no topo → teal médio na base
-        // (mantém contraste suficiente para o texto branco dentro do segmento).
-        int r = Lerp(0x08, 0x1c, t), g = Lerp(0x40, 0x82, t), b = Lerp(0x5c, 0xa2, t);
+        double t = max > 0 ? Math.Pow(Math.Clamp(value / max, 0, 1), 0.72) : 0;
+        // teal claro (valor baixo) → teal-navy forte (valor alto).
+        int r = Lerp(0xc6, 0x0b, t), g = Lerp(0xdd, 0x4f, t), b = Lerp(0xe8, 0x6f, t);
         return $"#{r:x2}{g:x2}{b:x2}";
     }
+
+    // Fundo claro (valor baixo) → texto escuro para manter a legibilidade.
+    private static bool FunnelDark(double value, double max) =>
+        (max > 0 ? Math.Pow(Math.Clamp(value / max, 0, 1), 0.72) : 0) < 0.45;
 
     // Largura da faixa do funil por POSIÇÃO (não pelo valor): estreita de forma
     // uniforme do topo à base, sempre afunilando — geometria limpa e simétrica.
