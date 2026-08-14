@@ -10,12 +10,15 @@ public class FollowUp
 {
     public string Id { get; set; } = "";           // = id da oportunidade
     public string Status { get; set; } = "Pendente"; // ver FollowUpStatus.All
+    public string SentDate { get; set; } = "";       // yyyy-MM-dd — envio da proposta
     public string LastContact { get; set; } = "";    // yyyy-MM-dd — último contato
     public string NextFollowUp { get; set; } = "";   // yyyy-MM-dd — próximo follow-up
     public string CadenceDays { get; set; } = "14";  // cadência (dias) da rotina
     public string Notes { get; set; } = "";          // observação atual
     public string UpdatedBy { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
+
+    public DateTime? SentDateValue => P(SentDate);
 
     private static DateTime? P(string s) =>
         DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;

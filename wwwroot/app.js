@@ -10,6 +10,19 @@ window.appDownload = (fileName, mime, base64) => {
     a.remove();
 };
 
+// Copia texto para a área de transferência (modelo de e-mail do follow-up).
+window.copyText = async (text) => {
+    try {
+        if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+    } catch (e) { }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        const ok = document.execCommand('copy'); ta.remove(); return ok;
+    } catch (e) { return false; }
+};
+
 // Alterna o recolhimento da sidebar guardando a preferência do usuário.
 window.appToggleSidebar = (collapsed) => {
     try { localStorage.setItem('hsf-sidebar', collapsed ? '1' : '0'); } catch { }

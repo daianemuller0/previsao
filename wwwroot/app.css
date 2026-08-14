@@ -1651,3 +1651,29 @@ tr.row-ind td.col-strong { color: #9a6a12; }
 .fu-hist-row:last-child { border-bottom: none; }
 .fu-hist-date { flex: 0 0 62px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .fu-hist-body { color: var(--text-2); }
+
+/* Follow-up · rotina + marcos + modelo de e-mail */
+.fu-routine { margin-top: 14px; padding: 16px 18px; border-radius: 14px; color: #fff;
+    background: linear-gradient(135deg, #0b4f6f 0%, #0e7490 100%); box-shadow: var(--shadow-sm); }
+.fu-routine-top { display: flex; align-items: center; justify-content: space-between; }
+.fu-routine-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+.fu-routine-tag { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.18); padding: 2px 9px; border-radius: 999px; }
+.fu-routine-sub { font-size: 12.5px; opacity: .92; margin: 6px 0 12px; line-height: 1.5; }
+.fu-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fu-chip { font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,.14); color: #fff; padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+.fu-chip.late { background: #c0392b; }
+.fu-chip.done { background: rgba(255,255,255,.10); opacity: .8; }
+.due-done { background: #eef2f7; color: var(--muted); }
+
+.seg-tabs { display: inline-flex; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.seg-tab { border: none; background: transparent; padding: 5px 12px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; font-family: inherit; }
+.seg-tab.on { background: var(--primary); color: #fff; }
+
+.fu-mail { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 14px; background: var(--panel-2); }
+.fu-mail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.fu-mail-t { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.fu-mail-body { width: 100%; font-family: inherit; font-size: 12.5px; line-height: 1.5; resize: vertical; background: var(--panel); }
+.fu-mail-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.fu-copied { font-size: 12px; color: var(--pos); font-weight: 700; }
+.fu-tpl { margin-bottom: 16px; }
+.fu-tpl-h { font-size: 12.5px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
