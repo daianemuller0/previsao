@@ -1549,7 +1549,7 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
     white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,20,35,.26);
 }
 /* Segmentos claros (valor baixo): texto escuro para manter legibilidade */
-.fn5-text.dark { color: #0d3b52; }
+.fn5-text.dark { color: #0b3566; }
 .fn5-text.dark .fn5-name, .fn5-text.dark .fn5-amt, .fn5-text.dark .fn5-sub { text-shadow: none; }
 
 /* ---- Indicar na Previsão (marcador do vendedor) ---- */
