@@ -1036,7 +1036,7 @@
     // de transcrição/sotaque). Só aplica se a pontuação passar do limiar.
     private void TryName(IEnumerable<string> options, Action<string> set, string[] toks, string label, List<string> applied)
     {
-        string best = null; double bestScore = 0;
+        string? best = null; double bestScore = 0;
         foreach (var o in options)
         {
             var s = MatchScore(o, toks);
@@ -1129,7 +1129,7 @@
     }
 
     // Normaliza p/ casar: minúsculas, sem acentos, espaços colapsados.
-    private static string NormV(string s)
+    private static string NormV(string? s)
     {
         if (string.IsNullOrWhiteSpace(s)) return "";
         var d = s.Trim().ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
