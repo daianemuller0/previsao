@@ -229,11 +229,10 @@
                 var f = _funnel[i];
                 var sh = f.Value / _funnelTotal * 100;
                 var conv = i < _funnel.Count - 1 && f.Value > 0 ? _funnel[i + 1].Value / f.Value * 100 : (double?)null;
-                // Largura com piso alto (62%) e estreitamento suave: funil largo,
-                // pouco pontudo. Base com boa largura mínima.
-                var dw = 62 + 38 * (f.Value / _funnelMax);
-                var dwN = i < _funnel.Count - 1 ? 62 + 38 * (_funnel[i + 1].Value / _funnelMax) : dw * 0.9;
-                var frac = Math.Clamp(dwN / dw, 0.74, 1.0);
+                // Geometria por posição: sempre afunilando (largura decrescente).
+                var dw = FnW(i, _funnel.Count);
+                var dwN = i < _funnel.Count - 1 ? FnW(i + 1, _funnel.Count) : dw * 0.86;
+                var frac = dwN / dw;
                 var inset = (1 - frac) / 2 * 100;
                 <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
                     <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
@@ -267,9 +266,9 @@
                     var f = _indFunnel[i];
                     var sh = f.Value / Math.Max(_indTotal, 1) * 100;
                     var conv = i < _indFunnel.Count - 1 && f.Value > 0 ? _indFunnel[i + 1].Value / f.Value * 100 : (double?)null;
-                    var dw = 62 + 38 * (f.Value / _indFunnelMax);
-                    var dwN = i < _indFunnel.Count - 1 ? 62 + 38 * (_indFunnel[i + 1].Value / _indFunnelMax) : dw * 0.9;
-                    var frac = Math.Clamp(dwN / dw, 0.74, 1.0);
+                    var dw = FnW(i, _indFunnel.Count);
+                    var dwN = i < _indFunnel.Count - 1 ? FnW(i + 1, _indFunnel.Count) : dw * 0.86;
+                    var frac = dwN / dw;
                     var inset = (1 - frac) / 2 * 100;
                     <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) · @f.Count opps">
                         <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _indFunnel.Count)"></div>
@@ -744,7 +743,6 @@
     private List<Opportunity> _indicadas = new();
     private double _indTotal;
     private List<FunnelRow> _indFunnel = new();
-    private double _indFunnelMax = 1;
     private List<SliceRow> _indByRep = new();
     // Gráficos do funil (base nova). Valores em R$ nativo (Amount converted).
     private List<SliceRow> _byRep = new(), _bySegment = new(), _byMarketH = new(), _bySubMarket = new(), _byBu2 = new();
@@ -942,6 +940,11 @@
         int r = Lerp(0x08, 0x1c, t), g = Lerp(0x40, 0x82, t), b = Lerp(0x5c, 0xa2, t);
         return $"#{r:x2}{g:x2}{b:x2}";
     }
+
+    // Largura da faixa do funil por POSIÇÃO (não pelo valor): estreita de forma
+    // uniforme do topo à base, sempre afunilando — geometria limpa e simétrica.
+    // O valor de cada etapa é lido no rótulo, não na largura.
+    private static double FnW(int i, int n) => n <= 1 ? 90 : 96 - (96 - 46) * i / (double)(n - 1);
 
     // Largura da faixa do funil (% do maior valor), com mínimo p/ legibilidade.
     private string FunnelWidth(double v) =>
@@ -1257,7 +1260,6 @@
         _indFunnel = _indicadas.GroupBy(KeyStage, StringComparer.OrdinalIgnoreCase)
             .Select(g => new FunnelRow(g.Key, g.Sum(o => o.AmountBrl), g.Count()))
             .Where(x => x.Value > 0).OrderBy(x => StageRank(x.Stage)).ThenByDescending(x => x.Value).ToList();
-        _indFunnelMax = Math.Max(_indFunnel.Count > 0 ? _indFunnel.Max(x => x.Value) : 1, 1);
         _indByRep = GroupBrl(_indicadas, KeyKam);
 
         // Gráficos do funil (todos sobre o recorte filtrado, valor = Amount converted):
