@@ -122,12 +122,6 @@
         <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">of target</span></div>
         <div class="kpi-spark"><Sparkline Values="@_mReal" Stroke="#1f9254" /></div>
     </div>
-    <div class="kpi accent-warn">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("target")</span><span class="kpi-label">Gap vs Target</span></div>
-        <div class="kpi-value">@MoneyBrl(_gapTgt)</div>
-        <div class="kpi-delta warn"><span class="ctx">target @MoneyBrl(_metaYear)</span></div>
-        <div class="kpi-bar"><i style="width:@Share(_fcBrl, Math.Max(_metaYear, 1))%"></i></div>
-    </div>
     <div class="kpi @(_gmAvg >= 30 ? "accent-pos" : "accent-warn")">
         <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("executive")</span><span class="kpi-label">Gross Margin</span></div>
         <div class="kpi-value">@Fmt.Pct(_gmAvg)</div>
