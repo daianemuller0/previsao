@@ -1132,7 +1132,12 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .xcard-ico svg { width: 17px; height: 17px; }
 
 /* ---- KPI Executive cards ---- */
-.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+.cov2 { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 6px; }
+.cov2-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cov2-k { font-size: 12px; color: var(--muted); font-weight: 600; }
+.cov2-v { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.cov2-v.pos { color: var(--pos); } .cov2-v.neg { color: var(--neg); }
 .kpi {
     background: var(--exec-card); border: 1px solid var(--exec-border); border-radius: 14px;
     box-shadow: var(--exec-shadow); padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 10px;
