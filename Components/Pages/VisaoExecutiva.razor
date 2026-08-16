@@ -130,9 +130,11 @@
     </div>
     <div class="kpi">
         <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("layers")</span><span class="kpi-label">Pipeline Coverage</span></div>
-        <div class="kpi-value">@_coverage.ToString("0.0", _pt)x</div>
-        <div class="kpi-delta @(_coverage >= 1 ? "pos" : "neg")"><span class="arw">@(_coverage >= 1 ? "▲" : "▼")</span> <span class="ctx">weighted pipeline vs remaining target</span></div>
-        <div class="kpi-bar"><i style="width:@Share(Math.Min(_coverage, 2), 2)%"></i></div>
+        <div class="cov2">
+            <div class="cov2-row"><span class="cov2-k">Meta NB+AFM</span><span class="cov2-v @(_coverageNbAfm >= 3 ? "pos" : "neg")">@_coverageNbAfm.ToString("0.0", _pt)x</span></div>
+            <div class="cov2-row"><span class="cov2-k">Meta Vendas HSA</span><span class="cov2-v @(_coverageHsa >= 3 ? "pos" : "neg")">@_coverageHsa.ToString("0.0", _pt)x</span></div>
+        </div>
+        <div class="kpi-delta"><span class="ctx">pipeline @_repYear ponderado ÷ meta restante</span></div>
     </div>
 </div>
 
@@ -712,6 +714,7 @@
     private double _realizedYtd, _attainYtd, _attainYear, _attainMonth, _committedMonth;
     private double _pipelineTotal, _pipelineWeighted, _marginForecast, _gmAvg;
     private double _coverage, _gapYear, _concentration, _atRisk, _eligiblePipeline, _remainingTarget;
+    private double _coverageNbAfm, _coverageHsa, _covPipeYear;   // cobertura por meta (ano)
     private int _openCount, _atRiskCount, _dq, _confidence, _health;
     private string _topCustomer = "—", _healthLabel = "", _coverageLabel = "", _sym = "US$";
     private double _fcMonthDelta, _fcQuarterDelta, _fcYearDelta, _moveNet;
@@ -1349,6 +1352,16 @@
         _eligiblePipeline = open.Where(o => o.Category is ForecastCategory.Commit or ForecastCategory.BestCase or ForecastCategory.Pipeline).Sum(W);
         _coverage = ForecastCalc.Coverage(_eligiblePipeline, _remainingTarget);
         _coverageLabel = _coverage.ToString("0.0", _pt) + "x";
+
+        // Cobertura por META (REPORT HSA), usando o pipeline ponderado DESTE ANO
+        // (ano da meta), independentemente do filtro "Todos os anos". Duas metas:
+        // NB+AFM e Vendas HSA. Cobertura = pipeline do ano ÷ meta restante.
+        _covPipeYear = open.Where(o => (o.ExpectedDateValue?.Year ?? 0) == _repYear)
+            .Where(o => o.Category is ForecastCategory.Commit or ForecastCategory.BestCase or ForecastCategory.Pipeline)
+            .Sum(W) * Rate;   // ponderado em R$
+        double realAno = _repReal.Sum(), metaNbAfmAno = _repMeta.Sum(), metaHsaAno = _repMetaHsa.Sum();
+        _coverageNbAfm = _covPipeYear / Math.Max(metaNbAfmAno - realAno, 1);
+        _coverageHsa = _covPipeYear / Math.Max(metaHsaAno - realAno, 1);
         _gapYear = ForecastCalc.Gap(_tgtYear, realizedYear, _fcYear);
 
         var risky = open.Where(o => ForecastCalc.Level(o, _today) is RiskLevel.Alto or RiskLevel.Critico).ToList();
