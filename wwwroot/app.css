@@ -1132,7 +1132,7 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .xcard-ico svg { width: 17px; height: 17px; }
 
 /* ---- KPI Executive cards ---- */
-.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .kpi {
     background: var(--exec-card); border: 1px solid var(--exec-border); border-radius: 14px;
     box-shadow: var(--exec-shadow); padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 10px;
@@ -1230,7 +1230,7 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .exi-text { font-size: 12.5px; line-height: 1.45; color: var(--muted); }
 
 /* Responsivo */
-@media (max-width: 1500px) { .kpi-row { grid-template-columns: repeat(5, 1fr); } .kpi-value { font-size: 24px; } }
+@media (max-width: 1500px) { .kpi-row { grid-template-columns: repeat(4, 1fr); } .kpi-value { font-size: 24px; } }
 @media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } .exi-grid { grid-template-columns: repeat(2, 1fr); } .seg-wrap { grid-template-columns: 160px 1fr; } }
 
 /* Colunas dos rankings (alinhamento consistente head + rows) */
