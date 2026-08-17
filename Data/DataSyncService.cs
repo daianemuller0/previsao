@@ -116,10 +116,14 @@ public sealed class DataSyncService
                         .ToDictionary(o => o.Id, StringComparer.Ordinal);
 
                     // Preserva marcações feitas no app (não vêm da planilha) para não
-                    // se perderem ao re-sincronizar: flag "Indicar na Previsão".
+                    // se perderem ao re-sincronizar: flag "Indicar na Previsão" e a
+                    // marcação de "venda indicada" (movida para o Controle).
                     foreach (var row in result.Rows)
-                        if (existing.TryGetValue(row.Id, out var prev) && !string.IsNullOrEmpty(prev.Indicada))
-                            row.Indicada = prev.Indicada;
+                        if (existing.TryGetValue(row.Id, out var prev))
+                        {
+                            if (!string.IsNullOrEmpty(prev.Indicada)) row.Indicada = prev.Indicada;
+                            if (!string.IsNullOrEmpty(prev.MovidaControle)) row.MovidaControle = prev.MovidaControle;
+                        }
 
                     _repo.SaveMany(result.Rows);
                     foreach (var id in existing.Keys)

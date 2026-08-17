@@ -376,6 +376,7 @@ h1 { font-size: 22px; color: var(--primary); }
 tr:hover .row-act { opacity: .85; }
 .row-act:hover { opacity: 1; background: var(--panel-2); color: var(--text-2); }
 .row-act.del:hover { color: var(--neg); background: var(--neg-bg); }
+.row-act.sell:hover { color: var(--pos); background: var(--pos-bg, #e7f6ec); }
 .row-act svg { width: 15px; height: 15px; }
 
 /* Caixa de confirmação (exclusão) */
