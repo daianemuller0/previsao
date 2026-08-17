@@ -56,7 +56,7 @@ public class Opportunity
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
     public string AmountOriginal { get; set; } = "0"; // valor na moeda de origem
-    public string ExchangeRate { get; set; } = "0";   // cotação BRL por USD (ex.: 5,40)
+    public string ExchangeRate { get; set; } = "0";   // fator moeda de origem → BRL (Valor BRL = original × taxa)
     public string GmPercent { get; set; } = "0";      // margem bruta %
 
     // Forecast
@@ -112,10 +112,17 @@ public class Opportunity
         ? AmountOriginalValue
         : AmountOriginalValue * (ExchangeRateValue > 0 ? ExchangeRateValue : 0);
 
-    // Valor em USD — moeda de consolidação executiva.
+    // Taxa global BRL por USD (moeda executiva de consolidação). Sincronizada do
+    // catálogo na inicialização. O valor em USD deriva SEMPRE do valor em BRL —
+    // que já sai correto da conversão da moeda de origem (origem → BRL).
+    public static double BrlPerUsd = 5.42;
+
+    // Valor em USD = valor em BRL ÷ (BRL por USD). Não usa a taxa por-linha
+    // (que é origem → BRL) para o passo do dólar — isso gerava valores absurdos
+    // quando a moeda de origem não era USD (ex.: CLP).
     public double AmountUsd => IsUsd
         ? AmountOriginalValue
-        : (ExchangeRateValue > 0 ? AmountOriginalValue / ExchangeRateValue : 0);
+        : (BrlPerUsd > 0 ? AmountBrl / BrlPerUsd : 0);
 
     public DateTime? ExpectedDateValue =>
         DateTime.TryParse(ExpectedDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
