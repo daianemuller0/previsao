@@ -111,7 +111,7 @@ else
                 <dl class="detail-grid">
                     <div class="dl"><dt>Moeda de origem</dt><dd>@_o.CurrencyCode</dd></div>
                     <div class="dl"><dt>Valor original</dt><dd>@_o.AmountOriginalValue.ToString("#,##0")</dd></div>
-                    <div class="dl"><dt>Câmbio (BRL/USD)</dt><dd>@_o.ExchangeRateValue.ToString("0.00")</dd></div>
+                    <div class="dl"><dt>Câmbio (@_o.CurrencyCode → BRL)</dt><dd>@_o.ExchangeRateValue.ToString("#,##0.####")</dd></div>
                     <div class="dl"><dt>Valor em BRL</dt><dd>@Fmt.Brl(_o.AmountBrl)</dd></div>
                     <div class="dl"><dt>Valor em USD</dt><dd>@Fmt.Usd(_o.AmountUsd)</dd></div>
                     <div class="dl"><dt>GM%</dt><dd>@Fmt.Pct(_o.GmPercentValue)</dd></div>

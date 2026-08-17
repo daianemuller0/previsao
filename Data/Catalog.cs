@@ -190,6 +190,9 @@ public sealed class Catalog
         _plant = Plants.ToDictionary(x => x.Id);
         _stage = Stages.ToDictionary(x => x.Id);
         _rate = ExchangeRates.ToDictionary(x => x.CurrencyCode, x => x.RateToUsd);
+        // Mantém a taxa BRL/USD global (usada no cálculo do Valor em USD) em sincronia.
+        if (_rate.TryGetValue("USD", out var usd) && usd > 0)
+            HowdenSalesForecast.Models.Opportunity.BrlPerUsd = usd;
     }
 
     // ---- lookups (nome por Id) ---------------------------------------------
