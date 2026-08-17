@@ -26,6 +26,7 @@
             else { @Icons.Svg("users") <text>Buscar contatos</text> }
         </button>
         <button class="btn-ghost" @onclick="() => _showTpl = true">@Icons.Svg("edit")Modelo de e-mail</button>
+        <button class="btn-ghost" @onclick="IniciarEnvioMassa">@Icons.Svg("mail")Enviar em massa</button>
         <button class="btn-primary" @onclick="IniciarRotina">@Icons.Svg("play")Iniciar rotina</button>
     </div>
 </div>
@@ -230,6 +231,68 @@
     </div>
 }
 
+@* ---- Envio em massa (rascunhos revisáveis, em fila) ---- *@
+@if (_massMode)
+{
+    var mr = MassCurrentRow();
+    <div class="drawer-backdrop" @onclick="CloseMass"></div>
+    <div class="drawer drawer-wide">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">Envio em massa · @(_massIdx + 1) de @_massQueue.Count</h2>
+                <p class="subtitle">Abre um rascunho por proposta no seu e-mail · você revisa e envia · o contato do dia é registrado e a rotina avança</p>
+            </div>
+            <button class="icon-btn" @onclick="CloseMass">@Icons.Svg("x")</button>
+        </div>
+
+        @if (_massSkipped > 0)
+        {
+            <div class="import-summary" style="margin-bottom:12px">@_massSkipped proposta(s) do filtro ficaram de fora por não ter e-mail de contato — use <strong>Buscar contatos</strong> antes.</div>
+        }
+
+        @if (mr is null)
+        {
+            <div class="empty">Nada para enviar.</div>
+        }
+        else
+        {
+            <div class="fu-contact">
+                <span class="fu-contact-ico">@Icons.Svg("mail")</span>
+                <div class="fu-contact-info">
+                    <strong>@Cat.CustomerName(mr.Opp.CustomerId)</strong>
+                    <span class="fu-contact-mail">@Proposta(mr.Opp) · @(mr.Cur?.Label ?? "concluído") · para: @mr.Fu.ContactEmail</span>
+                </div>
+            </div>
+
+            <div class="fu-mail">
+                <div class="fu-mail-head">
+                    <span class="fu-mail-t">Rascunho — @(mr.Cur?.Label ?? "—")</span>
+                    <div class="seg-tabs">
+                        @for (var i = 0; i < FollowUpRoutine.Langs.Length; i++)
+                        {
+                            var li = i;
+                            <button class="seg-tab @(_massLang == li ? "on" : "")" @onclick="() => _massLang = li">@FollowUpRoutine.Langs[li]</button>
+                        }
+                    </div>
+                </div>
+                <textarea class="field fu-mail-body" rows="9" readonly>@MassEmailPreview(mr)</textarea>
+                <div class="fu-mail-actions">
+                    <button class="btn-ghost" @onclick="() => MassAbrirRascunho(mr)">@Icons.Svg("mail")Abrir rascunho de e-mail</button>
+                </div>
+            </div>
+        }
+
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="CloseMass">Fechar</button>
+            <button class="btn-ghost" @onclick="MassPular">Pular</button>
+            @if (mr is not null)
+            {
+                <button class="btn-primary" @onclick="() => MassMarcarProximo(mr)">@Icons.Svg("check")Marcar enviado e próximo</button>
+            }
+        </div>
+    </div>
+}
+
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private string _user = "—";
@@ -262,6 +325,13 @@
     // Busca de contatos.
     private bool _searching;
     private string _contactMsg = "";
+
+    // Envio em massa (rascunhos revisáveis, em fila).
+    private bool _massMode;
+    private List<Opportunity> _massQueue = new();
+    private int _massIdx;
+    private int _massLang;
+    private int _massSkipped;
 
     // Modelos de e-mail (modal).
     private bool _showTpl;
@@ -381,6 +451,84 @@
         if (_queue.Count == 0) return;
         _routineMode = true; _queueIdx = 0;
         OpenRegister(_queue[0], true);
+    }
+
+    // ---- envio em massa (rascunhos revisáveis, em fila) ----
+    private void IniciarEnvioMassa()
+    {
+        // Elegíveis: propostas do filtro com marco pendente E e-mail de contato.
+        var pend = Filtered().Where(r => r.Cur is not null).ToList();
+        var comEmail = pend.Where(r => !string.IsNullOrWhiteSpace(r.Fu.ContactEmail)).ToList();
+        _massSkipped = pend.Count - comEmail.Count;
+        _massQueue = comEmail.Select(r => r.Opp).ToList();
+        if (_massQueue.Count == 0)
+        {
+            _contactMsg = _massSkipped > 0
+                ? $"{_massSkipped} proposta(s) sem e-mail de contato — use \"Buscar contatos\" antes de enviar em massa."
+                : "Nenhuma proposta pendente de contato no filtro.";
+            return;
+        }
+        _massIdx = 0; _massLang = 0; _massMode = true;
+    }
+
+    private Row? MassCurrentRow()
+    {
+        if (_massIdx < 0 || _massIdx >= _massQueue.Count) return null;
+        var id = _massQueue[_massIdx].Id;
+        return _rows.FirstOrDefault(r => r.Opp.Id == id);
+    }
+
+    private FollowUpRoutine.EmailCtx CtxFor(Row r)
+    {
+        var o = r.Opp;
+        return new FollowUpRoutine.EmailCtx(Cat.CustomerName(o.CustomerId), Proposta(o), Fmt.Brl(o.AmountBrl), Fmt.Date(o.ExpectedDate), Vendedor(o));
+    }
+
+    private string MassEmailPreview(Row r) => FollowUpRoutine.Email(r.Cur?.Num ?? 1, _massLang, CtxFor(r));
+
+    // Abre o rascunho no cliente de e-mail padrão (mailto:) para revisão/envio.
+    private async Task MassAbrirRascunho(Row r)
+    {
+        var (subj, body) = FollowUpRoutine.EmailParts(r.Cur?.Num ?? 1, _massLang, CtxFor(r));
+        var to = (r.Fu.ContactEmail ?? "").Trim();
+        var b = body.Replace("\r\n", "\n").Replace("\n", "\r\n");   // quebras de linha p/ o mailto
+        var url = $"mailto:{Uri.EscapeDataString(to)}?subject={Uri.EscapeDataString(subj)}&body={Uri.EscapeDataString(b)}";
+        await JS.InvokeVoidAsync("openMail", url);
+    }
+
+    // Registra o contato do dia (avança a rotina) e passa para a próxima proposta.
+    private void MassMarcarProximo(Row r)
+    {
+        var dict = FUp.All();
+        var f = dict.TryGetValue(r.Opp.Id, out var x) ? x : new FollowUp { Id = r.Opp.Id, Status = FollowUpStatus.Pendente };
+        if (string.IsNullOrWhiteSpace(f.SentDate))
+            f.SentDate = (r.Fu.SentDateValue ?? ParseDate(r.Opp.CreatedAt) ?? _today).ToString("yyyy-MM-dd");
+        if (FollowUpStatus.IsActive(f.Status)) f.Status = FollowUpStatus.EmContato;
+        f.LastContact = _today.ToString("yyyy-MM-dd");
+        f.NextFollowUp = "";
+        FUp.Save(f, _user);
+        FUp.AddLog(new FollowUpLog
+        {
+            OppId = r.Opp.Id, User = _user, Channel = "E-mail", Outcome = f.Status,
+            Note = "Follow-up em massa", Ts = _today.ToString("yyyy-MM-ddTHH:mm:ss"),
+        });
+        Load();
+        Avancar();
+    }
+
+    private void MassPular() => Avancar();
+
+    private void Avancar()
+    {
+        _massIdx++;
+        if (_massIdx >= _massQueue.Count) CloseMass();
+    }
+
+    private void CloseMass()
+    {
+        var done = _massMode;
+        _massMode = false; _massQueue = new(); _massIdx = 0; _massSkipped = 0;
+        if (done) _contactMsg = "Envio em massa concluído.";
     }
 
     // ---- drawer ----
