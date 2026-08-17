@@ -100,31 +100,31 @@
     var _gmPp = _gmAvg - 30.0;
 }
 <div class="xsec lvl1">
-    <span class="xsec-t">Executive Overview</span>
+    <span class="xsec-t">Visão Geral Executiva</span>
     <span class="xsec-s">how are we performing · @_year · @_currency</span>
     <span class="xsec-line"></span>
 </div>
 <div class="kpi-row">
     <div class="kpi">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("trend")</span><span class="kpi-label">Forecast</span></div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("trend")</span><span class="kpi-label">Previsão</span></div>
         <div class="kpi-value">@Money(_fcYear)</div>
-        <div class="kpi-delta @(_fcAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_fcAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_fcAtt) <span class="ctx">of target</span></div>
+        <div class="kpi-delta @(_fcAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_fcAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_fcAtt) <span class="ctx">da meta</span></div>
         <div class="kpi-spark"><Sparkline Values="@_monthAmt" Stroke="#17a2c0" /></div>
     </div>
     <div class="kpi accent-pos">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("check")</span><span class="kpi-label">Won / Booked</span></div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("check")</span><span class="kpi-label">Ganho / Fechado</span></div>
         <div class="kpi-value">@MoneyBrl(_heroReal)</div>
-        <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">of target</span></div>
+        <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">da meta</span></div>
         <div class="kpi-spark"><Sparkline Values="@_mReal" Stroke="#1f9254" /></div>
     </div>
     <div class="kpi @(_gmAvg >= 30 ? "accent-pos" : "accent-warn")">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("executive")</span><span class="kpi-label">Gross Margin</span></div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("executive")</span><span class="kpi-label">Margem Bruta</span></div>
         <div class="kpi-value">@Fmt.Pct(_gmAvg)</div>
-        <div class="kpi-delta @(_gmPp >= 0 ? "pos" : "warn")"><span class="arw">@(_gmPp >= 0 ? "▲" : "▼")</span> @Math.Abs(_gmPp).ToString("0.0", _pt) pp <span class="ctx">vs 30% target</span></div>
+        <div class="kpi-delta @(_gmPp >= 0 ? "pos" : "warn")"><span class="arw">@(_gmPp >= 0 ? "▲" : "▼")</span> @Math.Abs(_gmPp).ToString("0.0", _pt) pp <span class="ctx">vs meta de 30%</span></div>
         <div class="kpi-bar"><i style="width:@Share(_gmAvg, 40)%"></i></div>
     </div>
     <div class="kpi">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("layers")</span><span class="kpi-label">Pipeline Coverage</span></div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("layers")</span><span class="kpi-label">Cobertura do Funil</span></div>
         <div class="cov2">
             <div class="cov2-row"><span class="cov2-k">Meta NB+AFM</span><span class="cov2-v @(_coverageNbAfm >= 3 ? "pos" : "neg")">@_coverageNbAfm.ToString("0.0", _pt)x</span></div>
             <div class="cov2-row"><span class="cov2-k">Meta Vendas HSA</span><span class="cov2-v @(_coverageHsa >= 3 ? "pos" : "neg")">@_coverageHsa.ToString("0.0", _pt)x</span></div>
@@ -187,11 +187,11 @@
 
 @* ============ SALES FUNNEL + PREVISÃO INDICADA (lado a lado) ============ *@
 <div class="xsec">
-    <span class="xsec-t">Sales Funnel by Stage</span>
-    <span class="xsec-s">sequência do pipeline · @_currency</span>
+    <span class="xsec-t">Funil de Vendas por Etapa</span>
+    <span class="xsec-s">sequência do funil · @_currency</span>
     <span class="xsec-line"></span>
     @if (_indicadas.Count > 0) { <span class="ind-badge">@Icons.Svg("flag")@_indicadas.Count indicadas · @MoneyBrl(_indTotal)</span> }
-    @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Stage</button> }
+    @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Etapa</button> }
 </div>
 <div class="g12">
     <div class="c6"><div class="xcard pf-card">
@@ -205,15 +205,15 @@
         var _fnTop2 = _funnel.Count >= 2 ? _funnel.Take(2).Sum(x => x.Value) / _funnelTotal * 100 : 100;
         <div class="pf-head">
             <div>
-                <div class="xcard-title">Sales Funnel by Stage</div>
-                <div class="xcard-sub">Amount · @_currency · @_funnel.Count stages · sequência do pipeline</div>
+                <div class="xcard-title">Funil de Vendas por Etapa</div>
+                <div class="xcard-sub">Valor · @_currency · @_funnel.Count etapas · sequência do funil</div>
             </div>
             <div class="pf-totals">
-                <div class="pf-tot"><div class="pf-tot-l">Total Pipeline</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
-                <div class="pf-tot"><div class="pf-tot-l">Total Opportunities</div><div class="pf-tot-v">@_fnOpps</div></div>
+                <div class="pf-tot"><div class="pf-tot-l">Total do Funil</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
+                <div class="pf-tot"><div class="pf-tot-l">Total de Oportunidades</div><div class="pf-tot-v">@_fnOpps</div></div>
             </div>
         </div>
-        <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> of pipeline value is concentrated in the first @(_funnel.Count >= 2 ? "two stages" : "stage").</span></div>
+        <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> do valor do funil está concentrado @(_funnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa").</span></div>
         <div class="fn5 @(DimActive("stage") ? "has-active" : "")">
             @for (var i = 0; i < _funnel.Count; i++)
             {
@@ -225,12 +225,12 @@
                 var dwN = i < _funnel.Count - 1 ? FnW(i + 1, _funnel.Count) : dw * 0.86;
                 var frac = dwN / dw;
                 var inset = (1 - frac) / 2 * 100;
-                <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) of pipeline · @f.Count opportunities@(conv is { } cv ? " · " + Fmt.Pct(cv) + " to next" : "")">
+                <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) do funil · @f.Count oportunidades@(conv is { } cv ? " · " + Fmt.Pct(cv) + " para a próxima" : "")">
                     <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
                     <div class="fn5-text @(FunnelDark(i, _funnel.Count) ? "dark" : "")">
                         <div class="fn5-name">@f.Stage</div>
                         <div class="fn5-amt">@MoneyBrl(f.Value)</div>
-                        <div class="fn5-sub">@Fmt.Pct(sh) of pipeline · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " to next" : "")</div>
+                        <div class="fn5-sub">@Fmt.Pct(sh) do funil · @f.Count oport.@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " para a próxima" : "")</div>
                     </div>
                 </div>
             }
@@ -316,16 +316,16 @@
     var _smMax = _bySubMarket.Count > 0 ? _bySubMarket.Max(x => x.Value) : 1;
 }
 <div class="xsec">
-    <span class="xsec-t">Revenue Distribution &amp; Performance</span>
-    <span class="xsec-s">where is the revenue coming from · who is driving it · @_currency</span>
+    <span class="xsec-t">Distribuição de Receita &amp; Desempenho</span>
+    <span class="xsec-s">de onde vem a receita · quem está gerando · @_currency</span>
     <span class="xsec-line"></span>
-    <span class="xsec-s">click any element to filter</span>
+    <span class="xsec-s">clique em qualquer elemento para filtrar</span>
 </div>
 <div id="xf-charts">
     <div class="g12">
         @* ---- Commercial Segment (donut + lista) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Commercial Segment</div><div class="xcard-sub">@_bySegment.Count segmentos · participação</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Segmento Comercial</div><div class="xcard-sub">@_bySegment.Count segmentos · participação</div></div></div>
             @if (_bySegment.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -353,7 +353,7 @@
 
         @* ---- Forecast by Market (ranking) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Forecast by Market</div><div class="xcard-sub">@_byMarket.Count mercados · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por Mercado</div><div class="xcard-sub">@_byMarket.Count mercados · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span></div>
             @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -361,7 +361,7 @@
                     @foreach (var m in _byMarket)
                     {
                         var sh = m.Value / _marketTotal * 100;
-                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Forecast @Money(m.Value) · Share @Fmt.Pct(sh)">
+                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Previsão @Money(m.Value) · Participação @Fmt.Pct(sh)">
                             <div class="ibar-head">
                                 <span class="ibar-name">@m.Name</span>
                                 <span class="ibar-metrics"><span class="ibar-val">@Money(m.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span></span>
@@ -377,7 +377,7 @@
     @* ---- Sales Rep Performance | Forecast by Product (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Sales Rep Performance</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Desempenho por Vendedor</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span></div>
             @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -387,7 +387,7 @@
                     {
                         ri++;
                         var sh = s.Value / _repTot * 100;
-                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — Forecast @MoneyBrl(s.Value) · Share @Fmt.Pct(sh)">
+                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — Previsão @MoneyBrl(s.Value) · Participação @Fmt.Pct(sh)">
                             <div class="ibar-head">
                                 <span class="ibar-num">@ri</span>
                                 <span class="ibar-name">@s.Label</span>
@@ -400,7 +400,7 @@
             }
         </div></div>
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Forecast by Product</div><div class="xcard-sub">@_byProduct.Count produtos · Gross Margin em destaque</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por Produto</div><div class="xcard-sub">@_byProduct.Count produtos · Margem Bruta em destaque</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span></div>
             @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -409,7 +409,7 @@
                     {
                         var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
                         var sh = p.Value / _productTotal * 100;
-                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Forecast @Money(p.Value) · Share @Fmt.Pct(sh) · GM @Fmt.Pct(p.Margin)">
+                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Previsão @Money(p.Value) · Participação @Fmt.Pct(sh) · Margem @Fmt.Pct(p.Margin)">
                             <div class="ibar-head">
                                 <span class="ibar-name">@p.Name</span>
                                 <span class="ibar-metrics"><span class="ibar-val">@Money(p.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span></span>
@@ -431,7 +431,7 @@
     <div class="g12">
         @* ---- Sub-Market Performance (lollipop) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Sub-Market Performance</div><div class="xcard-sub">@_bySubMarket.Count sub-markets · todos exibidos</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Desempenho por Sub-Mercado</div><div class="xcard-sub">@_bySubMarket.Count sub-mercados · todos exibidos</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span></div>
             @if (_bySubMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -450,7 +450,7 @@
 
         @* ---- Business Unit Performance (donut + lista) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Business Unit Performance</div><div class="xcard-sub">@_byBu2.Count unidades · participação</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Desempenho por Unidade de Negócio</div><div class="xcard-sub">@_byBu2.Count unidades · participação</div></div></div>
             @if (_byBu2.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -495,7 +495,7 @@
     @* ---- Forecast by Month (timing) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c12"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Forecast by Month</div><div class="xcard-sub">Close Date · clique num mês para filtrar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_monthAmt.Sum())</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Previsão por Mês</div><div class="xcard-sub">Data de fechamento · clique num mês para filtrar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_monthAmt.Sum())</b></span></div>
             <div class="chart-body">@RenderXfColumns(_monthAmt)</div>
         </div></div>
     </div>
@@ -503,7 +503,7 @@
 
 @* ===================== EXECUTIVE INSIGHTS ===================== *@
 <div class="xsec">
-    <span class="xsec-t">Executive Insights</span>
+    <span class="xsec-t">Análises Executivas</span>
     <span class="xsec-s">calculado a partir dos dados reais do recorte</span>
     <span class="xsec-line"></span>
 </div>
@@ -514,24 +514,24 @@
         var _topSeg = _bySegment.Count > 0 ? _bySegment[0] : null;
     }
     <div class="exi">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("trend")</span><span class="exi-label">Forecast vs Target</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("trend")</span><span class="exi-label">Previsão vs Meta</span></div>
         <div class="exi-value @(_fcAtt >= 100 ? "pos" : "")">@Fmt.Pct(_fcAtt)</div>
-        <div class="exi-text">Previsão de @Money(_fcYear) frente à meta de @MoneyBrl(_metaYear). @_mktTxt lideram a contribuição do forecast.</div>
+        <div class="exi-text">Previsão de @Money(_fcYear) frente à meta de @MoneyBrl(_metaYear). @_mktTxt lideram a contribuição da previsão.</div>
     </div>
     <div class="exi warn">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("target")</span><span class="exi-label">Gap to Target</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("target")</span><span class="exi-label">Distância da Meta</span></div>
         <div class="exi-value warn">@MoneyBrl(_gapTgt)</div>
-        <div class="exi-text">Distância da meta anual. Priorizar a conversão das maiores oportunidades do pipeline (@_openCount abertas).</div>
+        <div class="exi-text">Distância da meta anual. Priorizar a conversão das maiores oportunidades do funil (@_openCount abertas).</div>
     </div>
     <div class="exi @(_gmAvg >= 30 ? "pos" : "warn")">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("executive")</span><span class="exi-label">Gross Margin</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("executive")</span><span class="exi-label">Margem Bruta</span></div>
         <div class="exi-value @(_gmAvg >= 30 ? "pos" : "warn")">@Fmt.Pct(_gmAvg)</div>
         <div class="exi-text">Margem bruta média do recorte (@(_gmPp >= 0 ? "+" : "")@_gmPp.ToString("0.0", _pt) pp vs meta de 30%), sustentada pelo mix de produtos.</div>
     </div>
     <div class="exi @(_coverage >= 1 ? "pos" : "warn")">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("layers")</span><span class="exi-label">Pipeline Coverage</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("layers")</span><span class="exi-label">Cobertura do Funil</span></div>
         <div class="exi-value">@_coverage.ToString("0.0", _pt)x</div>
-        <div class="exi-text">Pipeline ponderado sobre a meta restante. @(_coverage >= 1 ? "Cobertura suporta a entrega do ano." : "Cobertura abaixo de 1x — reforçar geração de pipeline.")</div>
+        <div class="exi-text">Funil ponderado sobre a meta restante. @(_coverage >= 1 ? "Cobertura suporta a entrega do ano." : "Cobertura abaixo de 1x — reforçar geração de pipeline.")</div>
     </div>
 </div>
 
@@ -550,7 +550,7 @@
 <div class="g12">
     <div class="c12">
         <div class="panel" style="height:100%">
-            <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por confiança · (% ganho + % período) ÷ 2</span></div></div>
+            <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por % de ganho</span></div></div>
             <div class="comp-bar">
                 @foreach (var c in _comp.Where(x => x.Value > 0))
                 {
@@ -1369,7 +1369,7 @@
 
         BuildHealth(open);
 
-        // Composição por FAIXA DE CONFIANÇA = (% ganho + % período) / 2.
+        // Composição por FAIXA DE % DE GANHO (win probability).
         var bands = new (string Band, string Color, double Lo, double Hi)[]
         {
             ("Muito alta", "#1f9254", 85, 101),
@@ -1379,7 +1379,7 @@
         };
         var compRaw = bands.Select(b =>
         {
-            var items = open.Where(o => { var c = ForecastCalc.Confidence(o); return c >= b.Lo && c < b.Hi; }).ToList();
+            var items = open.Where(o => { var c = o.WinProbabilityValue; return c >= b.Lo && c < b.Hi; }).ToList();
             return (b.Band, b.Color, Value: items.Sum(Metric), Count: items.Count);
         }).ToList();
         _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
