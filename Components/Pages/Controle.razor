@@ -1,5 +1,5 @@
 @page "/controle"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "controle,admin")]
 @rendermode InteractiveServer
 @inject ControleRepository Repo
 @inject Catalog Cat

@@ -49,6 +49,8 @@ builder.Services.AddSingleton<ControleRepository>();
 builder.Services.AddSingleton<FollowUpRepository>();
 // Busca do contato do cliente (nome + e-mail) nos arquivos de proposta da rede.
 builder.Services.AddSingleton<ContactLookupService>();
+// Contas de acesso (login/senha + carteira permitida por vendedor).
+builder.Services.AddSingleton<UserRepository>();
 // Gráficos personalizados do estúdio da Visão Executiva.
 builder.Services.AddSingleton<ChartConfigRepository>();
 // Identidade visual (logos da capa e da página interna).
@@ -70,6 +72,8 @@ using (var scope = app.Services.CreateScope())
     controleRepo.SeedIfEmpty();
     controleRepo.SeedRegistrosIfEmpty();
     scope.ServiceProvider.GetRequiredService<ChartConfigRepository>().SeedIfEmpty();
+    // Contas de acesso: semeia os logins dos vendedores na primeira execução.
+    scope.ServiceProvider.GetRequiredService<UserRepository>().SeedIfEmpty();
 }
 
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida
@@ -106,26 +110,48 @@ app.UseAuthorization();
 // Credencial única da equipe (Auth:Usuario / Auth:Senha). O "perfil" escolhido
 // no formulário vira o papel (role) usado para adaptar a navegação — demonstra
 // os três níveis de experiência (executivo, gestão, operação).
-app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg) =>
+app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg, UserRepository users) =>
 {
     var form = await http.Request.ReadFormAsync();
     var usuario = form["usuario"].ToString().Trim();
     var senha = form["senha"].ToString();
-    var perfil = form["perfil"].ToString();
 
-    var cfgUsuario = cfg["Auth:Usuario"] ?? "howden";
-    var cfgSenha = cfg["Auth:Senha"] ?? "howden2026";
+    List<Claim>? claims = null;
 
-    if (!usuario.Equals(cfgUsuario, StringComparison.OrdinalIgnoreCase) || senha != cfgSenha)
-        return Results.Redirect("/login?error=1");
-
-    var role = Roles.Normalize(perfil);
-    var claims = new List<Claim>
+    // 1) Conta de acesso individual (vendedor / controle / diretor / admin).
+    var login = usuario.ToLowerInvariant();
+    if (login.Contains('@')) login = login.Split('@')[0];   // aceita usuario@dominio
+    var user = users.Get(login);
+    if (user is not null && user.IsActive && users.Verify(user, senha))
     {
-        new(ClaimTypes.NameIdentifier, "equipe"),
-        new(ClaimTypes.Name, Roles.DisplayName(role)),
-        new(ClaimTypes.Role, role),
-    };
+        claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Login),
+            new(ClaimTypes.Name, user.Nome),
+            new(ClaimTypes.Role, AccessRoles.Normalize(user.Role)),
+            new(AccessScope.VendedoresClaim, user.Vendedores),
+        };
+    }
+
+    // 2) Credencial mestre de administração (appsettings) — sempre disponível.
+    if (claims is null)
+    {
+        var cfgUsuario = cfg["Auth:Usuario"] ?? "howden";
+        var cfgSenha = cfg["Auth:Senha"] ?? "howden2026";
+        if (usuario.Equals(cfgUsuario, StringComparison.OrdinalIgnoreCase) && senha == cfgSenha)
+        {
+            claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, "admin"),
+                new(ClaimTypes.Name, "Administrador"),
+                new(ClaimTypes.Role, AccessRoles.Admin),
+                new(AccessScope.VendedoresClaim, ""),
+            };
+        }
+    }
+
+    if (claims is null) return Results.Redirect("/login?error=1");
+
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
     return Results.Redirect("/");

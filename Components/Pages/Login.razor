@@ -67,14 +67,6 @@
                 <label>Senha
                     <input type="password" name="senha" autocomplete="current-password" placeholder="••••••••" required />
                 </label>
-                <label>Perfil de acesso
-                    <select name="perfil">
-                        @foreach (var r in Roles.All)
-                        {
-                            <option value="@r.Role">@r.Label</option>
-                        }
-                    </select>
-                </label>
                 <button type="submit" class="btn-primary">Acessar plataforma @Icons.Svg("arrow-right")</button>
             </form>
 

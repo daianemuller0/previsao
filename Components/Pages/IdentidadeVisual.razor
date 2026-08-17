@@ -1,5 +1,5 @@
 @page "/identidade"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "admin")]
 @rendermode InteractiveServer
 @inject BrandRepository Brand
 

@@ -1,0 +1,7 @@
+@inject NavigationManager Nav
+
+@* Usuário autenticado sem permissão para a página: manda para a aba padrão
+   permitida a todos os papéis (Oportunidades), em vez de voltar ao login. *@
+@code {
+    protected override void OnInitialized() => Nav.NavigateTo("/oportunidades", forceLoad: true);
+}

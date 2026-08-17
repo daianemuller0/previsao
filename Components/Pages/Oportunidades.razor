@@ -471,7 +471,19 @@
         ("dl-onestream", "market_onestream"), ("dl-unidade", "unidade_venda"), ("dl-bu_inter", "bu_intercompany"),
     };
 
-    protected override void OnInitialized() { _all = Repo.All(); Recompute(); }
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private AccessScope _scope = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null) _scope = AccessScope.Resolve((await AuthState).User);
+        _all = LoadScoped();
+        Recompute();
+    }
+
+    // Carrega as oportunidades já recortadas pela carteira permitida do login.
+    private List<Opportunity> LoadScoped() =>
+        Repo.All().Where(o => _scope.CanSeeVendedor(OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId)))).ToList();
 
     private void Recompute()
     {
@@ -577,7 +589,7 @@
 
         _bulkFound = flagged;
         _bulkNotFound = notFound;
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
         _bulkBusy = false;
     }
@@ -666,7 +678,7 @@
         _edit.UpdatedAt = _today.ToString("yyyy-MM-dd");
         _edit.UpdatedBy = Cat.KamName(_edit.KamId);
         Repo.Save(_edit);
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
         _edit = null;
     }
@@ -688,7 +700,7 @@
         full.Indicada = full.IndicadaValue ? "" : "Sim";
         full.UpdatedAt = _today.ToString("yyyy-MM-dd");
         Repo.Save(full);
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
     }
 
@@ -696,7 +708,7 @@
     {
         if (_delTarget is null) return;
         Repo.Delete(_delTarget.Id);
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
         _delTarget = null;
     }
@@ -713,7 +725,7 @@
     {
         if (_wipePwd != WipePassword) { _wipeError = true; return; }
         Repo.DeleteAll();
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
         CancelWipe();
     }
@@ -759,7 +771,7 @@
         if (_importResult is null || _importResult.Rows.Count == 0) return;
         if (_importMode == "replace") Repo.DeleteAll();
         Repo.SaveMany(_importResult.Rows);
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
         CancelImport();
     }
@@ -791,7 +803,7 @@
         _new.UpdatedAt = _today.ToString("yyyy-MM-dd");
         _new.UpdatedBy = _new.KamId;
         Repo.Save(_new);
-        _all = Repo.All();
+        _all = LoadScoped();
         Recompute();
         _new = null;
     }

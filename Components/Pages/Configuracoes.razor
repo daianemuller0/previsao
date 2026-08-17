@@ -1,5 +1,5 @@
 @page "/configuracoes"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "admin")]
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Configuration
 @inject DataSyncService Sync

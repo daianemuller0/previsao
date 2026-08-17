@@ -56,7 +56,7 @@
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     private bool Collapsed { get; set; }
-    private string _role = Roles.Admin;
+    private string _role = HowdenSalesForecast.Models.AccessRoles.Admin;
     private string? AppLogo => Brand.Get(HowdenSalesForecast.Data.BrandRepository.AppLogo);
 
     private record NavItem(string Key, string Route, string Icon, string Label);
@@ -86,26 +86,18 @@
         }),
     };
 
-    // Visibilidade por perfil (Seção 17). Admin/Diretoria/Gestor veem tudo.
-    private static readonly Dictionary<string, string[]> RoleMenus = new()
-    {
-        [Roles.Kam] = new[] { "oportunidades", "followup", "controle" },
-        [Roles.Financeiro] = new[] { "executivo", "followup", "controle", "listas" },
-        [Roles.Viewer] = new[] { "executivo", "followup", "controle" },
-    };
-
     protected override async Task OnInitializedAsync()
     {
         if (AuthState is not null)
         {
             var state = await AuthState;
             var role = state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-            if (!string.IsNullOrEmpty(role)) { _role = role; }
+            if (!string.IsNullOrEmpty(role)) { _role = HowdenSalesForecast.Models.AccessRoles.Normalize(role); }
         }
     }
 
-    private bool Allowed(string key) =>
-        !RoleMenus.TryGetValue(_role, out var keys) || keys.Contains(key);
+    // Abas visíveis conforme o papel do login (controle de acesso).
+    private bool Allowed(string key) => HowdenSalesForecast.Models.AccessRoles.CanTab(_role, key);
 
     private bool IsActive(string route)
     {

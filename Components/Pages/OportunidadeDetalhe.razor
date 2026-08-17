@@ -199,6 +199,8 @@ else
 }
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private AccessScope _scope = new();
     [Parameter] public string Id { get; set; } = "";
     private Opportunity? _o;
     private DateTime _today = DateTime.Today;
@@ -212,7 +214,17 @@ else
         new("historico", "Histórico"), new("documentos", "Documentos"),
     };
 
-    protected override void OnParametersSet() => _o = Repo.Get(Id);
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AuthState is not null) _scope = AccessScope.Resolve((await AuthState).User);
+        _o = Repo.Get(Id);
+        // Fora da carteira permitida: não expõe a oportunidade.
+        if (_o is not null && !_scope.CanSeeVendedor(OpportunityImporter.CanonicalVendedor(Cat.KamName(_o.KamId))))
+        {
+            _o = null;
+            Nav.NavigateTo("/oportunidades");
+        }
+    }
 
     private record Hist(string When, string Field, string From, string To, string User);
     private List<Hist> History()

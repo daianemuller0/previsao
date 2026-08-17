@@ -1,5 +1,5 @@
 @page "/followup"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "vendedor,diretor,admin")]
 @rendermode InteractiveServer
 @inject OpportunityRepository Repo
 @inject Catalog Cat
@@ -295,6 +295,7 @@
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private AccessScope _scope = new();
     private string _user = "—";
     private readonly DateTime _today = DateTime.Today;
 
@@ -340,14 +341,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (AuthState is not null) { var st = await AuthState; _user = st.User.Identity?.Name ?? "—"; }
+        if (AuthState is not null) { var st = await AuthState; _user = st.User.Identity?.Name ?? "—"; _scope = AccessScope.Resolve(st.User); }
         Load();
     }
 
     private void Load()
     {
         var fu = FUp.All();
-        var open = Repo.All().Where(o => ForecastCategories.IsOpen(o.Category)).ToList();
+        var open = Repo.All()
+            .Where(o => ForecastCategories.IsOpen(o.Category))
+            .Where(o => _scope.CanSeeVendedor(Vendedor(o)))   // recorte por carteira do login
+            .ToList();
 
         _rows = open.Select(o =>
         {
