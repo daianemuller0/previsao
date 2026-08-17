@@ -1,8 +1,10 @@
 @page "/configuracoes"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using Microsoft.Extensions.Configuration
 @inject DataSyncService Sync
 @inject ControleRepository Controle
+@inject IConfiguration Cfg
 
 @* ===========================================================================
    Configurações de importação — De-Para das colunas das duas origens de dados
@@ -204,6 +206,27 @@
             <span class="chip" style="cursor:default">@c</span>
         }
     </div>
+</div>
+
+@* ---- Busca de contato do cliente (Follow-up) ---- *@
+<div class="section-head" style="margin-top:20px"><span class="st-title">Follow-up · busca de contato do cliente</span><span class="st-sub">nome e e-mail lidos dos arquivos de proposta na rede</span><span class="st-line"></span></div>
+<div class="panel">
+    <p class="cfg-lead">Na aba <a href="/followup">Follow-up</a>, o botão <strong>Buscar contatos</strong> localiza o <strong>nome</strong> e o <strong>e-mail</strong> do contato do cliente. As propostas já vêm da base — aqui só buscamos o contato, que fica <strong>dentro dos arquivos de proposta</strong> nas pastas de rede, em células conhecidas. A pasta certa é escolhida pela <strong>Unidade de Venda (BU)</strong> da oportunidade (Brasil · Chile · Peru); BU indefinida tenta as três.</p>
+    <div class="cfg-kv"><span class="cfg-k">Brasil (AFM)</span><code class="cfg-path">@(Cfg["Contatos:BrasilAfmRoot"] ?? "—")\{proposta}\CUSTO_&_PRICING\</code></div>
+    <div class="cfg-kv"><span class="cfg-k">Brasil (NB)</span><code class="cfg-path">@(Cfg["Contatos:BrasilNbRoot"] ?? "—")\{proposta}\CUSTO_&_PRICING\</code></div>
+    <div class="cfg-kv"><span class="cfg-k">Chile / Peru</span><code class="cfg-path">@(Cfg["Contatos:ChileRoot"] ?? "—")\01 NB|02 AFM|03 SV\{proposta}\…</code></div>
+    <div class="table-wrap" style="margin-top:12px">
+        <table class="grid-tbl">
+            <thead><tr><th>Arquivo (maior revisão)</th><th>Aba</th><th>Nome</th><th>E-mail</th></tr></thead>
+            <tbody>
+                <tr><td><code>C_{proposta}-*.xlsm</code></td><td>Proposta <span class="cfg-note">(ou RESUMO)</span></td><td>D25 <span class="cfg-note">(G3)</span></td><td>D26 <span class="cfg-note">(G4)</span></td></tr>
+                <tr><td><code>P_{proposta}-C*.xlsm</code></td><td>PROPOSTA</td><td>C7</td><td>C8</td></tr>
+                <tr><td><code>P_{proposta}-*.xlsm</code> <span class="cfg-note">(sem “-C”)</span></td><td>PROPOSTA</td><td>C7</td><td>C8</td></tr>
+                <tr><td><code>R_{proposta}-R*.xlsm</code></td><td>Oferta</td><td class="cfg-note">—</td><td>B6</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="cfg-foot">Busca em ordem de prioridade e para no primeiro contato encontrado. Requer que o programa rode numa máquina com acesso às unidades de rede (H:\ e G:\). Para desligar a busca, use <code>Contatos:Enabled = false</code> no appsettings.</p>
 </div>
 
 @code {

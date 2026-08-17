@@ -47,6 +47,8 @@ builder.Services.AddSingleton<ListRepository>();
 builder.Services.AddSingleton<ControleRepository>();
 // Follow-up das propostas em aberto (estado + histórico de interações).
 builder.Services.AddSingleton<FollowUpRepository>();
+// Busca do contato do cliente (nome + e-mail) nos arquivos de proposta da rede.
+builder.Services.AddSingleton<ContactLookupService>();
 // Gráficos personalizados do estúdio da Visão Executiva.
 builder.Services.AddSingleton<ChartConfigRepository>();
 // Identidade visual (logos da capa e da página interna).

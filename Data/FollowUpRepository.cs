@@ -13,7 +13,7 @@ public class FollowUpRepository
 {
     private const string Ent = "followups";
     private const string EntLog = "followup_log";
-    private const string Cols = "id, status, last_contact, next_followup, cadence_days, notes, updated_by, updated_at, sent_date";
+    private const string Cols = "id, status, last_contact, next_followup, cadence_days, notes, updated_by, updated_at, sent_date, contact_name, contact_email";
     private const string LogCols = "id, opp_id, ts, user, channel, outcome, note";
 
     private readonly ParquetStore _store;
@@ -36,6 +36,8 @@ public class FollowUpRepository
             UpdatedBy = S(r, 6),
             UpdatedAt = S(r, 7),
             SentDate = S(r, 8),
+            ContactName = S(r, 9),
+            ContactEmail = S(r, 10),
         });
         var d = new Dictionary<string, FollowUp>(StringComparer.Ordinal);
         foreach (var f in list) if (!string.IsNullOrWhiteSpace(f.Id)) d[f.Id] = f;
@@ -53,6 +55,7 @@ public class FollowUpRepository
             new("next_followup", f.NextFollowUp), new("cadence_days", f.CadenceDays),
             new("notes", f.Notes), new("updated_by", f.UpdatedBy), new("updated_at", f.UpdatedAt),
             new("sent_date", f.SentDate),
+            new("contact_name", f.ContactName), new("contact_email", f.ContactEmail),
         });
     }
 
