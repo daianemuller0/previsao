@@ -1144,8 +1144,9 @@
     }
 
     // Oportunidades recortadas pela carteira permitida do login (controle de acesso).
+    // Exclui as que viraram "venda indicada" (movidas para o Controle).
     private List<Opportunity> LoadScoped() =>
-        Repo.All().Where(o => _scope.CanSeeVendedor(KeyKam(o))).ToList();
+        Repo.All().Where(o => !o.MovidaControleValue).Where(o => _scope.CanSeeVendedor(KeyKam(o))).ToList();
 
     // Inicializa (idempotente) o mapa interativo depois de renderizar. Passa a
     // referência do componente para o mapa poder disparar o cross-filter ao clicar.

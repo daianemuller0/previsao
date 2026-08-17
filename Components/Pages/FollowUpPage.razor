@@ -350,6 +350,7 @@
         var fu = FUp.All();
         var open = Repo.All()
             .Where(o => ForecastCategories.IsOpen(o.Category))
+            .Where(o => !o.MovidaControleValue)               // venda indicada saiu do funil
             .Where(o => _scope.CanSeeVendedor(Vendedor(o)))   // recorte por carteira do login
             .ToList();
 

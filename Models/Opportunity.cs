@@ -52,6 +52,7 @@ public class Opportunity
     public string AmountRaw { get; set; } = "";             // Amount (moeda de origem, não convertido)
     public string Indicada { get; set; } = "";              // Indicada na Previsão pelo vendedor (Sim)
     public string Setor { get; set; } = "";                 // Origem: NB (planilha NB) ou AFM (planilha AFM)
+    public string MovidaControle { get; set; } = "";        // "Sim" = venda indicada → movida p/ Controle (some das Oportunidades)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
@@ -103,6 +104,9 @@ public class Opportunity
 
     // Indicada na Previsão de Vendas (marcador do vendedor).
     public bool IndicadaValue => string.Equals(Indicada, "Sim", StringComparison.OrdinalIgnoreCase);
+
+    // Venda indicada: movida para o Controle (Ofertas e pedidos) e retirada das Oportunidades.
+    public bool MovidaControleValue => string.Equals(MovidaControle, "Sim", StringComparison.OrdinalIgnoreCase);
 
     private bool IsBrl => CurrencyCode.Equals("BRL", StringComparison.OrdinalIgnoreCase);
     private bool IsUsd => CurrencyCode.Equals("USD", StringComparison.OrdinalIgnoreCase);
