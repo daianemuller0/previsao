@@ -38,6 +38,7 @@
     <div class="flt"><span class="flt-label">KAM</span><select @bind="_kam"><option value="">Todos</option>@foreach (var k in KamOptions){<option value="@k">@Cat.KamName(k)</option>}</select></div>
     <div class="flt"><span class="flt-label">Categoria</span><select @bind="_cat"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
     <div class="flt"><span class="flt-label">Risco</span><select @bind="_risk"><option value="">Todos</option>@foreach (var r in Enum.GetValues<RiskLevel>()){<option value="@r.ToString()">@RiskLevels.Label(r)</option>}</select></div>
+    <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     <div class="filterbar-spacer"></div>
     @if (_activeFilters > 0) { <span class="tag">@_activeFilters ativo(s)</span> <button class="btn-link" @onclick="ClearFilters">Limpar</button> }
 </div>
@@ -388,6 +389,7 @@
     private List<Opportunity> _all = new();
     private DateTime _today = DateTime.Today;
     private string _search = "", _cat = "", _kam = "", _market = "", _risk = "";
+    private bool _onlyIndicated;
     private int _year, _monthFilter;                 // 0 = todos
     private DateTime? _dateFrom, _dateTo;
     private int _openCount;
@@ -404,12 +406,14 @@
     private IEnumerable<string> MarketOptions => _all.Select(o => o.MarketId).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(Cat.MarketName);
     private IEnumerable<string> KamOptions => _all.Select(o => o.KamId).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(Cat.KamName);
     private int _activeFilters => new[] { _search, _cat, _kam, _market, _risk }.Count(s => s != "")
-        + (_year > 0 ? 1 : 0) + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0);
+        + (_year > 0 ? 1 : 0) + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
+        + (_onlyIndicated ? 1 : 0);
 
     private void ClearFilters()
     {
         _search = _cat = _kam = _market = _risk = "";
         _year = _monthFilter = 0; _dateFrom = _dateTo = null;
+        _onlyIndicated = false;
     }
     private Opportunity? _new;
     private int _newMonthNum = DateTime.Today.Month, _newYear = DateTime.Today.Year;
@@ -574,6 +578,7 @@
         get
         {
             IEnumerable<Opportunity> q = _all;
+            if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
             if (!string.IsNullOrWhiteSpace(_cat)) q = q.Where(o => o.ForecastCategory == _cat);
             if (!string.IsNullOrWhiteSpace(_kam)) q = q.Where(o => o.KamId == _kam);
             if (!string.IsNullOrWhiteSpace(_market)) q = q.Where(o => o.MarketId == _market);
