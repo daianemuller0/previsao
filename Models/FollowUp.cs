@@ -15,8 +15,12 @@ public class FollowUp
     public string NextFollowUp { get; set; } = "";   // yyyy-MM-dd — próximo follow-up
     public string CadenceDays { get; set; } = "14";  // cadência (dias) da rotina
     public string Notes { get; set; } = "";          // observação atual
+    public string ContactName { get; set; } = "";    // nome do contato do cliente (buscado nos arquivos de proposta)
+    public string ContactEmail { get; set; } = "";   // e-mail do contato do cliente
     public string UpdatedBy { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
+
+    public bool HasContact => !string.IsNullOrWhiteSpace(ContactName) || !string.IsNullOrWhiteSpace(ContactEmail);
 
     public DateTime? SentDateValue => P(SentDate);
 

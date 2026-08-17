@@ -4,6 +4,7 @@
 @inject OpportunityRepository Repo
 @inject Catalog Cat
 @inject FollowUpRepository FUp
+@inject ContactLookupService Contacts
 @inject IJSRuntime JS
 
 @* ===========================================================================
@@ -20,10 +21,18 @@
         <p class="subtitle">Rotina de acompanhamento das propostas em aberto · @_rows.Count proposta(s) · @Fmt.Brl(_rows.Sum(r => r.Opp.AmountBrl)) em pipeline</p>
     </div>
     <div class="page-actions">
+        <button class="btn-ghost" disabled="@_searching" @onclick="BuscarContatos" title="Busca o nome e o e-mail do contato do cliente nos arquivos de proposta da rede (para as propostas do filtro que ainda não têm contato)">
+            @if (_searching) { <span class="spinner-sm"></span><text>Buscando contatos…</text> }
+            else { @Icons.Svg("users") <text>Buscar contatos</text> }
+        </button>
         <button class="btn-ghost" @onclick="() => _showTpl = true">@Icons.Svg("edit")Modelo de e-mail</button>
         <button class="btn-primary" @onclick="IniciarRotina">@Icons.Svg("play")Iniciar rotina</button>
     </div>
 </div>
+@if (!string.IsNullOrEmpty(_contactMsg))
+{
+    <div class="import-summary" style="margin-top:10px">@Icons.Svg("users") @_contactMsg</div>
+}
 
 @* ---- Rotina de Follow-up (marcos) ---- *@
 <div class="fu-routine">
@@ -57,6 +66,7 @@
             <tr>
                 <th class="no-sort">Marco / prazo</th>
                 <th class="no-sort">Cliente / Proposta</th>
+                <th class="no-sort">Contato</th>
                 <th class="no-sort">Vendedor</th>
                 <th class="no-sort right">Valor</th>
                 <th class="no-sort">Fechamento</th>
@@ -74,6 +84,14 @@
                         <div class="fu-sub">@(r.Cur?.Label ?? "rotina concluída")</div>
                     </td>
                     <td class="col-strong">@Cat.CustomerName(r.Opp.CustomerId)<div class="fu-sub">@Proposta(r.Opp)</div></td>
+                    <td>
+                        @if (r.Fu.HasContact)
+                        {
+                            @if (!string.IsNullOrWhiteSpace(r.Fu.ContactName)) { <div>@r.Fu.ContactName</div> }
+                            @if (!string.IsNullOrWhiteSpace(r.Fu.ContactEmail)) { <div class="fu-sub">@Icons.Svg("mail") @r.Fu.ContactEmail</div> }
+                        }
+                        else { <span class="muted">—</span> }
+                    </td>
                     <td>@Vendedor(r.Opp)</td>
                     <td class="right num">@Fmt.Brl(r.Opp.AmountBrl)</td>
                     <td class="nowrap">@Fmt.Date(r.Opp.ExpectedDate)</td>
@@ -86,7 +104,7 @@
             }
             @if (!Filtered().Any())
             {
-                <tr><td colspan="8" class="empty">Nenhuma proposta em aberto no filtro.</td></tr>
+                <tr><td colspan="9" class="empty">Nenhuma proposta em aberto no filtro.</td></tr>
             }
         </tbody>
     </table>
@@ -103,6 +121,29 @@
                 <p class="subtitle">@Cat.CustomerName(_editOpp.CustomerId) · @Proposta(_editOpp) · marco: @(_editRow.Cur?.Label ?? "concluído")</p>
             </div>
             <button class="icon-btn" @onclick="CloseDrawer">@Icons.Svg("x")</button>
+        </div>
+
+        @* Contato do cliente (buscado nos arquivos de proposta) *@
+        <div class="fu-contact">
+            <span class="fu-contact-ico">@Icons.Svg("mail")</span>
+            @if (_editRow.Fu.HasContact)
+            {
+                <div class="fu-contact-info">
+                    @if (!string.IsNullOrWhiteSpace(_editRow.Fu.ContactName)) { <strong>@_editRow.Fu.ContactName</strong> }
+                    @if (!string.IsNullOrWhiteSpace(_editRow.Fu.ContactEmail)) { <span class="fu-contact-mail">@_editRow.Fu.ContactEmail</span> }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_editRow.Fu.ContactEmail))
+                {
+                    <button class="btn-ghost" style="padding:3px 9px" @onclick="async () => await CopyText(_editRow!.Fu.ContactEmail)">@Icons.Svg("copy")Copiar e-mail</button>
+                }
+            }
+            else
+            {
+                <span class="muted">Sem contato do cliente.</span>
+                <button class="btn-ghost" style="padding:3px 9px" disabled="@_searching" @onclick="() => BuscarContatoDaLinha(_editRow)">
+                    @if (_searching) { <span class="spinner-sm"></span><text>Buscando…</text> } else { @Icons.Svg("users")<text>Buscar contato</text> }
+                </button>
+            }
         </div>
 
         @* Modelo de e-mail do marco atual, nos 3 idiomas *@
@@ -218,6 +259,10 @@
     private List<Row> _queue = new();
     private int _queueIdx;
 
+    // Busca de contatos.
+    private bool _searching;
+    private string _contactMsg = "";
+
     // Modelos de e-mail (modal).
     private bool _showTpl;
     private int _tplLang;
@@ -261,6 +306,66 @@
         if (_status != "") q = q.Where(r => r.Fu.Status == _status);
         if (_onlyDue) q = q.Where(r => r.Rank <= 1);
         return q;
+    }
+
+    // ---- Busca do contato do cliente (nome + e-mail) nos arquivos de proposta ----
+    // Porte da rotina VBA: as propostas já estão na base; só buscamos o contato.
+    private async Task BuscarContatos()
+    {
+        if (_searching) return;
+        if (!Contacts.Enabled) { _contactMsg = "Busca de contatos desativada nas configurações (Contatos:Enabled)."; return; }
+
+        // Alvos: propostas do filtro que ainda não têm contato.
+        var targets = Filtered().Where(r => !r.Fu.HasContact).Select(r => r.Opp).ToList();
+        if (targets.Count == 0) { _contactMsg = "Todas as propostas do filtro já têm contato."; return; }
+
+        _searching = true; _contactMsg = ""; StateHasChanged();
+
+        var (found, notFound) = await Task.Run(() =>
+        {
+            var dict = FUp.All();
+            int f = 0, nf = 0;
+            foreach (var o in targets)
+            {
+                if (TryFindAndSave(o, dict)) f++; else nf++;
+            }
+            return (f, nf);
+        });
+
+        _searching = false;
+        _contactMsg = $"Contatos encontrados: {found} · sem contato: {notFound} (de {targets.Count} proposta(s) do filtro).";
+        Load();
+    }
+
+    // Busca o contato de UMA proposta (botão dentro do drawer).
+    private async Task BuscarContatoDaLinha(Row r)
+    {
+        if (_searching) return;
+        if (!Contacts.Enabled) { _contactMsg = "Busca de contatos desativada nas configurações (Contatos:Enabled)."; return; }
+        _searching = true; StateHasChanged();
+
+        var ok = await Task.Run(() => TryFindAndSave(r.Opp, FUp.All()));
+
+        _searching = false;
+        Load();
+        // Atualiza o drawer com o registro recém-gravado (mantém o marco atual).
+        var updated = _rows.FirstOrDefault(x => x.Opp.Id == r.Opp.Id);
+        if (updated is not null) _editRow = updated;
+        _contactMsg = ok ? "Contato localizado." : "Contato não localizado nos arquivos de proposta.";
+    }
+
+    // Executa a busca e grava o contato encontrado. Devolve true se achou algo.
+    private bool TryFindAndSave(Opportunity o, Dictionary<string, FollowUp> dict)
+    {
+        var codigo = (o.ProposalNumber ?? "").Trim();
+        if (codigo == "") return false;
+        var hit = Contacts.Find(codigo, Cat.BuCode(o.PvBusinessUnitId));
+        if (!hit.Found) return false;
+        var fu = dict.TryGetValue(o.Id, out var x) ? x : new FollowUp { Id = o.Id, Status = FollowUpStatus.Pendente };
+        if (!string.IsNullOrWhiteSpace(hit.Name)) fu.ContactName = hit.Name;
+        if (!string.IsNullOrWhiteSpace(hit.Email)) fu.ContactEmail = hit.Email;
+        FUp.Save(fu, _user);
+        return true;
     }
 
     private string Vendedor(Opportunity o) => OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId));
