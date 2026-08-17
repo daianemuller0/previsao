@@ -13,8 +13,11 @@ namespace HowdenSalesForecast.Data;
 // ---------------------------------------------------------------------------
 public class UserRepository
 {
-    private const string Ent = "users";
-    private const string Cols = "login, nome, role, salt, hash, vendedores, ativo, updated_by, updated_at";
+    // O ParquetStore consolida sempre pela coluna "id" (PARTITION BY id); por isso
+    // a chave do usuário (o login) é gravada na coluna "id". Entidade nova para
+    // ignorar arquivos de um esquema anterior incompatível.
+    private const string Ent = "app_users";
+    private const string Cols = "id, nome, role, salt, hash, vendedores, ativo, updated_by, updated_at";
 
     // Senha padrão inicial de todos os logins semeados (o admin troca depois).
     public const string DefaultPassword = "howden2026";
@@ -52,7 +55,7 @@ public class UserRepository
         u.UpdatedAt = Iso(DateTime.Now);
         _store.WriteRow(Ent, new KeyValuePair<string, object?>[]
         {
-            new("login", u.Login), new("nome", u.Nome), new("role", u.Role),
+            new("id", u.Login), new("nome", u.Nome), new("role", u.Role),
             new("salt", u.Salt), new("hash", u.Hash), new("vendedores", u.Vendedores),
             new("ativo", u.Ativo), new("updated_by", u.UpdatedBy), new("updated_at", u.UpdatedAt),
         });
@@ -62,7 +65,7 @@ public class UserRepository
     {
         var key = (login ?? "").Trim().ToLowerInvariant();
         if (key == "") return;
-        _store.WriteRow(Ent, new KeyValuePair<string, object?>[] { new("login", key) }, deleted: true);
+        _store.WriteRow(Ent, new KeyValuePair<string, object?>[] { new("id", key) }, deleted: true);
     }
 
     // ---- senha ----
