@@ -99,8 +99,8 @@ public static class FollowUpRoutine
         },
     };
 
-    // Assunto + corpo do e-mail para um marco (1..4) e idioma (0=pt,1=en,2=es).
-    public static string Email(int milestone, int lang, EmailCtx c)
+    // Assunto e corpo já preenchidos (para o marco 1..4 e idioma 0=pt,1=en,2=es).
+    public static (string Subject, string Body) EmailParts(int milestone, int lang, EmailCtx c)
     {
         var mi = Math.Clamp(milestone, 1, 4) - 1;
         var li = Math.Clamp(lang, 0, 2);
@@ -111,7 +111,14 @@ public static class FollowUpRoutine
             .Replace("{valor}", c.Valor)
             .Replace("{fechamento}", c.Fechamento)
             .Replace("{vendedor}", c.Vendedor);
+        return (F(subj), F(body));
+    }
+
+    // Assunto + corpo do e-mail para um marco (1..4) e idioma (0=pt,1=en,2=es).
+    public static string Email(int milestone, int lang, EmailCtx c)
+    {
+        var (subj, body) = EmailParts(milestone, lang, c);
         var assunto = lang == 1 ? "Subject" : lang == 2 ? "Asunto" : "Assunto";
-        return $"{assunto}: {F(subj)}\n\n{F(body)}";
+        return $"{assunto}: {subj}\n\n{body}";
     }
 }

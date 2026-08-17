@@ -10,6 +10,17 @@ window.appDownload = (fileName, mime, base64) => {
     a.remove();
 };
 
+// Abre um rascunho de e-mail no cliente padrão (mailto:) sem navegar a página.
+// Usado no envio de follow-ups em massa (o usuário revisa e envia).
+window.openMail = (url) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+};
+
 // Copia texto para a área de transferência (modelo de e-mail do follow-up).
 window.copyText = async (text) => {
     try {
