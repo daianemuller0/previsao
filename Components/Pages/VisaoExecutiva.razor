@@ -1902,7 +1902,7 @@
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
         double total = Math.Max(data.Sum(d => Cv(d.Value)), 1);
-        double cx = 64, cy = 64, r = 50, sw = 20, C = 2 * Math.PI * r;
+        double cx = 64, cy = 64, r = 51, sw = 15, C = 2 * Math.PI * r;
 
         var sb = new System.Text.StringBuilder();
         sb.Append("<div class='donut-wrap'>");
@@ -1918,8 +1918,9 @@
             sb.Append($"<circle cx='{cx}' cy='{cy}' r='{r.ToString(inv)}' fill='none' stroke='{col}' stroke-width='{sw.ToString(inv)}' stroke-dasharray='{dash.ToString("0.##", inv)} {(C - dash).ToString("0.##", inv)}' stroke-dashoffset='{(-off).ToString("0.##", inv)}' transform='rotate(-90 {cx} {cy})'/>");
             off += dash;
         }
-        sb.Append($"<text x='{cx}' y='{(cy - 3).ToString(inv)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>Total</text>");
-        sb.Append($"<text x='{cx}' y='{(cy + 11).ToString(inv)}' text-anchor='middle' font-size='13' font-weight='700' fill='#1e2836'>{_sym} {Fmt.Compact(total)}</text>");
+        sb.Append($"<text x='{cx}' y='{(cy - 6).ToString(inv)}' text-anchor='middle' font-size='7.5' letter-spacing='.4' fill='#8a97a8'>TOTAL</text>");
+        sb.Append($"<text x='{cx}' y='{(cy + 5).ToString(inv)}' text-anchor='middle' font-size='13.5' font-weight='800' fill='#0f2038'>{Fmt.Compact(total)}</text>");
+        sb.Append($"<text x='{cx}' y='{(cy + 15).ToString(inv)}' text-anchor='middle' font-size='7.5' font-weight='700' fill='#5b6b82'>{_sym}</text>");
         sb.Append("</svg>");
 
         sb.Append("<ul class='donut-legend'>");

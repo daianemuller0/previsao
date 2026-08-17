@@ -816,7 +816,7 @@ label.fld .cell, label.fld .field, label.fld select, label.fld input { width: 10
 /* ---- Gráfico de rosca (donut) + legenda ---- */
 .chart-body.donut { min-height: 0; display: block; }
 .donut-wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.donut-svg { width: 128px; height: 128px; flex: 0 0 128px; }
+.donut-svg { width: 168px; height: 168px; flex: 0 0 168px; }
 .donut-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 150px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .donut-legend li { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 8px; font-size: 12.5px; }
 .donut-legend .dl-dot { width: 10px; height: 10px; border-radius: 3px; }
@@ -1210,7 +1210,7 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .seg-donut svg { width: 100%; height: 100%; display: block; }
 .seg-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none; }
 .seg-center .lab { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted-2); }
-.seg-center .val { font-size: 22px; font-weight: 800; letter-spacing: -.6px; color: var(--text); font-variant-numeric: tabular-nums; }
+.seg-center .val { font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--text); font-variant-numeric: tabular-nums; }
 .seg-list { display: flex; flex-direction: column; gap: 2px; }
 .seg-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; cursor: pointer; transition: background .12s ease; }
 .seg-row + .seg-row { border-top: 1px solid #f1f4f9; }
