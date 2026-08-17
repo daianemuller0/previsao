@@ -117,29 +117,26 @@
     </div>
 }
 
-@* ---- Indicar venda: confirmação com os dados completos da proposta ---- *@
-@if (_sell is not null)
+@* ---- Indicar venda: confirmar/editar os dados que vão para o Controle ---- *@
+@if (_sell is not null && _sellReg is not null)
 {
     <div class="drawer-backdrop" @onclick="() => _sell = null"></div>
-    <div class="confirm-box" style="width:min(620px,calc(100vw - 32px))">
+    <div class="confirm-box" style="width:min(640px,calc(100vw - 32px))">
         <div class="confirm-head">@Icons.Svg("dollar")<span>Indicar venda</span></div>
-        <p class="confirm-text">Confira os dados da proposta. Ao confirmar, a oferta <strong>sai das Oportunidades</strong> e vai para o <strong>Controle · Ofertas e pedidos</strong>.</p>
-        <dl class="detail-grid" style="margin:6px 0 4px">
-            <div class="dl"><dt>Proposta</dt><dd>@Dash(_sell.ProposalNumber)</dd></div>
-            <div class="dl"><dt>PV</dt><dd>@Dash(_sell.PvNumber)</dd></div>
-            <div class="dl"><dt>Cliente</dt><dd>@Cat.CustomerName(_sell.CustomerId)</dd></div>
-            <div class="dl"><dt>Vendedor (KAM)</dt><dd>@Cat.KamName(_sell.KamId)</dd></div>
-            <div class="dl"><dt>Mercado</dt><dd>@Cat.MarketName(_sell.MarketId)</dd></div>
-            <div class="dl"><dt>Produto</dt><dd>@Cat.ProductName(_sell.ProductId)</dd></div>
-            <div class="dl"><dt>País</dt><dd>@Cat.CountryName(_sell.CountryId)</dd></div>
-            <div class="dl"><dt>Unidade de Venda</dt><dd>@Dash(Cat.BuCode(_sell.PvBusinessUnitId))</dd></div>
-            <div class="dl"><dt>Data prevista</dt><dd>@Fmt.Date(_sell.ExpectedDate)</dd></div>
-            <div class="dl"><dt>Valor (R$)</dt><dd><strong>@Fmt.Brl(_sell.AmountBrl)</strong></dd></div>
-            <div class="dl"><dt>GM %</dt><dd>@Fmt.Pct(_sell.GmPercentValue)</dd></div>
-            <div class="dl"><dt>% de Ganho</dt><dd>@Fmt.Pct(_sell.WinProbabilityValue)</dd></div>
-            <div class="dl"><dt>% de Sair no Mês</dt><dd>@Fmt.Pct(_sell.CloseProbabilityValue)</dd></div>
-            <div class="dl"><dt>Categoria (NB/AFM)</dt><dd>@Dash(_sell.CommercialCategory)</dd></div>
-        </dl>
+        <p class="confirm-text">Confira e, se precisar, <strong>edite</strong> os dados. Ao confirmar, a oferta <strong>sai das Oportunidades</strong> e vai para o <strong>Controle · Ofertas e pedidos</strong>.</p>
+        <div class="form-grid">
+            <label class="fld">Oferta (proposta)<input class="field" @bind="_sellReg.Oferta" /></label>
+            <label class="fld">Pedido (PV)<input class="field" @bind="_sellReg.Pedido" /></label>
+            <label class="fld full">Cliente<input class="field" @bind="_sellReg.Cliente" /></label>
+            <label class="fld">Mercado<input class="field" @bind="_sellReg.Mercado" /></label>
+            <label class="fld">Vendedor (KAM)<input class="field" @bind="_sellReg.Kam" /></label>
+            <label class="fld">Valor Líquido (R$)<input class="field num" @bind="_sellReg.ValorLiquido" /></label>
+            <label class="fld">POC<input class="field" @bind="_sellReg.Poc" /></label>
+            <label class="fld">Semana<input class="field num" @bind="_sellReg.Semana" /></label>
+            <label class="fld">Mês
+                <select class="field" @bind="_sellReg.Mes"><option value="">—</option>@for (var m = 1; m <= 12; m++){<option value="@Fmt.MonthLong(m)">@Fmt.MonthLong(m)</option>}</select>
+            </label>
+        </div>
         @if (!string.IsNullOrEmpty(_sellErr)) { <div class="confirm-err">@_sellErr</div> }
         <div class="modal-actions">
             <button class="btn-ghost" disabled="@_sellBusy" @onclick="() => _sell = null">Cancelar</button>
@@ -350,34 +347,40 @@
 
     // ---- Indicar venda: move a oportunidade para o Controle (Ofertas e pedidos) ----
     private Opportunity? _sell;
+    private ControleRegistro? _sellReg;
     private string _sellErr = "";
     private bool _sellBusy;
 
-    private void OpenSell(Opportunity o) { _sell = o; _sellErr = ""; _sellBusy = false; }
+    // Monta um rascunho editável do registro (Ofertas e pedidos) a partir da proposta.
+    private void OpenSell(Opportunity o)
+    {
+        _sell = o; _sellErr = ""; _sellBusy = false;
+        var d = o.ExpectedDateValue;
+        _sellReg = new ControleRegistro
+        {
+            Oferta = string.IsNullOrWhiteSpace(o.ProposalNumber) ? o.Name : o.ProposalNumber,
+            Pedido = o.PvNumber,
+            Cliente = Cat.CustomerName(o.CustomerId),
+            Mercado = Cat.MarketName(o.MarketId),
+            Kam = OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId)),
+            ValorLiquido = o.AmountBrl.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+            Semana = d is { } dd ? System.Globalization.ISOWeek.GetWeekOfYear(dd).ToString() : "",
+            Mes = d is { } dm ? Fmt.MonthLong(dm.Month) : "",
+            Poc = Fmt.Pct(o.WinProbabilityValue),
+        };
+    }
 
     private async Task ConfirmSell()
     {
-        if (_sell is null || _sellBusy) return;
+        if (_sell is null || _sellReg is null || _sellBusy) return;
         _sellBusy = true; _sellErr = "";
         var o = _sell;
+        var reg = _sellReg;
         try
         {
             await Task.Run(() =>
             {
-                var d = o.ExpectedDateValue;
-                var reg = new ControleRegistro
-                {
-                    Oferta = string.IsNullOrWhiteSpace(o.ProposalNumber) ? o.Name : o.ProposalNumber,
-                    Pedido = o.PvNumber,
-                    Cliente = Cat.CustomerName(o.CustomerId),
-                    Mercado = Cat.MarketName(o.MarketId),
-                    Kam = OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId)),
-                    ValorLiquido = o.AmountBrl.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    Semana = d is { } dd ? System.Globalization.ISOWeek.GetWeekOfYear(dd).ToString() : "",
-                    Mes = d is { } dm ? Fmt.MonthLong(dm.Month) : "",
-                    Poc = Fmt.Pct(o.WinProbabilityValue),
-                };
-                Controle.SaveRegistro(reg, _user);
+                Controle.SaveRegistro(reg, _user);   // usa os valores (possivelmente editados)
 
                 var full = Repo.Get(o.Id) ?? o;
                 full.MovidaControle = "Sim";
@@ -385,7 +388,7 @@
                 full.UpdatedBy = _user;
                 Repo.Save(full);
             });
-            _sell = null;
+            _sell = null; _sellReg = null;
             await OnChanged.InvokeAsync();
         }
         catch (Exception ex) { _sellErr = "Falha ao indicar a venda: " + ex.Message; }
