@@ -1,0 +1,42 @@
+' =====================================================================
+'  COLE ESTE CONTEUDO EM: Project1 > Microsoft Outlook Objetos >
+'                         ThisOutlookSession
+'
+'  (nao e um modulo novo - e o objeto ThisOutlookSession que ja existe)
+'
+'  Isso faz a macro rodar SOZINHA quando o e-mail chega,
+'  sem depender de regra "executar um script".
+'
+'  Depois de colar: salve, feche e reabra o Outlook.
+'  Para ativar sem reabrir, rode IniciarMonitorPrevisao uma vez (F5).
+' =====================================================================
+
+Option Explicit
+
+Private WithEvents itensCaixaEntrada As Outlook.Items
+
+Private Sub Application_Startup()
+    IniciarMonitorPrevisao
+End Sub
+
+Public Sub IniciarMonitorPrevisao()
+    Dim ns As Outlook.NameSpace
+
+    On Error GoTo Erro
+    Set ns = Application.GetNamespace("MAPI")
+    Set itensCaixaEntrada = ns.GetDefaultFolder(olFolderInbox).Items
+    Debug.Print "Monitor de previsao ATIVO em " & Now
+    Exit Sub
+
+Erro:
+    Debug.Print "Falha ao iniciar monitor: " & Err.Number & " - " & Err.Description
+End Sub
+
+Private Sub itensCaixaEntrada_ItemAdd(ByVal Item As Object)
+    Dim n As Long
+
+    On Error Resume Next
+    If TypeOf Item Is Outlook.MailItem Then
+        n = SalvarPrevisao(Item)
+    End If
+End Sub
