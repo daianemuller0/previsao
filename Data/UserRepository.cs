@@ -84,22 +84,37 @@ public class UserRepository
         return Convert.ToHexString(bytes);
     }
 
-    // ---- semente das contas a partir das regras de acesso ----
+    // ---- semente / conciliação das contas a partir das regras de acesso ----
+    // Cria os logins que faltam e GARANTE o acesso mínimo das regras nos que já
+    // existem (une a carteira, sem remover o que o admin tenha acrescentado).
+    // Idempotente: se nada muda, não grava. Não mexe em senha de conta existente.
     public void SeedIfEmpty(string actor = "sistema")
     {
-        if (All().Count > 0) return;
+        var existing = All().ToDictionary(u => u.Login, StringComparer.OrdinalIgnoreCase);
         foreach (var (nome, role, vendedores) in SeedList)
         {
-            var u = new AppUser
+            var login = LoginFor(nome);
+            if (!existing.TryGetValue(login, out var u))
             {
-                Login = LoginFor(nome),
-                Nome = nome,
-                Role = role,
-                Vendedores = string.Join(";", vendedores),
-                Ativo = "Sim",
-            };
-            SetPassword(u, DefaultPassword);
-            Save(u, actor);
+                var novo = new AppUser
+                {
+                    Login = login, Nome = nome, Role = role,
+                    Vendedores = string.Join(";", vendedores), Ativo = "Sim",
+                };
+                SetPassword(novo, DefaultPassword);
+                Save(novo, actor);
+                continue;
+            }
+            // Conta existente: garante o acesso mínimo (só para vendedores).
+            if (role != AccessRoles.Vendedor || vendedores.Length == 0) continue;
+            var set = new HashSet<string>(u.VendedorList, StringComparer.CurrentCultureIgnoreCase);
+            var antes = set.Count;
+            foreach (var v in vendedores) set.Add(v);
+            if (set.Count != antes)
+            {
+                u.Vendedores = string.Join(";", set);
+                Save(u, actor);
+            }
         }
     }
 
@@ -116,7 +131,7 @@ public class UserRepository
     private static readonly (string Nome, string Role, string[] Vendedores)[] SeedList =
     {
         // Vendedores com acesso ampliado (grupos e vice-versa).
-        ("Rafael Toledo",      AccessRoles.Vendedor, new[]{ "Rafael Toledo","Andre Carvalho","Jose Moura","Leonardo Silva","Paulo Agostinho" }),
+        ("Rafael Toledo",      AccessRoles.Vendedor, new[]{ "Rafael Toledo","Andre Carvalho","Jose Moura","Leonardo Silva","Paulo Agostinho","Elmer" }),
         ("Bruno Castro",       AccessRoles.Vendedor, new[]{ "Bruno Castro","Leonardo Macachero","Emerson Barbosa" }),
         ("Leonardo Macachero", AccessRoles.Vendedor, new[]{ "Leonardo Macachero","Bruno Castro","Emerson Barbosa" }),
         ("Emerson Barbosa",    AccessRoles.Vendedor, new[]{ "Emerson Barbosa","Bruno Castro","Leonardo Macachero" }),
