@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject OpportunityImporter Importer
 @inject ListRepository Lists
+@inject IJSRuntime JS
 
 <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Oportunidades</span></div>
 
@@ -16,16 +17,15 @@
     </div>
     <div class="page-actions">
         <button class="icon-btn danger" title="Excluir base inteira" @onclick="() => _wipe = true">@Icons.Svg("trash")</button>
+        <button class="btn-ghost" @onclick="OpenBulk">@Icons.Svg("flag")Indicar em massa</button>
         <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
 </div>
 
-<div class="exec-grid cols-4">
+<div class="exec-grid cols-2">
     <StatCard Label="Abertas" Value="@_openCount.ToString()" Context="no funil" />
-    <StatCard Label="Valor em risco" Value="@Fmt.UsdShort(_riskValue)" Context="alto/crítico" />
-    <StatCard Label="Sem próxima ação" Value="@_noAction.ToString()" Context="requerem follow-up" />
-    <StatCard Label="Sem atualização 30d+" Value="@_stale.ToString()" Context="cobrar KAM" />
+    <StatCard Label="Valor total" Value="@("R$ " + Fmt.Compact(Rows.Sum(o => o.AmountBrl)))" Context="carteira no recorte" />
 </div>
 
 <div class="filterbar filterbar-sticky">
@@ -210,6 +210,48 @@
     </div>
 }
 
+@* ---- Indicação em massa (planilha de propostas) ---- *@
+@if (_bulk)
+{
+    <div class="drawer-backdrop" @onclick="() => _bulk = false"></div>
+    <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
+        <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("flag")<span>Indicar na Previsão em massa</span></div>
+        <p class="confirm-text">
+            Envie uma planilha (<strong>.xlsx</strong> ou <strong>.csv</strong>) com <strong>uma coluna</strong> contendo os
+            <strong>códigos de proposta</strong>. As propostas encontradas na base serão marcadas como
+            <strong>indicadas na previsão</strong>. Os códigos não encontrados voltam num Excel para você conferir.
+        </p>
+        <label class="fld">Arquivo (.xlsx ou .csv)
+            <InputFile class="field" OnChange="OnBulkFile" accept=".xlsx,.csv" />
+        </label>
+        @if (!string.IsNullOrEmpty(_bulkErr)) { <div class="confirm-err">@_bulkErr</div> }
+        @if (_bulkCodes.Count > 0 && _bulkFound is null)
+        {
+            <div class="import-summary mt-16"><strong>@_bulkCodes.Count</strong> código(s) lido(s) da planilha.</div>
+        }
+        @if (_bulkFound is not null)
+        {
+            <div class="import-summary mt-16">
+                <strong>@_bulkFound</strong> proposta(s) indicada(s) ·
+                <strong>@(_bulkNotFound?.Count ?? 0)</strong> código(s) não encontrado(s)
+            </div>
+            @if (_bulkNotFound is { Count: > 0 })
+            {
+                <div class="mt-16">
+                    <button class="btn-ghost" @onclick="DownloadNotFound">@Icons.Svg("download")Baixar não encontrados (.xlsx)</button>
+                </div>
+            }
+        }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _bulk = false">Fechar</button>
+            @if (_bulkFound is null)
+            {
+                <button class="btn-primary" disabled="@(_bulkCodes.Count == 0)" @onclick="ConfirmBulk">@Icons.Svg("check")Indicar @_bulkCodes.Count</button>
+            }
+        </div>
+    </div>
+}
+
 @if (_new is not null)
 {
     <div class="drawer-backdrop" @onclick="() => _new = null"></div>
@@ -348,7 +390,14 @@
     private string _search = "", _cat = "", _kam = "", _market = "", _risk = "";
     private int _year, _monthFilter;                 // 0 = todos
     private DateTime? _dateFrom, _dateTo;
-    private int _openCount, _noAction, _stale;
+    private int _openCount;
+
+    // Indicação em massa (planilha de propostas).
+    private bool _bulk;
+    private string _bulkErr = "";
+    private List<string> _bulkCodes = new();
+    private int? _bulkFound;
+    private List<string>? _bulkNotFound;
 
     // Opções dos filtros vindas dos próprios dados (funciona com listas de texto).
     private IEnumerable<int> Years => _all.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
@@ -362,7 +411,6 @@
         _search = _cat = _kam = _market = _risk = "";
         _year = _monthFilter = 0; _dateFrom = _dateTo = null;
     }
-    private double _riskValue;
     private Opportunity? _new;
     private int _newMonthNum = DateTime.Today.Month, _newYear = DateTime.Today.Year;
 
@@ -416,9 +464,108 @@
     {
         var open = _all.Where(o => ForecastCategories.IsOpen(o.Category)).ToList();
         _openCount = open.Count;
-        _noAction = open.Count(o => string.IsNullOrWhiteSpace(o.NextAction));
-        _stale = open.Count(o => ForecastCalc.DaysSinceUpdate(o, _today) >= 30);
-        _riskValue = open.Where(o => ForecastCalc.Level(o, _today) is RiskLevel.Alto or RiskLevel.Critico).Sum(o => o.AmountUsd);
+    }
+
+    // ---- Indicação em massa por planilha de propostas ----
+    private void OpenBulk()
+    {
+        _bulk = true; _bulkErr = "";
+        _bulkCodes = new(); _bulkFound = null; _bulkNotFound = null;
+    }
+
+    private async Task OnBulkFile(InputFileChangeEventArgs e)
+    {
+        _bulkErr = ""; _bulkFound = null; _bulkNotFound = null; _bulkCodes = new();
+        try
+        {
+            using var ms = new MemoryStream();
+            await e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(ms);
+            ms.Position = 0;
+            _bulkCodes = ReadBulkCodes(e.File.Name, ms);
+            if (_bulkCodes.Count == 0) _bulkErr = "Nenhum código encontrado na primeira coluna da planilha.";
+        }
+        catch (Exception ex) { _bulkErr = "Falha ao ler o arquivo: " + ex.Message; }
+    }
+
+    // Lê os códigos da 1ª coluna (ignora cabeçalho tipo "proposta"/"código").
+    private static List<string> ReadBulkCodes(string fileName, Stream stream)
+    {
+        var list = new List<string>();
+        if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
+            var text = reader.ReadToEnd();
+            foreach (var line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+            {
+                var first = line.Split(';', ',')[0].Trim().Trim('"').Trim();
+                if (first != "") list.Add(first);
+            }
+        }
+        else
+        {
+            using var wb = new ClosedXML.Excel.XLWorkbook(stream);
+            var ws = wb.Worksheets.FirstOrDefault();
+            if (ws is not null)
+                foreach (var cell in ws.Column(1).CellsUsed())
+                {
+                    var v = cell.GetString().Trim();
+                    if (v != "") list.Add(v);
+                }
+        }
+        // Remove um provável cabeçalho e duplicatas.
+        return list.Where(c => !IsHeader(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static bool IsHeader(string c)
+    {
+        var n = c.Trim().ToLowerInvariant();
+        return n is "proposta" or "propostas" or "codigo" or "código" or "codigos" or "code" or "proposal";
+    }
+
+    private void ConfirmBulk()
+    {
+        // Índice das oportunidades por número de proposta (pode haver várias por proposta).
+        var byProp = _all.Where(o => !string.IsNullOrWhiteSpace(o.ProposalNumber))
+            .GroupBy(o => o.ProposalNumber.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var notFound = new List<string>();
+        var toFlag = new List<Opportunity>();
+        foreach (var code in _bulkCodes)
+        {
+            if (byProp.TryGetValue(code.Trim(), out var opps)) toFlag.AddRange(opps);
+            else notFound.Add(code);
+        }
+
+        var flagged = 0;
+        foreach (var o in toFlag)
+        {
+            var full = Repo.Get(o.Id);
+            if (full is null || full.IndicadaValue) continue;
+            full.Indicada = "Sim";
+            Repo.Save(full);
+            flagged++;
+        }
+
+        _bulkFound = flagged;
+        _bulkNotFound = notFound;
+        _all = Repo.All();
+        Recompute();
+    }
+
+    private async Task DownloadNotFound()
+    {
+        if (_bulkNotFound is not { Count: > 0 }) return;
+        using var wb = new ClosedXML.Excel.XLWorkbook();
+        var ws = wb.Worksheets.Add("Não encontrados");
+        ws.Cell(1, 1).Value = "Proposta (não encontrada na base)";
+        for (var i = 0; i < _bulkNotFound.Count; i++) ws.Cell(i + 2, 1).Value = _bulkNotFound[i];
+        ws.Column(1).AdjustToContents();
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        var b64 = Convert.ToBase64String(ms.ToArray());
+        await JS.InvokeVoidAsync("appDownload", "propostas_nao_encontradas.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b64);
     }
 
     // Lista filtrada recomputada a cada render (padrão do projeto de Licenças).
