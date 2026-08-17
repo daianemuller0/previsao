@@ -228,7 +228,7 @@
         @if (!string.IsNullOrEmpty(_bulkErr)) { <div class="confirm-err">@_bulkErr</div> }
         @if (_bulkCodes.Count > 0 && _bulkFound is null)
         {
-            <div class="import-summary mt-16"><strong>@_bulkCodes.Count</strong> código(s) lido(s) da planilha.</div>
+            <div class="import-summary mt-16"><strong>@_bulkCodes.Count</strong> código(s) único(s) a indicar.@(_bulkRawCount > _bulkCodes.Count ? $" ({_bulkRawCount} linhas lidas · {_bulkRawCount - _bulkCodes.Count} repetidas/cabeçalho removidas)" : "")</div>
         }
         @if (_bulkFound is not null)
         {
@@ -398,6 +398,7 @@
     private bool _bulk;
     private string _bulkErr = "";
     private List<string> _bulkCodes = new();
+    private int _bulkRawCount;
     private int? _bulkFound;
     private List<string>? _bulkNotFound;
 
@@ -479,20 +480,20 @@
 
     private async Task OnBulkFile(InputFileChangeEventArgs e)
     {
-        _bulkErr = ""; _bulkFound = null; _bulkNotFound = null; _bulkCodes = new();
+        _bulkErr = ""; _bulkFound = null; _bulkNotFound = null; _bulkCodes = new(); _bulkRawCount = 0;
         try
         {
             using var ms = new MemoryStream();
             await e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(ms);
             ms.Position = 0;
-            _bulkCodes = ReadBulkCodes(e.File.Name, ms);
+            _bulkCodes = ReadBulkCodes(e.File.Name, ms, out _bulkRawCount);
             if (_bulkCodes.Count == 0) _bulkErr = "Nenhum código encontrado na primeira coluna da planilha.";
         }
         catch (Exception ex) { _bulkErr = "Falha ao ler o arquivo: " + ex.Message; }
     }
 
     // Lê os códigos da 1ª coluna (ignora cabeçalho tipo "proposta"/"código").
-    private static List<string> ReadBulkCodes(string fileName, Stream stream)
+    private static List<string> ReadBulkCodes(string fileName, Stream stream, out int rawCount)
     {
         var list = new List<string>();
         if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
@@ -516,7 +517,9 @@
                     if (v != "") list.Add(v);
                 }
         }
-        // Remove um provável cabeçalho e duplicatas.
+        // Remove um provável cabeçalho e duplicatas (a mesma proposta costuma
+        // repetir em várias linhas — item/produto/parcela). rawCount = linhas lidas.
+        rawCount = list.Count;
         return list.Where(c => !IsHeader(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
