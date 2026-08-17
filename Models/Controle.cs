@@ -68,7 +68,7 @@ public class ControleRegistro
 }
 
 // Taxa de conversão de moeda usada na importação do Aftermarket.
-// Rate = quantos R$ por 1 unidade da moeda (ex.: USD 5,42 = R$ por 1 dólar).
+// Rate = quantos R$ por 1 unidade da moeda (ex.: USD 5,3726 = R$ por 1 dólar).
 // Cadastrada na aba Controle / Configurações. BRL não precisa de taxa.
 public class CurrencyRate
 {

@@ -115,7 +115,7 @@ public class Opportunity
     // Taxa global BRL por USD (moeda executiva de consolidação). Sincronizada do
     // catálogo na inicialização. O valor em USD deriva SEMPRE do valor em BRL —
     // que já sai correto da conversão da moeda de origem (origem → BRL).
-    public static double BrlPerUsd = 5.42;
+    public static double BrlPerUsd = 5.3726;
 
     // Valor em USD = valor em BRL ÷ (BRL por USD). Não usa a taxa por-linha
     // (que é origem → BRL) para o passo do dólar — isso gerava valores absurdos
