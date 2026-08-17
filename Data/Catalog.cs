@@ -147,7 +147,7 @@ public sealed class Catalog
         ExchangeRates = new[]
         {
             new ExchangeRate("BRL", 1.0),   // referência
-            new ExchangeRate("USD", 5.42),  // BRL por USD
+            new ExchangeRate("USD", 5.3726),  // BRL por USD (taxa fixa da consolidação)
             new ExchangeRate("EUR", 5.88),  // BRL por EUR
         };
 
