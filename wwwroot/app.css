@@ -41,6 +41,7 @@
 
     --radius: 12px;
     --radius-sm: 9px;
+    --topbar-h: 60px;   /* altura fixa do topbar; a barra de filtros congela exatamente abaixo */
     --radius-xs: 6px;
     --shadow-xs: 0 1px 2px rgba(13, 35, 64, .06);
     --shadow-sm: 0 1px 3px rgba(13, 35, 64, .07), 0 1px 2px rgba(13, 35, 64, .04);
@@ -134,7 +135,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
 .topbar {
     background: var(--panel); border-bottom: 1px solid var(--border);
     padding: 11px 28px; display: flex; justify-content: space-between; align-items: center; gap: 16px;
-    position: sticky; top: 0; z-index: 30;
+    position: sticky; top: 0; z-index: 30; height: var(--topbar-h);
 }
 .topbar-title { font-weight: 700; font-size: 15px; color: var(--primary); display: flex; align-items: center; gap: 9px; }
 .topbar-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
@@ -167,6 +168,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
 .filterbar {
     background: var(--panel); border-bottom: 1px solid var(--border);
     padding: 9px 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    position: sticky; top: var(--topbar-h); z-index: 25;
 }
 .filterbar .flt {
     display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2);
