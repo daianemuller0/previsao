@@ -1,65 +1,240 @@
 @page "/administracao"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "admin")]
 @rendermode InteractiveServer
 @inject Catalog Cat
+@inject UserRepository Users
 
 <div class="breadcrumbs"><span>Sistema</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Administração</span></div>
 
 <div class="page-head">
     <div>
-        <h1>Administração</h1>
-        <p class="subtitle">Perfis de acesso, governança e informações da plataforma</p>
+        <h1>Controle de acesso</h1>
+        <p class="subtitle">Logins da equipe · papel de acesso · carteira de vendedores que cada login enxerga</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-primary" @onclick="OpenNew">@Icons.Svg("plus")Novo login</button>
     </div>
 </div>
 
-<div class="grid-2">
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title">Perfis de acesso</div></div>
-        <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
-            <table class="grid-tbl">
-                <thead><tr><th>Perfil</th><th>Escopo</th></tr></thead>
-                <tbody>
-                    @foreach (var (role, desc) in _perfis)
-                    {
-                        <tr><td class="col-strong">@Roles.DisplayName(role)</td><td>@desc</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        <p class="muted" style="font-size:11.5px;margin-top:10px">O controle de acesso é aplicado também no nível dos dados (cada KAM vê sua carteira).</p>
+@if (!string.IsNullOrEmpty(_msg)) { <div class="import-summary" style="margin-bottom:12px">@_msg</div> }
+
+<div class="panel">
+    <div class="panel-head"><div class="panel-title">Logins (@_users.Count)</div><div class="hint">senha padrão inicial: <code>@UserRepository.DefaultPassword</code> — troque por login</div></div>
+    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+        <table class="grid-tbl">
+            <thead>
+                <tr><th>Nome</th><th>Login</th><th>Papel</th><th>Abas</th><th>Carteira (vendedores)</th><th class="center">Ativo</th><th class="center actions-col"></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var u in _users)
+                {
+                    <tr class="clickable" @onclick="() => OpenEdit(u)">
+                        <td class="col-strong">@u.Nome</td>
+                        <td><code>@u.Login</code></td>
+                        <td><span class="badge @RoleCss(u.Role)">@AccessRoles.Label(u.Role)</span></td>
+                        <td class="muted" style="font-size:11.5px">@string.Join(" · ", AbasDe(u.Role))</td>
+                        <td>@(u.ScopeAll ? "Todos os vendedores" : (u.VendedorList.Count == 0 ? "—" : string.Join(", ", u.VendedorList)))</td>
+                        <td class="center">@(u.IsActive ? Mark("Sim") : Mark("Não"))</td>
+                        <td class="center actions-col">
+                            <button class="row-act" title="Editar" @onclick="() => OpenEdit(u)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
+                            <button class="row-act" title="Redefinir senha padrão" @onclick="() => ResetSenha(u)" @onclick:stopPropagation="true">@Icons.Svg("lock")</button>
+                        </td>
+                    </tr>
+                }
+                @if (_users.Count == 0) { <tr><td colspan="7" class="empty">Nenhum login cadastrado.</td></tr> }
+            </tbody>
+        </table>
     </div>
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title">Plataforma</div></div>
-        <dl class="detail-grid" style="grid-template-columns:1fr">
-            <div class="dl"><dt>Aplicação</dt><dd>Howden Sales Forecast</dd></div>
-            <div class="dl"><dt>Stack</dt><dd>.NET 8 · Blazor Server</dd></div>
-            <div class="dl"><dt>Persistência</dt><dd>DuckDB sobre Parquet</dd></div>
-            <div class="dl"><dt>Autenticação</dt><dd>Cookie · perfil por sessão</dd></div>
-            <div class="dl"><dt>Mercados</dt><dd>@Cat.Markets.Count</dd></div>
-            <div class="dl"><dt>Clientes / Plantas</dt><dd>@Cat.Customers.Count / @Cat.Plants.Count</dd></div>
-            <div class="dl"><dt>KAMs</dt><dd>@Cat.Kams.Count</dd></div>
-        </dl>
-    </div>
+    <p class="muted" style="font-size:11.5px;margin-top:10px">O recorte é aplicado nos dados: cada login só enxerga as oportunidades da carteira permitida (Oportunidades, Visão Executiva e Follow-up). Diretor e Controle veem todos os vendedores.</p>
 </div>
 
+@* ---- Papéis de acesso (referência) ---- *@
 <div class="panel mt-16">
-    <div class="panel-head"><div class="panel-title">Governança &amp; auditoria</div></div>
-    <div class="attention">
-        <div class="att-item"><div class="att-ico info">@Icons.Svg("history")</div><div class="att-body"><div class="att-title">Trilha de auditoria</div><div class="att-desc">Toda alteração de oportunidade registra usuário, data e valores</div></div></div>
-        <div class="att-item"><div class="att-ico info">@Icons.Svg("layers")</div><div class="att-body"><div class="att-title">Snapshots de forecast</div><div class="att-desc">Fotografias periódicas para comparação histórica</div></div></div>
-        <div class="att-item"><div class="att-ico info">@Icons.Svg("check")</div><div class="att-body"><div class="att-title">Data Quality Score</div><div class="att-desc">Indicador de completude e atualização por KAM e mercado</div></div></div>
-        <div class="att-item"><div class="att-ico info">@Icons.Svg("admin")</div><div class="att-body"><div class="att-title">Escrita append-only</div><div class="att-desc">Concorrência segura em pasta de rede compartilhada</div></div></div>
+    <div class="panel-head"><div class="panel-title">Papéis de acesso</div></div>
+    <div class="table-wrap" style="box-shadow:none;border:1px solid var(--border)">
+        <table class="grid-tbl">
+            <thead><tr><th>Papel</th><th>Abas</th><th>Escopo de dados</th></tr></thead>
+            <tbody>
+                <tr><td class="col-strong">Vendedor</td><td>Oportunidades · Visão Executiva · Follow-up</td><td>Sua carteira (a dele + as autorizadas)</td></tr>
+                <tr><td class="col-strong">Diretor</td><td>Oportunidades · Visão Executiva · Follow-up</td><td>Todos os vendedores</td></tr>
+                <tr><td class="col-strong">Controle</td><td>Oportunidades · Visão Executiva · Controle</td><td>Todos os vendedores</td></tr>
+                <tr><td class="col-strong">Administrador</td><td>Todas as abas + configurações</td><td>Todos os vendedores</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
+
+@* ---- Drawer: novo / editar login ---- *@
+@if (_edit is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _edit = null"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">@(_editNew ? "Novo login" : "Editar login")</h2>
+                <p class="subtitle">@(_editNew ? "Cria um acesso à plataforma" : _edit.Login)</p>
+            </div>
+            <button class="icon-btn" @onclick="() => _edit = null">@Icons.Svg("x")</button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_editErr)) { <div class="confirm-err">@_editErr</div> }
+
+        <div class="form-grid">
+            <label class="fld full">Nome<input class="field" @bind="_edit.Nome" placeholder="Nome do vendedor" /></label>
+            <label class="fld">Login@(_editNew ? "" : " (fixo)")<input class="field" @bind="_edit.Login" readonly="@(!_editNew)" placeholder="gerado do nome" /></label>
+            <label class="fld">Papel
+                <select class="field" @bind="_edit.Role">@foreach (var r in AccessRoles.All){<option value="@r.Role">@r.Label</option>}</select>
+            </label>
+            <label class="fld">Ativo
+                <select class="field" @bind="_edit.Ativo"><option value="Sim">Sim</option><option value="Nao">Não</option></select>
+            </label>
+            <label class="fld @(_editNew ? "" : "full")">@(_editNew ? "Senha inicial" : "Nova senha (em branco = manter)")<input class="field" type="text" @bind="_editPass" placeholder="@(_editNew ? UserRepository.DefaultPassword : "••••••••")" /></label>
+        </div>
+
+        @if (_edit.Role == AccessRoles.Vendedor)
+        {
+            <div class="fu-tpl" style="margin-top:8px">
+                <div class="fu-tpl-h">Carteira que este login enxerga</div>
+                <p class="muted" style="font-size:11.5px;margin:0 0 8px">Marque os vendedores cujas oportunidades este login pode ver (inclua ele mesmo).</p>
+                <div class="cfg-chips" style="gap:6px 14px">
+                    @foreach (var v in _editVendOptions)
+                    {
+                        var name = v;
+                        <label class="flt-toggle @(_editVend.Contains(name) ? "on" : "")" style="cursor:pointer">
+                            <input type="checkbox" checked="@_editVend.Contains(name)" @onchange="e => ToggleVend(name, e)" />
+                            <span>@name</span>
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="modal-actions">
+            @if (!_editNew) { <button class="btn-danger-ghost" @onclick="() => DeleteUser(_edit)">@Icons.Svg("trash")Excluir</button> }
+            <div class="filterbar-spacer"></div>
+            <button class="btn-ghost" @onclick="() => _edit = null">Cancelar</button>
+            <button class="btn-primary" @onclick="SaveUser">@Icons.Svg("check")Salvar</button>
+        </div>
+    </div>
+}
 
 @code {
-    private readonly (string Role, string Desc)[] _perfis =
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private string _actor = "admin";
+
+    private List<AppUser> _users = new();
+    private List<string> _vendOptions = new();
+    private string _msg = "";
+
+    private AppUser? _edit;
+    private bool _editNew;
+    private string _editErr = "";
+    private string _editPass = "";
+    private HashSet<string> _editVend = new(StringComparer.CurrentCultureIgnoreCase);
+    private List<string> _editVendOptions = new();
+
+    protected override async Task OnInitializedAsync()
     {
-        (Roles.Admin, "Acesso completo à plataforma e configurações"),
-        (Roles.Diretoria, "Todas as análises e o consolidado executivo"),
-        (Roles.Gestor, "Vendedores e oportunidades sob sua gestão"),
-        (Roles.Kam, "Próprias oportunidades e resultados"),
-        (Roles.Financeiro, "Valores, margens, moedas, câmbio e análises financeiras"),
-        (Roles.Viewer, "Somente consulta ao consolidado executivo"),
+        if (AuthState is not null) _actor = (await AuthState).User.Identity?.Name ?? "admin";
+        Load();
+    }
+
+    private void Load()
+    {
+        _users = Users.All();
+        // Opções de vendedores: nomes canônicos do catálogo de KAMs.
+        _vendOptions = Cat.Kams.Select(k => OpportunityImporter.CanonicalVendedor(k.Name))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    private void OpenNew()
+    {
+        _edit = new AppUser { Role = AccessRoles.Vendedor, Ativo = "Sim" };
+        _editNew = true; _editErr = ""; _editPass = "";
+        _editVend = new(StringComparer.CurrentCultureIgnoreCase);
+        _editVendOptions = _vendOptions.ToList();
+    }
+
+    private void OpenEdit(AppUser u)
+    {
+        _edit = new AppUser
+        {
+            Login = u.Login, Nome = u.Nome, Role = u.Role, Salt = u.Salt, Hash = u.Hash,
+            Vendedores = u.Vendedores, Ativo = u.Ativo,
+        };
+        _editNew = false; _editErr = ""; _editPass = "";
+        _editVend = new(u.VendedorList, StringComparer.CurrentCultureIgnoreCase);
+        // Garante que nomes já atribuídos apareçam mesmo se não estiverem no catálogo.
+        _editVendOptions = _vendOptions.Union(u.VendedorList, StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    private void ToggleVend(string name, ChangeEventArgs e)
+    {
+        if (e.Value is true) _editVend.Add(name); else _editVend.Remove(name);
+    }
+
+    private void SaveUser()
+    {
+        if (_edit is null) return;
+        _edit.Nome = (_edit.Nome ?? "").Trim();
+        if (_edit.Nome == "") { _editErr = "Informe o nome."; return; }
+
+        if (_editNew)
+        {
+            if (string.IsNullOrWhiteSpace(_edit.Login)) _edit.Login = UserRepository.LoginFor(_edit.Nome);
+            _edit.Login = _edit.Login.Trim().ToLowerInvariant();
+            if (Users.Get(_edit.Login) is not null) { _editErr = "Já existe um login com esse identificador."; return; }
+        }
+
+        _edit.Vendedores = _edit.Role == AccessRoles.Vendedor ? string.Join(";", _editVend) : "";
+
+        // Senha: nova conta usa a padrão se em branco; edição mantém se em branco.
+        if (!string.IsNullOrWhiteSpace(_editPass)) Users.SetPassword(_edit, _editPass.Trim());
+        else if (_editNew) Users.SetPassword(_edit, UserRepository.DefaultPassword);
+
+        Users.Save(_edit, _actor);
+        _msg = $"Login \"{_edit.Login}\" salvo.";
+        _edit = null;
+        Load();
+    }
+
+    private void ResetSenha(AppUser u)
+    {
+        var full = Users.Get(u.Login);
+        if (full is null) return;
+        Users.SetPassword(full, UserRepository.DefaultPassword);
+        Users.Save(full, _actor);
+        _msg = $"Senha de \"{u.Login}\" redefinida para a padrão ({UserRepository.DefaultPassword}).";
+    }
+
+    private void DeleteUser(AppUser u)
+    {
+        Users.Delete(u.Login);
+        _msg = $"Login \"{u.Login}\" removido.";
+        _edit = null;
+        Load();
+    }
+
+    private static string[] AbasDe(string role) => AccessRoles.Tabs.TryGetValue(AccessRoles.Normalize(role), out var t)
+        ? t.Select(LabelAba).ToArray() : Array.Empty<string>();
+
+    private static string LabelAba(string key) => key switch
+    {
+        "executivo" => "Visão Executiva", "oportunidades" => "Oportunidades", "followup" => "Follow-up",
+        "controle" => "Controle", "listas" => "Listas", "configuracoes" => "Configurações",
+        "identidade" => "Identidade", "administracao" => "Administração", _ => key,
     };
+
+    private static string RoleCss(string role) => role switch
+    {
+        AccessRoles.Admin => "fc-commit", AccessRoles.Diretor => "fc-best",
+        AccessRoles.Controle => "fc-upside", _ => "fc-pipe",
+    };
+
+    private static MarkupString Mark(string s) =>
+        string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase)
+            ? new("<span class='mk yes'>Sim</span>") : new MarkupString("<span class='mk no'>Não</span>");
 }

@@ -42,7 +42,7 @@
 
 @code {
     private static string RoleLabel(AuthenticationState ctx) =>
-        Roles.DisplayName(ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Admin);
+        AccessRoles.Label(AccessRoles.Normalize(ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value));
 
     private static string Iniciais(string? nome)
     {

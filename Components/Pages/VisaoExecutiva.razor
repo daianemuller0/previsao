@@ -1138,11 +1138,19 @@
         return System.Text.RegularExpressions.Regex.Replace(sb.ToString().Normalize(System.Text.NormalizationForm.FormC), "\\s+", " ").Trim();
     }
 
-    protected override void OnInitialized()
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private AccessScope _scope = new();
+
+    protected override async Task OnInitializedAsync()
     {
-        _opps = Repo.All();
+        if (AuthState is not null) _scope = AccessScope.Resolve((await AuthState).User);
+        _opps = LoadScoped();
         LoadReport();
     }
+
+    // Oportunidades recortadas pela carteira permitida do login (controle de acesso).
+    private List<Opportunity> LoadScoped() =>
+        Repo.All().Where(o => _scope.CanSeeVendedor(KeyKam(o))).ToList();
 
     // Inicializa (idempotente) o mapa interativo depois de renderizar. Passa a
     // referência do componente para o mapa poder disparar o cross-filter ao clicar.
@@ -1170,7 +1178,7 @@
 
     // Recarrega as oportunidades após editar/duplicar/excluir na tabela.
     // Build() é chamado no topo do render e recomputa Top 10 e listagem.
-    private void ReloadOpps() => _opps = Repo.All();
+    private void ReloadOpps() => _opps = LoadScoped();
 
     // Opções dos filtros vindas dos DADOS reais (não do catálogo demo): valores
     // distintos presentes nas oportunidades, exibidos pelo nome do catálogo
