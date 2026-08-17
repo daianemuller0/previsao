@@ -1893,7 +1893,7 @@
 
     // Paleta dos gráficos de pizza/rosca.
     private static readonly string[] PieColors =
-        { "#007A9E", "#009496", "#0b4f6f", "#5bb0c9", "#b7791f", "#1f9254", "#64748b", "#c0392b" };
+        { "#1b5fa9", "#14a8a0", "#f2a63c", "#e2664e", "#6c5ce0", "#2fae6b", "#d15fa6", "#3f9bd6", "#a0705a", "#7a8794" };
 
     private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
 
@@ -1967,9 +1967,9 @@
         builder.AddMarkupContent(0, sb.ToString());
     };
 
-    // Cores discretas e coerentes p/ segmentos/unidades (sem excesso de vibração).
+    // Paleta CATEGÓRICA (fatias distinguíveis) — profissional, sem virar arco-íris.
     private static readonly string[] SegColors =
-        { "#0b4f6f", "#0e7490", "#3f89a6", "#6aa9be", "#93c2d2", "#b9d7e0", "#5b6b82", "#8fa0b5", "#c3ccd8", "#7c8ba0" };
+        { "#1b5fa9", "#14a8a0", "#f2a63c", "#e2664e", "#6c5ce0", "#2fae6b", "#d15fa6", "#3f9bd6", "#a0705a", "#7a8794" };
 
     // Anel do donut (Commercial Segment / Business Unit) — fatias clicáveis.
     private RenderFragment RenderDonutRing(IReadOnlyList<SliceRow> data, string dim) => builder =>
