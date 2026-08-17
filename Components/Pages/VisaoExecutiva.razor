@@ -305,19 +305,9 @@
 {
     <div class="g12" style="margin-top:16px">
         <div class="c12"><div class="xcard ind-card">
-            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div></div>
-            <div class="ind-list-head"><span>Cliente / Oportunidade</span><span>Stage</span><span>Vendedor</span><span class="right">Valor</span></div>
-            <div class="ind-list scroll-y" style="max-height:380px">
-                @foreach (var o in _indicadas)
-                {
-                    <div class="ind-row" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")' title="@o.Name">
-                        <span class="ind-cust">@(string.IsNullOrWhiteSpace(Cat.CustomerName(o.CustomerId)) ? o.Name : Cat.CustomerName(o.CustomerId))</span>
-                        <span class="ind-stage">@(string.IsNullOrWhiteSpace(o.Stage) ? "—" : o.Stage)</span>
-                        <span class="ind-rep">@Cat.KamName(o.KamId)</span>
-                        <span class="ind-amt right">@Fmt.Brl(o.AmountBrl)</span>
-                    </div>
-                }
-            </div>
+            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indTotal)</b></span></div>
+            <OpportunityTable Rows="_indicadas" CssClass="tbl-compact" Style="max-height:380px;overflow:auto"
+                              EmptyText="Nenhuma oportunidade indicada no recorte." OnChanged="ReloadOpps" />
         </div></div>
     </div>
 }
