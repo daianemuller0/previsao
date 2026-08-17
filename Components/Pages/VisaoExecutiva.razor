@@ -1,6 +1,6 @@
 @page "/executivo"
 @attribute [Authorize]
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject OpportunityRepository Repo
 @inject Catalog Cat
 @inject ControleRepository ControleRepo

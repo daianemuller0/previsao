@@ -17,15 +17,16 @@ public class FollowUpRepository
     private const string LogCols = "id, opp_id, ts, user, channel, outcome, note";
 
     private readonly ParquetStore _store;
+    private readonly object _lock = new();
+    private List<FollowUp>? _state;       // cache do estado (evita ler a rede a cada página)
+    private List<FollowUpLog>? _logs;     // cache do histórico
     public FollowUpRepository(ParquetStore store) => _store = store;
 
     private static string S(IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
     private static string Iso(DateTime d) => d.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
-    // Estado de follow-up por id de oportunidade.
-    public Dictionary<string, FollowUp> All()
-    {
-        var list = _store.ReadLatest(Ent, Cols, r => new FollowUp
+    private List<FollowUp> LoadState() =>
+        _store.ReadLatest(Ent, Cols, r => new FollowUp
         {
             Id = S(r, 0),
             Status = string.IsNullOrWhiteSpace(S(r, 1)) ? FollowUpStatus.Pendente : S(r, 1),
@@ -39,9 +40,33 @@ public class FollowUpRepository
             ContactName = S(r, 9),
             ContactEmail = S(r, 10),
         });
-        var d = new Dictionary<string, FollowUp>(StringComparer.Ordinal);
-        foreach (var f in list) if (!string.IsNullOrWhiteSpace(f.Id)) d[f.Id] = f;
-        return d;
+
+    private List<FollowUp> StateCache()
+    {
+        if (_state is null) _state = LoadState();
+        return _state;
+    }
+
+    private List<FollowUpLog> LogsCache()
+    {
+        if (_logs is null)
+            _logs = _store.ReadLatest(EntLog, LogCols, r => new FollowUpLog
+            {
+                Id = S(r, 0), OppId = S(r, 1), Ts = S(r, 2), User = S(r, 3),
+                Channel = S(r, 4), Outcome = S(r, 5), Note = S(r, 6),
+            });
+        return _logs;
+    }
+
+    // Estado de follow-up por id de oportunidade (do cache).
+    public Dictionary<string, FollowUp> All()
+    {
+        lock (_lock)
+        {
+            var d = new Dictionary<string, FollowUp>(StringComparer.Ordinal);
+            foreach (var f in StateCache()) if (!string.IsNullOrWhiteSpace(f.Id)) d[f.Id] = Clone(f);
+            return d;
+        }
     }
 
     public void Save(FollowUp f, string user)
@@ -57,9 +82,16 @@ public class FollowUpRepository
             new("sent_date", f.SentDate),
             new("contact_name", f.ContactName), new("contact_email", f.ContactEmail),
         });
+        // Write-through: reflete no cache sem reler a rede.
+        lock (_lock)
+        {
+            var c = StateCache();
+            c.RemoveAll(x => x.Id == f.Id);
+            c.Add(Clone(f));
+        }
     }
 
-    // Registra uma interação (histórico) e devolve o log gravado.
+    // Registra uma interação (histórico).
     public void AddLog(FollowUpLog l)
     {
         if (string.IsNullOrWhiteSpace(l.Id)) l.Id = "fl-" + Guid.NewGuid().ToString("N");
@@ -69,17 +101,25 @@ public class FollowUpRepository
             new("id", l.Id), new("opp_id", l.OppId), new("ts", l.Ts), new("user", l.User),
             new("channel", l.Channel), new("outcome", l.Outcome), new("note", l.Note),
         });
+        lock (_lock) { if (_logs is not null) _logs.Add(l); }
     }
 
     public List<FollowUpLog> Logs(string oppId)
     {
-        var list = _store.ReadLatest(EntLog, LogCols, r => new FollowUpLog
-        {
-            Id = S(r, 0), OppId = S(r, 1), Ts = S(r, 2), User = S(r, 3),
-            Channel = S(r, 4), Outcome = S(r, 5), Note = S(r, 6),
-        });
-        return list.Where(l => l.OppId == oppId).OrderByDescending(l => l.Ts).ToList();
+        lock (_lock)
+            return LogsCache().Where(l => l.OppId == oppId).OrderByDescending(l => l.Ts).ToList();
     }
 
-    public int LogCount(string oppId) => Logs(oppId).Count;
+    public int LogCount(string oppId)
+    {
+        lock (_lock) return LogsCache().Count(l => l.OppId == oppId);
+    }
+
+    private static FollowUp Clone(FollowUp f) => new()
+    {
+        Id = f.Id, Status = f.Status, SentDate = f.SentDate, LastContact = f.LastContact,
+        NextFollowUp = f.NextFollowUp, CadenceDays = f.CadenceDays, Notes = f.Notes,
+        ContactName = f.ContactName, ContactEmail = f.ContactEmail,
+        UpdatedBy = f.UpdatedBy, UpdatedAt = f.UpdatedAt,
+    };
 }

@@ -205,6 +205,15 @@ WHERE _rn = 1 AND NOT _deleted{order};";
         return Directory.EnumerateFiles(dir, "*.parquet").Count();
     }
 
+    /// <summary>Nomes das entidades existentes (subpastas com Parquet) — para compactar todas.</summary>
+    public IEnumerable<string> Entities()
+    {
+        if (!Directory.Exists(Folder)) return Array.Empty<string>();
+        return Directory.EnumerateDirectories(Folder)
+            .Select(d => Path.GetFileName(d))
+            .Where(n => !string.IsNullOrEmpty(n))!;
+    }
+
     /// <summary>
     /// Compacta a entidade: consolida a versão mais recente de cada id (sem os
     /// apagados) num ÚNICO Parquet novo e remove os arquivos antigos.

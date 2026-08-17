@@ -3,9 +3,10 @@ using Microsoft.Extensions.Logging;
 
 namespace HowdenSalesForecast.Data;
 
-// Compacta periodicamente os Parquet de 'opportunities'. Como a gravação é
-// append-only, os arquivos se acumulam com o tempo; a compactação junta tudo
-// num único arquivo, mantendo a leitura rápida no longo prazo.
+// Compacta periodicamente os Parquet de TODAS as entidades. Como a gravação é
+// append-only, os arquivos se acumulam com o tempo (follow-up, logs, controle,
+// usuários…); a compactação junta cada entidade num único arquivo, mantendo a
+// leitura rápida no longo prazo. Roda uma vez ao subir e depois a cada 30 min.
 public class CompactionService : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(30);
@@ -24,18 +25,21 @@ public class CompactionService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            foreach (var entity in _store.Entities())
             {
-                var count = _store.FileCount("opportunities");
-                if (count > Threshold)
+                try
                 {
-                    _store.Compact("opportunities");
-                    _log.LogInformation("Compactação de 'opportunities': {Antes} arquivos → 1.", count);
+                    var count = _store.FileCount(entity);
+                    if (count > Threshold)
+                    {
+                        _store.Compact(entity);
+                        _log.LogInformation("Compactação de '{Entidade}': {Antes} arquivos → 1.", entity, count);
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "Falha ao compactar 'opportunities' (tentará novamente).");
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex, "Falha ao compactar '{Entidade}' (tentará novamente).", entity);
+                }
             }
 
             try { await Task.Delay(Interval, stoppingToken); }

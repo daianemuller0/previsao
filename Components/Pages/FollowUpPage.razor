@@ -1,6 +1,6 @@
 @page "/followup"
 @attribute [Authorize(Roles = "vendedor,diretor,admin")]
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject OpportunityRepository Repo
 @inject Catalog Cat
 @inject FollowUpRepository FUp
