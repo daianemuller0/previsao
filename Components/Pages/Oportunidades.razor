@@ -243,11 +243,18 @@
                 </div>
             }
         }
+        @if (_bulkBusy)
+        {
+            <div class="import-summary mt-16"><span class="spinner-sm"></span> Indicando @_bulkCodes.Count proposta(s)… aguarde, não feche a janela.</div>
+        }
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _bulk = false">Fechar</button>
+            <button class="btn-ghost" disabled="@_bulkBusy" @onclick="() => _bulk = false">Fechar</button>
             @if (_bulkFound is null)
             {
-                <button class="btn-primary" disabled="@(_bulkCodes.Count == 0)" @onclick="ConfirmBulk">@Icons.Svg("check")Indicar @_bulkCodes.Count</button>
+                <button class="btn-primary" disabled="@(_bulkCodes.Count == 0 || _bulkBusy)" @onclick="ConfirmBulk">
+                    @if (_bulkBusy) { <span class="spinner-sm"></span><text>Indicando…</text> }
+                    else { @Icons.Svg("check") <text>Indicar @_bulkCodes.Count</text> }
+                </button>
             }
         </div>
     </div>
@@ -399,6 +406,7 @@
     private string _bulkErr = "";
     private List<string> _bulkCodes = new();
     private int _bulkRawCount;
+    private bool _bulkBusy;
     private int? _bulkFound;
     private List<string>? _bulkNotFound;
 
@@ -529,35 +537,49 @@
         return n is "proposta" or "propostas" or "codigo" or "código" or "codigos" or "code" or "proposal";
     }
 
-    private void ConfirmBulk()
+    private async Task ConfirmBulk()
     {
-        // Índice das oportunidades por número de proposta (pode haver várias por proposta).
-        var byProp = _all.Where(o => !string.IsNullOrWhiteSpace(o.ProposalNumber))
-            .GroupBy(o => o.ProposalNumber.Trim(), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+        if (_bulkBusy) return;
+        _bulkBusy = true;
+        StateHasChanged();          // mostra o "Indicando…" antes do trabalho pesado
 
-        var notFound = new List<string>();
-        var toFlag = new List<Opportunity>();
-        foreach (var code in _bulkCodes)
+        var codes = _bulkCodes;
+        var all = _all;
+        // Roda fora da thread da UI para o estado "Indicando…" aparecer na hora.
+        var (flagged, notFound) = await Task.Run(() =>
         {
-            if (byProp.TryGetValue(code.Trim(), out var opps)) toFlag.AddRange(opps);
-            else notFound.Add(code);
-        }
+            // Índice das oportunidades por número de proposta (pode haver várias por proposta).
+            var byProp = all.Where(o => !string.IsNullOrWhiteSpace(o.ProposalNumber))
+                .GroupBy(o => o.ProposalNumber.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
-        var flagged = 0;
-        foreach (var o in toFlag)
-        {
-            var full = Repo.Get(o.Id);
-            if (full is null || full.IndicadaValue) continue;
-            full.Indicada = "Sim";
-            Repo.Save(full);
-            flagged++;
-        }
+            var nf = new List<string>();
+            var toFlag = new List<Opportunity>();
+            foreach (var code in codes)
+            {
+                if (byProp.TryGetValue(code.Trim(), out var opps)) toFlag.AddRange(opps);
+                else nf.Add(code);
+            }
+
+            // Marca e grava TUDO numa única gravação (SaveMany) — evita centenas
+            // de escritas em disco, uma por proposta.
+            var toSave = new List<Opportunity>();
+            foreach (var o in toFlag)
+            {
+                var full = Repo.Get(o.Id);
+                if (full is null || full.IndicadaValue) continue;
+                full.Indicada = "Sim";
+                toSave.Add(full);
+            }
+            if (toSave.Count > 0) Repo.SaveMany(toSave);
+            return (toSave.Count, nf);
+        });
 
         _bulkFound = flagged;
         _bulkNotFound = notFound;
         _all = Repo.All();
         Recompute();
+        _bulkBusy = false;
     }
 
     private async Task DownloadNotFound()
