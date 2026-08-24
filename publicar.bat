@@ -30,12 +30,14 @@ pause
 REM --- 1) Publica numa pasta temporaria limpa -------------------------------
 if exist "%TEMPO%" rmdir /s /q "%TEMPO%"
 
+REM Self-contained (nao exige .NET instalado), mas SEM arquivo unico: um .exe de
+REM 130 MB costuma ser bloqueado pelo antivirus/politica ao gravar na rede.
+REM Assim o .exe fica pequeno e o restante vai como DLLs normais.
 dotnet publish "%~dp0HowdenSalesForecast.csproj" ^
   -c Release ^
   -r win-x64 ^
   --self-contained true ^
-  -p:PublishSingleFile=true ^
-  -p:IncludeNativeLibrariesForSelfExtract=true ^
+  -p:PublishSingleFile=false ^
   -o "%TEMPO%"
 
 if errorlevel 1 (
