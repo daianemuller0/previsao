@@ -169,7 +169,10 @@ public class ContactLookupService
     // Arquivo de MAIOR revisão que casa com a máscara: a parte após o prefixo (e
     // antes de ".xlsm") é numérica; vence o maior número. excludeContains descarta
     // nomes que contêm o trecho (ex.: "-C" para pegar só P_{codigo}-{rev}).
-    private static string? BestFile(string pasta, string pattern, string prefix, string? excludeContains = null)
+    private static string? BestFile(string pasta, string pattern, string prefix, string? excludeContains = null) =>
+        BestByRevision(pasta, pattern, prefix, ".xlsm", excludeContains);
+
+    private static string? BestByRevision(string pasta, string pattern, string prefix, string ext, string? excludeContains = null)
     {
         if (string.IsNullOrWhiteSpace(pasta) || !Directory.Exists(pasta)) return null;
         string? best = null;
@@ -185,9 +188,50 @@ public class ContactLookupService
                 continue;
             var part = name;
             if (part.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) part = part[prefix.Length..];
-            part = Regex.Replace(part, @"\.xlsm$", "", RegexOptions.IgnoreCase).Trim();
+            part = Regex.Replace(part, Regex.Escape(ext) + "$", "", RegexOptions.IgnoreCase).Trim();
             if (long.TryParse(part, out var rev) && rev > bestRev) { bestRev = rev; best = path; }
         }
         return best;
+    }
+
+    // ---- PDF da proposta (para anexar no e-mail do follow-up) ----
+    // Porte do EnviarFollowUps (VBA): procura P_{codigo}-C*.pdf / P_{codigo}-R*.pdf
+    // (maior revisão) nas pastas PROPUESTA/PROPOSTA. Devolve o caminho ou null.
+    public string? FindProposalPdf(string codigo, string? buCode)
+    {
+        codigo = (codigo ?? "").Trim();
+        if (!_enabled || codigo == "") return null;
+
+        var bu = (buCode ?? "").Trim().ToUpperInvariant();
+        var isBr = bu.StartsWith("HSA");
+        var isCl = bu.StartsWith("HCHL");
+        var isPe = bu.StartsWith("HPU");
+        var isUnd = bu.Length == 0;
+
+        var folders = new List<string>();
+        if (isBr || isUnd)
+        {
+            folders.Add(Path.Combine(_brAfmRoot, codigo, "PROPUESTA"));
+            folders.Add(Path.Combine(_brAfmRoot, codigo, "PROPOSTA"));
+            folders.Add(Path.Combine(_brNbRoot, codigo, "PROPOSTA"));
+            folders.Add(Path.Combine(_brNbRoot, codigo, "PROPUESTA"));
+        }
+        if (isCl || isUnd)
+        {
+            folders.Add(Path.Combine(_clRoot, "02 AFM", codigo, "PROPUESTA"));
+            folders.Add(Path.Combine(_clRoot, "03 SV", codigo, "PROPUESTA"));
+            folders.Add(Path.Combine(_clRoot, "01 NB", codigo, "PROPOSTA"));
+            folders.Add(Path.Combine(_clRoot, "01 NB", codigo, "PROPUESTA"));
+        }
+        if (isPe || isUnd)
+            folders.Add(Path.Combine(_brAfmRoot, "0_HPU", codigo, "PROPUESTA"));
+
+        foreach (var f in folders)
+        {
+            var best = BestByRevision(f, $"P_{codigo}-C*.pdf", $"P_{codigo}-C", ".pdf")
+                    ?? BestByRevision(f, $"P_{codigo}-R*.pdf", $"P_{codigo}-R", ".pdf");
+            if (best is not null) return best;
+        }
+        return null;
     }
 }
