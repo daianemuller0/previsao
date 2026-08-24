@@ -235,6 +235,11 @@
                 </div>
             }
         </div>
+        @* Base do funil: valor efetivamente vendido (Realizado · REPORT HSA). *@
+        <div class="fn5-bottom">
+            <span class="fn5-bottom-l">@Icons.Svg("check")Vendas totais · Realizado@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
+            <span class="fn5-bottom-v">@MoneyBrl(_heroReal)</span>
+        </div>
     }
     </div></div>
     <div class="c6">
