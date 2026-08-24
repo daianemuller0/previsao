@@ -21,7 +21,7 @@ public class OpportunityRepository
         "next_action_date, risks, notes, postpone_count, created_at, updated_at, updated_by, " +
         "value_changed_at, date_changed_at, servico_previsto, market_onestream, ramp, coluna1, otp, top10, " +
         "stage, commercial_segment, process, brand, end_user_site, chance, customer_ref, is_inter_company, " +
-        "description, status_description, amount_raw, indicada, setor, movida_controle";
+        "description, status_description, amount_raw, indicada, setor, movida_controle, kyc";
 
     private readonly ParquetStore _store;
     private readonly object _lock = new();
@@ -94,6 +94,7 @@ public class OpportunityRepository
             Indicada = S(r, 53),
             Setor = S(r, 54),
             MovidaControle = S(r, 55),
+            Kyc = S(r, 56),
         }, orderBy: "expected_date");
 
     // Garante o cache carregado (dentro do lock).
@@ -209,6 +210,7 @@ public class OpportunityRepository
             new("indicada", o.Indicada),
             new("setor", o.Setor),
             new("movida_controle", o.MovidaControle),
+            new("kyc", o.Kyc),
         };
 
     public void Delete(string id)
@@ -258,6 +260,6 @@ public class OpportunityRepository
         EndUserSite = o.EndUserSite, Chance = o.Chance, CustomerRef = o.CustomerRef,
         IsInterCompany = o.IsInterCompany, Description = o.Description, StatusDescription = o.StatusDescription,
         AmountRaw = o.AmountRaw, Indicada = o.Indicada, Setor = o.Setor,
-        MovidaControle = o.MovidaControle,
+        MovidaControle = o.MovidaControle, Kyc = o.Kyc,
     };
 }
