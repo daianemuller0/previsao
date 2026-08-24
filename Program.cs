@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 var builder = WebApplication.CreateBuilder(args);
 
 // Porta padrão (modo por-usuário). Para "servidor central", rode com:
-//   HowdenSalesForecast.exe --urls http://0.0.0.0:5080
+//   "Howden Sales Forecast.exe" --urls http://0.0.0.0:5080
 if (string.IsNullOrEmpty(builder.Configuration["urls"]) &&
     string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
 {
