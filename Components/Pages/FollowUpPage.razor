@@ -5,6 +5,7 @@
 @inject Catalog Cat
 @inject FollowUpRepository FUp
 @inject ContactLookupService Contacts
+@inject OutlookMailService Outlook
 @inject IJSRuntime JS
 
 @* ===========================================================================
@@ -250,6 +251,35 @@
             <div class="import-summary" style="margin-bottom:12px">@_massSkipped proposta(s) do filtro ficaram de fora por não ter e-mail de contato — use <strong>Buscar contatos</strong> antes.</div>
         }
 
+        @* Abre TODOS os rascunhos de uma vez no Outlook, com o PDF da proposta anexado. *@
+        <div class="fu-mail" style="margin-bottom:12px">
+            <div class="fu-mail-head">
+                <span class="fu-mail-t">Abrir todos no Outlook (@_massQueue.Count) · com PDF anexado</span>
+                <div class="seg-tabs">
+                    @for (var i = 0; i < FollowUpRoutine.Langs.Length; i++)
+                    {
+                        var li = i;
+                        <button class="seg-tab @(_massLang == li ? "on" : "")" @onclick="() => _massLang = li">@FollowUpRoutine.Langs[li]</button>
+                    }
+                </div>
+            </div>
+            @if (Outlook.Available)
+            {
+                <div class="fu-mail-actions">
+                    <button class="btn-primary" disabled="@_outlookBusy" @onclick="EnviarTodosOutlook">
+                        @if (_outlookBusy) { <span class="spinner-sm"></span><text>Abrindo no Outlook…</text> }
+                        else { @Icons.Svg("mail")<text>Abrir todos no Outlook (@_massLangNome)</text> }
+                    </button>
+                    <span class="muted" style="font-size:11.5px">Cada rascunho abre no seu Outlook já com o PDF da proposta; você revisa e envia.</span>
+                </div>
+            }
+            else
+            {
+                <div class="muted" style="font-size:12px">Anexo automático indisponível aqui — requer o programa rodando na sua máquina Windows com o Outlook. Use "Abrir rascunho" (abaixo) por proposta.</div>
+            }
+            @if (!string.IsNullOrEmpty(_outlookMsg)) { <div class="import-summary" style="margin-top:8px">@_outlookMsg</div> }
+        </div>
+
         @if (mr is null)
         {
             <div class="empty">Nada para enviar.</div>
@@ -333,6 +363,9 @@
     private int _massIdx;
     private int _massLang;
     private int _massSkipped;
+    private bool _outlookBusy;
+    private string _outlookMsg = "";
+    private string _massLangNome => FollowUpRoutine.Langs[Math.Clamp(_massLang, 0, FollowUpRoutine.Langs.Length - 1)];
 
     // Modelos de e-mail (modal).
     private bool _showTpl;
@@ -501,8 +534,8 @@
         await JS.InvokeVoidAsync("openMail", url);
     }
 
-    // Registra o contato do dia (avança a rotina) e passa para a próxima proposta.
-    private void MassMarcarProximo(Row r)
+    // Registra o contato do dia (marca último contato = hoje, avança o marco).
+    private void RegistrarContatoDia(Row r, string nota)
     {
         var dict = FUp.All();
         var f = dict.TryGetValue(r.Opp.Id, out var x) ? x : new FollowUp { Id = r.Opp.Id, Status = FollowUpStatus.Pendente };
@@ -515,10 +548,55 @@
         FUp.AddLog(new FollowUpLog
         {
             OppId = r.Opp.Id, User = _user, Channel = "E-mail", Outcome = f.Status,
-            Note = "Follow-up em massa", Ts = _today.ToString("yyyy-MM-ddTHH:mm:ss"),
+            Note = nota, Ts = _today.ToString("yyyy-MM-ddTHH:mm:ss"),
         });
+    }
+
+    // Registra o contato do dia e passa para a próxima proposta.
+    private void MassMarcarProximo(Row r)
+    {
+        RegistrarContatoDia(r, "Follow-up em massa");
         Load();
         Avancar();
+    }
+
+    // Abre TODOS os rascunhos de uma vez no Outlook, com o PDF da proposta anexado
+    // (automação COM, como o macro). Registra o contato do dia de cada uma.
+    private async Task EnviarTodosOutlook()
+    {
+        if (_outlookBusy) return;
+        if (!Outlook.Available) { _outlookMsg = "Outlook indisponível nesta máquina (requer Windows com Outlook)."; return; }
+        var rows = _massQueue.Select(op => _rows.FirstOrDefault(r => r.Opp.Id == op.Id)).Where(r => r is not null).Select(r => r!).ToList();
+        if (rows.Count == 0) { _outlookMsg = "Nada para enviar."; return; }
+
+        _outlookBusy = true; _outlookMsg = ""; StateHasChanged();
+        var lang = _massLang;
+
+        var (result, semPdf) = await Task.Run(() =>
+        {
+            var ds = new List<OutlookMailService.DraftSpec>();
+            int noPdf = 0;
+            foreach (var r in rows)
+            {
+                var o = r.Opp;
+                var (subj, body) = FollowUpRoutine.EmailParts(r.Cur?.Num ?? 1, lang, CtxFor(r));
+                var codigo = (o.ProposalNumber ?? "").Trim();
+                var pdf = string.IsNullOrEmpty(codigo) ? null : Contacts.FindProposalPdf(codigo, Cat.BuCode(o.PvBusinessUnitId));
+                if (pdf is null) noPdf++;
+                ds.Add(new OutlookMailService.DraftSpec((r.Fu.ContactEmail ?? "").Trim(), null, subj, body, pdf));
+            }
+            return (Outlook.CreateDrafts(ds), noPdf);
+        });
+
+        // Marca todas como contatadas (o usuário revisa/envia no Outlook).
+        foreach (var r in rows) RegistrarContatoDia(r, "Follow-up em massa (Outlook, com PDF)");
+        Load();
+
+        _outlookBusy = false;
+        _massMode = false; _massQueue = new(); _massIdx = 0; _massSkipped = 0;
+        var errTxt = result.Errors.Count > 0 ? $" · {result.Errors.Count} com erro" : "";
+        _contactMsg = $"{result.Created} rascunho(s) aberto(s) no Outlook · {result.Attached} com PDF anexado"
+            + (semPdf > 0 ? $" · {semPdf} sem PDF encontrado" : "") + errTxt + ". Revise e envie no Outlook.";
     }
 
     private void MassPular() => Avancar();

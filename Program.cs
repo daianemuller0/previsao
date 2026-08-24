@@ -51,6 +51,8 @@ builder.Services.AddSingleton<FollowUpRepository>();
 builder.Services.AddSingleton<ContactLookupService>();
 // Contas de acesso (login/senha + carteira permitida por vendedor).
 builder.Services.AddSingleton<UserRepository>();
+// Abertura de rascunhos no Outlook (automação COM) para o follow-up em massa.
+builder.Services.AddSingleton<OutlookMailService>();
 // Gráficos personalizados do estúdio da Visão Executiva.
 builder.Services.AddSingleton<ChartConfigRepository>();
 // Identidade visual (logos da capa e da página interna).
