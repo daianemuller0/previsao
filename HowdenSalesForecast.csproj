@@ -5,6 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>HowdenSalesForecast</RootNamespace>
+
+    <!-- Ícone do executável: é o que aparece no atalho do Windows. -->
+    <ApplicationIcon>wwwroot\howden.ico</ApplicationIcon>
+    <!-- Identificação exibida nas propriedades do arquivo (.exe). -->
+    <AssemblyName>Howden Sales Forecast</AssemblyName>
+    <Product>Howden Sales Forecast</Product>
+    <Company>Howden · A Chart Industries Company</Company>
+    <Description>Sales &amp; Revenue Intelligence — Howden Brasil</Description>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
