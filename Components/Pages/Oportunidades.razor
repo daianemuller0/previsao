@@ -19,6 +19,7 @@
     <div class="page-actions">
         <button class="icon-btn danger" title="Excluir base inteira" @onclick="() => _wipe = true">@Icons.Svg("trash")</button>
         <button class="btn-ghost" @onclick="OpenBulk">@Icons.Svg("flag")Indicar em massa</button>
+        <button class="btn-ghost" @onclick="OpenUnindicate">@Icons.Svg("x")Desindicar todas</button>
         <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
@@ -135,6 +136,23 @@
     <datalist id="@id">
         @foreach (var v in Lists.Items(key)) { <option value="@v" /> }
     </datalist>
+}
+
+@* ---- Desindicar em massa: limpa a flag "Indicada" de todas ---- *@
+@if (_unind)
+{
+    <div class="drawer-backdrop" @onclick="() => _unind = false"></div>
+    <div class="confirm-box">
+        <div class="confirm-head">@Icons.Svg("flag")<span>Desindicar todas</span></div>
+        <p class="confirm-text">Remover a marcação <strong>Indicada na Previsão</strong> de <strong>@_indCount</strong> oportunidade(s)? As oportunidades continuam na base — só a indicação é limpa.</p>
+        @if (!string.IsNullOrEmpty(_unindMsg)) { <div class="import-summary">@_unindMsg</div> }
+        <div class="modal-actions">
+            <button class="btn-ghost" disabled="@_unindBusy" @onclick="() => _unind = false">Cancelar</button>
+            <button class="btn-primary" disabled="@(_unindBusy || _indCount == 0)" @onclick="ConfirmUnindicate">
+                @if (_unindBusy) { <span class="spinner-sm"></span><text>Desindicando…</text> } else { @Icons.Svg("check") <text>Desindicar @_indCount</text> }
+            </button>
+        </div>
+    </div>
 }
 
 @* ---- Confirmar exclusão de uma oportunidade ---- *@
@@ -533,6 +551,44 @@
     {
         _bulk = true; _bulkErr = "";
         _bulkCodes = new(); _bulkFound = null; _bulkNotFound = null;
+    }
+
+    // ---- Desindicar em massa: limpa a flag "Indicada" de todas as oportunidades ----
+    private bool _unind;
+    private bool _unindBusy;
+    private string _unindMsg = "";
+    private int _indCount;
+
+    private void OpenUnindicate()
+    {
+        _indCount = _all.Count(o => o.IndicadaValue);
+        _unindMsg = _indCount == 0 ? "Nenhuma oportunidade indicada no momento." : "";
+        _unind = true; _unindBusy = false;
+    }
+
+    private async Task ConfirmUnindicate()
+    {
+        if (_unindBusy) return;
+        _unindBusy = true; _unindMsg = ""; StateHasChanged();
+        var all = _all;
+        var cleared = await Task.Run(() =>
+        {
+            var toSave = new List<Opportunity>();
+            foreach (var o in all.Where(x => x.IndicadaValue))
+            {
+                var full = Repo.Get(o.Id);
+                if (full is null || !full.IndicadaValue) continue;
+                full.Indicada = "";
+                full.UpdatedAt = _today.ToString("yyyy-MM-dd");
+                full.UpdatedBy = _user;
+                toSave.Add(full);
+            }
+            if (toSave.Count > 0) Repo.SaveMany(toSave);
+            return toSave.Count;
+        });
+        _all = LoadScoped();
+        Recompute();
+        _unindBusy = false; _unind = false;
     }
 
     private async Task OnBulkFile(InputFileChangeEventArgs e)
