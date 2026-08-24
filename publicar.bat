@@ -22,8 +22,9 @@ set "TEMPO=%TEMP%\hsf_publish"
 echo.
 echo  Destino: %DESTINO%
 echo.
-echo  ATENCAO: feche o programa se ele estiver aberto (aqui ou em outra
-echo           maquina), senao os arquivos ficam travados.
+echo  Pode publicar mesmo com o programa aberto: o executavel anterior e
+echo  renomeado e o novo entra no lugar. Quem estiver usando so vera a versao
+echo  nova ao reabrir o atalho.
 echo.
 pause
 
@@ -47,25 +48,39 @@ if errorlevel 1 (
   exit /b 1
 )
 
-REM --- 2) Espelha no destino (remove sobras de versoes antigas) --------------
+REM --- 2) Libera o executavel anterior ---------------------------------------
+REM O Windows NAO deixa sobrescrever um .exe em uso, mas DEIXA renomear. Entao
+REM renomeamos o antigo (mesmo se alguem estiver com o programa aberto) e o novo
+REM entra no lugar. Quem ja estava usando continua rodando na copia renomeada.
+set "EXE=%DESTINO%\Howden Sales Forecast.exe"
+if exist "%EXE%" (
+  echo  Liberando o executavel anterior...
+  ren "%EXE%" "Howden Sales Forecast.old_%RANDOM%%RANDOM%.exe" 2>nul
+)
+
+REM --- 3) Espelha no destino (remove sobras de versoes antigas) --------------
 echo.
 echo  Copiando para o destino...
-robocopy "%TEMPO%" "%DESTINO%" /MIR /NFL /NDL /NJH /NP /R:2 /W:2
+REM /XF: nao mexe nos executaveis antigos renomeados (podem estar em uso).
+robocopy "%TEMPO%" "%DESTINO%" /MIR /NFL /NDL /NJH /NP /R:2 /W:2 /XF "*.old_*.exe"
 REM robocopy: codigos 0..7 = sucesso; 8+ = erro real.
 if errorlevel 8 (
   echo.
   echo  *** Falha ao copiar para a pasta de rede. ***
   echo.
-  echo  Se o erro foi "Acesso negado" no arquivo .exe, quase sempre significa que
-  echo  O PROGRAMA ESTA ABERTO em alguma maquina — o Windows nao deixa substituir
-  echo  um executavel em uso. Feche o programa em todas as maquinas e rode de novo.
-  echo  Persistindo, apague o conteudo da pasta de destino e repita.
+  echo  Verifique o acesso a pasta. Se o erro foi "Acesso negado" num arquivo,
+  echo  feche o programa em todas as maquinas e rode de novo; persistindo,
+  echo  apague o conteudo da pasta de destino e repita.
   echo.
   pause
   exit /b 1
 )
 
-REM --- 3) Cria o atalho com o icone (logo Howden, embutido no .exe) ----------
+REM Limpa os executaveis antigos que ninguem esta mais usando (os em uso ficam
+REM para a proxima publicacao — a exclusao simplesmente falha e e ignorada).
+del /q "%DESTINO%\*.old_*.exe" >nul 2>&1
+
+REM --- 4) Cria o atalho com o icone (logo Howden, embutido no .exe) ----------
 powershell -NoProfile -Command ^
   "$d='%DESTINO%';" ^
   "$exe=Join-Path $d 'Howden Sales Forecast.exe';" ^
