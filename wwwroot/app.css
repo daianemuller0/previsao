@@ -153,6 +153,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
     cursor: pointer; transition: all .14s; position: relative;
 }
 .icon-btn:hover { border-color: var(--border-strong); background: var(--panel-2); color: var(--text-2); }
+a.icon-btn { text-decoration: none; }
 .icon-btn svg { width: 17px; height: 17px; }
 .icon-btn .dot { position: absolute; top: 6px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--neg); border: 1.5px solid #fff; }
 .user { text-align: right; line-height: 1.25; }

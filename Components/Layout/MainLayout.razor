@@ -27,6 +27,7 @@
                             <div class="user-role">@RoleLabel(context)</div>
                         </div>
                         <div class="avatar">@Iniciais(context.User.Identity?.Name)</div>
+                        <a class="icon-btn" href="/minha-senha" title="Alterar minha senha">@Icons.Svg("lock")</a>
                         <form method="post" action="/auth/logout">
                             <button class="icon-btn" type="submit" title="Sair">@Icons.Svg("logout")</button>
                         </form>

@@ -1,0 +1,104 @@
+@page "/minha-senha"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject UserRepository Users
+@inject NavigationManager Nav
+
+@* ===========================================================================
+   Troca da própria senha. Qualquer usuário logado altera a sua — exige a senha
+   atual e a confirmação da nova. O admin continua podendo redefinir pela aba
+   Administração.
+   =========================================================================== *@
+
+<div class="breadcrumbs"><span>Sistema</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Minha senha</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Alterar minha senha</h1>
+        <p class="subtitle">@_nome@(string.IsNullOrEmpty(_login) ? "" : " · login " + _login)</p>
+    </div>
+</div>
+
+<div class="panel" style="max-width:520px">
+    @if (!_podeTrocar)
+    {
+        <div class="import-summary">
+            Este acesso usa a <strong>credencial mestre</strong> do sistema, que não é alterada por aqui.
+            Entre com o seu login pessoal para trocar a senha, ou peça ao administrador.
+        </div>
+    }
+    else
+    {
+        <div class="form-grid">
+            <label class="fld full">Senha atual
+                <input class="field" type="password" autocomplete="current-password" @bind="_atual" />
+            </label>
+            <label class="fld full">Nova senha <span class="hint">mínimo de @MinLen caracteres</span>
+                <input class="field" type="password" autocomplete="new-password" @bind="_nova" />
+            </label>
+            <label class="fld full">Confirmar nova senha
+                <input class="field" type="password" autocomplete="new-password" @bind="_conf" />
+            </label>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_erro)) { <div class="confirm-err">@_erro</div> }
+        @if (_ok) { <div class="import-summary">@Icons.Svg("check") Senha alterada com sucesso. Use a nova senha no próximo acesso.</div> }
+
+        <div class="modal-actions">
+            <button class="btn-primary" disabled="@_busy" @onclick="Salvar">
+                @if (_busy) { <span class="spinner-sm"></span><text>Salvando…</text> } else { @Icons.Svg("check") <text>Salvar nova senha</text> }
+            </button>
+        </div>
+        <p class="muted" style="font-size:11.5px;margin-top:10px">
+            A senha é guardada de forma protegida (hash), então ninguém — nem o administrador — consegue vê-la.
+            Se você esquecer, o administrador redefine para a senha padrão na aba Administração.
+        </p>
+    }
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private const int MinLen = 6;
+
+    private string _login = "", _nome = "—";
+    private bool _podeTrocar;
+
+    private string _atual = "", _nova = "", _conf = "", _erro = "";
+    private bool _ok, _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is null) return;
+        var st = await AuthState;
+        _nome = st.User.Identity?.Name ?? "—";
+        _login = st.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        // A credencial mestre (appsettings) não está na base de usuários.
+        _podeTrocar = !string.IsNullOrEmpty(_login) && Users.Get(_login) is not null;
+    }
+
+    private void Salvar()
+    {
+        if (_busy) return;
+        _erro = ""; _ok = false;
+
+        var u = Users.Get(_login);
+        if (u is null) { _erro = "Conta não encontrada."; return; }
+        if (!Users.Verify(u, _atual)) { _erro = "Senha atual incorreta."; return; }
+        var nova = (_nova ?? "").Trim();
+        if (nova.Length < MinLen) { _erro = $"A nova senha deve ter pelo menos {MinLen} caracteres."; return; }
+        if (nova != (_conf ?? "").Trim()) { _erro = "A confirmação não confere com a nova senha."; return; }
+        if (Users.Verify(u, nova)) { _erro = "A nova senha deve ser diferente da atual."; return; }
+
+        _busy = true;
+        try
+        {
+            Users.SetPassword(u, nova);
+            Users.Save(u, _login);
+            _atual = _nova = _conf = "";
+            _ok = true;
+        }
+        catch (Exception ex) { _erro = "Falha ao salvar: " + ex.Message; }
+        finally { _busy = false; }
+    }
+}
