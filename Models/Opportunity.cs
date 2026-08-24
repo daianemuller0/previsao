@@ -53,6 +53,7 @@ public class Opportunity
     public string Indicada { get; set; } = "";              // Indicada na Previsão pelo vendedor (Sim)
     public string Setor { get; set; } = "";                 // Origem: NB (planilha NB) ou AFM (planilha AFM)
     public string MovidaControle { get; set; } = "";        // "Sim" = venda indicada → movida p/ Controle (some das Oportunidades)
+    public string Kyc { get; set; } = "";                   // KYC (Know Your Customer): "Sim"/"Não"
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";

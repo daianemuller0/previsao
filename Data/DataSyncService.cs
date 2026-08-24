@@ -123,6 +123,7 @@ public sealed class DataSyncService
                         {
                             if (!string.IsNullOrEmpty(prev.Indicada)) row.Indicada = prev.Indicada;
                             if (!string.IsNullOrEmpty(prev.MovidaControle)) row.MovidaControle = prev.MovidaControle;
+                            if (!string.IsNullOrEmpty(prev.Kyc)) row.Kyc = prev.Kyc;
                         }
 
                     _repo.SaveMany(result.Rows);

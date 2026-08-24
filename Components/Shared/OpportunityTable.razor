@@ -42,6 +42,7 @@
                 <th>Coluna1</th>
                 <th class="center">OTP</th>
                 <th class="center">TOP 10</th>
+                <th class="center">KYC</th>
             </tr>
         </thead>
         <tbody>
@@ -85,11 +86,12 @@
                     <td>@Dash(o.Coluna1)</td>
                     <td class="center">@Mark(o.Otp)</td>
                     <td class="center">@Mark(o.Top10)</td>
+                    <td class="center">@Mark(o.Kyc)</td>
                 </tr>
             }
             @if (Rows.Count == 0)
             {
-                <tr><td colspan="30" class="empty">@EmptyText</td></tr>
+                <tr><td colspan="31" class="empty">@EmptyText</td></tr>
             }
         </tbody>
     </table>
@@ -217,6 +219,7 @@
             <label class="fld">Coluna1<input class="field" @bind="_edit.Coluna1" /></label>
             <label class="fld">OTP<select class="field" @bind="_edit.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
             <label class="fld">TOP 10<select class="field" @bind="_edit.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">KYC<select class="field" @bind="_edit.Kyc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
             <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
         </div>
