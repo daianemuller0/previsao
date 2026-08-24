@@ -1559,6 +1559,16 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 }
 /* Segmentos claros (valor baixo): texto escuro para manter legibilidade */
 .fn5-text.dark { color: #0b3566; }
+/* Base do funil: valor vendido (Realizado). Fecha o funil como "chão". */
+.fn5-bottom {
+    width: 100%; max-width: 470px; margin: 7px auto 0; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px; padding: 11px 18px; border-radius: 10px;
+    background: linear-gradient(180deg, #08234c, #041226); color: #fff;
+    box-shadow: 0 6px 14px -8px rgba(4,18,38,.55);
+}
+.fn5-bottom-l { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; opacity: .92; }
+.fn5-bottom-l svg { width: 15px; height: 15px; }
+.fn5-bottom-v { font-size: 18px; font-weight: 800; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
 .fn5-text.dark .fn5-name, .fn5-text.dark .fn5-amt, .fn5-text.dark .fn5-sub { text-shadow: none; }
 
 /* ---- Indicar na Previsão (marcador do vendedor) ---- */
