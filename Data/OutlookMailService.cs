@@ -27,6 +27,12 @@ public class OutlookMailService
             errors.Add("Disponível apenas no Windows com o Outlook instalado.");
             return new Result(0, 0, errors);
         }
+        return RunWindows(drafts, errors);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static Result RunWindows(IReadOnlyList<DraftSpec> drafts, List<string> errors)
+    {
         int created = 0, attached = 0;
         RunSta(() => CreateDraftsWin(drafts, ref created, ref attached, errors));
         return new Result(created, attached, errors);
@@ -65,6 +71,7 @@ public class OutlookMailService
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static void RunSta(Action a)
     {
         Exception? err = null;

@@ -36,42 +36,20 @@
 
 @* ---- Filtros globais ---- *@
 <div class="filterbar filterbar-sticky">
-    <div class="flt"><span class="flt-label">Ano</span><select @bind="_yearFilter"><option value="0">Todos</option>@foreach (var y in YearOptions){<option value="@y">@y</option>}</select></div>
-    <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
+    <MultiFilter Label="Ano" AllText="Todos" Options="YearOptions.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
     <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
     <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
-    <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var nm in MarketOptions){<option value="@nm">@nm</option>}</select></div>
-    <div class="flt flt-multi">
-        <span class="flt-label">Vendedor</span>
-        <button type="button" class="flt-multi-btn" @onclick="() => _kamOpen = !_kamOpen">
-            @(_kams.Count == 0 ? "Todos" : _kams.Count + " selec.")<span class="flt-caret">▾</span>
-        </button>
-        @if (_kamOpen)
-        {
-            <div class="flt-multi-panel">
-                <div class="flt-multi-head">
-                    <span>@(_kams.Count) selecionado(s)</span>
-                    @if (_kams.Count > 0) { <button class="btn-link" @onclick="() => _kams.Clear()">Limpar</button> }
-                    <button class="btn-link" @onclick="() => _kamOpen = false">Fechar</button>
-                </div>
-                @foreach (var nm in KamOptions)
-                {
-                    var kid = nm;
-                    <label class="flt-check"><input type="checkbox" checked="@_kams.Contains(kid)" @onchange="() => ToggleKam(kid)" /> <span>@kid</span></label>
-                }
-                @if (!KamOptions.Any()) { <div class="flt-multi-empty">Nenhum vendedor nos dados.</div> }
-            </div>
-        }
-    </div>
-    <div class="flt"><span class="flt-label">Categoria</span><select @bind="_catFilter"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
-    <div class="flt"><span class="flt-label">Setor</span><select @bind="_setorFilter"><option value="">Ambos</option><option value="NB">New Business</option><option value="AFM">Aftermarket</option></select></div>
+    <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
+    <MultiFilter Label="KAM" AllText="Todos" EmptyText="Nenhum vendedor nos dados." Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Setor" AllText="Ambos" Options="SetorOptions" Selected="_setores" OnChanged="StateHasChanged" />
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     @if (_showMore)
     {
-        <div class="flt"><span class="flt-label">País</span><select @bind="_country"><option value="">Todos</option>@foreach (var nm in CountryOptions){<option value="@nm">@nm</option>}</select></div>
-        <div class="flt"><span class="flt-label">Produto</span><select @bind="_product"><option value="">Todos</option>@foreach (var nm in ProductOptions){<option value="@nm">@nm</option>}</select></div>
-        <div class="flt"><span class="flt-label">Cliente</span><select @bind="_customer"><option value="">Todos</option>@foreach (var nm in CustomerOptions){<option value="@nm">@nm</option>}</select></div>
-        <div class="flt"><span class="flt-label">Unidade de negócio</span><select @bind="_bu"><option value="">Todas</option>@foreach (var nm in BuOptions){<option value="@nm">@nm</option>}</select></div>
+        <MultiFilter Label="País" AllText="Todos" Options="CountryOptions" Selected="_countries" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Produto" AllText="Todos" Options="ProductOptions" Selected="_products" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Cliente" AllText="Todos" Options="CustomerOptions" Selected="_customers" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Unidade de negócio" AllText="Todas" Options="BuOptions" Selected="_bus" OnChanged="StateHasChanged" />
         <div class="flt"><span class="flt-label">Filtrar por</span><select @bind="_valMetric"><option value="total">Valor total</option><option value="conv">Chance de conversão</option></select></div>
         <div class="flt"><span class="flt-label">Mínimo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="0" @bind="_valMin" /></div>
         <div class="flt"><span class="flt-label">Máximo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="—" @bind="_valMax" /></div>
@@ -664,17 +642,37 @@
     private int _year, _month, _quarter;
     // Filtros por NOME resolvido (mesmo rótulo mostrado nos gráficos), para que o
     // clique num elemento (cross-filter estilo Power BI) case com o agrupamento.
-    private string _market = "", _catFilter = "", _country = "", _product = "", _customer = "", _bu = "", _commercial = "", _stage = "", _segment = "", _submarket = "";
-    private string _setorFilter = "";      // "" = ambos · "NB" · "AFM" (origem da planilha)
-    private HashSet<string> _kams = new(StringComparer.OrdinalIgnoreCase);   // KAM é multi-seleção (por nome)
-    private bool _kamOpen;
-    private void ToggleKam(string name) { if (!_kams.Remove(name)) _kams.Add(name); }
+    private string _commercial = "", _stage = "", _segment = "", _submarket = "";
+    // Filtros da barra: TODOS multi-seleção (vazio = todos).
+    private static HashSet<string> NewSet() => new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _kams = NewSet();        // KAM (vendedor)
+    private HashSet<string> _markets = NewSet();
+    private HashSet<string> _setores = NewSet();     // "New Business" · "Aftermarket"
+    private HashSet<string> _countries = NewSet();
+    private HashSet<string> _products = NewSet();
+    private HashSet<string> _customers = NewSet();
+    private HashSet<string> _bus = NewSet();
+    private HashSet<string> _years = NewSet();       // anos como texto ("2026")
+    private HashSet<string> _months = NewSet();      // meses por nome ("Janeiro")
+    private IEnumerable<HashSet<string>> AllSets =>
+        new[] { _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months };
     private DotNetObjectReference<VisaoExecutiva>? _ref;
     private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
-    private int _monthFilter;              // 0 = todos
-    private int _yearFilter;               // 0 = todos os anos
+    // Derivados (rótulos e REPORT usam um único mês/ano quando há exatamente um).
+    private int _monthFilter => _months.Count == 1 ? MonthNum(_months.First()) : 0;
+    private int _yearFilter => _years.Count == 1 && int.TryParse(_years.First(), out var y) ? y : 0;
     private bool _onlyIndicated;           // mostrar só as oportunidades indicadas na previsão
     private IEnumerable<int> YearOptions => _opps.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
+    private static IEnumerable<string> MonthOptions => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
+    private static readonly string[] SetorOptions = { "New Business", "Aftermarket" };
+    private static int MonthNum(string nome)
+    {
+        for (var m = 1; m <= 12; m++) if (string.Equals(Fmt.MonthLong(m), nome, StringComparison.OrdinalIgnoreCase)) return m;
+        return 0;
+    }
+    // Meses selecionados (1..12); vazio = todos.
+    private List<int> SelectedMonths => _months.Select(MonthNum).Where(m => m is >= 1 and <= 12).ToList();
+    private static string SetorCode(string label) => label.StartsWith("After", StringComparison.OrdinalIgnoreCase) ? "AFM" : "NB";
     private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
     private string _valMetric = "total";   // total (Net Value) | conv (Chance de conversão)
     private double? _valMin, _valMax;      // faixa de valor (R$) do métrico escolhido
@@ -837,37 +835,37 @@
         var v = (val ?? "").Trim();
         if (v == "" || v == "—") return;
         string Tog(string cur) => Eq(cur, v) ? "" : v;
+        // Nos filtros multi-seleção, o clique alterna o valor dentro do conjunto.
+        static void TogSet(HashSet<string> set, string val) { if (!set.Remove(val)) set.Add(val); }
         switch (dim)
         {
-            case "market":     _market = Tog(_market); break;
-            case "country":    _country = Tog(_country); break;
-            case "product":    _product = Tog(_product); break;
-            case "customer":   _customer = Tog(_customer); break;
-            case "bu":         _bu = Tog(_bu); break;
+            case "market":     TogSet(_markets, v); break;
+            case "country":    TogSet(_countries, v); break;
+            case "product":    TogSet(_products, v); break;
+            case "customer":   TogSet(_customers, v); break;
+            case "bu":         TogSet(_bus, v); break;
             case "commercial": _commercial = Tog(_commercial); break;
-            case "category":   _catFilter = Tog(_catFilter); break;
             case "stage":      _stage = Tog(_stage); break;
             case "segment":    _segment = Tog(_segment); break;
             case "submarket":  _submarket = Tog(_submarket); break;
-            case "month":      if (int.TryParse(v, out var mm) && mm is >= 1 and <= 12) _monthFilter = _monthFilter == mm ? 0 : mm; break;
-            case "kam":        if (!_kams.Remove(v)) _kams.Add(v); break;
+            case "month":      if (int.TryParse(v, out var mm) && mm is >= 1 and <= 12) TogSet(_months, Fmt.MonthLong(mm)); break;
+            case "kam":        TogSet(_kams, v); break;
         }
     }
 
     // Marca visualmente o elemento ativo no cross-filter.
     private bool IsActive(string dim, string val) => dim switch
     {
-        "market" => Eq(_market, val),
-        "country" => Eq(_country, val),
-        "product" => Eq(_product, val),
-        "customer" => Eq(_customer, val),
-        "bu" => Eq(_bu, val),
+        "market" => _markets.Contains(val),
+        "country" => _countries.Contains(val),
+        "product" => _products.Contains(val),
+        "customer" => _customers.Contains(val),
+        "bu" => _bus.Contains(val),
         "commercial" => Eq(_commercial, val),
-        "category" => Eq(_catFilter, val),
         "stage" => Eq(_stage, val),
         "segment" => Eq(_segment, val),
         "submarket" => Eq(_submarket, val),
-        "month" => int.TryParse(val, out var mm) && _monthFilter == mm,
+        "month" => int.TryParse(val, out var mm) && mm is >= 1 and <= 12 && _months.Contains(Fmt.MonthLong(mm)),
         "kam" => _kams.Contains(val),
         _ => false,
     };
@@ -877,11 +875,11 @@
     // Há algum filtro ativo nessa dimensão? (para desaturar os não-selecionados)
     private bool DimActive(string dim) => dim switch
     {
-        "market" => _market != "",
-        "product" => _product != "",
+        "market" => _markets.Count > 0,
+        "product" => _products.Count > 0,
         "kam" => _kams.Count > 0,
         "segment" => _segment != "",
-        "bu" => _bu != "",
+        "bu" => _bus.Count > 0,
         "submarket" => _submarket != "",
         "stage" => _stage != "",
         _ => false,
@@ -939,190 +937,6 @@
     [JSInvokable]
     public Task ApplyCrossFilter(string dim, string val) =>
         InvokeAsync(() => { CrossFilter(dim, val); StateHasChanged(); });
-
-    // ---- Comando por voz (Web Speech API) --------------------------------------
-    private string _voiceStatus = "idle";   // idle · listening · unsupported · error
-    private string _voiceHeard = "";         // texto reconhecido (parcial/final)
-    private string _voiceApplied = "";       // resumo do que foi aplicado
-
-    [JSInvokable]
-    public Task VoiceStatus(string status) => InvokeAsync(() =>
-    {
-        _voiceStatus = status ?? "idle";
-        if (_voiceStatus == "arming") { _voiceHeard = ""; _voiceApplied = "Segure a barra de espaço para ativar…"; }
-        else if (_voiceStatus == "listening") { _voiceHeard = ""; _voiceApplied = ""; }
-        else if (_voiceStatus == "unsupported") { _voiceApplied = "Voz não suportada neste navegador (use Edge ou Chrome)."; }
-        else if (_voiceStatus.StartsWith("error")) { _voiceApplied = "Não consegui ouvir. Tente de novo."; }
-        StateHasChanged();
-    });
-
-    [JSInvokable]
-    public Task VoiceInterim(string text) => InvokeAsync(() => { _voiceHeard = text ?? ""; StateHasChanged(); });
-
-    [JSInvokable]
-    public Task ApplyVoiceCommand(string transcript) => InvokeAsync(() => { RunVoice(transcript); StateHasChanged(); });
-
-    // Interpreta a frase falada e aplica os filtros correspondentes.
-    private void RunVoice(string transcript)
-    {
-        _voiceHeard = transcript ?? "";
-        _voiceStatus = "idle";
-        var t = NormV(transcript);
-        if (t == "") { _voiceApplied = "Não entendi."; return; }
-        // Traduz termos pt→inglês (os dados são em inglês) e casa por palavras.
-        var te = ExpandSyn(t);
-
-        // Limpar tudo.
-        if (t.Contains("limpar") || t.Contains("limpa") || t.Contains("resetar") || t.Contains("reseta") || t.Contains("remover filtro") || t.Contains("remove filtro") || t.Contains("tirar filtro") || t.Contains("zerar"))
-        { ClearFilters(); _voiceApplied = "Filtros limpos"; return; }
-
-        var applied = new List<string>();
-
-        // Setor (NB × AFM).
-        if (t.Contains("ambos") || t.Contains("todos os setores")) { _setorFilter = ""; applied.Add("Setor: ambos"); }
-        else if (t.Contains("aftermarket") || t.Contains("after market") || t.Contains("afta market") || t.Contains("pos venda") || t.Contains("posvenda") || VWord(t, "afm")) { _setorFilter = "AFM"; applied.Add("Setor: Aftermarket"); }
-        else if (t.Contains("new business") || t.Contains("niu business") || t.Contains("novo negocio") || VWord(t, "nb")) { _setorFilter = "NB"; applied.Add("Setor: New Business"); }
-
-        // Somente indicadas.
-        if (t.Contains("somente indicada") || t.Contains("so indicada") || t.Contains("apenas indicada") || t.Contains("indicada na previsao") || t.Contains("indicadas na previsao"))
-        { _onlyIndicated = true; applied.Add("Somente indicadas"); }
-        else if (t.Contains("todas as oportunidades") || t.Contains("tirar indicada") || t.Contains("remover indicada") || t.Contains("nao indicada"))
-        { _onlyIndicated = false; applied.Add("Todas as oportunidades"); }
-
-        // Ano.
-        if (t.Contains("todos os anos")) { _yearFilter = 0; applied.Add("Ano: todos"); }
-        else { var ym = System.Text.RegularExpressions.Regex.Match(t, "20\\d{2}"); if (ym.Success && int.TryParse(ym.Value, out var yy)) { _yearFilter = yy; applied.Add("Ano: " + yy); } }
-
-        // Mês.
-        var meses = new[] { "janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro" };
-        if (t.Contains("todos os meses")) { _monthFilter = 0; applied.Add("Mês: todos"); }
-        else { for (var mi = 0; mi < 12; mi++) if (t.Contains(meses[mi])) { _monthFilter = mi + 1; applied.Add("Mês: " + Fmt.MonthLong(mi + 1)); break; } }
-
-        // Dimensões por nome — casa por PALAVRAS (não substring exato).
-        var toks = Tokens(te);
-        TryName(CountryOptions, v => _country = v, toks, "País", applied);
-        TryName(MarketOptions, v => _market = v, toks, "Market", applied);
-        TryName(SubMarketOptions, v => _submarket = v, toks, "Sub-Market", applied);
-        TryName(ProductOptions, v => _product = v, toks, "Produto", applied);
-        TryName(SegmentOptions, v => _segment = v, toks, "Segmento", applied);
-        TryName(BuOptions, v => _bu = v, toks, "Unidade", applied);
-        TryName(StageOptions, v => _stage = v, toks, "Stage", applied);
-        TryName(CustomerOptions, v => _customer = v, toks, "Cliente", applied);
-
-        // Vendedor (multi-seleção): adiciona os que casarem com a fala (fuzzy).
-        foreach (var k in KamOptions)
-            if (MatchScore(k, toks) >= 0.80) { if (!_kams.Contains(k)) _kams.Add(k); applied.Add("Vendedor: " + k); }
-
-        _voiceApplied = applied.Count > 0 ? string.Join(" · ", applied.Distinct()) : "Não entendi. Repita mais devagar.";
-    }
-
-    // Aplica a opção que melhor casa com a fala (casamento aproximado, tolera erros
-    // de transcrição/sotaque). Só aplica se a pontuação passar do limiar.
-    private void TryName(IEnumerable<string> options, Action<string> set, string[] toks, string label, List<string> applied)
-    {
-        string? best = null; double bestScore = 0;
-        foreach (var o in options)
-        {
-            var s = MatchScore(o, toks);
-            if (s > bestScore) { bestScore = s; best = o; }
-        }
-        if (best != null && bestScore >= 0.74) { set(best); applied.Add(label + ": " + best); }
-    }
-
-    // Pontuação [0..1]: média da melhor similaridade de cada palavra do rótulo
-    // contra as palavras faladas.
-    private static double MatchScore(string option, string[] toks)
-    {
-        var ow = SignWords(option);
-        if (ow.Length == 0 || toks.Length == 0) return 0;
-        double sum = 0;
-        foreach (var w in ow)
-        {
-            double bw = 0;
-            foreach (var tk in toks) { var s = Sim(w, tk); if (s > bw) bw = s; }
-            sum += bw;
-        }
-        return sum / ow.Length;
-    }
-
-    // Similaridade entre duas palavras (1 = igual). Conta alto quando uma contém a
-    // outra; senão usa a distância de edição (Levenshtein) normalizada.
-    private static double Sim(string a, string b)
-    {
-        if (a == b) return 1;
-        if (a.Length >= 3 && b.Length >= 3 && (a.Contains(b) || b.Contains(a))) return 0.92;
-        var max = Math.Max(a.Length, b.Length);
-        return max == 0 ? 0 : 1.0 - (double)Lev(a, b) / max;
-    }
-
-    private static int Lev(string a, string b)
-    {
-        int n = a.Length, m = b.Length;
-        if (n == 0) return m;
-        if (m == 0) return n;
-        var prev = new int[m + 1];
-        var cur = new int[m + 1];
-        for (var j = 0; j <= m; j++) prev[j] = j;
-        for (var i = 1; i <= n; i++)
-        {
-            cur[0] = i;
-            for (var j = 1; j <= m; j++)
-            {
-                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
-                cur[j] = Math.Min(Math.Min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
-            }
-            (prev, cur) = (cur, prev);
-        }
-        return prev[m];
-    }
-
-    // Palavras significativas (≥3 letras) de um rótulo, normalizadas.
-    private static string[] SignWords(string label) =>
-        Tokens(NormV(label)).Where(w => w.Length >= 3).ToArray();
-
-    private static string[] Tokens(string s) =>
-        System.Text.RegularExpressions.Regex.Split(s ?? "", "[^a-z0-9]+").Where(w => w.Length > 0).ToArray();
-
-    // Palavra inteira (evita "nb" casar dentro de outra palavra).
-    private static bool VWord(string t, string w) =>
-        System.Text.RegularExpressions.Regex.IsMatch(t, "\\b" + System.Text.RegularExpressions.Regex.Escape(w) + "\\b");
-
-    // Sinônimos pt→inglês (dados em inglês): acrescenta o termo-alvo à fala.
-    private static readonly (string From, string To)[] VSyn =
-    {
-        ("brasil", "brazil"), ("uruguai", "uruguay"), ("equador", "ecuador"),
-        ("mineracao", "mining"), ("minerio", "mining"), ("agua", "water"),
-        ("cimento", "cement"), ("aco", "steel"), ("siderurgia", "steel"),
-        ("petroleo", "oil gas"), ("oleo e gas", "oil gas"), ("gas", "gas"),
-        ("petroquimica", "petrochemical"), ("hidrogenio", "hydrogen"),
-        ("tunel", "tunnel"), ("mobilidade", "mobility"), ("papel", "paper"),
-        ("celulose", "pulp"), ("energia", "power"), ("saneamento", "water"),
-        ("residuo", "waste"), ("esgoto", "wastewater"), ("offshore", "offshore"),
-        ("estrada", "road"), ("rodovia", "road"), ("subterraneo", "underground"),
-        ("metais", "metal"), ("metal", "metal"), ("ferro", "iron"), ("carvao", "coal"),
-        ("quimica", "chemical"), ("refinaria", "refinery"), ("fertilizante", "fertilizer"),
-        ("acucar", "sugar"), ("etanol", "ethanol"), ("naval", "marine"), ("defesa", "defense"),
-    };
-
-    private static string ExpandSyn(string t)
-    {
-        var extra = new System.Text.StringBuilder(t);
-        foreach (var (from, to) in VSyn)
-            if (t.Contains(from)) { extra.Append(' '); extra.Append(to); }
-        return extra.ToString();
-    }
-
-    // Normaliza p/ casar: minúsculas, sem acentos, espaços colapsados.
-    private static string NormV(string? s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "";
-        var d = s.Trim().ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
-        var sb = new System.Text.StringBuilder(d.Length);
-        foreach (var c in d)
-            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
-                sb.Append(c);
-        return System.Text.RegularExpressions.Regex.Replace(sb.ToString().Normalize(System.Text.NormalizationForm.FormC), "\\s+", " ").Trim();
-    }
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private AccessScope _scope = new();
@@ -1186,21 +1000,24 @@
     private IEnumerable<Opportunity> Filtered()
     {
         IEnumerable<Opportunity> q = _opps;
-        if (_market != "") q = q.Where(o => Eq(KeyMarket(o), _market));
+        if (_markets.Count > 0) q = q.Where(o => _markets.Contains(KeyMarket(o)));
         if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KeyKam(o)));
-        if (_catFilter != "") q = q.Where(o => o.ForecastCategory == _catFilter);
-        if (_setorFilter != "") q = q.Where(o => string.Equals(o.Setor, _setorFilter, StringComparison.OrdinalIgnoreCase));
-        if (_country != "") q = q.Where(o => Eq(KeyCountry(o), _country));
-        if (_product != "") q = q.Where(o => Eq(KeyProduct(o), _product));
-        if (_customer != "") q = q.Where(o => Eq(KeyCustomer(o), _customer));
-        if (_bu != "") q = q.Where(o => Eq(KeyBu(o), _bu));
+        if (_setores.Count > 0)
+        {
+            var cods = _setores.Select(SetorCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            q = q.Where(o => cods.Contains(o.Setor ?? ""));
+        }
+        if (_countries.Count > 0) q = q.Where(o => _countries.Contains(KeyCountry(o)));
+        if (_products.Count > 0) q = q.Where(o => _products.Contains(KeyProduct(o)));
+        if (_customers.Count > 0) q = q.Where(o => _customers.Contains(KeyCustomer(o)));
+        if (_bus.Count > 0) q = q.Where(o => _bus.Contains(KeyBu(o)));
         if (_commercial != "") q = q.Where(o => Eq(KeyCommercial(o), _commercial));
         if (_stage != "") q = q.Where(o => Eq(KeyStage(o), _stage));
         if (_segment != "") q = q.Where(o => Eq(KeySegment(o), _segment));
         if (_submarket != "") q = q.Where(o => Eq(KeySubMarket(o), _submarket));
-        if (_yearFilter > 0) q = q.Where(o => o.ExpectedDateValue?.Year == _yearFilter);
+        if (_years.Count > 0) q = q.Where(o => _years.Contains((o.ExpectedDateValue?.Year ?? 0).ToString()));
         if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
-        if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
+        if (SelectedMonths is { Count: > 0 } ms) q = q.Where(o => o.ExpectedDateValue is { } d && ms.Contains(d.Month));
         if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
         if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
         if (_valMin is { } vmin) q = q.Where(o => MetricBrl(o, _valMetric) >= vmin);
@@ -1210,10 +1027,9 @@
 
     private void ClearFilters()
     {
-        _market = _catFilter = _country = _product = _customer = _bu = _commercial = _stage = _segment = _submarket = "";
-        _setorFilter = "";
-        _kams.Clear();
-        _yearFilter = 0; _monthFilter = 0; _dateFrom = _dateTo = null;
+        _commercial = _stage = _segment = _submarket = "";
+        foreach (var s in AllSets) s.Clear();
+        _dateFrom = _dateTo = null;
         _onlyIndicated = false;
         _valMin = _valMax = null; _valMetric = "total";
     }
@@ -1225,10 +1041,10 @@
         // Ano de referência: o selecionado no filtro, ou o ano atual quando "Todos".
         _year = _yearFilter > 0 ? _yearFilter : _today.Year;
         _month = _today.Month; _quarter = Fmt.QuarterOf(_month);
-        _activeFilters = new[] { _market, _catFilter, _country, _product, _customer, _bu, _commercial, _stage, _segment, _submarket, _setorFilter }.Count(s => s != "")
-            + (_kams.Count > 0 ? 1 : 0)
-            + (_yearFilter > 0 ? 1 : 0) + (_onlyIndicated ? 1 : 0)
-            + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
+        _activeFilters = new[] { _commercial, _stage, _segment, _submarket }.Count(s => s != "")
+            + AllSets.Count(s => s.Count > 0)
+            + (_onlyIndicated ? 1 : 0)
+            + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
 
         var opps = Filtered().ToList();
@@ -1266,11 +1082,12 @@
 
         // Hero: Meta × Realizado do REPORT HSA (guia Controle). Sem filtro de mês
         // mostra o total do ano; com filtro de mês mostra o mês selecionado.
-        if (_monthFilter is >= 1 and <= 12)
+        var hm = SelectedMonths;
+        if (hm.Count > 0)
         {
-            _heroReal = _repReal[_monthFilter - 1];
-            _heroMeta = _repMeta[_monthFilter - 1];
-            _heroMetaHsa = _repMetaHsa[_monthFilter - 1];
+            _heroReal = hm.Sum(m => _repReal[m - 1]);
+            _heroMeta = hm.Sum(m => _repMeta[m - 1]);
+            _heroMetaHsa = hm.Sum(m => _repMetaHsa[m - 1]);
         }
         else
         {
@@ -1844,7 +1661,7 @@
             var has = byName.TryGetValue(name, out var v);
             var fill = has ? Shade(maxV > 0 ? v / maxV : 0) : "#e7edf3";
             var label = mapToLabel.TryGetValue(name, out var lb) ? lb : "";
-            var active = label != "" && Eq(_country, label);
+            var active = label != "" && _countries.Contains(label);
             var data = has
                 ? $" data-value='{Esc(Money(v))}' data-pct='{Esc(Fmt.Pct(v / Math.Max(_countryTotal, 1) * 100))}' data-metric='{Esc(MetricLabel)}' data-xf-val='{Esc(label)}'"
                 : "";

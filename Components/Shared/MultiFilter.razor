@@ -1,0 +1,58 @@
+@* Filtro de múltipla seleção reutilizável da barra de filtros.
+   - Permite marcar VÁRIAS opções (nenhuma marcada = todas).
+   - Fecha ao clicar em qualquer área em branco (backdrop transparente),
+     no botão "Fechar" ou ao clicar de novo no próprio filtro. *@
+
+<div class="flt flt-multi">
+    <span class="flt-label">@Label</span>
+    <button type="button" class="flt-multi-btn" @onclick="Toggle">
+        @(Selected.Count == 0 ? AllText : Selected.Count == 1 ? Selected.First() : Selected.Count + " selec.")<span class="flt-caret">▾</span>
+    </button>
+    @if (_open)
+    {
+        @* Área em branco: clicar fora recolhe o filtro. *@
+        <div class="flt-multi-backdrop" @onclick="Close"></div>
+        <div class="flt-multi-panel">
+            <div class="flt-multi-head">
+                <span>@Selected.Count selecionado(s)</span>
+                @if (Selected.Count > 0) { <button class="btn-link" @onclick="ClearAll">Limpar</button> }
+                <button class="btn-link" @onclick="Close">Fechar</button>
+            </div>
+            @foreach (var op in Options)
+            {
+                var v = op;
+                <label class="flt-check">
+                    <input type="checkbox" checked="@Selected.Contains(v)" @onchange="() => Pick(v)" />
+                    <span>@v</span>
+                </label>
+            }
+            @if (!Options.Any()) { <div class="flt-multi-empty">@EmptyText</div> }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string AllText { get; set; } = "Todos";
+    [Parameter] public string EmptyText { get; set; } = "Sem opções no recorte.";
+    [Parameter] public IEnumerable<string> Options { get; set; } = Array.Empty<string>();
+    [Parameter] public HashSet<string> Selected { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool _open;
+
+    private void Toggle() => _open = !_open;
+    private void Close() => _open = false;
+
+    private async Task Pick(string v)
+    {
+        if (!Selected.Remove(v)) Selected.Add(v);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ClearAll()
+    {
+        Selected.Clear();
+        await OnChanged.InvokeAsync();
+    }
+}
