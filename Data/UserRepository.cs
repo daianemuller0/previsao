@@ -105,8 +105,17 @@ public class UserRepository
                 Save(novo, actor);
                 continue;
             }
-            // Conta existente: garante o acesso mínimo (só para vendedores).
-            if (role != AccessRoles.Vendedor || vendedores.Length == 0) continue;
+            // Conta existente: promove ao papel especial das regras (Controle /
+            // Diretor) quando ainda está como vendedor. Nunca rebaixa nem desfaz
+            // uma promoção feita pelo admin.
+            if (role != AccessRoles.Vendedor)
+            {
+                if (u.Role == AccessRoles.Vendedor) { u.Role = role; Save(u, actor); }
+                continue;
+            }
+
+            // Vendedor: garante o acesso mínimo à carteira das regras.
+            if (vendedores.Length == 0) continue;
             var set = new HashSet<string>(u.VendedorList, StringComparer.CurrentCultureIgnoreCase);
             var antes = set.Count;
             foreach (var v in vendedores) set.Add(v);
@@ -146,8 +155,8 @@ public class UserRepository
         ("Leonardo Silva",     AccessRoles.Vendedor, new[]{ "Leonardo Silva" }),
         ("Paulo Agostinho",    AccessRoles.Vendedor, new[]{ "Paulo Agostinho" }),
         ("Emilio Ruiz",        AccessRoles.Vendedor, new[]{ "Emilio Ruiz" }),
-        ("Thiago Veiga",       AccessRoles.Vendedor, new[]{ "Thiago Veiga" }),
         // Perfis especiais (veem todos).
+        ("Thiago Veiga",         AccessRoles.Controle, Array.Empty<string>()),
         ("Sandra Silva",         AccessRoles.Controle, Array.Empty<string>()),
         ("Edson Luis Geraldini", AccessRoles.Diretor,  Array.Empty<string>()),
     };
