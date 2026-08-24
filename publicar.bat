@@ -30,14 +30,14 @@ pause
 REM --- 1) Publica numa pasta temporaria limpa -------------------------------
 if exist "%TEMPO%" rmdir /s /q "%TEMPO%"
 
-REM Self-contained (nao exige .NET instalado), mas SEM arquivo unico: um .exe de
-REM 130 MB costuma ser bloqueado pelo antivirus/politica ao gravar na rede.
-REM Assim o .exe fica pequeno e o restante vai como DLLs normais.
+REM Self-contained em ARQUIVO UNICO: nao exige .NET instalado e deixa a pasta
+REM publicada limpa (poucos arquivos).
 dotnet publish "%~dp0HowdenSalesForecast.csproj" ^
   -c Release ^
   -r win-x64 ^
   --self-contained true ^
-  -p:PublishSingleFile=false ^
+  -p:PublishSingleFile=true ^
+  -p:IncludeNativeLibrariesForSelfExtract=true ^
   -o "%TEMPO%"
 
 if errorlevel 1 (
@@ -54,7 +54,13 @@ robocopy "%TEMPO%" "%DESTINO%" /MIR /NFL /NDL /NJH /NP /R:2 /W:2
 REM robocopy: codigos 0..7 = sucesso; 8+ = erro real.
 if errorlevel 8 (
   echo.
-  echo  *** Falha ao copiar para a pasta de rede. Verifique acesso/arquivos em uso. ***
+  echo  *** Falha ao copiar para a pasta de rede. ***
+  echo.
+  echo  Se o erro foi "Acesso negado" no arquivo .exe, quase sempre significa que
+  echo  O PROGRAMA ESTA ABERTO em alguma maquina — o Windows nao deixa substituir
+  echo  um executavel em uso. Feche o programa em todas as maquinas e rode de novo.
+  echo  Persistindo, apague o conteudo da pasta de destino e repita.
+  echo.
   pause
   exit /b 1
 )
