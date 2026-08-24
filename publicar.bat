@@ -16,7 +16,7 @@ REM ===========================================================================
 setlocal
 
 set "DESTINO=%~1"
-if "%DESTINO%"=="" set "DESTINO=\\BZVCPFIL003\proj_ramires$\DB\AFM_HSA\previsao\arquivo\01"
+if "%DESTINO%"=="" set "DESTINO=\\BZVCPFIL003\proj_ramires$\DB\AFM_HSA\previsao\arquivo\02"
 set "TEMPO=%TEMP%\hsf_publish"
 
 echo.
