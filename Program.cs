@@ -166,9 +166,12 @@ app.MapPost("/auth/logout", async (HttpContext http) =>
 }).DisableAntiforgery();
 
 // Exporta o forecast consolidado em CSV (BOM UTF-8, separador ';' p/ Excel pt-BR).
-app.MapGet("/forecast/export", (OpportunityRepository repo, Catalog cat) =>
+app.MapGet("/forecast/export", (HttpContext http, OpportunityRepository repo, Catalog cat) =>
 {
     var today = DateTime.Today;
+    // Recorte de acesso: cada login só exporta a carteira que pode enxergar, e
+    // nunca as oportunidades já movidas para o Controle (venda indicada).
+    var scope = AccessScope.Resolve(http.User);
     static string Campo(string s) => s.Contains(';') || s.Contains('"') || s.Contains('\n')
         ? $"\"{s.Replace("\"", "\"\"")}\"" : s;
     string Inv(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
@@ -177,7 +180,10 @@ app.MapGet("/forecast/export", (OpportunityRepository repo, Catalog cat) =>
     sb.AppendLine("Proposta;Oportunidade;Categoria;Status pipeline;Data prevista;Quarter;Pais;Mercado;" +
                   "Produto;KAM;Cliente;Planta;Moeda;Valor USD;Valor BRL;GM%;Prob ganho;Prob periodo;" +
                   "Forecast ponderado USD;Margem USD;Risco;Categoria comercial;Proxima acao;Atualizado em");
-    foreach (var o in repo.All())
+    var exportaveis = repo.All()
+        .Where(o => !o.MovidaControleValue)
+        .Where(o => scope.CanSeeVendedor(OpportunityImporter.CanonicalVendedor(cat.KamName(o.KamId))));
+    foreach (var o in exportaveis)
     {
         var d = o.ExpectedDateValue ?? today;
         sb.AppendLine(string.Join(';', new[]
@@ -215,7 +221,8 @@ app.MapGet("/controle/export", (ControleRepository repo, HttpRequest req) =>
         }));
     var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
     return Results.File(bytes, "text/csv; charset=utf-8", $"controle_{year}.csv");
-}).RequireAuthorization();
+    // Mesma restrição da aba Controle: só Controle e Administrador.
+}).RequireAuthorization(p => p.RequireRole(AccessRoles.Controle, AccessRoles.Admin));
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

@@ -29,7 +29,7 @@
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
         <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (Esc para sair)">@Icons.Svg("play")Apresentação</button>
-        <a class="btn-ghost" href="/forecast/export" target="_blank" title="Exportar CSV">@Icons.Svg("download")Exportar</a>
+        <button class="btn-ghost" title="Exportar as oportunidades do recorte atual (respeita os filtros da página)" @onclick="ExportarFiltradas">@Icons.Svg("download")Exportar</button>
         <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
     </div>
 </div>
@@ -988,14 +988,22 @@
     // Build() é chamado no topo do render e recomputa Top 10 e listagem.
     private void ReloadOpps() => _opps = LoadScoped();
 
+    // Exporta as oportunidades do recorte atual (todos os filtros da página).
+    private Task ExportarFiltradas() =>
+        ExportarXlsx(_filtered, $"oportunidades_{_today:yyyy-MM-dd}.xlsx", "Oportunidades");
+
     // Exporta SÓ as oportunidades indicadas do recorte atual (.xlsx).
-    private async Task ExportarIndicadas()
+    private Task ExportarIndicadas() =>
+        ExportarXlsx(_indicadas, $"oportunidades_indicadas_{_today:yyyy-MM-dd}.xlsx", "Indicadas");
+
+    // Gera o .xlsx de uma lista de oportunidades e entrega o download.
+    private async Task ExportarXlsx(List<Opportunity> lista, string nome, string aba)
     {
-        if (_indicadas.Count == 0) return;
+        if (lista.Count == 0) return;
         var bytes = await Task.Run(() =>
         {
             using var wb = new ClosedXML.Excel.XLWorkbook();
-            var ws = wb.Worksheets.Add("Indicadas");
+            var ws = wb.Worksheets.Add(aba);
             string[] head =
             {
                 "Setor", "Quarter", "Data", "País", "Market Variável", "Market", "Product",
@@ -1007,7 +1015,7 @@
             ws.Row(1).Style.Font.Bold = true;
 
             var r = 2;
-            foreach (var o in _indicadas)
+            foreach (var o in lista)
             {
                 var d = o.ExpectedDateValue;
                 var c = 1;
@@ -1042,7 +1050,6 @@
             return ms.ToArray();
         });
 
-        var nome = $"oportunidades_indicadas_{_today:yyyy-MM-dd}.xlsx";
         try
         {
             await JS.InvokeVoidAsync("appDownload", nome,
