@@ -349,8 +349,11 @@ h1 { font-size: 22px; color: var(--primary); }
 }
 .btn-ghost:hover { border-color: var(--border-strong); background: var(--panel-2); text-decoration: none; color: var(--text); }
 .btn-ghost.sm, .btn-primary.sm { padding: 6px 11px; font-size: 11.5px; }
-.btn-link { background: none; border: none; color: var(--secondary); cursor: pointer; font-size: 12.5px; font-family: inherit; padding: 2px 4px; }
+.btn-link { background: none; border: none; color: var(--secondary); cursor: pointer; font-size: 12.5px; font-family: inherit; padding: 2px 4px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .btn-link:hover { text-decoration: underline; }
+/* Ícone dentro do link: sem tamanho definido o SVG estoura e quebra a linha. */
+.btn-link svg { width: 13px; height: 13px; flex: 0 0 auto; }
 .btn-icon { width: 34px; padding: 0; height: 34px; justify-content: center; }
 .btn svg, .btn-primary svg, .btn-ghost svg { width: 15px; height: 15px; }
 
