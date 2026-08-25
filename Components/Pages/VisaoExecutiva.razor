@@ -507,13 +507,13 @@
 
 @* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
 <div class="section-head">
-    <span class="st-title">Top 10 oportunidades mais quentes</span>
-    <span class="st-sub">confiança + peso do valor · acima de R$ 1 mi</span>
+    <span class="st-title">Oportunidades mais quentes</span>
+    <span class="st-sub">indicadas na previsão + marcadas como TOP 10 · @_top10Opps.Count oport. · @MoneyBrl(_top10Opps.Sum(o => o.AmountBrl))</span>
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Ver todas</a>
 </div>
 <OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
-                  EmptyText="Sem oportunidades acima de R$ 1 mi no recorte." OnChanged="ReloadOpps" />
+                  EmptyText="Nenhuma oportunidade indicada na previsão ou marcada como TOP 10 no recorte." OnChanged="ReloadOpps" />
 
 @* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
 <div class="section-head"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
@@ -828,6 +828,8 @@
            .Where(x => x.Value > 0).OrderByDescending(x => x.Value).ToList();
 
     private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+    // Campo marcado como "Sim" (ex.: TOP 10 preenchido pelo KAM).
+    private static bool Sim(string? s) => string.Equals((s ?? "").Trim(), "Sim", StringComparison.OrdinalIgnoreCase);
 
     // Cross-filter: alterna o filtro da dimensão (clicar de novo no mesmo valor limpa).
     private void CrossFilter(string dim, string? val)
@@ -1136,14 +1138,15 @@
         _pipelineTotal = open.Sum(o => o.AmountUsd);
         _pipelineWeighted = open.Sum(W);
 
-        // Top 10 oportunidades mais quentes: só entram valores ≥ R$ 1 mi; o
-        // ranking combina a confiança (%) com o peso do valor (HeatScore).
-        var hotElegiveis = open.Where(o => o.AmountBrl >= ForecastCalc.HotMinAmountBrl).ToList();
+        // Oportunidades mais quentes: entram APENAS as sinalizadas pelo vendedor —
+        // indicadas na previsão OU marcadas com TOP 10 = "Sim". A ordem segue o
+        // HeatScore (confiança + peso do valor). Todas as marcadas aparecem.
+        var hotElegiveis = open.Where(o => o.IndicadaValue || Sim(o.Top10)).ToList();
         var maxHotBrl = hotElegiveis.Count > 0 ? hotElegiveis.Max(o => o.AmountBrl) : 0;
         _top10Opps = hotElegiveis
             .OrderByDescending(o => ForecastCalc.HeatScore(o, maxHotBrl))
             .ThenByDescending(o => o.AmountBrl)
-            .Take(10).ToList();
+            .ToList();
         var eligibleForecast = opps.Where(o => InYear(o) && Eligible(o)).ToList();
         _marginForecast = eligibleForecast.Sum(ForecastCalc.MarginUsd);
         _gmAvg = eligibleForecast.Count > 0 ? eligibleForecast.Average(o => o.GmPercentValue) : 0;

@@ -16,9 +16,6 @@ public static class ForecastCalc
     public static double Confidence(Opportunity o) =>
         (o.WinProbabilityValue + o.CloseProbabilityValue) / 2.0;
 
-    // Valor mínimo (R$) para uma oportunidade concorrer ao Top 10 "mais quentes".
-    public const double HotMinAmountBrl = 1_000_000;
-
     // Score de "calor" (0–100) das oportunidades mais quentes: combina a
     // confiança (% de ganho + % de sair no mês) com o peso do valor. O valor
     // entra normalizado pelo maior valor do recorte, com raiz para suavizar o
