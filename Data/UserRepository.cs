@@ -158,6 +158,9 @@ public class UserRepository
         // Perfis especiais (veem todos).
         ("Thiago Veiga",         AccessRoles.Controle, Array.Empty<string>()),
         ("Sandra Silva",         AccessRoles.Controle, Array.Empty<string>()),
+        ("Marcos Pinto",         AccessRoles.Controle, Array.Empty<string>()),
+        ("Thais Trevine",        AccessRoles.Controle, Array.Empty<string>()),
+        ("Rogerio Silva",        AccessRoles.Controle, Array.Empty<string>()),
         ("Edson Luis Geraldini", AccessRoles.Diretor,  Array.Empty<string>()),
     };
 }
