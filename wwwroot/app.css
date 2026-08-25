@@ -980,6 +980,8 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .reg-atencao > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 .reg-alert { display: inline-flex; color: var(--warn); cursor: help; }
 .reg-alert svg { width: 15px; height: 15px; }
+/* Ícone solto num rótulo de formulário: sem limite o SVG ocupa a largura toda. */
+.fld > svg { width: 14px; height: 14px; vertical-align: -2px; }
 
 /* ===================== Capa (login split-screen) ===================== */
 .cover { min-height: 100vh; display: grid; grid-template-columns: 1.15fr 1fr; }
