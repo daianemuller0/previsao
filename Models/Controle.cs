@@ -64,6 +64,7 @@ public class ControleRegistro
     public string ValorOriginal { get; set; } = "";  // valor na moeda de origem
     public string Observacao { get; set; } = "";     // observação livre
     public string Atencao { get; set; } = "";        // nota de ATENÇÃO p/ o Controle
+    public string OppId { get; set; } = "";          // oportunidade de origem (p/ desfazer a venda indicada)
     public string UpdatedBy { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
 

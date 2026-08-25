@@ -381,6 +381,7 @@
             Moeda = string.IsNullOrWhiteSpace(o.CurrencyCode) ? "BRL" : o.CurrencyCode,
             ValorOriginal = o.AmountOriginalValue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
             Observacao = o.Notes ?? "",
+            OppId = o.Id,           // permite devolver a oferta às Oportunidades
         };
     }
 
