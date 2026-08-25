@@ -17,10 +17,14 @@
         <p class="subtitle">Carteira comercial · @Rows.Count de @_all.Count oportunidade(s) · valor total @Fmt.Brl(Rows.Sum(o => o.AmountBrl))</p>
     </div>
     <div class="page-actions">
-        <button class="icon-btn danger" title="Excluir base inteira" @onclick="() => _wipe = true">@Icons.Svg("trash")</button>
-        <button class="btn-ghost" @onclick="OpenBulk">@Icons.Svg("flag")Indicar em massa</button>
-        <button class="btn-ghost" @onclick="OpenUnindicate">@Icons.Svg("x")Desindicar todas</button>
-        <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
+        @* Manutenção da base: só o administrador. *@
+        @if (_isAdmin)
+        {
+            <button class="icon-btn danger" title="Excluir base inteira" @onclick="() => _wipe = true">@Icons.Svg("trash")</button>
+            <button class="btn-ghost" @onclick="OpenBulk">@Icons.Svg("flag")Indicar em massa</button>
+            <button class="btn-ghost" @onclick="OpenUnindicate">@Icons.Svg("x")Desindicar todas</button>
+            <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
+        }
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
 </div>
@@ -32,17 +36,18 @@
 
 <div class="filterbar filterbar-sticky">
     <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" @bind="_search" @bind:event="oninput" /></div>
-    <div class="flt"><span class="flt-label">Ano</span><select @bind="_year"><option value="0">Todos</option>@foreach (var y in Years){<option value="@y">@y</option>}</select></div>
-    <div class="flt"><span class="flt-label">Mês</span><select @bind="_monthFilter"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select></div>
+    <MultiFilter Label="Ano" AllText="Todos" Options="Years.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
     <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
     <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
-    <div class="flt"><span class="flt-label">Mercado</span><select @bind="_market"><option value="">Todos</option>@foreach (var m in MarketOptions){<option value="@m">@Cat.MarketName(m)</option>}</select></div>
-    <div class="flt"><span class="flt-label">KAM</span><select @bind="_kam"><option value="">Todos</option>@foreach (var k in KamOptions){<option value="@k">@Cat.KamName(k)</option>}</select></div>
-    <div class="flt"><span class="flt-label">Categoria</span><select @bind="_cat"><option value="">Todas</option>@foreach (var c in Enum.GetValues<ForecastCategory>()){<option value="@c.ToString()">@ForecastCategories.Label(c)</option>}</select></div>
-    <div class="flt"><span class="flt-label">Risco</span><select @bind="_risk"><option value="">Todos</option>@foreach (var r in Enum.GetValues<RiskLevel>()){<option value="@r.ToString()">@RiskLevels.Label(r)</option>}</select></div>
+    <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
+    <MultiFilter Label="KAM" AllText="Todos" EmptyText="Nenhum vendedor nos dados." Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Categoria" AllText="Todas" Options="CategoriaOptions" Selected="_cats" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Risco" AllText="Todos" Options="RiscoOptions" Selected="_risks" OnChanged="StateHasChanged" />
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     <div class="filterbar-spacer"></div>
-    @if (_activeFilters > 0) { <span class="tag">@_activeFilters ativo(s)</span> <button class="btn-link" @onclick="ClearFilters">Limpar</button> }
+    @if (_activeFilters > 0) { <span class="tag">@_activeFilters ativo(s)</span> }
+    <button class="btn-link" @onclick="ClearFilters">@Icons.Svg("x")Limpar filtros</button>
 </div>
 
 <div class="table-wrap">
@@ -449,11 +454,15 @@
 @code {
     private List<Opportunity> _all = new();
     private DateTime _today = DateTime.Today;
-    private string _search = "", _cat = "", _kam = "", _market = "", _risk = "";
+    private string _search = "";
+    // Filtros multi-seleção (vazio = todos). Guardam os RÓTULOS exibidos.
+    private static HashSet<string> NewSet() => new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _cats = NewSet(), _kams = NewSet(), _markets = NewSet(),
+                            _risks = NewSet(), _years = NewSet(), _months = NewSet();
     private bool _onlyIndicated;
-    private int _year, _monthFilter;                 // 0 = todos
     private DateTime? _dateFrom, _dateTo;
     private int _openCount;
+    private bool _isAdmin;                            // manutenção da base só p/ admin
 
     // Indicação em massa (planilha de propostas).
     private bool _bulk;
@@ -466,16 +475,27 @@
 
     // Opções dos filtros vindas dos próprios dados (funciona com listas de texto).
     private IEnumerable<int> Years => _all.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
-    private IEnumerable<string> MarketOptions => _all.Select(o => o.MarketId).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(Cat.MarketName);
-    private IEnumerable<string> KamOptions => _all.Select(o => o.KamId).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(Cat.KamName);
-    private int _activeFilters => new[] { _search, _cat, _kam, _market, _risk }.Count(s => s != "")
-        + (_year > 0 ? 1 : 0) + (_monthFilter is >= 1 and <= 12 ? 1 : 0) + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
+    private static IEnumerable<string> MonthOptions => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
+    // Opções por RÓTULO (o que aparece na tela), para casar com a seleção múltipla.
+    private IEnumerable<string> MarketOptions => _all.Select(o => Cat.MarketName(o.MarketId))
+        .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> KamOptions => _all.Select(KamName)
+        .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
+    private static IEnumerable<string> CategoriaOptions => Enum.GetValues<ForecastCategory>().Select(ForecastCategories.Label);
+    private static IEnumerable<string> RiscoOptions => Enum.GetValues<RiskLevel>().Select(RiskLevels.Label);
+    private string KamName(Opportunity o) => OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId));
+
+    private IEnumerable<HashSet<string>> AllSets => new[] { _cats, _kams, _markets, _risks, _years, _months };
+    private int _activeFilters => (_search != "" ? 1 : 0)
+        + AllSets.Count(s => s.Count > 0)
+        + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
         + (_onlyIndicated ? 1 : 0);
 
     private void ClearFilters()
     {
-        _search = _cat = _kam = _market = _risk = "";
-        _year = _monthFilter = 0; _dateFrom = _dateTo = null;
+        _search = "";
+        foreach (var s in AllSets) s.Clear();
+        _dateFrom = _dateTo = null;
         _onlyIndicated = false;
     }
     private Opportunity? _new;
@@ -531,7 +551,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (AuthState is not null) { var st = await AuthState; _scope = AccessScope.Resolve(st.User); _user = st.User.Identity?.Name ?? "—"; }
+        if (AuthState is not null)
+        {
+            var st = await AuthState;
+            _scope = AccessScope.Resolve(st.User);
+            _user = st.User.Identity?.Name ?? "—";
+            _isAdmin = _scope.Role == AccessRoles.Admin;
+        }
         _all = LoadScoped();
         Recompute();
     }
@@ -713,12 +739,12 @@
         {
             IEnumerable<Opportunity> q = _all;
             if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
-            if (!string.IsNullOrWhiteSpace(_cat)) q = q.Where(o => o.ForecastCategory == _cat);
-            if (!string.IsNullOrWhiteSpace(_kam)) q = q.Where(o => o.KamId == _kam);
-            if (!string.IsNullOrWhiteSpace(_market)) q = q.Where(o => o.MarketId == _market);
-            if (!string.IsNullOrWhiteSpace(_risk)) q = q.Where(o => ForecastCalc.Level(o, _today).ToString() == _risk);
-            if (_year > 0) q = q.Where(o => o.ExpectedDateValue?.Year == _year);
-            if (_monthFilter is >= 1 and <= 12) q = q.Where(o => o.ExpectedDateValue?.Month == _monthFilter);
+            if (_cats.Count > 0) q = q.Where(o => _cats.Contains(ForecastCategories.Label(o.Category)));
+            if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KamName(o)));
+            if (_markets.Count > 0) q = q.Where(o => _markets.Contains(Cat.MarketName(o.MarketId)));
+            if (_risks.Count > 0) q = q.Where(o => _risks.Contains(RiskLevels.Label(ForecastCalc.Level(o, _today))));
+            if (_years.Count > 0) q = q.Where(o => _years.Contains((o.ExpectedDateValue?.Year ?? 0).ToString()));
+            if (_months.Count > 0) q = q.Where(o => o.ExpectedDateValue is { } d && _months.Contains(Fmt.MonthLong(d.Month)));
             if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
             if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
             if (!string.IsNullOrWhiteSpace(_search))
