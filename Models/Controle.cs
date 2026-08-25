@@ -59,12 +59,25 @@ public class ControleRegistro
     public string ValorLiquido { get; set; } = "";   // R$
     public string Semana { get; set; } = "";
     public string Mes { get; set; } = "";
-    public string Poc { get; set; } = "";
+    public string Poc { get; set; } = "";            // "Sim" / "Não"
+    public string Moeda { get; set; } = "BRL";       // moeda de origem da oferta
+    public string ValorOriginal { get; set; } = "";  // valor na moeda de origem
+    public string Observacao { get; set; } = "";     // observação livre
+    public string Atencao { get; set; } = "";        // nota de ATENÇÃO p/ o Controle
     public string UpdatedBy { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
 
     public double ValorLiquidoV =>
         double.TryParse(ValorLiquido, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+
+    public double ValorOriginalV =>
+        double.TryParse(ValorOriginal, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+
+    /// <summary>Semana (número) do registro; 0 quando não informada.</summary>
+    public int SemanaV => int.TryParse(Semana, out var v) ? v : 0;
+
+    /// <summary>Tem nota de atenção pendente para o Controle?</summary>
+    public bool TemAtencao => !string.IsNullOrWhiteSpace(Atencao);
 }
 
 // Taxa de conversão de moeda usada na importação do Aftermarket.

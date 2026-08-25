@@ -275,7 +275,14 @@
 {
     <div class="g12" style="margin-top:16px">
         <div class="c12"><div class="xcard ind-card">
-            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indTotal)</b></span></div>
+            <div class="xcard-head">
+                <span class="xcard-ico ind-ico">@Icons.Svg("flag")</span>
+                <div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div>
+                <span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indTotal)</b></span>
+                <button class="btn-ghost" style="padding:4px 10px;margin-left:12px" title="Exportar só as oportunidades indicadas (.xlsx)" @onclick="ExportarIndicadas">
+                    @Icons.Svg("download")Exportar
+                </button>
+            </div>
             <OpportunityTable Rows="_indicadas" CssClass="tbl-compact" Style="max-height:380px;overflow:auto"
                               EmptyText="Nenhuma oportunidade indicada no recorte." OnChanged="ReloadOpps" />
         </div></div>
@@ -980,6 +987,70 @@
     // Recarrega as oportunidades após editar/duplicar/excluir na tabela.
     // Build() é chamado no topo do render e recomputa Top 10 e listagem.
     private void ReloadOpps() => _opps = LoadScoped();
+
+    // Exporta SÓ as oportunidades indicadas do recorte atual (.xlsx).
+    private async Task ExportarIndicadas()
+    {
+        if (_indicadas.Count == 0) return;
+        var bytes = await Task.Run(() =>
+        {
+            using var wb = new ClosedXML.Excel.XLWorkbook();
+            var ws = wb.Worksheets.Add("Indicadas");
+            string[] head =
+            {
+                "Setor", "Quarter", "Data", "País", "Market Variável", "Market", "Product",
+                "Tipo de Equipamento", "Key Account", "Customer", "Proposta", "Net Value (R$)",
+                "PM %", "% de Ganho", "% de Sair no Mês", "Chance Conversão (R$)", "NB/AFM",
+                "Unidade de Venda", "PV", "Valor USD", "OTP", "TOP 10", "KYC",
+            };
+            for (var i = 0; i < head.Length; i++) ws.Cell(1, i + 1).Value = head[i];
+            ws.Row(1).Style.Font.Bold = true;
+
+            var r = 2;
+            foreach (var o in _indicadas)
+            {
+                var d = o.ExpectedDateValue;
+                var c = 1;
+                ws.Cell(r, c++).Value = o.Setor;
+                ws.Cell(r, c++).Value = d is { } dq ? $"Q{Fmt.QuarterOf(dq.Month)} {dq.Year}" : "";
+                ws.Cell(r, c++).Value = d is { } dd ? dd.ToString("dd/MM/yyyy") : "";
+                ws.Cell(r, c++).Value = Cat.CountryName(o.CountryId);
+                ws.Cell(r, c++).Value = Cat.SubMarketName(o.SubMarketId);
+                ws.Cell(r, c++).Value = Cat.MarketName(o.MarketId);
+                ws.Cell(r, c++).Value = Cat.ProductName(o.ProductId);
+                ws.Cell(r, c++).Value = Cat.EquipmentName(o.EquipmentTypeId);
+                ws.Cell(r, c++).Value = Cat.KamName(o.KamId);
+                ws.Cell(r, c++).Value = Cat.CustomerName(o.CustomerId);
+                ws.Cell(r, c++).Value = o.ProposalNumber;
+                ws.Cell(r, c++).Value = o.AmountBrl;
+                ws.Cell(r, c++).Value = o.GmPercentValue;
+                ws.Cell(r, c++).Value = o.WinProbabilityValue;
+                ws.Cell(r, c++).Value = o.CloseProbabilityValue;
+                ws.Cell(r, c++).Value = ForecastCalc.ConversionBrl(o);
+                ws.Cell(r, c++).Value = o.CommercialCategory;
+                ws.Cell(r, c++).Value = Cat.BuCode(o.PvBusinessUnitId);
+                ws.Cell(r, c++).Value = o.PvNumber;
+                ws.Cell(r, c++).Value = o.AmountUsd;
+                ws.Cell(r, c++).Value = o.Otp;
+                ws.Cell(r, c++).Value = o.Top10;
+                ws.Cell(r, c++).Value = o.Kyc;
+                r++;
+            }
+            ws.Columns().AdjustToContents();
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return ms.ToArray();
+        });
+
+        var nome = $"oportunidades_indicadas_{_today:yyyy-MM-dd}.xlsx";
+        try
+        {
+            await JS.InvokeVoidAsync("appDownload", nome,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                Convert.ToBase64String(bytes));
+        }
+        catch { /* download indisponível: ignora */ }
+    }
 
     // Opções dos filtros vindas dos DADOS reais (não do catálogo demo): valores
     // distintos presentes nas oportunidades, exibidos pelo nome do catálogo

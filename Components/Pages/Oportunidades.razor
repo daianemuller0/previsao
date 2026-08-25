@@ -190,10 +190,18 @@
             <label class="fld">Mercado<input class="field" @bind="_sellReg.Mercado" /></label>
             <label class="fld">Vendedor (KAM)<input class="field" @bind="_sellReg.Kam" /></label>
             <label class="fld">Valor Líquido (R$)<input class="field num" @bind="_sellReg.ValorLiquido" /></label>
-            <label class="fld">POC<input class="field" @bind="_sellReg.Poc" /></label>
+            <label class="fld">POC
+                <select class="field" @bind="_sellReg.Poc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+            </label>
+            <label class="fld">Moeda de origem<input class="field" @bind="_sellReg.Moeda" /></label>
+            <label class="fld">Valor na moeda de origem<input class="field num" @bind="_sellReg.ValorOriginal" /></label>
             <label class="fld">Semana<input class="field num" @bind="_sellReg.Semana" /></label>
             <label class="fld">Mês
                 <select class="field" @bind="_sellReg.Mes"><option value="">—</option>@for (var m = 1; m <= 12; m++){<option value="@Fmt.MonthLong(m)">@Fmt.MonthLong(m)</option>}</select>
+            </label>
+            <label class="fld full">Observação<textarea class="field" rows="2" @bind="_sellReg.Observacao"></textarea></label>
+            <label class="fld full">Nota de atenção <span class="hint">se preenchida, a oferta fica destacada para o Controle</span>
+                <textarea class="field" rows="2" @bind="_sellReg.Atencao" placeholder="Ex.: pendência documental, aguardando aprovação…"></textarea>
             </label>
         </div>
         @if (!string.IsNullOrEmpty(_sellErr)) { <div class="confirm-err">@_sellErr</div> }
@@ -857,7 +865,10 @@
             ValorLiquido = o.AmountBrl.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
             Semana = d is { } dd ? System.Globalization.ISOWeek.GetWeekOfYear(dd).ToString() : "",
             Mes = d is { } dm ? Fmt.MonthLong(dm.Month) : "",
-            Poc = Fmt.Pct(o.WinProbabilityValue),
+            Poc = "",
+            Moeda = string.IsNullOrWhiteSpace(o.CurrencyCode) ? "BRL" : o.CurrencyCode,
+            ValorOriginal = o.AmountOriginalValue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+            Observacao = o.Notes ?? "",
         };
     }
 
