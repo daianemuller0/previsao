@@ -124,10 +124,47 @@ else
         </div>
     </div>
 
+    @* ---- Vendas por semana (a partir das ofertas/pedidos registrados) ---- *@
+    <div class="panel" style="margin-top:16px">
+        <div class="panel-head">
+            <div class="panel-title">Vendas por semana <span class="hint">total das ofertas registradas em cada semana · @Sym</span></div>
+            <div class="flt" style="border:1px solid var(--border);border-radius:999px;padding:5px 12px">
+                <span class="flt-label">Mês</span>
+                <select @bind="_regMes"><option value="0">Todos</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
+            </div>
+        </div>
+        @if (_semanas.Count == 0)
+        {
+            <div class="empty">Nenhuma oferta registrada com semana informada@(_regMes > 0 ? " em " + Fmt.MonthLong(_regMes) : "").</div>
+        }
+        else
+        {
+            <div class="table-wrap rep-wrap">
+                <table class="grid-tbl rep-tbl">
+                    <thead>
+                        <tr><th>Semana</th>@foreach (var s in _semanas){<th class="right">S@(s.Semana)</th>}<th class="right">Total</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="rname">Vendas (Valor Líquido)</td>
+                            @foreach (var s in _semanas){<td class="right">@Num(s.Total)</td>}
+                            <td class="right strong">@Num(_semanas.Sum(x => x.Total))</td>
+                        </tr>
+                        <tr>
+                            <td class="rname">Ofertas</td>
+                            @foreach (var s in _semanas){<td class="right">@s.Qtd</td>}
+                            <td class="right strong">@_semanas.Sum(x => x.Qtd)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
     @* ---- Ofertas / Pedidos (tabela livre com CRUD + importação) ---- *@
     <div class="panel" style="margin-top:16px">
         <div class="panel-head">
-            <div class="panel-title">Ofertas e pedidos <span class="hint">@_regFiltered.Count registro(s)@(_regValor > 0 ? $" · {Brl(_regValor)}" : "")</span></div>
+            <div class="panel-title">Ofertas e pedidos <span class="hint">@_regFiltered.Count registro(s)@(_regValor > 0 ? $" · {Brl(_regValor)}" : "")@(_regAtencao > 0 ? $" · {_regAtencao} com atenção" : "")</span></div>
             <div style="display:flex;gap:8px;align-items:center">
                 <input class="ta-search" placeholder="Buscar oferta, cliente, KAM…" @bind="_regSearch" @bind:event="oninput" />
                 <button class="btn-ghost sm" @onclick="() => _showRegImport = true">@Icons.Svg("import")Importar</button>
@@ -139,28 +176,36 @@ else
                 <thead>
                     <tr>
                         <th class="center" style="width:70px"></th>
+                        <th class="center" style="width:34px" title="Nota de atenção">!</th>
                         <th>Oferta</th><th>Pedido</th><th>Cliente</th><th>Mercado</th><th>KAM</th>
-                        <th class="right">Valor Líquido</th><th class="center">Semana</th><th class="center">Mês</th><th class="center">POC</th>
+                        <th class="right">Valor Líquido</th><th class="center">Moeda</th><th class="right">Valor origem</th>
+                        <th class="center">Semana</th><th class="center">Mês</th><th class="center">POC</th><th>Observação</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var g in _regFiltered)
                     {
                         var gid = g.Id;
-                        <tr>
+                        <tr class="@(g.TemAtencao ? "reg-atencao" : "")">
                             <td class="center actions-col">
                                 <button class="row-act" title="Editar" @onclick="() => EditReg(g)">@Icons.Svg("edit")</button>
                                 <button class="row-act del" title="Excluir" @onclick="() => _regDel = g">@Icons.Svg("trash")</button>
                             </td>
+                            <td class="center">
+                                @if (g.TemAtencao) { <span class="reg-alert" title="@g.Atencao">@Icons.Svg("alert")</span> }
+                            </td>
                             <td class="col-strong">@Dash(g.Oferta)</td><td>@Dash(g.Pedido)</td><td>@Dash(g.Cliente)</td>
                             <td>@Dash(g.Mercado)</td><td>@Dash(g.Kam)</td>
                             <td class="right num">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td>
+                            <td class="center">@Dash(g.Moeda)</td>
+                            <td class="right num">@(g.ValorOriginalV != 0 ? g.ValorOriginalV.ToString("#,##0.##", Pt) : "—")</td>
                             <td class="center">@Dash(g.Semana)</td>
                             <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td>
-                            <td class="center">@Dash(g.Poc)</td>
+                            <td class="center">@Mark(g.Poc)</td>
+                            <td title="@g.Observacao">@Dash(g.Observacao)</td>
                         </tr>
                     }
-                    @if (_regFiltered.Count == 0){<tr><td colspan="10" class="empty">Nenhum registro. Use "Adicionar" ou "Importar".</td></tr>}
+                    @if (_regFiltered.Count == 0){<tr><td colspan="14" class="empty">Nenhum registro. Use "Adicionar" ou "Importar".</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -180,10 +225,20 @@ else
             <label class="fld">Mercado<input class="field" list="dl-market" @bind="_regEdit.Mercado" /></label>
             <label class="fld">KAM<input class="field" list="dl-key_account" @bind="_regEdit.Kam" /></label>
             <label class="fld">Valor Líquido (R$)<input class="field num" @bind="_regEdit.ValorLiquido" /></label>
-            <label class="fld">POC<input class="field" @bind="_regEdit.Poc" /></label>
+            <label class="fld">POC
+                <select class="field" @bind="_regEdit.Poc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+            </label>
+            <label class="fld">Moeda de origem
+                <select class="field" @bind="_regEdit.Moeda">@foreach (var c in MoedaOptions){<option value="@c">@c</option>}</select>
+            </label>
+            <label class="fld">Valor na moeda de origem<input class="field num" @bind="_regEdit.ValorOriginal" /></label>
             <label class="fld">Semana<input class="field num" @bind="_regEdit.Semana" /></label>
             <label class="fld">Mês
                 <select class="field" @bind="_regEdit.Mes"><option value="">—</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
+            </label>
+            <label class="fld full">Observação<textarea class="field" rows="2" @bind="_regEdit.Observacao" placeholder="Anotações do registro…"></textarea></label>
+            <label class="fld full">@Icons.Svg("alert") Nota de atenção <span class="hint">se preenchida, a linha fica destacada para o Controle</span>
+                <textarea class="field" rows="2" @bind="_regEdit.Atencao" placeholder="Ex.: aguardando aprovação de crédito, pendência documental…"></textarea>
             </label>
         </div>
         <div class="modal-actions">
@@ -263,7 +318,19 @@ else
 
     private List<ControleRegistro> _regFiltered = new();
     private double _regValor;
+    private int _regAtencao;                 // registros com nota de atenção
+    private int _regMes;                     // 0 = todos os meses (painel semanal)
+    private record SemanaRow(int Semana, double Total, int Qtd);
+    private List<SemanaRow> _semanas = new();
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s!;
+    private static MarkupString Mark(string? s) =>
+        string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase) ? new("<span class='mk yes'>Sim</span>")
+        : (string.Equals(s, "Não", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "Nao", StringComparison.OrdinalIgnoreCase))
+            ? new MarkupString("<span class='mk no'>Não</span>") : new MarkupString("—");
+    // Moedas disponíveis para o valor de origem (as cadastradas + BRL).
+    // Carregada uma vez (Reload) — ler a cada render custaria um acesso à rede.
+    private List<string> _moedas = new() { "BRL" };
+    private IEnumerable<string> MoedaOptions => _moedas;
 
     protected override async Task OnInitializedAsync()
     {
@@ -279,6 +346,10 @@ else
         _updated = last?.ToString("dd/MM/yyyy HH:mm") ?? "—";
         _updatedBy = _entries.OrderByDescending(e => e.UpdatedAtValue).FirstOrDefault()?.UpdatedBy ?? "—";
         _registros = Repo.Registros();
+        _moedas = new[] { "BRL" }.Concat(Repo.CurrencyRates().Select(m => m.Code))
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList();
         _pending.Clear();
         _loading = false;
     }
@@ -295,8 +366,31 @@ else
             var s = _regSearch.Trim().ToLowerInvariant();
             q = q.Where(g => (g.Oferta + g.Pedido + g.Cliente + g.Mercado + g.Kam + g.Poc).ToLowerInvariant().Contains(s));
         }
-        _regFiltered = q.OrderByDescending(g => g.ValorLiquidoV).ToList();
+        // Linhas com nota de atenção primeiro — o Controle vê logo o que precisa de ação.
+        _regFiltered = q.OrderByDescending(g => g.TemAtencao).ThenByDescending(g => g.ValorLiquidoV).ToList();
         _regValor = _regFiltered.Sum(g => g.ValorLiquidoV);
+        _regAtencao = _regFiltered.Count(g => g.TemAtencao);
+
+        // Vendas por semana: soma o valor líquido das ofertas de cada semana.
+        _semanas = _registros
+            .Where(g => g.SemanaV > 0)
+            .Where(g => _regMes == 0 || MesNum(g.Mes) == _regMes)
+            .GroupBy(g => g.SemanaV)
+            .Select(g => new SemanaRow(g.Key, g.Sum(x => x.ValorLiquidoV), g.Count()))
+            .OrderBy(x => x.Semana)
+            .ToList();
+    }
+
+    // Mês do registro: aceita número ("10") ou nome ("Outubro").
+    private static int MesNum(string? mes)
+    {
+        var s = (mes ?? "").Trim();
+        if (s == "") return 0;
+        if (int.TryParse(s, out var n) && n is >= 1 and <= 12) return n;
+        for (var m = 1; m <= 12; m++)
+            if (string.Equals(Fmt.MonthLong(m), s, StringComparison.OrdinalIgnoreCase)
+             || string.Equals(Fmt.MonthName(m), s, StringComparison.OrdinalIgnoreCase)) return m;
+        return 0;
     }
 
     private void NewReg() { _regEdit = new ControleRegistro(); _regIsNew = true; }

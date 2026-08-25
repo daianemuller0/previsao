@@ -204,14 +204,17 @@ public class ControleRepository
 
     // ---- registros de ofertas/pedidos (tabela livre) -----------------------
     private const string EntReg = "controle_registros";
-    private const string RegCols = "id, oferta, pedido, cliente, mercado, kam, valor_liquido, semana, mes, poc, updated_by, updated_at";
+    private const string RegCols = "id, oferta, pedido, cliente, mercado, kam, valor_liquido, semana, mes, poc, " +
+        "moeda, valor_original, observacao, atencao, updated_by, updated_at";
 
     public List<ControleRegistro> Registros() =>
         _store.ReadLatest(EntReg, RegCols, r => new ControleRegistro
         {
             Id = S(r, 0), Oferta = S(r, 1), Pedido = S(r, 2), Cliente = S(r, 3), Mercado = S(r, 4),
             Kam = S(r, 5), ValorLiquido = S(r, 6), Semana = S(r, 7), Mes = S(r, 8), Poc = S(r, 9),
-            UpdatedBy = S(r, 10), UpdatedAt = S(r, 11),
+            Moeda = string.IsNullOrWhiteSpace(S(r, 10)) ? "BRL" : S(r, 10),
+            ValorOriginal = S(r, 11), Observacao = S(r, 12), Atencao = S(r, 13),
+            UpdatedBy = S(r, 14), UpdatedAt = S(r, 15),
         });
 
     private static KeyValuePair<string, object?>[] RowReg(ControleRegistro g) => new KeyValuePair<string, object?>[]
@@ -219,6 +222,8 @@ public class ControleRepository
         new("id", g.Id), new("oferta", g.Oferta), new("pedido", g.Pedido), new("cliente", g.Cliente),
         new("mercado", g.Mercado), new("kam", g.Kam), new("valor_liquido", g.ValorLiquido),
         new("semana", g.Semana), new("mes", g.Mes), new("poc", g.Poc),
+        new("moeda", g.Moeda), new("valor_original", g.ValorOriginal),
+        new("observacao", g.Observacao), new("atencao", g.Atencao),
         new("updated_by", g.UpdatedBy), new("updated_at", g.UpdatedAt),
     };
 
