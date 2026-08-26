@@ -58,6 +58,11 @@ public sealed class DataSyncService
     // pessoa a abrir depois de uma nova exportação paga o custo.
     private const string EntSync = "sync_state";
 
+    // Entra na marca: quando o mapeamento das planilhas muda (uma coluna nova
+    // passa a ser lida), a versão sobe e todo mundo reimporta na próxima abertura,
+    // mesmo que a planilha da rede continue exatamente a mesma.
+    private const string ImportVersion = "v2";
+
     private string? MarcaGravada(string prefix)
     {
         try
@@ -88,7 +93,7 @@ public sealed class DataSyncService
         try
         {
             var fi = new FileInfo(file);
-            return $"{fi.Name}|{fi.LastWriteTimeUtc.Ticks}|{fi.Length}";
+            return $"{ImportVersion}|{fi.Name}|{fi.LastWriteTimeUtc.Ticks}|{fi.Length}";
         }
         catch { return ""; }
     }
