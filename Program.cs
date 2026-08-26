@@ -85,18 +85,29 @@ builder.Services.AddSingleton<DataSyncService>();
 
 var app = builder.Build();
 
+// Cronômetro da subida: cada etapa que toca a pasta de rede imprime quanto
+// levou. Quando alguém reclamar de demora para abrir, o console diz onde o
+// tempo foi — em vez de adivinharmos.
+var _t0 = System.Diagnostics.Stopwatch.StartNew();
+void Etapa(string nome, Action acao)
+{
+    var t = System.Diagnostics.Stopwatch.StartNew();
+    try { acao(); }
+    finally { Console.WriteLine($"[subida] {nome}: {t.ElapsedMilliseconds} ms (total {_t0.ElapsedMilliseconds} ms)"); }
+}
+
 // Semente dos dados demonstrativos na primeira execução (pasta vazia).
 using (var scope = app.Services.CreateScope())
 {
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
-    DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>());
-    scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty();
+    Console.WriteLine($"[subida] pasta de dados: {store.Folder}");
+    Etapa("catálogo", () => DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>()));
+    Etapa("listas", () => scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty());
     var controleRepo = scope.ServiceProvider.GetRequiredService<ControleRepository>();
-    controleRepo.SeedIfEmpty();
-    controleRepo.SeedRegistrosIfEmpty();
-    scope.ServiceProvider.GetRequiredService<ChartConfigRepository>().SeedIfEmpty();
+    Etapa("controle", () => { controleRepo.SeedIfEmpty(); controleRepo.SeedRegistrosIfEmpty(); });
+    Etapa("gráficos", () => scope.ServiceProvider.GetRequiredService<ChartConfigRepository>().SeedIfEmpty());
     // Contas de acesso: semeia os logins dos vendedores na primeira execução.
-    scope.ServiceProvider.GetRequiredService<UserRepository>().SeedIfEmpty();
+    Etapa("usuários", () => scope.ServiceProvider.GetRequiredService<UserRepository>().SeedIfEmpty());
 }
 
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida
@@ -106,8 +117,8 @@ _ = Task.Run(() =>
     try
     {
         var oppRepo = app.Services.GetRequiredService<OpportunityRepository>();
-        oppRepo.RemoveDemo();                 // remove oportunidades demo antigas
-        oppRepo.Refresh();
+        Etapa("limpeza demo", () => oppRepo.RemoveDemo());   // remove oportunidades demo antigas
+        Etapa("leitura da base", () => oppRepo.Refresh());
         // A compactação NÃO roda aqui: reescrever a base inteira na rede a cada
         // abertura é caro. O CompactionService cuida disso em segundo plano,
         // só quando há arquivos demais.
@@ -115,7 +126,10 @@ _ = Task.Run(() =>
         // Atualiza as bases (New Business + Aftermarket) a partir das planilhas do
         // CRM na rede. Os vendedores atualizam o CRM e a exportação cai nesses
         // caminhos; a cada abertura do programa reimportamos o estado mais recente.
-        app.Services.GetRequiredService<DataSyncService>().SyncAll();
+        var sync = app.Services.GetRequiredService<DataSyncService>();
+        Etapa("sincronização das planilhas", () => sync.SyncAll());
+        Console.WriteLine($"[subida] {sync.LastNb.Message}");
+        Console.WriteLine($"[subida] {sync.LastAfm.Message}");
     }
     catch { /* pasta indisponível ou lenta: o app segue no ar */ }
 });
