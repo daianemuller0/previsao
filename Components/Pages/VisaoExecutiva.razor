@@ -36,6 +36,7 @@
 
 @* ---- Filtros globais ---- *@
 <div class="filterbar filterbar-sticky">
+    <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" @bind="_search" @bind:event="oninput" /></div>
     <MultiFilter Label="Ano" AllText="Todos" Options="YearOptions.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
     <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
     <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
@@ -671,6 +672,7 @@
     private int _monthFilter => _months.Count == 1 ? MonthNum(_months.First()) : 0;
     private int _yearFilter => _years.Count == 1 && int.TryParse(_years.First(), out var y) ? y : 0;
     private bool _onlyIndicated;           // mostrar só as oportunidades indicadas na previsão
+    private string _search = "";           // busca livre: oportunidade, cliente, proposta
     private IEnumerable<int> YearOptions => _opps.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
     private static IEnumerable<string> MonthOptions => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private static readonly string[] SetorOptions = { "New Business", "Aftermarket" };
@@ -1099,6 +1101,11 @@
         if (_submarket != "") q = q.Where(o => Eq(KeySubMarket(o), _submarket));
         if (_years.Count > 0) q = q.Where(o => _years.Contains((o.ExpectedDateValue?.Year ?? 0).ToString()));
         if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            var b = _search.Trim().ToLowerInvariant();
+            q = q.Where(o => (o.Name + o.ProposalNumber + Cat.CustomerName(o.CustomerId)).ToLowerInvariant().Contains(b));
+        }
         if (SelectedMonths is { Count: > 0 } ms) q = q.Where(o => o.ExpectedDateValue is { } d && ms.Contains(d.Month));
         if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
         if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
@@ -1113,6 +1120,7 @@
         foreach (var s in AllSets) s.Clear();
         _dateFrom = _dateTo = null;
         _onlyIndicated = false;
+        _search = "";
         _valMin = _valMax = null; _valMetric = "total";
     }
     private void SaveView() { _savedMsg = true; }
@@ -1126,6 +1134,7 @@
         _activeFilters = new[] { _commercial, _stage, _segment, _submarket }.Count(s => s != "")
             + AllSets.Count(s => s.Count > 0)
             + (_onlyIndicated ? 1 : 0)
+            + (_search != "" ? 1 : 0)
             + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
 
