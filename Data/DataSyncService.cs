@@ -22,11 +22,13 @@ public sealed class DataSyncService
     private readonly Catalog _cat;
     private readonly OpportunityRepository _repo;
     private readonly ControleRepository _controle;
+    private readonly ParquetStore _store;
     private readonly object _lock = new();
 
-    public DataSyncService(IConfiguration cfg, Catalog cat, OpportunityRepository repo, ControleRepository controle)
+    public DataSyncService(IConfiguration cfg, Catalog cat, OpportunityRepository repo,
+        ControleRepository controle, ParquetStore store)
     {
-        _cfg = cfg; _cat = cat; _repo = repo; _controle = controle;
+        _cfg = cfg; _cat = cat; _repo = repo; _controle = controle; _store = store;
     }
 
     public bool NbEnabled => _cfg.GetValue("Nb:Enabled", true);
@@ -44,14 +46,57 @@ public sealed class DataSyncService
     private Profile NbProfile => new("New Business", NbEnabled, NbPath, OpportunityImporter.Source.Nb, "imp-", false);
     private Profile AfmProfile => new("Aftermarket", AfmEnabled, AfmPath, OpportunityImporter.Source.Afm, "afm-", true);
 
-    public void SyncAll() { SyncNb(); SyncAfm(); }
-    public DataSyncStatus SyncNb() { var s = Run(NbProfile); LastNb = s; return s; }
-    public DataSyncStatus SyncAfm() { var s = Run(AfmProfile); LastAfm = s; return s; }
+    /// <summary>Sincroniza na subida do app: pula a origem cuja planilha não mudou.</summary>
+    public void SyncAll() { LastNb = Run(NbProfile, force: false); LastAfm = Run(AfmProfile, force: false); }
+    /// <summary>Sincronização manual (botão em Configurações): sempre reimporta.</summary>
+    public DataSyncStatus SyncNb() { var s = Run(NbProfile, force: true); LastNb = s; return s; }
+    public DataSyncStatus SyncAfm() { var s = Run(AfmProfile, force: true); LastAfm = s; return s; }
+
+    // ---- marca da última importação (compartilhada entre as máquinas) --------
+    // Guarda "arquivo|data de modificação|tamanho" por origem. Enquanto a planilha
+    // exportada pelo CRM não mudar, ninguém precisa reimportar — só a primeira
+    // pessoa a abrir depois de uma nova exportação paga o custo.
+    private const string EntSync = "sync_state";
+
+    private string? MarcaGravada(string prefix)
+    {
+        try
+        {
+            return _store.ReadLatest(EntSync, "id, stamp", r => new
+            {
+                Id = r.IsDBNull(0) ? "" : r.GetString(0),
+                Stamp = r.IsDBNull(1) ? "" : r.GetString(1),
+            }).FirstOrDefault(x => x.Id == prefix)?.Stamp;
+        }
+        catch { return null; }
+    }
+
+    private void GravarMarca(string prefix, string stamp)
+    {
+        try
+        {
+            _store.WriteRow(EntSync, new KeyValuePair<string, object?>[]
+            {
+                new("id", prefix), new("stamp", stamp),
+            });
+        }
+        catch { /* não impede a sincronização */ }
+    }
+
+    private static string MarcaDoArquivo(string file)
+    {
+        try
+        {
+            var fi = new FileInfo(file);
+            return $"{fi.Name}|{fi.LastWriteTimeUtc.Ticks}|{fi.Length}";
+        }
+        catch { return ""; }
+    }
 
     // Lê a planilha da rede e espelha as oportunidades da origem. Nunca lança:
     // qualquer problema vira mensagem no status (a rede pode estar lenta/indisponível
     // e o app precisa seguir no ar).
-    private DataSyncStatus Run(Profile p)
+    private DataSyncStatus Run(Profile p, bool force)
     {
         lock (_lock)
         {
@@ -75,6 +120,18 @@ public sealed class DataSyncService
                     return Finish(st);
                 }
                 st.File = file;
+
+                // Planilha inalterada desde a última importação: não há o que fazer.
+                // (Só pula se a base realmente tiver os dados dessa origem — assim,
+                //  se alguém apagar a base, a reimportação acontece mesmo assim.)
+                var marca = MarcaDoArquivo(file);
+                var temDados = _repo.All().Any(o => o.Id.StartsWith(p.Prefix, StringComparison.Ordinal));
+                if (!force && temDados && marca != "" && marca == MarcaGravada(p.Prefix))
+                {
+                    st.Ok = true;
+                    st.Message = $"{p.Label} já está atualizado (planilha sem alterações desde a última importação).";
+                    return Finish(st);
+                }
 
                 // Copia para memória permitindo leitura mesmo com o CRM gravando.
                 byte[] bytes;
@@ -131,6 +188,8 @@ public sealed class DataSyncService
                         if (!newIds.Contains(id)) _repo.Delete(id);
                     _repo.Refresh();
                 }
+
+                if (result.Rows.Count > 0 && marca != "") GravarMarca(p.Prefix, marca);
 
                 st.Rows = result.Rows.Count;
                 st.Warnings = result.Warnings.Count;

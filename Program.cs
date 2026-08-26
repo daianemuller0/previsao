@@ -103,11 +103,12 @@ _ = Task.Run(() =>
 {
     try
     {
-        var store = app.Services.GetRequiredService<ParquetStore>();
         var oppRepo = app.Services.GetRequiredService<OpportunityRepository>();
         oppRepo.RemoveDemo();                 // remove oportunidades demo antigas
-        store.Compact("opportunities");        // consolida e descarta os tombstones
         oppRepo.Refresh();
+        // A compactação NÃO roda aqui: reescrever a base inteira na rede a cada
+        // abertura é caro. O CompactionService cuida disso em segundo plano,
+        // só quando há arquivos demais.
 
         // Atualiza as bases (New Business + Aftermarket) a partir das planilhas do
         // CRM na rede. Os vendedores atualizam o CRM e a exportação cai nesses
