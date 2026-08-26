@@ -10,6 +10,10 @@ namespace HowdenSalesForecast.Data;
 public class CompactionService : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(30);
+    // Espera antes da primeira passada: compactar é reescrever a entidade inteira
+    // na rede. Fazer isso junto com a leitura da base e a importação das planilhas
+    // disputa a mesma rede e atrasa justamente a abertura do programa.
+    private static readonly TimeSpan Warmup = TimeSpan.FromMinutes(3);
     private const int Threshold = 25; // compacta quando ultrapassar este nº de arquivos
 
     private readonly ParquetStore _store;
@@ -23,6 +27,9 @@ public class CompactionService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        try { await Task.Delay(Warmup, stoppingToken); }
+        catch (TaskCanceledException) { return; }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             foreach (var entity in _store.Entities())
