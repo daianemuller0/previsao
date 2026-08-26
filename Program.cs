@@ -70,6 +70,8 @@ builder.Services.AddSingleton<FollowUpRepository>();
 builder.Services.AddSingleton<ContactLookupService>();
 // Contas de acesso (login/senha + carteira permitida por vendedor).
 builder.Services.AddSingleton<UserRepository>();
+// Preferência de colunas da tabela de oportunidades, por usuário.
+builder.Services.AddSingleton<ColumnPrefsRepository>();
 // Abertura de rascunhos no Outlook (automação COM) para o follow-up em massa.
 builder.Services.AddSingleton<OutlookMailService>();
 // Gráficos personalizados do estúdio da Visão Executiva.

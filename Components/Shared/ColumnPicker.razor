@@ -1,0 +1,69 @@
+@* Painel de colunas: cada usuário decide a ordem e o que fica visível na tabela
+   de oportunidades. Trabalha sobre uma cópia — só ao "Aplicar" a preferência é
+   devolvida ao componente pai (que grava por login). *@
+
+<div class="drawer-backdrop" @onclick="Fechar"></div>
+<div class="cols-panel">
+    <div class="page-head">
+        <div>
+            <h2 style="color:var(--primary)">Colunas da tabela</h2>
+            <p class="subtitle">Marque o que aparece e use as setas para reordenar. Vale só para você.</p>
+        </div>
+        <button class="icon-btn" @onclick="Fechar">@Icons.Svg("x")</button>
+    </div>
+
+    <div class="cols-list">
+        @for (var i = 0; i < _work.Count; i++)
+        {
+            var idx = i;
+            var c = _work[idx];
+            <div class="cols-item @(c.Visible ? "" : "off")">
+                <label class="cols-chk">
+                    <input type="checkbox" checked="@c.Visible" @onchange="e => Alternar(idx, e)" />
+                    <span>@c.Def.Label</span>
+                </label>
+                <div class="cols-move">
+                    <button class="row-act" title="Subir" disabled="@(idx == 0)" @onclick="() => Mover(idx, -1)">@Icons.Svg("up")</button>
+                    <button class="row-act" title="Descer" disabled="@(idx == _work.Count - 1)" @onclick="() => Mover(idx, 1)">@Icons.Svg("down")</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="modal-actions">
+        <button class="btn-ghost" @onclick="Padrao">@Icons.Svg("history")Restaurar padrão</button>
+        <div class="filterbar-spacer"></div>
+        <button class="btn-ghost" @onclick="Fechar">Cancelar</button>
+        <button class="btn-primary" @onclick="Aplicar">@Icons.Svg("check")Aplicar</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<OpportunityColumns.ColState> Cols { get; set; } = new();
+    [Parameter] public EventCallback<List<OpportunityColumns.ColState>> OnApply { get; set; }
+    [Parameter] public EventCallback OnReset { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private List<OpportunityColumns.ColState> _work = new();
+
+    // O painel é criado ao abrir e destruído ao fechar: copia uma vez só,
+    // para não perder os ajustes em andamento se o pai re-renderizar.
+    protected override void OnInitialized() => _work = Cols.ToList();
+
+    private void Alternar(int i, ChangeEventArgs e)
+    {
+        var on = e.Value is bool b && b;
+        _work[i] = _work[i] with { Visible = on };
+    }
+
+    private void Mover(int i, int delta)
+    {
+        var j = i + delta;
+        if (j < 0 || j >= _work.Count) return;
+        (_work[i], _work[j]) = (_work[j], _work[i]);
+    }
+
+    private Task Aplicar() => OnApply.InvokeAsync(_work);
+    private Task Padrao() => OnReset.InvokeAsync();
+    private Task Fechar() => OnClose.InvokeAsync();
+}
