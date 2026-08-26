@@ -11,10 +11,29 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Porta padrão (modo por-usuário). Para "servidor central", rode com:
 //   "Howden Sales Forecast.exe" --urls http://0.0.0.0:5080
+// Se a 5080 já estiver ocupada (o programa aberto noutra janela, por exemplo),
+// usa a próxima porta livre em vez de encerrar com erro de bind do Kestrel.
 if (string.IsNullOrEmpty(builder.Configuration["urls"]) &&
     string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
 {
-    builder.WebHost.UseUrls("http://localhost:5080");
+    builder.WebHost.UseUrls($"http://localhost:{PortaLivre(5080)}");
+}
+
+// Primeira porta livre a partir de "inicial" (tenta 20; 0 = o SO escolhe).
+static int PortaLivre(int inicial)
+{
+    for (var p = inicial; p < inicial + 20; p++)
+    {
+        try
+        {
+            var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, p);
+            l.Start();
+            l.Stop();
+            return p;
+        }
+        catch (System.Net.Sockets.SocketException) { /* ocupada: tenta a próxima */ }
+    }
+    return 0;
 }
 
 // --- Blazor Server (componentes interativos no servidor) ---
