@@ -51,7 +51,12 @@ builder.Services.AddRazorComponents()
 // encerra o processo quando a última aba some — num servidor central isso
 // derrubaria o serviço para todos, então lá fica desligado.
 if (modoPessoal)
+{
     builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, DesligaAoFechar>();
+    // Se o navegador nem chegar a abrir, ninguém se conecta: o programa desiste
+    // em vez de ficar de pé para sempre, invisível.
+    builder.Services.AddHostedService<EncerraSemNinguem>();
+}
 
 // --- Autenticação por cookie (sessão no navegador do usuário) ---
 builder.Services.AddCascadingAuthenticationState();
