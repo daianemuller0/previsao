@@ -177,16 +177,12 @@ public sealed class DataSyncService
                         .Where(o => o.Id.StartsWith(p.Prefix, StringComparison.Ordinal))
                         .ToDictionary(o => o.Id, StringComparer.Ordinal);
 
-                    // Preserva marcações feitas no app (não vêm da planilha) para não
-                    // se perderem ao re-sincronizar: flag "Indicar na Previsão" e a
-                    // marcação de "venda indicada" (movida para o Controle).
+                    // Funde a linha da planilha com o que já estava guardado, para
+                    // que a re-sincronização NUNCA apague o trabalho de quem está
+                    // usando o sistema.
                     foreach (var row in result.Rows)
                         if (existing.TryGetValue(row.Id, out var prev))
-                        {
-                            if (!string.IsNullOrEmpty(prev.Indicada)) row.Indicada = prev.Indicada;
-                            if (!string.IsNullOrEmpty(prev.MovidaControle)) row.MovidaControle = prev.MovidaControle;
-                            if (!string.IsNullOrEmpty(prev.Kyc)) row.Kyc = prev.Kyc;
-                        }
+                            Preservar(row, prev);
 
                     _repo.SaveMany(result.Rows);
                     foreach (var id in existing.Keys)
@@ -211,6 +207,54 @@ public sealed class DataSyncService
                 st.Message = $"Falha ao sincronizar {p.Label}: " + ex.Message;
                 return Finish(st);
             }
+        }
+    }
+
+    // ---- fusão planilha × app ----------------------------------------------
+    // A planilha do CRM manda no que ela traz; o que a pessoa preenche no
+    // sistema é dela. Sem isso, cada re-sincronização devolvia a linha ao estado
+    // da planilha e apagava o preenchimento feito na tela.
+
+    // Campos que a planilha NUNCA traz: pertencem ao app e vencem sempre.
+    private static readonly HashSet<string> SoDoApp = new(StringComparer.Ordinal)
+    {
+        nameof(Opportunity.Indicada),         // indicada na previsão
+        nameof(Opportunity.MovidaControle),   // venda indicada → Controle
+        nameof(Opportunity.Kyc),
+        nameof(Opportunity.Top10),
+        nameof(Opportunity.PlantId),
+        nameof(Opportunity.ForecastCategory), // escolha do usuário na tela
+        nameof(Opportunity.PipelineStageId),  // idem (Etapa)
+        nameof(Opportunity.ManagerProbability),
+        nameof(Opportunity.Justification),
+        nameof(Opportunity.NextAction),
+        nameof(Opportunity.NextActionDate),
+        nameof(Opportunity.Risks),
+        nameof(Opportunity.ValueChangedAt),
+        nameof(Opportunity.DateChangedAt),
+        nameof(Opportunity.CreatedAt),        // data de criação original
+    };
+
+    // Tudo é persistido como texto; percorrer as propriedades de texto cobre a
+    // entidade inteira e continua cobrindo os campos que forem criados depois.
+    private static readonly System.Reflection.PropertyInfo[] Campos =
+        typeof(Opportunity).GetProperties()
+            .Where(x => x.PropertyType == typeof(string) && x.CanRead && x.CanWrite
+                        && x.Name != nameof(Opportunity.Id))
+            .ToArray();
+
+    // "0" conta como ausência: os campos numéricos nascem em "0" e o importador
+    // devolve "0" quando a coluna vem vazia — não é uma informação da planilha.
+    private static bool SemInfo(string? v) => string.IsNullOrWhiteSpace(v) || v == "0";
+
+    private static void Preservar(Opportunity nova, Opportunity antiga)
+    {
+        foreach (var campo in Campos)
+        {
+            var doApp = (string?)campo.GetValue(antiga);
+            if (string.IsNullOrWhiteSpace(doApp)) continue;
+            if (SoDoApp.Contains(campo.Name) || SemInfo((string?)campo.GetValue(nova)))
+                campo.SetValue(nova, doApp);
         }
     }
 

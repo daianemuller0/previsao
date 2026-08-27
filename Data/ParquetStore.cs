@@ -253,12 +253,50 @@ COPY (
         var finalName = Path.Combine(dir, $"{DateTime.UtcNow.Ticks:D19}_{Guid.NewGuid():N}.parquet");
         File.Move(tmpPath, finalName);
 
-        // Remove apenas os arquivos existentes no início (preserva escritas novas).
-        foreach (var f in oldFiles)
-        {
-            try { File.Delete(f); } catch { /* em uso por outro leitor: ignora, próxima rodada limpa */ }
-        }
+        // Os arquivos capturados no início saem de circulação — mas vão para o
+        // histórico em vez de sumir. A compactação só guarda a versão mais recente
+        // de cada id; se alguma coisa for sobrescrita por engano, é daqui que se
+        // recupera o estado anterior.
+        Arquivar(dir, oldFiles);
         return 1;
+    }
+
+    // Pasta de histórico da entidade (não é lida pelas consultas: o glob de
+    // leitura é "<entidade>/*.parquet", sem entrar em subpastas).
+    private const string HistDir = "_historico";
+    private static readonly TimeSpan HistRetencao = TimeSpan.FromDays(30);
+
+    private static void Arquivar(string dir, List<string> files)
+    {
+        string? destino = null;
+        try
+        {
+            destino = Path.Combine(dir, HistDir, $"{DateTime.UtcNow:yyyyMMdd_HHmmss}");
+            Directory.CreateDirectory(destino);
+        }
+        catch { /* sem permissão para criar o histórico: segue apagando */ }
+
+        foreach (var f in files)
+        {
+            try
+            {
+                if (destino is not null) File.Move(f, Path.Combine(destino, Path.GetFileName(f)));
+                else File.Delete(f);
+            }
+            catch { /* em uso por outro leitor: ignora, próxima rodada limpa */ }
+        }
+
+        // Poda: histórico serve para socorro recente, não para crescer sem fim.
+        try
+        {
+            var raiz = Path.Combine(dir, HistDir);
+            if (!Directory.Exists(raiz)) return;
+            var limite = DateTime.UtcNow - HistRetencao;
+            foreach (var d in Directory.EnumerateDirectories(raiz))
+                if (Directory.GetCreationTimeUtc(d) < limite)
+                    try { Directory.Delete(d, recursive: true); } catch { }
+        }
+        catch { /* poda é oportunista */ }
     }
 
     /// <summary>
@@ -267,7 +305,8 @@ COPY (
     public void Clear(string entity)
     {
         var dir = EntityDir(entity);
-        foreach (var f in Directory.EnumerateFiles(dir, "*.parquet"))
-            File.Delete(f);
+        // Vai para o histórico, não para o vazio: apagar a base é justamente o
+        // tipo de operação de que alguém se arrepende dez minutos depois.
+        Arquivar(dir, Directory.EnumerateFiles(dir, "*.parquet").ToList());
     }
 }
