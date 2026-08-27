@@ -1846,14 +1846,17 @@ body.zoom-mode { overflow: hidden; }
 .exec-board > #xf-charts,
 .exec-board > #xf-charts > .g12 { display: contents; }
 
-/* Blocos que não nasceram como coluna da grade ocupam a linha inteira. */
-.exec-board > .xsec,
-.exec-board > .kpi-row,
-.exec-board > .hero,
+/* Blocos que não nasceram como coluna da grade ocupam a linha inteira. Vale em
+   qualquer nível: com "display: contents" nos agrupamentos, um cabeçalho que
+   estava dentro de #xf-charts também vira item da grade — e sem isso ele fica
+   espremido numa coluna de 1/12 da tela. */
+.exec-board .xsec,
+.exec-board .kpi-row,
+.exec-board .hero,
 .exec-board > .panel,
-.exec-board > .exi-grid,
-.exec-board > .section-head,
-.exec-board > .attn2 { grid-column: span 12; }
+.exec-board .exi-grid,
+.exec-board .section-head,
+.exec-board .attn2 { grid-column: span 12; }
 
 /* Modo organizar: as peças ficam evidentes e o conteúdo para de responder ao
    mouse, senão arrastar um gráfico dispararia o filtro por clique. */
