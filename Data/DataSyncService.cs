@@ -185,8 +185,35 @@ public sealed class DataSyncService
                             Preservar(row, prev);
 
                     _repo.SaveMany(result.Rows);
-                    foreach (var id in existing.Keys)
-                        if (!newIds.Contains(id)) _repo.Delete(id);
+
+                    // ---- baixa das linhas que sumiram da planilha ----------------
+                    // Duas travas, porque apagar aqui destrói trabalho de vendedor:
+                    //
+                    //  1. Leitura curta demais. Se a planilha veio com bem menos
+                    //     linhas do que a base tem (arquivo truncado, exportação
+                    //     pela metade, mudança de layout), NÃO apaga nada nesta
+                    //     rodada — linha a mais é ruído, linha a menos é perda.
+                    //  2. Linha com trabalho no app (indicada, movida para o
+                    //     Controle, KYC, TOP 10, observação, próxima ação…) nunca
+                    //     sai sozinha, mesmo que o CRM não a exporte mais. Quem
+                    //     quiser removê-la faz isso pela tela, de propósito.
+                    var sumiram = existing.Where(kv => !newIds.Contains(kv.Key)).Select(kv => kv.Value).ToList();
+                    var leituraCurta = existing.Count > 0 && result.Rows.Count < existing.Count * 0.75;
+
+                    if (leituraCurta)
+                    {
+                        st.Kept = sumiram.Count;
+                        st.ShortRead = true;
+                    }
+                    else
+                    {
+                        foreach (var o in sumiram)
+                        {
+                            if (TemTrabalhoDoApp(o)) { st.Kept++; continue; }
+                            _repo.Delete(o.Id);
+                            st.Removed++;
+                        }
+                    }
                     _repo.Refresh();
                 }
 
@@ -198,6 +225,12 @@ public sealed class DataSyncService
                 st.Ok = true;
                 st.Message = result.Rows.Count > 0
                     ? $"{result.Rows.Count} oportunidade(s) de {p.Label} sincronizada(s)."
+                      + (st.Removed > 0 ? $" {st.Removed} saíram da planilha e foram baixadas." : "")
+                      + (st.Kept > 0
+                          ? st.ShortRead
+                              ? $" ATENÇÃO: a planilha veio com bem menos linhas que a base — {st.Kept} oportunidade(s) foram MANTIDAS por segurança. Confira a exportação do CRM."
+                              : $" {st.Kept} não estão mais na planilha, mas foram mantidas porque têm preenchimento feito no sistema."
+                          : "")
                     : "Planilha lida, mas nenhuma oportunidade reconhecida — confira o cabeçalho das colunas.";
                 return Finish(st);
             }
@@ -233,6 +266,11 @@ public sealed class DataSyncService
         nameof(Opportunity.ValueChangedAt),
         nameof(Opportunity.DateChangedAt),
         nameof(Opportunity.CreatedAt),        // data de criação original
+        // Assinatura da última alteração REAL. Sem preservá-la, cada
+        // sincronização carimbaria "Importação" por cima de quem mexeu — e o
+        // sistema perderia justamente o sinal de que ali tem trabalho de gente.
+        nameof(Opportunity.UpdatedBy),
+        nameof(Opportunity.UpdatedAt),
     };
 
     // Tudo é persistido como texto; percorrer as propriedades de texto cobre a
@@ -246,6 +284,30 @@ public sealed class DataSyncService
     // "0" conta como ausência: os campos numéricos nascem em "0" e o importador
     // devolve "0" quando a coluna vem vazia — não é uma informação da planilha.
     private static bool SemInfo(string? v) => string.IsNullOrWhiteSpace(v) || v == "0";
+
+    // Assinatura de quem importou (o importador carimba isto em UpdatedBy).
+    private static readonly string[] CarimboImportacao = { "Importação", "Importação AFM" };
+
+    /// <summary>A oportunidade carrega algo que só existe por alguém ter mexido
+    /// nela no sistema? Se sim, ela NÃO é apagada por sincronização — some da
+    /// planilha, continua aqui, e quem quiser removê-la faz isso pela tela.
+    /// Repare que ForecastCategory e etapa ficam de fora: o importador já os
+    /// preenche, então serviriam de "trabalho" em toda linha e a baixa nunca
+    /// aconteceria.</summary>
+    private static bool TemTrabalhoDoApp(Opportunity o) =>
+        !string.IsNullOrWhiteSpace(o.Indicada)
+        || !string.IsNullOrWhiteSpace(o.MovidaControle)
+        || !string.IsNullOrWhiteSpace(o.Kyc)
+        || !string.IsNullOrWhiteSpace(o.Top10)
+        || !string.IsNullOrWhiteSpace(o.PlantId)
+        || !string.IsNullOrWhiteSpace(o.NextAction)
+        || !string.IsNullOrWhiteSpace(o.NextActionDate)
+        || !string.IsNullOrWhiteSpace(o.Risks)
+        || !string.IsNullOrWhiteSpace(o.Justification)
+        || !string.IsNullOrWhiteSpace(o.ManagerProbability)
+        // Editada por gente: o importador carimba a própria assinatura.
+        || (!string.IsNullOrWhiteSpace(o.UpdatedBy)
+            && !CarimboImportacao.Contains(o.UpdatedBy, StringComparer.OrdinalIgnoreCase));
 
     private static void Preservar(Opportunity nova, Opportunity antiga)
     {
@@ -288,6 +350,12 @@ public sealed class DataSyncStatus
     public string File { get; set; } = "";
     public int Rows { get; set; }
     public int Warnings { get; set; }
+    /// <summary>Linhas que sumiram da planilha e foram baixadas.</summary>
+    public int Removed { get; set; }
+    /// <summary>Linhas que sumiram da planilha mas foram MANTIDAS (trava de segurança).</summary>
+    public int Kept { get; set; }
+    /// <summary>A planilha veio com bem menos linhas que a base — nada foi apagado.</summary>
+    public bool ShortRead { get; set; }
     public List<string> Currencies { get; set; } = new();
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
