@@ -1,90 +1,55 @@
 namespace HowdenSalesForecast.Data;
 
 // ---------------------------------------------------------------------------
-// Colunas da tabela de oportunidades: definição única (chave, rótulo e
-// alinhamento) usada pela guia Oportunidades e pela Visão Executiva, mais a
-// leitura/gravação da preferência de cada usuário (ordem + colunas ocultas).
-//
-// Formato da preferência: "chave1,chave2,-chave3" — o "-" marca a coluna como
-// oculta. Chaves desconhecidas são ignoradas e chaves novas (versões futuras)
-// entram no fim, então a preferência nunca "quebra" ao adicionarmos colunas.
+// Colunas da tabela de oportunidades: a definição única (chave, rótulo e
+// alinhamento) usada pela guia Oportunidades e pela Visão Executiva. A mecânica
+// de preferência por usuário (ordem + ocultas) mora em TableColumns, que serve
+// a todas as tabelas do sistema.
 // ---------------------------------------------------------------------------
 public static class OpportunityColumns
 {
-    public sealed record ColDef(string Key, string Label, string Align = "");
+    /// <summary>Chave desta tabela na preferência do usuário.</summary>
+    public const string Tabela = "opps";
 
     // Ordem padrão da tabela.
-    public static readonly ColDef[] All =
+    public static readonly TableColumns.ColDef[] All =
     {
-        new("setor",       "Setor",              "center"),
-        new("quarter",     "Quarter",            "nowrap"),
-        new("date",        "Date",               "nowrap"),
-        new("pais",        "País"),
-        new("marketvar",   "Market Variável"),
-        new("market",      "Market"),
-        new("product",     "Product"),
-        new("equip",       "Tipo de Equipamento"),
-        new("kam",         "Key Account"),
-        new("customer",    "Customer"),
-        new("plantname",   "PlantName"),
-        new("proposta",    "Proposta"),
-        new("netvalue",    "Net Value",          "right"),
-        new("pm",          "PM %",               "right"),
-        new("ganho",       "% de Ganho",         "right"),
-        new("sairmes",     "% de Sair no Mês",   "right"),
-        new("conversao",   "Chance Conversão",   "right"),
-        new("nbafm",       "NB/AFM",             "center"),
-        new("servico",     "Serviço previsto"),
-        new("onestream",   "Market onestream"),
-        new("unidade",     "Unidade de Venda"),
-        new("buinter",     "BU Intercompany"),
-        new("obs",         "Observação"),
-        new("pv",          "PV"),
-        new("ramp",        "RAMP"),
-        new("usd",         "VALOR USD",          "right"),
-        new("taxa",        "Taxa",               "right"),
-        new("coluna1",     "Coluna1"),
-        new("otp",         "OTP",                "center"),
-        new("top10",       "TOP 10",             "center"),
-        new("kyc",         "KYC",                "center"),
+        new TableColumns.ColDef("setor",       "Setor",              "center"),
+        new TableColumns.ColDef("quarter",     "Quarter",            "nowrap"),
+        new TableColumns.ColDef("date",        "Date",               "nowrap"),
+        new TableColumns.ColDef("pais",        "País"),
+        new TableColumns.ColDef("marketvar",   "Market Variável"),
+        new TableColumns.ColDef("market",      "Market"),
+        new TableColumns.ColDef("product",     "Product"),
+        new TableColumns.ColDef("equip",       "Tipo de Equipamento"),
+        new TableColumns.ColDef("kam",         "Key Account"),
+        new TableColumns.ColDef("customer",    "Customer"),
+        new TableColumns.ColDef("plantname",   "PlantName"),
+        new TableColumns.ColDef("proposta",    "Proposta"),
+        new TableColumns.ColDef("netvalue",    "Net Value",          "right"),
+        new TableColumns.ColDef("pm",          "PM %",               "right"),
+        new TableColumns.ColDef("ganho",       "% de Ganho",         "right"),
+        new TableColumns.ColDef("sairmes",     "% de Sair no Mês",   "right"),
+        new TableColumns.ColDef("conversao",   "Chance Conversão",   "right"),
+        new TableColumns.ColDef("nbafm",       "NB/AFM",             "center"),
+        new TableColumns.ColDef("servico",     "Serviço previsto"),
+        new TableColumns.ColDef("onestream",   "Market onestream"),
+        new TableColumns.ColDef("unidade",     "Unidade de Venda"),
+        new TableColumns.ColDef("buinter",     "BU Intercompany"),
+        new TableColumns.ColDef("obs",         "Observação"),
+        new TableColumns.ColDef("pv",          "PV"),
+        new TableColumns.ColDef("ramp",        "RAMP"),
+        new TableColumns.ColDef("usd",         "VALOR USD",          "right"),
+        new TableColumns.ColDef("taxa",        "Taxa",               "right"),
+        new TableColumns.ColDef("coluna1",     "Coluna1"),
+        new TableColumns.ColDef("otp",         "OTP",                "center"),
+        new TableColumns.ColDef("top10",       "TOP 10",             "center"),
+        new TableColumns.ColDef("kyc",         "KYC",                "center"),
     };
 
     // Colunas ocultas por padrão (o usuário pode reexibir).
     private static readonly HashSet<string> OcultasPadrao = new(StringComparer.OrdinalIgnoreCase) { "equip" };
 
-    public sealed record ColState(ColDef Def, bool Visible);
-
-    /// <summary>Preferência padrão: ordem de All, com as ocultas padrão desmarcadas.</summary>
-    public static List<ColState> Default() =>
-        All.Select(d => new ColState(d, !OcultasPadrao.Contains(d.Key))).ToList();
-
-    /// <summary>Lê a preferência gravada; entradas desconhecidas somem e colunas
-    /// novas entram no fim (visíveis), preservando o que o usuário já ajustou.</summary>
-    public static List<ColState> Parse(string? pref)
-    {
-        if (string.IsNullOrWhiteSpace(pref)) return Default();
-
-        var byKey = All.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
-        var result = new List<ColState>();
-        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var raw in pref.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var oculta = raw.StartsWith('-');
-            var key = oculta ? raw[1..] : raw;
-            if (!byKey.TryGetValue(key, out var def) || !vistos.Add(def.Key)) continue;
-            result.Add(new ColState(def, !oculta));
-        }
-
-        // Colunas que ainda não estavam na preferência (ex.: recém-criadas).
-        foreach (var d in All)
-            if (!vistos.Contains(d.Key))
-                result.Add(new ColState(d, !OcultasPadrao.Contains(d.Key)));
-
-        return result;
-    }
-
-    /// <summary>Serializa a preferência para gravação.</summary>
-    public static string Serialize(IEnumerable<ColState> cols) =>
-        string.Join(",", cols.Select(c => (c.Visible ? "" : "-") + c.Def.Key));
+    public static List<TableColumns.ColState> Default() => TableColumns.Default(All, OcultasPadrao);
+    public static List<TableColumns.ColState> Parse(string? pref) => TableColumns.Parse(pref, All, OcultasPadrao);
 }

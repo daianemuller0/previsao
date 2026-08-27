@@ -7,6 +7,8 @@
 @inject ContactLookupService Contacts
 @inject OutlookMailService Outlook
 @inject IJSRuntime JS
+@inject ColumnPrefsRepository ColPrefs
+@implements IDisposable
 
 @* ===========================================================================
    Follow-up das propostas em aberto. Puxa as oportunidades em aberto do forecast
@@ -65,48 +67,58 @@
 <div class="table-wrap tbl-compact" style="max-height:700px;overflow:auto;margin-top:12px">
     <table class="grid-tbl">
         <thead>
-            <tr>
-                <th class="no-sort">Marco / prazo</th>
-                <th class="no-sort">Cliente / Proposta</th>
-                <th class="no-sort">Contato</th>
-                <th class="no-sort">Vendedor</th>
-                <th class="no-sort right">Valor</th>
-                <th class="no-sort">Fechamento</th>
-                <th class="no-sort">Último contato</th>
-                <th class="no-sort">Status</th>
-                <th class="no-sort center">Ação</th>
+            @* Arraste o cabeçalho para reordenar as colunas (guardado por usuário). *@
+            <tr id="th-fu" class="th-drag">
+                @foreach (var c in Visiveis)
+                {
+                    <th class="no-sort @c.Def.Align" draggable="true" data-key="@c.Def.Key" title="@c.Def.Label — arraste para mover a coluna">@c.Def.Label</th>
+                }
             </tr>
         </thead>
         <tbody>
             @foreach (var r in Filtered())
             {
                 <tr class="@(r.Rank == 0 ? "fu-urgent" : "") @(string.Equals(r.Opp.Otp, "Sim", StringComparison.OrdinalIgnoreCase) ? "row-otp" : "")">
-                    <td>
-                        <span class="fu-due @DueCss(r)">@DueLabel(r)</span>
-                        <div class="fu-sub">@(r.Cur?.Label ?? "rotina concluída")</div>
-                    </td>
-                    <td class="col-strong">@Cat.CustomerName(r.Opp.CustomerId)<div class="fu-sub">@Proposta(r.Opp)</div></td>
-                    <td>
-                        @if (r.Fu.HasContact)
+                    @foreach (var c in Visiveis)
+                    {
+                        switch (c.Def.Key)
                         {
-                            @if (!string.IsNullOrWhiteSpace(r.Fu.ContactName)) { <div>@r.Fu.ContactName</div> }
-                            @if (!string.IsNullOrWhiteSpace(r.Fu.ContactEmail)) { <div class="fu-sub">@Icons.Svg("mail") @r.Fu.ContactEmail</div> }
+                            case "marco":
+                                <td>
+                                    <span class="fu-due @DueCss(r)">@DueLabel(r)</span>
+                                    <div class="fu-sub">@(r.Cur?.Label ?? "rotina concluída")</div>
+                                </td>
+                                break;
+                            case "cliente":
+                                <td class="col-strong">@Cat.CustomerName(r.Opp.CustomerId)<div class="fu-sub">@Proposta(r.Opp)</div></td>
+                                break;
+                            case "contato":
+                                <td>
+                                    @if (r.Fu.HasContact)
+                                    {
+                                        @if (!string.IsNullOrWhiteSpace(r.Fu.ContactName)) { <div>@r.Fu.ContactName</div> }
+                                        @if (!string.IsNullOrWhiteSpace(r.Fu.ContactEmail)) { <div class="fu-sub">@Icons.Svg("mail") @r.Fu.ContactEmail</div> }
+                                    }
+                                    else { <span class="muted">—</span> }
+                                </td>
+                                break;
+                            case "vendedor":   <td>@Vendedor(r.Opp)</td> break;
+                            case "valor":      <td class="right num">@Fmt.Brl(r.Opp.AmountBrl)</td> break;
+                            case "fechamento": <td class="nowrap">@Fmt.Date(r.Opp.ExpectedDate)</td> break;
+                            case "ultimo":     <td class="nowrap">@(r.Fu.LastContactValue is { } lc ? lc.ToString("dd/MM/yy") : "—")</td> break;
+                            case "status":     <td><span class="badge @StatusCss(r.Fu.Status)">@r.Fu.Status</span></td> break;
+                            case "acao":
+                                <td class="center nowrap">
+                                    <button class="btn-ghost" style="padding:3px 9px" @onclick="() => OpenRegister(r, false)">@Icons.Svg("check")Contatar</button>
+                                </td>
+                                break;
                         }
-                        else { <span class="muted">—</span> }
-                    </td>
-                    <td>@Vendedor(r.Opp)</td>
-                    <td class="right num">@Fmt.Brl(r.Opp.AmountBrl)</td>
-                    <td class="nowrap">@Fmt.Date(r.Opp.ExpectedDate)</td>
-                    <td class="nowrap">@(r.Fu.LastContactValue is { } lc ? lc.ToString("dd/MM/yy") : "—")</td>
-                    <td><span class="badge @StatusCss(r.Fu.Status)">@r.Fu.Status</span></td>
-                    <td class="center nowrap">
-                        <button class="btn-ghost" style="padding:3px 9px" @onclick="() => OpenRegister(r, false)">@Icons.Svg("check")Contatar</button>
-                    </td>
+                    }
                 </tr>
             }
             @if (!Filtered().Any())
             {
-                <tr><td colspan="9" class="empty">Nenhuma proposta em aberto no filtro.</td></tr>
+                <tr><td colspan="@Visiveis.Count" class="empty">Nenhuma proposta em aberto no filtro.</td></tr>
             }
         </tbody>
     </table>
@@ -374,9 +386,54 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (AuthState is not null) { var st = await AuthState; _user = st.User.Identity?.Name ?? "—"; _scope = AccessScope.Resolve(st.User); }
+        if (AuthState is not null)
+        {
+            var st = await AuthState;
+            _user = st.User.Identity?.Name ?? "—";
+            _scope = AccessScope.Resolve(st.User);
+            _login = st.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? st.User.Identity?.Name ?? "";
+        }
+        _cols = TableColumns.Parse(ColPrefs.Get(_login, Tabela), Colunas);
         Load();
     }
+
+    // ---- colunas da lista: ordem por usuário (arraste no cabeçalho) ---------
+    private const string Tabela = "followup";
+    private static readonly TableColumns.ColDef[] Colunas =
+    {
+        new("marco",      "Marco / prazo"),
+        new("cliente",    "Cliente / Proposta"),
+        new("contato",    "Contato"),
+        new("vendedor",   "Vendedor"),
+        new("valor",      "Valor",           "right"),
+        new("fechamento", "Fechamento"),
+        new("ultimo",     "Último contato"),
+        new("status",     "Status"),
+        new("acao",       "Ação",            "center"),
+    };
+
+    private string _login = "";
+    private List<TableColumns.ColState> _cols = TableColumns.Default(Colunas);
+    private List<TableColumns.ColState> Visiveis => _cols.Where(c => c.Visible).ToList();
+    private DotNetObjectReference<FollowUpPage>? _ref;
+
+    /// <summary>Nova ordem das colunas depois de arrastar o cabeçalho.</summary>
+    [JSInvokable]
+    public Task SaveColumnOrder(string tabela, string[] ordem) => InvokeAsync(() =>
+    {
+        _cols = TableColumns.Reorder(_cols, ordem);
+        ColPrefs.Save(_login, Tabela, TableColumns.Serialize(_cols));
+        StateHasChanged();
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ref ??= DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("colOrder.init", "th-fu", _ref, Tabela); } catch { }
+    }
+
+    public void Dispose() => _ref?.Dispose();
 
     private void Load()
     {

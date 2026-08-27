@@ -266,25 +266,28 @@ window.worldMap = (function () {
 })();
 
 // ---------------------------------------------------------------------------
-// Reordenar barras de um gráfico arrastando.
+// Reordenar por arraste: barras de um gráfico (vertical) e colunas de uma
+// tabela (horizontal, arrastando o cabeçalho).
 //
 // Regra de ouro: o DOM é do Blazor. Durante o arraste só mexemos em CLASSES
 // (que o Blazor reescreve no próximo render, sem estrago); a nova ordem é
 // calculada em memória e devolvida ao componente, que redesenha a lista já
 // ordenada. Mover nós de verdade embaralharia o diff do Blazor.
 // ---------------------------------------------------------------------------
-window.chartOrder = (function () {
+window.dragOrder = (function () {
     function itens(box) { return Array.from(box.querySelectorAll('[data-key]')); }
     function limpar(box) {
         itens(box).forEach(x => x.classList.remove('co-drag', 'co-before', 'co-after'));
     }
 
-    function init(id, ref, chave) {
+    // metodo   = método [JSInvokable] que recebe (chave, ordem)
+    // horizontal = true para cabeçalho de tabela (antes/depois pelo eixo X)
+    function init(id, ref, chave, metodo, horizontal) {
         const box = document.getElementById(id);
         if (!box) return;
         if (box.__co) { box.__co.ref = ref; box.__co.chave = chave; return; }
 
-        const st = { ref, chave, key: null, alvo: null, depois: false };
+        const st = { ref, chave, metodo: metodo || 'SaveChartOrder', horizontal: !!horizontal, key: null, alvo: null, depois: false };
         box.__co = st;
 
         box.addEventListener('dragstart', e => {
@@ -305,7 +308,9 @@ window.chartOrder = (function () {
             if (!over || !box.contains(over) || over.getAttribute('data-key') === st.key) return;
             const r = over.getBoundingClientRect();
             st.alvo = over.getAttribute('data-key');
-            st.depois = (e.clientY - r.top) > r.height / 2;
+            st.depois = st.horizontal
+                ? (e.clientX - r.left) > r.width / 2
+                : (e.clientY - r.top) > r.height / 2;
             itens(box).forEach(x => x.classList.remove('co-before', 'co-after'));
             over.classList.add(st.depois ? 'co-after' : 'co-before');
         });
@@ -324,7 +329,7 @@ window.chartOrder = (function () {
             if (para < 0) return;
             if (depois) para++;
             ordem.splice(para, 0, key);
-            st.ref.invokeMethodAsync('SaveChartOrder', st.chave, ordem);
+            st.ref.invokeMethodAsync(st.metodo, st.chave, ordem);
         }
 
         box.addEventListener('drop', e => { e.preventDefault(); soltar(); });
@@ -335,3 +340,13 @@ window.chartOrder = (function () {
     }
     return { init };
 })();
+
+// Compatibilidade: gráficos continuam chamando chartOrder.init(id, ref, chave).
+window.chartOrder = {
+    init: (id, ref, chave) => window.dragOrder.init(id, ref, chave, 'SaveChartOrder', false)
+};
+
+// Colunas de tabela: arrasta o <th> e devolve a nova ordem ao componente.
+window.colOrder = {
+    init: (id, ref, tabela) => window.dragOrder.init(id, ref, tabela, 'SaveColumnOrder', true)
+};

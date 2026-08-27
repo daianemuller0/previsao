@@ -39,12 +39,12 @@
 </div>
 
 @code {
-    [Parameter] public List<OpportunityColumns.ColState> Cols { get; set; } = new();
-    [Parameter] public EventCallback<List<OpportunityColumns.ColState>> OnApply { get; set; }
+    [Parameter] public List<TableColumns.ColState> Cols { get; set; } = new();
+    [Parameter] public EventCallback<List<TableColumns.ColState>> OnApply { get; set; }
     [Parameter] public EventCallback OnReset { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 
-    private List<OpportunityColumns.ColState> _work = new();
+    private List<TableColumns.ColState> _work = new();
 
     // O painel é criado ao abrir e destruído ao fechar: copia uma vez só,
     // para não perder os ajustes em andamento se o pai re-renderizar.

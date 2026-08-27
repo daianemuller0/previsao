@@ -5,6 +5,9 @@
 @inject Catalog Cat
 @inject ListRepository Lists
 @inject OpportunityRepository Opps
+@inject ColumnPrefsRepository ColPrefs
+@inject IJSRuntime JS
+@implements IDisposable
 @using HowdenSalesForecast.Models
 @using System.Globalization
 
@@ -175,39 +178,46 @@ else
         <div class="table-wrap rep-wrap">
             <table class="grid-tbl reg-tbl">
                 <thead>
-                    <tr>
+                    @* Arraste o cabeçalho para reordenar as colunas (guardado por usuário). *@
+                    <tr id="th-reg" class="th-drag">
                         <th class="center" style="width:70px"></th>
-                        <th class="center" style="width:34px" title="Nota de atenção">!</th>
-                        <th>Oferta</th><th>Pedido</th><th>Cliente</th><th>Mercado</th><th>KAM</th>
-                        <th class="right">Valor Líquido</th><th class="center">Moeda</th><th class="right">Valor origem</th>
-                        <th class="center">Semana</th><th class="center">Mês</th><th class="center">POC</th><th>Observação</th>
+                        @foreach (var c in RegVisiveis)
+                        {
+                            <th class="@c.Def.Align" draggable="true" data-key="@c.Def.Key" title="@c.Def.Label — arraste para mover a coluna">@c.Def.Label</th>
+                        }
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var g in _regFiltered)
                     {
-                        var gid = g.Id;
                         <tr class="@(g.TemAtencao ? "reg-atencao" : "")">
                             <td class="center actions-col">
                                 <button class="row-act" title="Editar" @onclick="() => EditReg(g)">@Icons.Svg("edit")</button>
                                 <button class="row-act" title="Voltar para Oportunidades (desfazer a venda indicada)" @onclick="() => _regBack = g">@Icons.Svg("history")</button>
                                 <button class="row-act del" title="Excluir" @onclick="() => _regDel = g">@Icons.Svg("trash")</button>
                             </td>
-                            <td class="center">
-                                @if (g.TemAtencao) { <span class="reg-alert" title="@g.Atencao">@Icons.Svg("alert")</span> }
-                            </td>
-                            <td class="col-strong">@Dash(g.Oferta)</td><td>@Dash(g.Pedido)</td><td>@Dash(g.Cliente)</td>
-                            <td>@Dash(g.Mercado)</td><td>@Dash(g.Kam)</td>
-                            <td class="right num">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td>
-                            <td class="center">@Dash(g.Moeda)</td>
-                            <td class="right num">@(g.ValorOriginalV != 0 ? g.ValorOriginalV.ToString("#,##0.##", Pt) : "—")</td>
-                            <td class="center">@Dash(g.Semana)</td>
-                            <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td>
-                            <td class="center">@Mark(g.Poc)</td>
-                            <td title="@g.Observacao">@Dash(g.Observacao)</td>
+                            @foreach (var c in RegVisiveis)
+                            {
+                                switch (c.Def.Key)
+                                {
+                                    case "atencao":  <td class="center">@if (g.TemAtencao) { <span class="reg-alert" title="@g.Atencao">@Icons.Svg("alert")</span> }</td> break;
+                                    case "oferta":   <td class="col-strong">@Dash(g.Oferta)</td> break;
+                                    case "pedido":   <td>@Dash(g.Pedido)</td> break;
+                                    case "cliente":  <td>@Dash(g.Cliente)</td> break;
+                                    case "mercado":  <td>@Dash(g.Mercado)</td> break;
+                                    case "kam":      <td>@Dash(g.Kam)</td> break;
+                                    case "liquido":  <td class="right num">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td> break;
+                                    case "moeda":    <td class="center">@Dash(g.Moeda)</td> break;
+                                    case "origem":   <td class="right num">@(g.ValorOriginalV != 0 ? g.ValorOriginalV.ToString("#,##0.##", Pt) : "—")</td> break;
+                                    case "semana":   <td class="center">@Dash(g.Semana)</td> break;
+                                    case "mes":      <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td> break;
+                                    case "poc":      <td class="center">@Mark(g.Poc)</td> break;
+                                    case "obs":      <td title="@g.Observacao">@Dash(g.Observacao)</td> break;
+                                }
+                            }
                         </tr>
                     }
-                    @if (_regFiltered.Count == 0){<tr><td colspan="14" class="empty">Nenhum registro. Use "Adicionar" ou "Importar".</td></tr>}
+                    @if (_regFiltered.Count == 0){<tr><td colspan="@(RegVisiveis.Count + 1)" class="empty">Nenhum registro. Use "Adicionar" ou "Importar".</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -355,9 +365,57 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (AuthState is not null) { var st = await AuthState; _user = st.User.Identity?.Name ?? "—"; }
+        if (AuthState is not null)
+        {
+            var st = await AuthState;
+            _user = st.User.Identity?.Name ?? "—";
+            _login = st.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? st.User.Identity?.Name ?? "";
+        }
+        _regCols = TableColumns.Parse(ColPrefs.Get(_login, TabelaReg), RegColunas);
         Reload();
     }
+
+    // ---- colunas de "Ofertas e pedidos": ordem por usuário (arraste no <th>) --
+    private const string TabelaReg = "controle_reg";
+    private static readonly TableColumns.ColDef[] RegColunas =
+    {
+        new("atencao", "!",             "center"),
+        new("oferta",  "Oferta"),
+        new("pedido",  "Pedido"),
+        new("cliente", "Cliente"),
+        new("mercado", "Mercado"),
+        new("kam",     "KAM"),
+        new("liquido", "Valor Líquido", "right"),
+        new("moeda",   "Moeda",         "center"),
+        new("origem",  "Valor origem",  "right"),
+        new("semana",  "Semana",        "center"),
+        new("mes",     "Mês",           "center"),
+        new("poc",     "POC",           "center"),
+        new("obs",     "Observação"),
+    };
+
+    private string _login = "";
+    private List<TableColumns.ColState> _regCols = TableColumns.Default(RegColunas);
+    private List<TableColumns.ColState> RegVisiveis => _regCols.Where(c => c.Visible).ToList();
+    private DotNetObjectReference<Controle>? _ref;
+
+    /// <summary>Nova ordem das colunas depois de arrastar o cabeçalho.</summary>
+    [JSInvokable]
+    public Task SaveColumnOrder(string tabela, string[] ordem) => InvokeAsync(() =>
+    {
+        _regCols = TableColumns.Reorder(_regCols, ordem);
+        ColPrefs.Save(_login, TabelaReg, TableColumns.Serialize(_regCols));
+        StateHasChanged();
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ref ??= DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("colOrder.init", "th-reg", _ref, TabelaReg); } catch { }
+    }
+
+    public void Dispose() => _ref?.Dispose();
 
     private void Reload()
     {
