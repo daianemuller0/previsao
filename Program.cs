@@ -72,6 +72,8 @@ builder.Services.AddSingleton<ContactLookupService>();
 builder.Services.AddSingleton<UserRepository>();
 // Preferência de colunas da tabela de oportunidades, por usuário.
 builder.Services.AddSingleton<ColumnPrefsRepository>();
+// Ajustes dos gráficos de barras (ordem e espessura), por usuário.
+builder.Services.AddSingleton<ChartPrefsRepository>();
 // Abertura de rascunhos no Outlook (automação COM) para o follow-up em massa.
 builder.Services.AddSingleton<OutlookMailService>();
 // Gráficos personalizados do estúdio da Visão Executiva.
