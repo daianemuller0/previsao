@@ -290,8 +290,17 @@
             </div>
         </div>
 
-        @* Indicadas por vendedor *@
-        <div class="xcard ind-card" style="margin-top:16px">
+    }
+    </div>
+</div>
+
+@* Indicadas por vendedor + lista (linha inteira cada) *@
+@if (_indicadas.Count > 0)
+{
+    <div class="g12" style="margin-top:16px">
+        @* Estava embaixo do funil, na meia coluna: as barras ficavam curtas e
+           sobrava a metade esquerda vazia. Linha inteira aproveita o espaço. *@
+        <div class="c12" data-pnl="indicadas-vendedor"><div class="xcard ind-card">
             <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Indicadas por Vendedor</div><div class="xcard-sub">@_indByRep.Count vendedor(es) · valor indicado</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indByRep.Sum(x => x.Value))</b></span><TelaCheia /></div>
             @{ var _indRepMax = _indByRep.Count > 0 ? _indByRep.Max(x => x.Value) : 1; }
             <div class="ibar scroll-y" style="max-height:300px">
@@ -307,15 +316,7 @@
                     </div>
                 }
             </div>
-        </div>
-    }
-    </div>
-</div>
-
-@* Lista das indicadas (linha inteira) *@
-@if (_indicadas.Count > 0)
-{
-    <div class="g12" style="margin-top:16px">
+        </div></div>
         <div class="c12" data-pnl="lista-indicadas"><div class="xcard ind-card">
             <div class="xcard-head">
                 <span class="xcard-ico ind-ico">@Icons.Svg("flag")</span>
