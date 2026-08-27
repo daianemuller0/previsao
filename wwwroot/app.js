@@ -42,54 +42,62 @@ window.appSidebarState = () => {
     try { return localStorage.getItem('hsf-sidebar') === '1'; } catch { return false; }
 };
 
-// ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
-// Modo apresentação: tela cheia + troca de tela automática. Em vez de rolar
-// devagar, salta uma tela inteira por vez (como slides), fica parado alguns
-// segundos em cada uma, e ao chegar no fim volta ao topo e repete. Ideal para
-// exibir o dashboard numa TV. Sai com Esc, ao fechar a tela cheia ou no toggle.
+// Modo apresentação: tela cheia + ROLAGEM LENTA e contínua, para o dashboard
+// ficar passando numa TV. Rola alguns pixels por segundo, faz uma pausa no fim
+// e volta ao topo. Sai com Esc, ao fechar a tela cheia ou clicando de novo.
 window.presentation = (function () {
-    let timer = null, running = false, page = 0;
-    const DWELL = 7000;    // ms parado em cada tela antes de trocar
+    let raf = null, running = false, pos = 0, ultimo = 0, pausaAte = 0;
+    const PPS = 22;          // pixels por segundo — devagar, dá para ler
+    const PAUSA = 4000;      // ms parado no fim antes de voltar ao topo
 
     function maxScroll() {
         const doc = document.scrollingElement || document.documentElement;
         return Math.max(0, doc.scrollHeight - window.innerHeight);
     }
-    // Nº de telas (uma altura de viewport cada), incluindo o resto final.
-    function pageCount() {
-        return Math.max(1, Math.ceil(maxScroll() / window.innerHeight) + 1);
-    }
-    function show(i) {
-        const y = Math.min(i * window.innerHeight, maxScroll());
-        window.scrollTo({ top: y, behavior: 'smooth' });
-    }
-    function tick() {
+    function passo(agora) {
         if (!running) return;
-        page = (page + 1) % pageCount();   // avança; ao passar do fim, volta ao topo
-        show(page);
+        const dt = ultimo ? (agora - ultimo) : 0;
+        ultimo = agora;
+
+        if (agora < pausaAte) { raf = requestAnimationFrame(passo); return; }
+
+        const fim = maxScroll();
+        pos += (dt / 1000) * PPS;
+        if (pos >= fim) {
+            // Chegou ao fim: espera um pouco e recomeça de cima.
+            pos = fim;
+            window.scrollTo(0, pos);
+            pausaAte = agora + PAUSA;
+            pos = 0;
+            setTimeout(() => { if (running) window.scrollTo({ top: 0, behavior: 'smooth' }); }, PAUSA);
+        } else {
+            window.scrollTo(0, pos);
+        }
+        raf = requestAnimationFrame(passo);
     }
     function onFsChange() { if (!document.fullscreenElement) stop(); }
     function onKey(e) { if (e.key === 'Escape') stop(); }
     function start() {
         if (running) { stop(); return; }
         const el = document.documentElement;
-        if (el.requestFullscreen) { try { el.requestFullscreen(); } catch (e) {} }
-        running = true; page = 0;
-        window.scrollTo({ top: 0, behavior: 'auto' });
+        if (el.requestFullscreen) { try { el.requestFullscreen(); } catch (e) { } }
+        running = true; pos = 0; ultimo = 0; pausaAte = 0;
+        window.scrollTo(0, 0);
         document.addEventListener('fullscreenchange', onFsChange);
         document.addEventListener('keydown', onKey);
-        timer = setInterval(tick, DWELL);
+        raf = requestAnimationFrame(passo);
     }
     function stop() {
         running = false;
-        if (timer) { clearInterval(timer); timer = null; }
+        if (raf) { cancelAnimationFrame(raf); raf = null; }
         document.removeEventListener('fullscreenchange', onFsChange);
         document.removeEventListener('keydown', onKey);
-        if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) {} }
+        if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) { } }
     }
     return { start, stop };
 })();
 
+// ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
 // Comando por voz (Web Speech API · Edge/Chrome). Escuta em pt-BR e manda o
 // texto reconhecido para o componente Blazor (ApplyVoiceCommand), que interpreta
 // e aplica os filtros. Callbacks de status/parcial alimentam o indicador na tela.
@@ -385,17 +393,47 @@ window.colOrder = {
 };
 
 // ---------------------------------------------------------------------------
-// Tela cheia de um painel de gráfico. O botão não sabe em qual card está: sobe
-// pela árvore até achar o card e pede tela cheia dele. Assim o mesmo botão
-// serve a qualquer painel, sem precisar de id nem de parâmetro.
+// Ampliar um painel de gráfico.
+//
+// Não usa a tela cheia do navegador: ela esconderia a barra de filtros, que é
+// justamente o que a pessoa quer continuar mexendo com o gráfico grande. O
+// painel vira um bloco fixo que ocupa a tela ABAIXO do topo e dos filtros — a
+// altura deles é medida na hora, porque a barra de filtros muda de altura
+// conforme quebra em mais linhas.
+//
+// Só mexe em CLASSES de elementos que o Blazor já criou; não insere nem move
+// nós, senão o diff do Blazor se perderia.
 // ---------------------------------------------------------------------------
-window.appTelaCheia = function (btn) {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-        return;
-    }
+window.appAmpliar = function (btn) {
     const card = btn.closest('.xcard, .panel');
     if (!card) return;
-    const pedir = card.requestFullscreen || card.webkitRequestFullscreen;
-    if (pedir) pedir.call(card);
+    if (card.classList.contains('zoom-card')) { window.appAmpliarSair(); return; }
+
+    window.appAmpliarSair();                       // um painel ampliado por vez
+
+    // Onde termina o que precisa continuar visível (topo + barra de filtros).
+    const barra = document.querySelector('.filterbar');
+    const topo = document.querySelector('.topbar');
+    let y = 0;
+    if (barra) y = Math.max(y, barra.getBoundingClientRect().bottom);
+    else if (topo) y = Math.max(y, topo.getBoundingClientRect().bottom);
+    document.documentElement.style.setProperty('--zoom-top', Math.round(Math.max(y, 0)) + 'px');
+
+    // O menu lateral continua visível: o painel começa onde a área de conteúdo
+    // começa (e o menu pode estar recolhido, então a largura é medida também).
+    const conteudo = document.querySelector('.content') || document.querySelector('.main-col');
+    const x = conteudo ? Math.max(0, conteudo.getBoundingClientRect().left) : 0;
+    document.documentElement.style.setProperty('--zoom-left', Math.round(x) + 'px');
+
+    card.classList.add('zoom-card');
+    document.body.classList.add('zoom-mode');
+    document.addEventListener('keydown', sairComEsc);
 };
+
+window.appAmpliarSair = function () {
+    document.querySelectorAll('.zoom-card').forEach(c => c.classList.remove('zoom-card'));
+    document.body.classList.remove('zoom-mode');
+    document.removeEventListener('keydown', sairComEsc);
+};
+
+function sairComEsc(e) { if (e.key === 'Escape') window.appAmpliarSair(); }
