@@ -29,7 +29,7 @@ else
                 <div class="opp-badges">
                     <span class="badge @ForecastCategories.Css(_o.Category)">@ForecastCategories.Label(_o.Category)</span>
                     <span class="badge @RiskLevels.Css(lvl)">Risco @RiskLevels.Label(lvl)</span>
-                    <span class="tag">@Cat.StageName(_o.PipelineStageId)</span>
+                    <span class="tag">@EtapaFunil(_o)</span>
                     <span class="tag">@CommercialCategory.Name(_o.CommercialCategory)</span>
                     @if (ForecastCalc.DaysSinceUpdate(_o, _today) >= 30) { <span class="tag warn">sem atualização @ForecastCalc.DaysSinceUpdate(_o, _today)d</span> }
                     @if (ForecastCalc.DaysToExpected(_o, _today) < 0 && ForecastCategories.IsOpen(_o.Category)) { <span class="tag neg">data vencida</span> }
@@ -64,7 +64,7 @@ else
                 <div class="panel">
                     <div class="panel-title mb-16">Resumo</div>
                     <dl class="detail-grid">
-                        <div class="dl"><dt>Etapa</dt><dd>@Cat.StageName(_o.PipelineStageId)</dd></div>
+                        <div class="dl"><dt>Etapa do funil</dt><dd>@EtapaFunil(_o)</dd></div>
                         <div class="dl"><dt>Forecast Category</dt><dd>@ForecastCategories.Label(_o.Category)</dd></div>
                         <div class="dl"><dt>Responsável (KAM)</dt><dd>@Cat.KamName(_o.KamId)</dd></div>
                         <div class="dl"><dt>Próxima ação</dt><dd>@(string.IsNullOrWhiteSpace(_o.NextAction) ? "—" : _o.NextAction)</dd></div>
@@ -205,6 +205,17 @@ else
     private Opportunity? _o;
     private DateTime _today = DateTime.Today;
     private string _tab = "resumo";
+
+    // Etapa do funil: é a coluna Stage da planilha (no Aftermarket, convertida
+    // para a etapa equivalente do nosso funil). O PipelineStageId antigo não
+    // vinha de importação e mostrava sempre "Qualificação".
+    private static string EtapaFunil(Opportunity o)
+    {
+        var isAfm = string.Equals(o.Setor, "AFM", StringComparison.OrdinalIgnoreCase)
+                 || o.Id.StartsWith("afm-", StringComparison.OrdinalIgnoreCase);
+        var etapa = isAfm ? OpportunityImporter.MapAfmStage(o.Stage, o.StatusDescription) : o.Stage;
+        return string.IsNullOrWhiteSpace(etapa) ? "—" : etapa.Trim();
+    }
 
     private record TabDef(string Key, string Label);
     private readonly TabDef[] _tabs =

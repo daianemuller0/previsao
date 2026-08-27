@@ -59,7 +59,6 @@
                             case "marketvar": <td>@Cat.SubMarketName(o.SubMarketId)</td> break;
                             case "market":    <td>@Cat.MarketName(o.MarketId)</td> break;
                             case "product":   <td>@Cat.ProductName(o.ProductId)</td> break;
-                            case "equip":     <td>@Cat.EquipmentName(o.EquipmentTypeId)</td> break;
                             case "kam":       <td>@Cat.KamName(o.KamId)</td> break;
                             case "customer":  <td class="col-strong">@Cat.CustomerName(o.CustomerId)</td> break;
                             case "plantname": <td>@Dash(o.EndUserSite)</td> break;
@@ -183,30 +182,21 @@
             <label class="fld">Market<input class="field" list="dl-market" @bind="_edit.MarketId" /></label>
             <label class="fld">Market Variável<input class="field" list="dl-market_var" @bind="_edit.SubMarketId" /></label>
             <label class="fld">Product<input class="field" list="dl-product" @bind="_edit.ProductId" /></label>
-            <label class="fld">Tipo de Equipamento<input class="field" list="dl-tipo_equip" @bind="_edit.EquipmentTypeId" /></label>
             <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_edit.KamId" /></label>
             <label class="fld">Customer<input class="field" list="dl-customer" @bind="_edit.CustomerId" /></label>
-            @* PlantName vem da planilha (AFM: coluna PlantName; NB: End User Site).
-               A "Planta" abaixo é o cadastro interno e não vem de importação. *@
+            @* PlantName vem da planilha (AFM: coluna PlantName; NB: End User Site). *@
             <label class="fld">PlantName<input class="field" @bind="_edit.EndUserSite" /></label>
-            <label class="fld">Planta (cadastro)
-                <select class="field" @bind="_edit.PlantId">
-                    <option value="">—</option>
-                    @if (Unknown(_edit.PlantId, Cat.Plants.Select(x => x.Id))) { <option value="@_edit.PlantId" selected>@_edit.PlantId</option> }
-                    @foreach (var p in Cat.Plants) { <option value="@p.Id">@p.Name</option> }
-                </select>
-            </label>
 
-            <label class="fld">Categoria (NB/AFM)<input class="field" list="dl-nb_afm" @bind="_edit.CommercialCategory" /></label>
+            <label class="fld">Categoria (NB/AFM) <span class="hint">vem do setor de origem</span>
+                <input class="field" value="@_edit.CommercialCategory" readonly />
+            </label>
             <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_edit.ServicoPrevisto" /></label>
             <label class="fld">Market onestream<input class="field" list="dl-onestream" @bind="_edit.MarketOnestream" /></label>
-            <label class="fld">Forecast Category
-                <select class="field" @bind="_edit.ForecastCategory">@foreach (var c in Enum.GetValues<ForecastCategory>()) { <option value="@c.ToString()">@ForecastCategories.Label(c)</option> }</select>
-            </label>
-            <label class="fld">Etapa
-                <select class="field" @bind="_edit.PipelineStageId">
+            <label class="fld">Etapa do funil
+                <select class="field" @bind="_edit.Stage">
                     <option value="">—</option>
-                    @foreach (var s in Cat.Stages) { <option value="@s.Id">@s.Name</option> }
+                    @if (Unknown(_edit.Stage, Cat.Stages.Select(x => x.Name))) { <option value="@_edit.Stage" selected>@_edit.Stage</option> }
+                    @foreach (var s in Cat.Stages) { <option value="@s.Name">@s.Name</option> }
                 </select>
             </label>
 
@@ -226,13 +216,11 @@
             <label class="fld">Is Inter Company <span class="hint">vem da planilha</span><input class="field" @bind="_edit.IsInterCompany" /></label>
 
             @* Colunas do funil que vêm da planilha e não tinham lugar no formulário. *@
-            <label class="fld">Stage (etapa da planilha)<input class="field" @bind="_edit.Stage" /></label>
             <label class="fld">Commercial Segment<input class="field" @bind="_edit.CommercialSegment" /></label>
             <label class="fld">Process<input class="field" @bind="_edit.Process" /></label>
             <label class="fld">Brand<input class="field" @bind="_edit.Brand" /></label>
             <label class="fld">Chance<input class="field" @bind="_edit.Chance" /></label>
             <label class="fld">Customer Ref#<input class="field" @bind="_edit.CustomerRef" /></label>
-            <label class="fld">Status Description<input class="field" @bind="_edit.StatusDescription" /></label>
             <label class="fld full">Description<input class="field" @bind="_edit.Description" /></label>
 
             <label class="fld">RAMP<input class="field" @bind="_edit.Ramp" /></label>
@@ -364,8 +352,8 @@
     private static readonly (string Id, string Key)[] FormLists =
     {
         ("dl-pais", "pais"), ("dl-market_var", "market_var"), ("dl-market", "market"),
-        ("dl-product", "product"), ("dl-tipo_equip", "tipo_equip"), ("dl-key_account", "key_account"),
-        ("dl-customer", "customer"), ("dl-nb_afm", "nb_afm"), ("dl-servico", "servico_previsto"),
+        ("dl-product", "product"), ("dl-key_account", "key_account"),
+        ("dl-customer", "customer"), ("dl-servico", "servico_previsto"),
         ("dl-onestream", "market_onestream"), ("dl-unidade", "unidade_venda"), ("dl-bu_inter", "bu_intercompany"),
     };
 
@@ -383,7 +371,6 @@
         _edit.MarketId = Cat.Markets.FirstOrDefault(x => x.Id == _edit.MarketId)?.Name ?? _edit.MarketId;
         _edit.SubMarketId = Cat.SubMarkets.FirstOrDefault(x => x.Id == _edit.SubMarketId)?.Name ?? _edit.SubMarketId;
         _edit.ProductId = Cat.Products.FirstOrDefault(x => x.Id == _edit.ProductId)?.Name ?? _edit.ProductId;
-        _edit.EquipmentTypeId = Cat.EquipmentTypes.FirstOrDefault(x => x.Id == _edit.EquipmentTypeId)?.Name ?? _edit.EquipmentTypeId;
         _edit.KamId = Cat.Kams.FirstOrDefault(x => x.Id == _edit.KamId)?.Name ?? _edit.KamId;
         _edit.CustomerId = Cat.Customers.FirstOrDefault(x => x.Id == _edit.CustomerId)?.Name ?? _edit.CustomerId;
         _edit.PvBusinessUnitId = Cat.BusinessUnits.FirstOrDefault(x => x.Id == _edit.PvBusinessUnitId)?.Code ?? _edit.PvBusinessUnitId;
