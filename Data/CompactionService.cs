@@ -14,7 +14,9 @@ public class CompactionService : BackgroundService
     // na rede. Fazer isso junto com a leitura da base e a importação das planilhas
     // disputa a mesma rede e atrasa justamente a abertura do programa.
     private static readonly TimeSpan Warmup = TimeSpan.FromMinutes(3);
-    private const int Threshold = 25; // compacta quando ultrapassar este nº de arquivos
+    // Cada leitura abre TODOS os Parquet da entidade. Numa pasta de rede o custo
+    // é por arquivo, então menos arquivos = abertura mais rápida para todo mundo.
+    private const int Threshold = 12;
 
     private readonly ParquetStore _store;
     private readonly ILogger<CompactionService> _log;
