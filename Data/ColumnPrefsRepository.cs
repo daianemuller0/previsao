@@ -3,9 +3,9 @@ using System.Data;
 namespace HowdenSalesForecast.Data;
 
 // ---------------------------------------------------------------------------
-// Preferência de colunas POR USUÁRIO (ordem e colunas ocultas da tabela de
-// oportunidades). Guardada no ParquetStore com id = login, então cada pessoa
-// monta a tabela do jeito que preferir sem afetar as outras.
+// Preferência de colunas POR USUÁRIO E POR TABELA (ordem e colunas ocultas).
+// Guardada no ParquetStore com id = "login|tabela", então cada pessoa monta
+// cada tabela do jeito que preferir sem afetar as outras.
 // Cache em memória: a leitura acontece uma vez por login.
 // ---------------------------------------------------------------------------
 public class ColumnPrefsRepository
@@ -40,28 +40,44 @@ public class ColumnPrefsRepository
         return _cache;
     }
 
-    /// <summary>Preferência do login (vazio = padrão).</summary>
-    public string Get(string login)
+    private static string Chave(string login, string tabela) =>
+        (login ?? "").Trim() + "|" + (tabela ?? "").Trim();
+
+    /// <summary>Preferência do login para uma tabela (vazio = padrão).</summary>
+    public string Get(string login, string tabela)
     {
-        var key = (login ?? "").Trim();
-        if (key == "") return "";
-        lock (_lock) return Cache().TryGetValue(key, out var v) ? v : "";
+        if (string.IsNullOrWhiteSpace(login)) return "";
+        lock (_lock)
+        {
+            var c = Cache();
+            if (c.TryGetValue(Chave(login, tabela), out var v)) return v;
+            // Compatibilidade: antes de existirem várias tabelas, a preferência
+            // da tabela de oportunidades era gravada só com o login.
+            if (tabela == OpportunityColumns.Tabela && c.TryGetValue(login.Trim(), out var antigo)) return antigo;
+            return "";
+        }
     }
 
-    public void Save(string login, string cols)
+    public void Save(string login, string tabela, string cols)
     {
-        var key = (login ?? "").Trim();
-        if (key == "") return;
+        if (string.IsNullOrWhiteSpace(login)) return;
+        var key = Chave(login, tabela);
         _store.WriteRow(Ent, new KeyValuePair<string, object?>[] { new("id", key), new("cols", cols ?? "") });
         lock (_lock) { Cache()[key] = cols ?? ""; Version++; }
     }
 
     /// <summary>Volta ao padrão (remove a preferência gravada).</summary>
-    public void Reset(string login)
+    public void Reset(string login, string tabela)
     {
-        var key = (login ?? "").Trim();
-        if (key == "") return;
+        if (string.IsNullOrWhiteSpace(login)) return;
+        var key = Chave(login, tabela);
         _store.WriteRow(Ent, new KeyValuePair<string, object?>[] { new("id", key) }, deleted: true);
-        lock (_lock) { Cache().Remove(key); Version++; }
+        lock (_lock)
+        {
+            var c = Cache();
+            c.Remove(key);
+            if (tabela == OpportunityColumns.Tabela) c.Remove(login.Trim());
+            Version++;
+        }
     }
 }

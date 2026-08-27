@@ -4,6 +4,8 @@
 @inject ListRepository Lists
 @inject ControleRepository Controle
 @inject ColumnPrefsRepository ColPrefs
+@inject IJSRuntime JS
+@implements IDisposable
 
 @* Tabela de oportunidades reutilizável. Apresenta EXATAMENTE as mesmas colunas
    da guia Oportunidades e oferece as mesmas ações (editar, duplicar e excluir),
@@ -25,11 +27,12 @@
 <div class="table-wrap @CssClass" style="@Style">
     <table class="grid-tbl">
         <thead>
-            <tr>
+            @* Arraste o cabeçalho para reordenar as colunas (guardado por usuário). *@
+            <tr id="@HeadId" class="th-drag">
                 <th class="center actions-col"></th>
                 @foreach (var c in Visiveis)
                 {
-                    <th class="@c.Def.Align">@c.Def.Label</th>
+                    <th class="@c.Def.Align" draggable="true" data-key="@c.Def.Key" title="@c.Def.Label — arraste para mover a coluna">@c.Def.Label</th>
                 }
             </tr>
         </thead>
@@ -250,12 +253,16 @@
     private DateTime _today = DateTime.Today;
 
     // ---- colunas configuráveis por usuário ----
-    private List<OpportunityColumns.ColState> _cols = OpportunityColumns.Default();
+    private List<TableColumns.ColState> _cols = OpportunityColumns.Default();
     private bool _colsOpen;
     private string _login = "";
     private int _colsVersion = -1;   // versão da preferência já aplicada nesta tabela
 
-    private List<OpportunityColumns.ColState> Visiveis => _cols.Where(c => c.Visible).ToList();
+    private List<TableColumns.ColState> Visiveis => _cols.Where(c => c.Visible).ToList();
+
+    // Cada instância tem o seu <tr>: o id precisa ser único na página.
+    private readonly string HeadId = "th-" + Guid.NewGuid().ToString("N")[..8];
+    private DotNetObjectReference<OpportunityTable>? _ref;
 
     protected override async Task OnInitializedAsync()
     {
@@ -278,22 +285,43 @@
 
     private void CarregarColunas()
     {
-        _cols = OpportunityColumns.Parse(ColPrefs.Get(_login));
+        _cols = OpportunityColumns.Parse(ColPrefs.Get(_login, OpportunityColumns.Tabela));
         _colsVersion = ColPrefs.Version;
     }
 
-    private void AplicarColunas(List<OpportunityColumns.ColState> cols)
+    private void AplicarColunas(List<TableColumns.ColState> cols)
     {
         _colsOpen = false;
-        ColPrefs.Save(_login, OpportunityColumns.Serialize(cols));
+        Gravar(cols);
+    }
+
+    private void Gravar(List<TableColumns.ColState> cols)
+    {
+        ColPrefs.Save(_login, OpportunityColumns.Tabela, TableColumns.Serialize(cols));
         _cols = cols;
         _colsVersion = ColPrefs.Version;
     }
 
+    /// <summary>Nova ordem das colunas depois de arrastar o cabeçalho.</summary>
+    [JSInvokable]
+    public Task SaveColumnOrder(string tabela, string[] ordem) => InvokeAsync(() =>
+    {
+        Gravar(TableColumns.Reorder(_cols, ordem));
+        StateHasChanged();
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ref ??= DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("colOrder.init", HeadId, _ref, OpportunityColumns.Tabela); } catch { }
+    }
+
+    public void Dispose() => _ref?.Dispose();
+
     private void ResetarColunas()
     {
         _colsOpen = false;
-        ColPrefs.Reset(_login);
+        ColPrefs.Reset(_login, OpportunityColumns.Tabela);
         _cols = OpportunityColumns.Default();
         _colsVersion = ColPrefs.Version;
     }
