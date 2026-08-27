@@ -111,7 +111,7 @@ public sealed class ParquetStore
         var full = Duck(Path.Combine(dir, fileName));
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = $"COPY t TO '{full}' (FORMAT PARQUET);";
+            cmd.CommandText = $"COPY t TO '{full}' (FORMAT PARQUET, COMPRESSION ZSTD);";
             cmd.ExecuteNonQuery();
         }
     }
@@ -134,15 +134,20 @@ public sealed class ParquetStore
             cmd.ExecuteNonQuery();
         }
 
+        // Um comando só, reaproveitado: montar e preparar um INSERT por linha
+        // custava caro numa importação de mais de mil oportunidades.
         var placeholders = string.Join(", ", first.Select(_ => "?")) + ", ?, ?";
-        foreach (var row in rows)
+        using (var cmd = conn.CreateCommand())
         {
-            using var cmd = conn.CreateCommand();
             cmd.CommandText = $"INSERT INTO t VALUES ({placeholders});";
-            foreach (var kv in row) AddParam(cmd, kv.Value);
-            AddParam(cmd, DateTime.UtcNow.Ticks);
-            AddParam(cmd, false);
-            cmd.ExecuteNonQuery();
+            foreach (var row in rows)
+            {
+                cmd.Parameters.Clear();
+                foreach (var kv in row) AddParam(cmd, kv.Value);
+                AddParam(cmd, DateTime.UtcNow.Ticks);
+                AddParam(cmd, false);
+                cmd.ExecuteNonQuery();
+            }
         }
 
         var dir = EntityDir(entity);
@@ -150,7 +155,7 @@ public sealed class ParquetStore
         var full = Duck(Path.Combine(dir, fileName));
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = $"COPY t TO '{full}' (FORMAT PARQUET);";
+            cmd.CommandText = $"COPY t TO '{full}' (FORMAT PARQUET, COMPRESSION ZSTD);";
             cmd.ExecuteNonQuery();
         }
     }
@@ -159,11 +164,18 @@ public sealed class ParquetStore
     /// Lê a entidade já consolidada: versão mais recente por id, sem os apagados.
     /// Retorna vazio se ainda não houver nenhum arquivo (primeira execução).
     /// </summary>
+    // Esquema conhecido de cada entidade, válido enquanto o conjunto de arquivos
+    // não mudar. Descobrir as colunas exige abrir o rodapé de TODOS os Parquet —
+    // fazer isso em toda leitura dobrava as idas à rede sem necessidade.
+    private readonly Dictionary<string, (string Chave, HashSet<string> Cols)> _esquemas = new(StringComparer.OrdinalIgnoreCase);
+
     public List<T> ReadLatest<T>(string entity, string selectCols, Func<IDataReader, T> map, string orderBy = "")
     {
         var dir = EntityDir(entity);
-        if (!Directory.EnumerateFiles(dir, "*.parquet").Any())
-            return new List<T>();
+        // GetFiles traz nome, tamanho e data numa varredura só (uma ida à rede);
+        // pedir isso arquivo a arquivo custaria uma ida por arquivo.
+        var arquivos = new DirectoryInfo(dir).GetFiles("*.parquet");
+        if (arquivos.Length == 0) return new List<T>();
 
         var glob = Duck(Path.Combine(dir, "*.parquet"));
         using var conn = Open();
@@ -171,23 +183,38 @@ public sealed class ParquetStore
         // Evolução de esquema: arquivos antigos podem não ter colunas novas.
         // union_by_name junta esquemas diferentes entre arquivos, e as colunas
         // pedidas que não existirem em NENHUM arquivo viram NULL no SELECT.
-        var presentes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using (var describe = conn.CreateCommand())
+        var chave = $"{arquivos.Length}|{arquivos.Max(f => f.LastWriteTimeUtc.Ticks)}|{arquivos.Sum(f => f.Length)}";
+        HashSet<string>? presentes;
+        lock (_esquemas)
+            presentes = _esquemas.TryGetValue(entity, out var e) && e.Chave == chave ? e.Cols : null;
+
+        if (presentes is null)
         {
+            presentes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var describe = conn.CreateCommand();
             describe.CommandText = $"DESCRIBE SELECT * FROM read_parquet('{glob}', union_by_name=true);";
             using var dr = describe.ExecuteReader();
             while (dr.Read()) presentes.Add(dr.GetString(0));
+            lock (_esquemas) _esquemas[entity] = (chave, presentes);
         }
 
-        var cols = string.Join(", ", selectCols.Split(',')
-            .Select(c => c.Trim())
-            .Select(c => presentes.Contains(c) ? c : $"NULL AS {c}"));
+        var pedidas = selectCols.Split(',').Select(c => c.Trim()).Where(c => c != "").ToList();
+        var cols = string.Join(", ", pedidas.Select(c => presentes.Contains(c) ? c : $"NULL AS {c}"));
+
+        // Lê SÓ as colunas usadas (as pedidas + as três de controle). Sem isso a
+        // consulta traz a linha inteira do Parquet: numa entidade de dezenas de
+        // colunas, é muito byte atravessando a rede à toa.
+        var internas = new[] { "id", "_ts", "_deleted" };
+        var lidas = internas.All(presentes.Contains)
+            ? string.Join(", ", pedidas.Where(presentes.Contains).Concat(internas)
+                                       .Distinct(StringComparer.OrdinalIgnoreCase))
+            : "*";   // arquivo fora do padrão: lê tudo, correção antes de economia
 
         var order = string.IsNullOrWhiteSpace(orderBy) ? "" : $" ORDER BY {orderBy}";
         var sql = $@"
 SELECT {cols}
 FROM (
-    SELECT *, row_number() OVER (PARTITION BY id ORDER BY _ts DESC) AS _rn
+    SELECT {lidas}, row_number() OVER (PARTITION BY id ORDER BY _ts DESC) AS _rn
     FROM read_parquet('{glob}', union_by_name=true)
 )
 WHERE _rn = 1 AND NOT _deleted{order};";
@@ -253,7 +280,7 @@ COPY (
         FROM read_parquet('{glob}', union_by_name=true)
     )
     WHERE _rn = 1 AND NOT _deleted
-) TO '{tmpDuck}' (FORMAT PARQUET);";
+) TO '{tmpDuck}' (FORMAT PARQUET, COMPRESSION ZSTD);";
             cmd.ExecuteNonQuery();
         }
 
