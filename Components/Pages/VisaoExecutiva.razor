@@ -949,8 +949,6 @@
         { "#0b4f6f", "#0a6285", "#007A9E", "#1092b0", "#2aa5c0", "#5bb0c9", "#86c4d8", "#aed7e5" };
     private static string FunnelColor(int i) => FunnelColors[Math.Min(i, FunnelColors.Length - 1)];
 
-    // Chamado pelo mapa (JS) ao clicar num país. Reentra no contexto do componente.
-    [JSInvokable]
     // ---- gráficos de barras: ordem (arraste) e espessura, por usuário --------
     private string _login = "";
     private int _chartVersion = -1;
@@ -1012,6 +1010,8 @@
         StateHasChanged();
     });
 
+    // Chamado pelo mapa (JS) ao clicar num país. Reentra no contexto do componente.
+    [JSInvokable]
     public Task ApplyCrossFilter(string dim, string val) =>
         InvokeAsync(() => { CrossFilter(dim, val); StateHasChanged(); });
 
