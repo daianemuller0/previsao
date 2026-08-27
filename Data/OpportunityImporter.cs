@@ -350,7 +350,9 @@ public sealed class OpportunityImporter
             EquipmentTypeId = equip,
             KamId = kam,
             CustomerId = customer,
-            CommercialCategory = NormalizeCat(get(new[] { "NB/AFM", "NB/RT/AFM/SV" })),
+            // A exportação atual do Salesforce não traz a coluna NB/AFM; nesse
+            // caso a própria origem responde: esta planilha é a de New Business.
+            CommercialCategory = Ou(NormalizeCat(get(new[] { "NB/AFM", "NB/RT/AFM/SV" })), "NB"),
             IntercompanyBu = buInter,
             PvBusinessUnitId = puv,
             ServicoPrevisto = get(new[] { "Serviço previsto", "Servico previsto" }),
@@ -577,6 +579,9 @@ public sealed class OpportunityImporter
     private static string Show(string s) => string.IsNullOrWhiteSpace(s) ? "(sem número)" : s;
 
     // NB/RT/AFM/SV — normaliza para o código conhecido, senão preserva o texto.
+    private static string Ou(string valor, string alternativa) =>
+        string.IsNullOrWhiteSpace(valor) ? alternativa : valor;
+
     private static string NormalizeCat(string s)
     {
         var n = Norm(s);
