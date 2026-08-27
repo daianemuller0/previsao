@@ -8,7 +8,8 @@ REM  destino (robocopy /MIR): assim os arquivos de versoes antigas sao removidos
 REM  e nao sobra executavel velho para alguem abrir por engano.
 REM
 REM  A BASE DE DADOS NAO E AFETADA: ela fica em ...\previsao (pasta acima),
-REM  fora da pasta do programa.
+REM  fora da pasta do programa — e continua na rede, compartilhada por todos.
+REM  O que passa a ficar local em cada maquina e so o PROGRAMA (via iniciar.cmd).
 REM
 REM  Uso:  publicar.bat            -> publica no caminho padrao (abaixo)
 REM        publicar.bat "D:\pasta" -> publica em outro caminho
@@ -58,6 +59,14 @@ if exist "%EXE%" (
   ren "%EXE%" "Howden Sales Forecast.old_%RANDOM%%RANDOM%.exe" 2>nul
 )
 
+REM --- 2b) Leva o launcher junto -------------------------------------------
+REM O atalho aponta para o iniciar.cmd, nao para o .exe: ele mantem uma copia
+REM local do programa e so recopia quando sai versao nova. Abrir o .exe direto
+REM da rede obriga o Windows a trazer ~130 MB antes de o programa comecar — por
+REM VPN isso levava minutos, toda vez.
+copy /y "%~dp0iniciar.ps1" "%TEMPO%\iniciar.ps1" >nul
+copy /y "%~dp0iniciar.cmd" "%TEMPO%\iniciar.cmd" >nul
+
 REM --- 3) Espelha no destino (remove sobras de versoes antigas) --------------
 echo.
 echo  Copiando para o destino...
@@ -84,9 +93,11 @@ REM --- 4) Cria o atalho com o icone (logo Howden, embutido no .exe) ----------
 powershell -NoProfile -Command ^
   "$d='%DESTINO%';" ^
   "$exe=Join-Path $d 'Howden Sales Forecast.exe';" ^
+  "$cmd=Join-Path $d 'iniciar.cmd';" ^
   "$lnk=Join-Path $d 'Howden Sales Forecast.lnk';" ^
   "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($lnk);" ^
-  "$s.TargetPath=$exe; $s.WorkingDirectory=$d; $s.IconLocation=\"$exe,0\";" ^
+  "$s.TargetPath=$cmd; $s.WorkingDirectory=$d; $s.IconLocation=\"$exe,0\";" ^
+  "$s.WindowStyle=7;" ^
   "$s.Description='Howden Sales Forecast - Sales & Revenue Intelligence';" ^
   "$s.Save(); Write-Host ' Atalho criado: ' $lnk"
 
@@ -95,5 +106,8 @@ rmdir /s /q "%TEMPO%"
 echo.
 echo  Publicacao concluida.
 echo  Para usar: abra o atalho "Howden Sales Forecast" na pasta publicada.
+echo.
+echo  Na primeira abertura de cada pessoa o programa e copiado para a maquina
+echo  dela (uma vez so). Depois disso a abertura e imediata, mesmo por VPN.
 echo.
 pause
