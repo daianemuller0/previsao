@@ -1816,3 +1816,22 @@ td .fu-sub svg { width: 12px; height: 12px; vertical-align: -1px; margin-right: 
 
 /* O resto da página não rola por baixo do painel ampliado. */
 body.zoom-mode { overflow: hidden; }
+
+/* Régua de rolagem horizontal acima da tabela (a nativa fica no rodapé, longe
+   de quem está olhando o cabeçalho). O filho só existe para dar largura. */
+.tbl-scroll-topo { overflow-x: auto; overflow-y: hidden; margin-bottom: 2px; }
+.tbl-scroll-topo > div { height: 1px; }
+
+/* Ícone ao lado do título dos funis — os dois seguem o mesmo padrão. */
+.pf-ico { width: 15px; height: 15px; margin-right: 7px; vertical-align: -2px; color: var(--teal); }
+
+/* Tamanho da letra (A- / A+) na barra do topo. */
+.fonte-ctl { display: inline-flex; align-items: center; gap: 2px; }
+.fonte-ctl button {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; padding: 0; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text-2); border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-weight: 700; line-height: 1;
+}
+.fonte-ctl button:hover { background: var(--panel-2); color: var(--primary); border-color: var(--teal); }
+.fonte-ctl .nivel { font-size: 11px; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }

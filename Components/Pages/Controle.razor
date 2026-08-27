@@ -175,7 +175,9 @@ else
                 <button class="btn-primary sm" @onclick="NewReg">@Icons.Svg("edit")Adicionar</button>
             </div>
         </div>
-        <div class="table-wrap rep-wrap">
+        @* Régua de rolagem acima da tabela (a de baixo obriga a descer a lista toda). *@
+        <div class="tbl-scroll-topo" id="sc-reg"><div></div></div>
+        <div class="table-wrap rep-wrap" id="tw-reg">
             <table class="grid-tbl reg-tbl">
                 <thead>
                     @* Arraste o cabeçalho para reordenar as colunas (guardado por usuário). *@
@@ -413,6 +415,7 @@ else
     {
         if (firstRender) _ref ??= DotNetObjectReference.Create(this);
         try { await JS.InvokeVoidAsync("colOrder.init", "th-reg", _ref, TabelaReg); } catch { }
+        try { await JS.InvokeVoidAsync("appRolagemTopo", "sc-reg", "tw-reg"); } catch { }
     }
 
     public void Dispose() => _ref?.Dispose();

@@ -24,7 +24,10 @@
     <ColumnPicker Cols="_cols" OnApply="AplicarColunas" OnReset="ResetarColunas" OnClose="() => _colsOpen = false" />
 }
 
-<div class="table-wrap @CssClass" style="@Style">
+@* Régua de rolagem horizontal ACIMA da tabela: com dezenas de colunas, a barra
+   lá embaixo obriga a percorrer a lista inteira só para deslocar as colunas. *@
+<div class="tbl-scroll-topo" id="@RolaId"><div></div></div>
+<div class="table-wrap @CssClass" id="@WrapId" style="@Style">
     <table class="grid-tbl">
         <thead>
             @* Arraste o cabeçalho para reordenar as colunas (guardado por usuário). *@
@@ -292,6 +295,8 @@
 
     // Cada instância tem o seu <tr>: o id precisa ser único na página.
     private readonly string HeadId = "th-" + Guid.NewGuid().ToString("N")[..8];
+    private readonly string RolaId = "sc-" + Guid.NewGuid().ToString("N")[..8];
+    private readonly string WrapId = "tw-" + Guid.NewGuid().ToString("N")[..8];
     private DotNetObjectReference<OpportunityTable>? _ref;
 
     protected override async Task OnInitializedAsync()
@@ -344,6 +349,9 @@
     {
         if (firstRender) _ref ??= DotNetObjectReference.Create(this);
         try { await JS.InvokeVoidAsync("colOrder.init", HeadId, _ref, OpportunityColumns.Tabela); } catch { }
+        // A cada render: o número de colunas pode ter mudado e a régua precisa
+        // acompanhar a largura nova da tabela.
+        try { await JS.InvokeVoidAsync("appRolagemTopo", RolaId, WrapId); } catch { }
     }
 
     public void Dispose() => _ref?.Dispose();

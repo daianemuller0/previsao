@@ -97,7 +97,6 @@ window.presentation = (function () {
     return { start, stop };
 })();
 
-// ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
 // Comando por voz (Web Speech API · Edge/Chrome). Escuta em pt-BR e manda o
 // texto reconhecido para o componente Blazor (ApplyVoiceCommand), que interpreta
 // e aplica os filtros. Callbacks de status/parcial alimentam o indicador na tela.
@@ -189,6 +188,7 @@ window.xfilter = (function () {
     return { init };
 })();
 
+// ---- Mapa-múndi interativo (tooltip, zoom com a roda, arrastar p/ mover) ----
 window.worldMap = (function () {
     function estado(id) {
         const wrap = document.getElementById(id);
@@ -411,6 +411,10 @@ window.appAmpliar = function (btn) {
 
     window.appAmpliarSair();                       // um painel ampliado por vez
 
+    // Sobe a página primeiro: com ela rolada, a barra de filtros pode estar em
+    // qualquer altura, e a medida sairia errada.
+    window.scrollTo(0, 0);
+
     // Onde termina o que precisa continuar visível (topo + barra de filtros).
     const barra = document.querySelector('.filterbar');
     const topo = document.querySelector('.topbar');
@@ -437,3 +441,70 @@ window.appAmpliarSair = function () {
 };
 
 function sairComEsc(e) { if (e.key === 'Escape') window.appAmpliarSair(); }
+
+// ---------------------------------------------------------------------------
+// Régua de rolagem horizontal ACIMA da tabela.
+//
+// Com dezenas de colunas, a barra nativa fica no rodapé: para deslocar as
+// colunas a pessoa precisa descer a lista inteira. Aqui um segundo trilho fica
+// no topo, sincronizado nos dois sentidos com o container real.
+//
+// Feito com dois elementos que o Blazor já criou (a régua vem no markup), sem
+// inserir nós — o DOM é dele.
+// ---------------------------------------------------------------------------
+window.appRolagemTopo = function (idRegua, idTabela) {
+    const regua = document.getElementById(idRegua);
+    const tabela = document.getElementById(idTabela);
+    if (!regua || !tabela) return;
+
+    const medida = regua.firstElementChild;
+    if (!medida) return;
+
+    // Largura do conteúdo: é o que define o tamanho do "polegar" da régua.
+    const ajustar = () => {
+        medida.style.width = tabela.scrollWidth + 'px';
+        // Sem rolagem horizontal, a régua não tem por que aparecer.
+        regua.style.display = tabela.scrollWidth > tabela.clientWidth + 1 ? '' : 'none';
+    };
+    ajustar();
+
+    if (regua.__sync) { regua.__sync(); return; }   // já ligado: só remede
+
+    let de = null;                                  // evita o eco de um no outro
+    regua.addEventListener('scroll', () => {
+        if (de === 'tabela') { de = null; return; }
+        de = 'regua'; tabela.scrollLeft = regua.scrollLeft;
+    });
+    tabela.addEventListener('scroll', () => {
+        if (de === 'regua') { de = null; return; }
+        de = 'tabela'; regua.scrollLeft = tabela.scrollLeft;
+    });
+    window.addEventListener('resize', ajustar);
+    regua.__sync = ajustar;
+};
+
+// ---------------------------------------------------------------------------
+// Tamanho da letra de tudo. Guardado por máquina (localStorage): é preferência
+// de quem está olhando a tela, não do cadastro da pessoa.
+// ---------------------------------------------------------------------------
+window.appFonte = (function () {
+    const MIN = 80, MAX = 160, PASSO = 10, CHAVE = 'hsf-fonte';
+
+    function ler() {
+        try { return Math.min(MAX, Math.max(MIN, parseInt(localStorage.getItem(CHAVE) || '100', 10))); }
+        catch { return 100; }
+    }
+    function aplicar(v) {
+        document.documentElement.style.zoom = v === 100 ? '' : (v / 100);
+        const rot = document.getElementById('fonte-nivel');
+        if (rot) rot.textContent = v + '%';
+    }
+    function mudar(delta) {
+        const v = Math.min(MAX, Math.max(MIN, ler() + delta * PASSO));
+        try { localStorage.setItem(CHAVE, String(v)); } catch { }
+        aplicar(v);
+    }
+    // Ao carregar a página, restaura o tamanho escolhido.
+    document.addEventListener('DOMContentLoaded', () => aplicar(ler()));
+    return { mudar, aplicar, ler };
+})();

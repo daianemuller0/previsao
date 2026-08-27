@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
 
 <div class="app-shell">
     <NavMenu />
@@ -12,6 +13,13 @@
                 <div class="search-global">
                     @Icons.Svg("search")
                     <input placeholder="Buscar oportunidade, cliente, proposta…" />
+                </div>
+                @* Tamanho da letra de tudo: resolvido no navegador e guardado
+                   na máquina, porque é preferência de quem olha a tela. *@
+                <div class="fonte-ctl" title="Tamanho da letra">
+                    <button type="button" onclick="appFonte.mudar(-1)" title="Diminuir a letra">A−</button>
+                    <span class="nivel" id="fonte-nivel">100%</span>
+                    <button type="button" onclick="appFonte.mudar(1)" title="Aumentar a letra">A+</button>
                 </div>
                 <AuthorizeView>
                     <Authorized>
@@ -35,6 +43,14 @@
 </div>
 
 @code {
+    // O rótulo do tamanho da letra é desenhado pelo Blazor, depois de o app.js
+    // já ter restaurado a preferência: reaplica para o número bater com o zoom.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await JS.InvokeVoidAsync("appFonte.aplicar", await JS.InvokeAsync<int>("appFonte.ler")); } catch { }
+    }
+
     private static string RoleLabel(AuthenticationState ctx) =>
         AccessRoles.Label(AccessRoles.Normalize(ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value));
 
