@@ -119,7 +119,7 @@ void Etapa(string nome, Action acao)
 using (var scope = app.Services.CreateScope())
 {
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
-    Anota($"[subida] pasta de dados: {store.Folder}");
+    Anota($"[subida] pasta de dados: {store.Folder} · espelho local: {(store.EspelhoAtivo ? "sim" : "não (pasta local)")}");
     Etapa("catálogo", () => DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>()));
     Etapa("listas", () => scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty());
     var controleRepo = scope.ServiceProvider.GetRequiredService<ControleRepository>();

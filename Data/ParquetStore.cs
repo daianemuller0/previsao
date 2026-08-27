@@ -50,12 +50,73 @@ public sealed class ParquetStore
                     "Verifique a chave \"Data:Folder\" no appsettings.", ex2);
             }
         }
+
+        _remoto = EhRede(Folder);
+        _espelho = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "HowdenSalesForecast", "espelho");
     }
 
     // Diretórios já garantidos nesta execução. Em pasta de rede (ainda mais por
     // VPN) cada CreateDirectory é uma ida ao servidor, e EntityDir é chamado em
     // toda leitura e toda gravação.
     private readonly HashSet<string> _dirsOk = new(StringComparer.OrdinalIgnoreCase);
+
+    // ---- espelho local dos Parquet (leitura) --------------------------------
+    // Ler Parquet direto da rede é lento não pelo tamanho, mas pelo VAIVÉM: o
+    // DuckDB abre o rodapé de cada arquivo, volta, lê pedaços de coluna, volta.
+    // Por VPN cada ida dessas custa caro. Copiar os arquivos de uma vez (leitura
+    // sequencial, que a rede faz bem) e consultar a cópia local troca dezenas de
+    // idas por uma. A CÓPIA SÓ ACONTECE QUANDO A PASTA DA REDE MUDA — e qualquer
+    // gravação, de quem quer que seja, muda a assinatura da pasta.
+    //
+    // As GRAVAÇÕES continuam indo direto para a rede: o espelho é só de leitura,
+    // então ninguém trabalha em cima de dado local desatualizado.
+    private readonly bool _remoto;
+    private readonly string _espelho;
+
+    /// <summary>Está lendo de um espelho local (pasta de dados na rede)?</summary>
+    public bool EspelhoAtivo => _remoto;
+
+    private bool EhRede(string caminho)
+    {
+        try
+        {
+            if (caminho.StartsWith(@"\\", StringComparison.Ordinal)) return true;
+            var raiz = Path.GetPathRoot(caminho);
+            return raiz is not null && new DriveInfo(raiz).DriveType == DriveType.Network;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Assinatura da pasta: muda a cada gravação, exclusão ou compactação.</summary>
+    private static string Assinatura(FileInfo[] arquivos) =>
+        arquivos.Length == 0 ? "0"
+        : $"{arquivos.Length}|{arquivos.Max(f => f.LastWriteTimeUtc.Ticks)}|{arquivos.Sum(f => f.Length)}";
+
+    /// <summary>Pasta a consultar: o espelho local quando vale a pena, senão a
+    /// própria pasta da rede. Nunca lança — na dúvida, lê da rede.</summary>
+    private string PastaDeLeitura(string entity, FileInfo[] arquivos, string assinatura)
+    {
+        if (!_remoto) return Path.Combine(Folder, entity);
+        try
+        {
+            var destino = Path.Combine(_espelho, entity);
+            var marca = Path.Combine(destino, ".assinatura");
+            if (Directory.Exists(destino) && File.Exists(marca) &&
+                File.ReadAllText(marca).Trim() == assinatura)
+                return destino;
+
+            Directory.CreateDirectory(destino);
+            foreach (var velho in Directory.EnumerateFiles(destino, "*.parquet"))
+                File.Delete(velho);
+            foreach (var f in arquivos)
+                f.CopyTo(Path.Combine(destino, f.Name), overwrite: true);
+            File.WriteAllText(marca, assinatura);
+            return destino;
+        }
+        catch { return Path.Combine(Folder, entity); }
+    }
 
     private string EntityDir(string entity)
     {
@@ -177,13 +238,15 @@ public sealed class ParquetStore
         var arquivos = new DirectoryInfo(dir).GetFiles("*.parquet");
         if (arquivos.Length == 0) return new List<T>();
 
-        var glob = Duck(Path.Combine(dir, "*.parquet"));
+        // Uma varredura da pasta responde tudo: se algo mudou (para o espelho e
+        // para o esquema) e quais arquivos copiar.
+        var chave = Assinatura(arquivos);
+        var glob = Duck(Path.Combine(PastaDeLeitura(entity, arquivos, chave), "*.parquet"));
         using var conn = Open();
 
         // Evolução de esquema: arquivos antigos podem não ter colunas novas.
         // union_by_name junta esquemas diferentes entre arquivos, e as colunas
         // pedidas que não existirem em NENHUM arquivo viram NULL no SELECT.
-        var chave = $"{arquivos.Length}|{arquivos.Max(f => f.LastWriteTimeUtc.Ticks)}|{arquivos.Sum(f => f.Length)}";
         HashSet<string>? presentes;
         lock (_esquemas)
             presentes = _esquemas.TryGetValue(entity, out var e) && e.Chave == chave ? e.Cols : null;
