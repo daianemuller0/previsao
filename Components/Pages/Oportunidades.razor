@@ -88,18 +88,18 @@
     </div>
 }
 
-@* ---- Importar base a partir de planilha (.xlsx / .csv) ---- *@
+@* ---- Importar base a partir de planilha (.xlsx / .xlsm / .xls / .csv) ---- *@
 @if (_import)
 {
     <div class="drawer-backdrop" @onclick="CancelImport"></div>
     <div class="confirm-box" style="width:min(540px,calc(100vw - 32px))">
         <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("import")<span>Importar base</span></div>
         <p class="confirm-text">
-            Envie a planilha do forecast (<strong>.xlsx</strong> ou <strong>.csv</strong>) com as colunas padrão.
+            Envie a planilha do forecast (<strong>.xlsx</strong>, <strong>.xls</strong> ou <strong>.csv</strong>) com as colunas padrão.
             País, mercado, produto, cliente e KAM são casados automaticamente com o catálogo; valores sem correspondência são preservados como texto.
         </p>
-        <label class="fld">Arquivo (.xlsx ou .csv)
-            <InputFile class="field" OnChange="OnImportFile" accept=".xlsx,.csv" />
+        <label class="fld">Arquivo (.xlsx, .xls ou .csv)
+            <InputFile class="field" OnChange="OnImportFile" accept=".xlsx,.xlsm,.xls,.csv" />
         </label>
         @if (_importing) { <div class="info-banner mt-16">Lendo o arquivo…</div> }
         @if (!string.IsNullOrEmpty(_importErr)) { <div class="confirm-err">@_importErr</div> }
@@ -138,12 +138,12 @@
     <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
         <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("flag")<span>Indicar na Previsão em massa</span></div>
         <p class="confirm-text">
-            Envie uma planilha (<strong>.xlsx</strong> ou <strong>.csv</strong>) com <strong>uma coluna</strong> contendo os
+            Envie uma planilha (<strong>.xlsx</strong>, <strong>.xls</strong> ou <strong>.csv</strong>) com <strong>uma coluna</strong> contendo os
             <strong>códigos de proposta</strong>. As propostas encontradas na base serão marcadas como
             <strong>indicadas na previsão</strong>. Os códigos não encontrados voltam num Excel para você conferir.
         </p>
-        <label class="fld">Arquivo (.xlsx ou .csv)
-            <InputFile class="field" OnChange="OnBulkFile" accept=".xlsx,.csv" />
+        <label class="fld">Arquivo (.xlsx, .xls ou .csv)
+            <InputFile class="field" OnChange="OnBulkFile" accept=".xlsx,.xlsm,.xls,.csv" />
         </label>
         @if (!string.IsNullOrEmpty(_bulkErr)) { <div class="confirm-err">@_bulkErr</div> }
         @if (_bulkCodes.Count > 0 && _bulkFound is null)
@@ -408,6 +408,17 @@
                 if (first != "") list.Add(first);
             }
         }
+        else if (fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
+        {
+            // .xls (binário antigo): o ClosedXML só lê OpenXML.
+            using var reader = ExcelDataReader.ExcelReaderFactory.CreateReader(stream);
+            while (reader.Read())
+            {
+                if (reader.FieldCount == 0 || reader.IsDBNull(0)) continue;
+                var v = reader.GetValue(0)?.ToString()?.Trim() ?? "";
+                if (v != "") list.Add(v);
+            }
+        }
         else
         {
             using var wb = new ClosedXML.Excel.XLWorkbook(stream);
@@ -532,7 +543,7 @@
         CancelWipe();
     }
 
-    // ---- importação de planilha (.xlsx / .csv) ----
+    // ---- importação de planilha (.xlsx / .xlsm / .xls / .csv) ----
     private void OpenImport()
     {
         _import = true; _importResult = null; _importFileName = ""; _importErr = ""; _importMode = "add";
