@@ -106,6 +106,38 @@ public class Opportunity
     // Indicada na Previsão de Vendas (marcador do vendedor).
     public bool IndicadaValue => string.Equals(Indicada, "Sim", StringComparison.OrdinalIgnoreCase);
 
+    // Setor de origem (NB/AFM). Registros antigos ficaram sem o campo; nesses o
+    // prefixo do id ainda conta de qual planilha vieram.
+    public string SetorEfetivo =>
+        !string.IsNullOrWhiteSpace(Setor) ? Setor.Trim()
+        : Id.StartsWith("afm-", StringComparison.OrdinalIgnoreCase) ? "AFM"
+        : Id.StartsWith("imp-", StringComparison.OrdinalIgnoreCase) ? "NB"
+        : "";
+
+    // Categoria comercial: vem do setor de origem. Só cai no campo gravado para
+    // as oportunidades criadas à mão, que não têm planilha por trás.
+    public string CategoriaNbAfm =>
+        SetorEfetivo != "" ? SetorEfetivo : CommercialCategory;
+
+    // A previsão só está completa quando estes campos estão preenchidos — é o
+    // que o vendedor precisa informar ao indicar a oportunidade.
+    public IReadOnlyList<string> PendenciasPrevisao
+    {
+        get
+        {
+            var f = new List<string>();
+            if (WinProbabilityValue <= 0) f.Add("% de Ganho");
+            if (CloseProbabilityValue <= 0) f.Add("% de Sair no Mês");
+            if (string.IsNullOrWhiteSpace(Ramp)) f.Add("RAMP");
+            if (string.IsNullOrWhiteSpace(Otp)) f.Add("OTP");
+            if (string.IsNullOrWhiteSpace(Top10)) f.Add("TOP 10");
+            if (string.IsNullOrWhiteSpace(Kyc)) f.Add("KYC");
+            return f;
+        }
+    }
+
+    public bool PrevisaoIncompleta => IndicadaValue && PendenciasPrevisao.Count > 0;
+
     // Venda indicada: movida para o Controle (Ofertas e pedidos) e retirada das Oportunidades.
     public bool MovidaControleValue => string.Equals(MovidaControle, "Sim", StringComparison.OrdinalIgnoreCase);
 

@@ -61,7 +61,7 @@ public sealed class DataSyncService
     // Entra na marca: quando o mapeamento das planilhas muda (uma coluna nova
     // passa a ser lida), a versão sobe e todo mundo reimporta na próxima abertura,
     // mesmo que a planilha da rede continue exatamente a mesma.
-    private const string ImportVersion = "v3";
+    private const string ImportVersion = "v4";
 
     private string? MarcaGravada(string prefix)
     {
