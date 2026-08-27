@@ -21,7 +21,6 @@ public static class OpportunityColumns
         new TableColumns.ColDef("marketvar",   "Market Variável"),
         new TableColumns.ColDef("market",      "Market"),
         new TableColumns.ColDef("product",     "Product"),
-        new TableColumns.ColDef("equip",       "Tipo de Equipamento"),
         new TableColumns.ColDef("kam",         "Key Account"),
         new TableColumns.ColDef("customer",    "Customer"),
         new TableColumns.ColDef("plantname",   "PlantName"),
@@ -47,8 +46,8 @@ public static class OpportunityColumns
         new TableColumns.ColDef("kyc",         "KYC",                "center"),
     };
 
-    // Colunas ocultas por padrão (o usuário pode reexibir).
-    private static readonly HashSet<string> OcultasPadrao = new(StringComparer.OrdinalIgnoreCase) { "equip" };
+    // Colunas ocultas por padrão (o usuário pode reexibir pelo painel "Colunas").
+    private static readonly HashSet<string> OcultasPadrao = new(StringComparer.OrdinalIgnoreCase) { "onestream" };
 
     public static List<TableColumns.ColState> Default() => TableColumns.Default(All, OcultasPadrao);
     public static List<TableColumns.ColState> Parse(string? pref) => TableColumns.Parse(pref, All, OcultasPadrao);
