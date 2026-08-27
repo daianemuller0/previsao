@@ -1592,6 +1592,14 @@ tr.row-ind { background: #fff8e6; }
 tr.row-ind:hover { background: #fdf0cf; }
 tr.row-ind td.col-strong { color: #9a6a12; }
 
+/* OTP confirmado: verde discreto na linha inteira, em todas as listagens.
+   Vem depois da indicada porque OTP é o sinal mais forte (o pedido já entrou);
+   quando a linha é as duas coisas, a faixa âmbar à esquerda mantém a indicação. */
+tr.row-otp { background: #edf8f1; }
+tr.row-otp:hover { background: #e0f2e8; }
+tr.row-otp td.col-strong { color: #1c6b43; }
+tr.row-ind.row-otp td:first-child { box-shadow: inset 3px 0 0 #e0a92b; }
+
 /* ==========================================================================
    PREVISÃO INDICADA — seção dedicada às oportunidades sinalizadas
    ========================================================================== */

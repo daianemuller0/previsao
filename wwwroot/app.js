@@ -246,6 +246,14 @@ window.worldMap = (function () {
             const val = p.getAttribute('data-xf-val');
             if (val) s.ref.invokeMethodAsync('ApplyCrossFilter', 'country', val);
         });
+        // Duplo clique fora de qualquer país (oceano / país sem dados): limpa
+        // todos os filtros da página — a saída rápida depois de ir clicando.
+        wrap.addEventListener('dblclick', e => {
+            if (!s.ref) return;
+            const p = e.target.closest && e.target.closest('path[data-xf-val]');
+            if (p) return;
+            s.ref.invokeMethodAsync('ClearAllFilters');
+        });
         apply(s);
     }
     function zoom(id, factor) {

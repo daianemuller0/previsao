@@ -80,7 +80,7 @@
         <tbody>
             @foreach (var r in Filtered())
             {
-                <tr class="@(r.Rank == 0 ? "fu-urgent" : "")">
+                <tr class="@(r.Rank == 0 ? "fu-urgent" : "") @(string.Equals(r.Opp.Otp, "Sim", StringComparison.OrdinalIgnoreCase) ? "row-otp" : "")">
                     <td>
                         <span class="fu-due @DueCss(r)">@DueLabel(r)</span>
                         <div class="fu-sub">@(r.Cur?.Label ?? "rotina concluída")</div>
