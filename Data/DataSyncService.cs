@@ -256,6 +256,10 @@ public sealed class DataSyncService
         nameof(Opportunity.Kyc),
         nameof(Opportunity.Top10),
         nameof(Opportunity.PlantId),
+        // Categoria NB/AFM: a exportação do CRM não traz a coluna, então o
+        // importador deduz pela origem. Dedução não sobrescreve correção feita
+        // na tela — só preenche quando ainda não há nada guardado.
+        nameof(Opportunity.CommercialCategory),
         nameof(Opportunity.ForecastCategory), // escolha do usuário na tela
         nameof(Opportunity.PipelineStageId),  // idem (Etapa)
         nameof(Opportunity.ManagerProbability),

@@ -186,7 +186,10 @@
             <label class="fld">Tipo de Equipamento<input class="field" list="dl-tipo_equip" @bind="_edit.EquipmentTypeId" /></label>
             <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_edit.KamId" /></label>
             <label class="fld">Customer<input class="field" list="dl-customer" @bind="_edit.CustomerId" /></label>
-            <label class="fld">Planta
+            @* PlantName vem da planilha (AFM: coluna PlantName; NB: End User Site).
+               A "Planta" abaixo é o cadastro interno e não vem de importação. *@
+            <label class="fld">PlantName<input class="field" @bind="_edit.EndUserSite" /></label>
+            <label class="fld">Planta (cadastro)
                 <select class="field" @bind="_edit.PlantId">
                     <option value="">—</option>
                     @if (Unknown(_edit.PlantId, Cat.Plants.Select(x => x.Id))) { <option value="@_edit.PlantId" selected>@_edit.PlantId</option> }
@@ -220,6 +223,17 @@
 
             <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_edit.PvBusinessUnitId" /></label>
             <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_edit.IntercompanyBu" /></label>
+            <label class="fld">Is Inter Company <span class="hint">vem da planilha</span><input class="field" @bind="_edit.IsInterCompany" /></label>
+
+            @* Colunas do funil que vêm da planilha e não tinham lugar no formulário. *@
+            <label class="fld">Stage (etapa da planilha)<input class="field" @bind="_edit.Stage" /></label>
+            <label class="fld">Commercial Segment<input class="field" @bind="_edit.CommercialSegment" /></label>
+            <label class="fld">Process<input class="field" @bind="_edit.Process" /></label>
+            <label class="fld">Brand<input class="field" @bind="_edit.Brand" /></label>
+            <label class="fld">Chance<input class="field" @bind="_edit.Chance" /></label>
+            <label class="fld">Customer Ref#<input class="field" @bind="_edit.CustomerRef" /></label>
+            <label class="fld">Status Description<input class="field" @bind="_edit.StatusDescription" /></label>
+            <label class="fld full">Description<input class="field" @bind="_edit.Description" /></label>
 
             <label class="fld">RAMP<input class="field" @bind="_edit.Ramp" /></label>
             <label class="fld">Coluna1<input class="field" @bind="_edit.Coluna1" /></label>
