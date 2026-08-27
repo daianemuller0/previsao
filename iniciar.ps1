@@ -57,7 +57,7 @@ if (-not $ok) {
     # /MIR espelha (remove sobras de versoes antigas). O launcher e os atalhos
     # ficam de fora: sao da pasta de rede, nao do programa.
     robocopy $rede $local /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:2 `
-             /XF 'iniciar.ps1' 'iniciar.cmd' 'iniciar.vbs' '*.lnk' 'old_*.exe' '*.old_*.exe' | Out-Null
+             /XF 'iniciar.ps1' 'iniciar.cmd' '*.lnk' 'old_*.exe' '*.old_*.exe' | Out-Null
     if ($LASTEXITCODE -ge 8) {
         Write-Host ' Falha ao copiar o programa. Verifique o acesso a pasta de rede.' -ForegroundColor Red
         Read-Host ' Enter para fechar'

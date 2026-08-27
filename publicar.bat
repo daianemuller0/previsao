@@ -60,14 +60,13 @@ if exist "%EXE%" (
 )
 
 REM --- 2b) Leva o launcher junto -------------------------------------------
-REM O atalho aponta para o iniciar.vbs, nao para o .exe: ele mantem uma copia
+REM O atalho aponta para o iniciar.cmd, nao para o .exe: ele mantem uma copia
 REM local do programa e so recopia quando sai versao nova. Abrir o .exe direto
 REM da rede obriga o Windows a trazer ~130 MB antes de o programa comecar — por
-REM VPN isso levava minutos, toda vez. O .vbs abre sem janela nenhuma; o .cmd
-REM fica junto porque e ele que aparece (de proposito) durante a copia.
+REM VPN isso levava minutos, toda vez. A janela do .cmd fica visivel: e por ela
+REM que se acompanha a copia quando sai versao nova.
 copy /y "%~dp0iniciar.ps1" "%TEMPO%\iniciar.ps1" >nul
 copy /y "%~dp0iniciar.cmd" "%TEMPO%\iniciar.cmd" >nul
-copy /y "%~dp0iniciar.vbs" "%TEMPO%\iniciar.vbs" >nul
 
 REM --- 3) Espelha no destino (remove sobras de versoes antigas) --------------
 echo.
@@ -95,11 +94,10 @@ REM --- 4) Cria o atalho com o icone (logo Howden, embutido no .exe) ----------
 powershell -NoProfile -Command ^
   "$d='%DESTINO%';" ^
   "$exe=Join-Path $d 'Howden Sales Forecast.exe';" ^
-  "$vbs=Join-Path $d 'iniciar.vbs';" ^
+  "$cmd=Join-Path $d 'iniciar.cmd';" ^
   "$lnk=Join-Path $d 'Howden Sales Forecast.lnk';" ^
   "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($lnk);" ^
-  "$s.TargetPath='wscript.exe'; $s.Arguments='\"'+$vbs+'\"';" ^
-  "$s.WorkingDirectory=$d; $s.IconLocation=\"$exe,0\";" ^
+  "$s.TargetPath=$cmd; $s.WorkingDirectory=$d; $s.IconLocation=\"$exe,0\";" ^
   "$s.Description='Howden Sales Forecast - Sales & Revenue Intelligence';" ^
   "$s.Save(); Write-Host ' Atalho criado: ' $lnk"
 
