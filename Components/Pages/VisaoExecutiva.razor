@@ -179,12 +179,13 @@
         var _fnTop2 = _funnel.Count >= 2 ? _funnel.Take(2).Sum(x => x.Value) / _funnelTotal * 100 : 100;
         <div class="pf-head">
             <div>
-                <div class="xcard-title">Funil de Vendas por Etapa</div>
+                <div class="xcard-title">@Icons.Svg("pipeline", "pf-ico")Funil de Vendas por Etapa</div>
                 <div class="xcard-sub">Valor · @_currency · @_funnel.Count etapas · sequência do funil</div>
             </div>
             <div class="pf-totals">
                 <div class="pf-tot"><div class="pf-tot-l">Total do Funil</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
                 <div class="pf-tot"><div class="pf-tot-l">Total de Oportunidades</div><div class="pf-tot-v">@_fnOpps</div></div>
+                <TelaCheia />
             </div>
         </div>
         <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> do valor do funil está concentrado @(_funnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa").</span></div>
@@ -228,9 +229,27 @@
     else
     {
         @* Funil só das indicadas *@
-        <div class="xcard ind-card">
-            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("flag")</span><div><div class="xcard-title">Funil das indicadas · por Stage</div><div class="xcard-sub">@_indicadas.Count oport. · @MoneyBrl(_indTotal) · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) do pipeline</div></div><TelaCheia /></div>
-            <div class="fn5">
+        @* Mesma estrutura do funil ao lado (cabeçalho, aviso, etapas e base):
+           são leituras que se comparam, então qualquer diferença de formato
+           vira ruído na hora de olhar os dois juntos. *@
+        <div class="xcard pf-card ind-card">
+            @{
+                var _ifOpps = _indFunnel.Sum(x => x.Count);
+                var _ifTop2 = _indFunnel.Count >= 2 ? _indFunnel.Take(2).Sum(x => x.Value) / Math.Max(_indTotal, 1) * 100 : 100;
+            }
+            <div class="pf-head">
+                <div>
+                    <div class="xcard-title">@Icons.Svg("flag", "pf-ico")Funil das Indicadas por Etapa</div>
+                    <div class="xcard-sub">Valor · @_currency · @_indFunnel.Count etapas · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) do pipeline</div>
+                </div>
+                <div class="pf-totals">
+                    <div class="pf-tot"><div class="pf-tot-l">Total do Funil</div><div class="pf-tot-v">@MoneyBrl(_indTotal)</div></div>
+                    <div class="pf-tot"><div class="pf-tot-l">Total de Oportunidades</div><div class="pf-tot-v">@_ifOpps</div></div>
+                    <TelaCheia />
+                </div>
+            </div>
+            <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_ifTop2)</strong> do valor do funil está concentrado @(_indFunnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa").</span></div>
+            <div class="fn5 @(DimActive("stage") ? "has-active" : "")">
                 @for (var i = 0; i < _indFunnel.Count; i++)
                 {
                     var f = _indFunnel[i];
@@ -240,15 +259,20 @@
                     var dwN = i < _indFunnel.Count - 1 ? FnW(i + 1, _indFunnel.Count) : dw * 0.86;
                     var frac = dwN / dw;
                     var inset = (1 - frac) / 2 * 100;
-                    <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) · @f.Count opps">
+                    <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) do funil · @f.Count oportunidades@(conv is { } cv ? " · " + Fmt.Pct(cv) + " para a próxima" : "")">
                         <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _indFunnel.Count)"></div>
                         <div class="fn5-text @(FunnelDark(i, _indFunnel.Count) ? "dark" : "")">
                             <div class="fn5-name">@f.Stage</div>
                             <div class="fn5-amt">@MoneyBrl(f.Value)</div>
-                            <div class="fn5-sub">@Fmt.Pct(sh) · @f.Count opps@(conv is { } c ? " · ↓ " + Fmt.Pct(c) : "")</div>
+                            <div class="fn5-sub">@Fmt.Pct(sh) do funil · @f.Count oport.@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " para a próxima" : "")</div>
                         </div>
                     </div>
                 }
+            </div>
+            @* Mesma base do outro funil: o valor efetivamente vendido. *@
+            <div class="fn5-bottom">
+                <span class="fn5-bottom-l">@Icons.Svg("check")Vendas totais · Realizado@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
+                <span class="fn5-bottom-v">@MoneyBrl(_heroReal)</span>
             </div>
         </div>
 
