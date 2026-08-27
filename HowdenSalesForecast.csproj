@@ -10,6 +10,16 @@
          encerra é o fechamento da última aba (ver DesligaAoFechar). -->
     <OutputType>WinExe</OutputType>
 
+    <!-- O executável é self-contained (leva o .NET e o DuckDB dentro), e é ele
+         que atravessa a rede quando alguém pega uma versão nova. Comprimir o
+         conteúdo corta o tamanho quase pela metade; o custo é descompactar na
+         primeira execução, que acontece no disco local e só uma vez por versão. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+
+    <!-- Só os textos em inglês das bibliotecas: as traduções viram dezenas de
+         DLLs de satélite que ninguém lê (a interface é nossa, em pt-BR). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
     <!-- Ícone do executável: é o que aparece no atalho do Windows. -->
     <ApplicationIcon>wwwroot\howden.ico</ApplicationIcon>
     <!-- Identificação exibida nas propriedades do arquivo (.exe). -->
