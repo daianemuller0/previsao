@@ -1835,3 +1835,42 @@ body.zoom-mode { overflow: hidden; }
 }
 .fonte-ctl button:hover { background: var(--panel-2); color: var(--primary); border-color: var(--teal); }
 .fonte-ctl .nivel { font-size: 11px; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Painel montável da Visão Executiva
+   ========================================================================== */
+/* Os agrupamentos internos deixam de formar caixa: os painéis viram itens
+   diretos da MESMA grade, e é só por isso que um gráfico consegue sair de uma
+   linha e ir para outra. */
+.exec-board > .g12,
+.exec-board > #xf-charts,
+.exec-board > #xf-charts > .g12 { display: contents; }
+
+/* Blocos que não nasceram como coluna da grade ocupam a linha inteira. */
+.exec-board > .xsec,
+.exec-board > .kpi-row,
+.exec-board > .hero,
+.exec-board > .panel,
+.exec-board > .exi-grid,
+.exec-board > .section-head,
+.exec-board > .attn2 { grid-column: span 12; }
+
+/* Modo organizar: as peças ficam evidentes e o conteúdo para de responder ao
+   mouse, senão arrastar um gráfico dispararia o filtro por clique. */
+.exec-board.organizando [data-pnl] {
+    outline: 2px dashed var(--teal); outline-offset: 3px;
+    border-radius: 8px; cursor: grab; position: relative;
+}
+.exec-board.organizando [data-pnl] > * { pointer-events: none; }
+.exec-board.organizando [data-pnl].co-drag { opacity: .45; cursor: grabbing; }
+.exec-board.organizando [data-pnl].co-before { outline-color: var(--primary); box-shadow: inset 4px 0 0 var(--primary); }
+.exec-board.organizando [data-pnl].co-after { outline-color: var(--primary); box-shadow: inset -4px 0 0 var(--primary); }
+
+/* No modo organizar, a peça avisa o que dá para fazer com ela. */
+.exec-board.organizando [data-pnl]::after {
+    content: 'arraste para mover · duplo clique muda a largura';
+    position: absolute; top: 4px; right: 6px; z-index: 5;
+    font-size: 10px; font-weight: 700; letter-spacing: .02em;
+    color: var(--primary); background: var(--panel); border: 1px solid var(--teal);
+    border-radius: 6px; padding: 2px 7px; pointer-events: none; opacity: .85;
+}

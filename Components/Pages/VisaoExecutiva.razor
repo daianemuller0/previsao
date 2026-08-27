@@ -31,6 +31,12 @@
         </div>
         <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (Esc para sair)">@Icons.Svg("play")Apresentação</button>
         <button class="btn-ghost" title="Exportar as oportunidades do recorte atual (respeita os filtros da página)" @onclick="ExportarFiltradas">@Icons.Svg("download")Exportar</button>
+        @* Montar a página: arrastar os painéis e escolher a largura de cada um. *@
+        <button class="btn-ghost @(_organizando ? "active" : "")" title="Arrastar os painéis para montar a página do seu jeito" @onclick="AlternarOrganizar">@Icons.Svg("layers")@(_organizando ? "Concluir" : "Organizar")</button>
+        @if (_organizando)
+        {
+            <button class="btn-ghost" title="Voltar à disposição original dos painéis" @onclick="RestaurarLayout">@Icons.Svg("history")Restaurar padrão</button>
+        }
         <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
     </div>
 </div>
@@ -72,6 +78,14 @@
     @if (_savedMsg) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
 </div>
 
+@* ===========================================================================
+   PAINEL MONTÁVEL: daqui até o fim, cada bloco marcado com data-pnl é uma peça
+   que a pessoa pode arrastar para onde quiser e deixar com meia largura ou
+   inteira. Os agrupamentos internos (.g12, #xf-charts) viram "display: contents"
+   pelo CSS, então todas as peças ficam na MESMA grade — é isso que permite um
+   gráfico sair de uma linha e ir para outra.
+   =========================================================================== *@
+<div class="g12 exec-board" id="exec-board">
 @* ===================== EXECUTIVE OVERVIEW (KPIs) ===================== *@
 @{
     var _fcBrl = _fcYear * Rate;   // sempre em R$ (Amount converted), independe do toggle
@@ -80,12 +94,12 @@
     var _gapTgt = Math.Max(_metaYear - _fcBrl, 0);
     var _gmPp = _gmAvg - 30.0;
 }
-<div class="xsec lvl1">
+<div class="xsec lvl1" data-pnl="sec-visao">
     <span class="xsec-t">Visão Geral Executiva</span>
     <span class="xsec-s">how are we performing · @_year · @_currency</span>
     <span class="xsec-line"></span>
 </div>
-<div class="kpi-row">
+<div class="kpi-row" data-pnl="kpis">
     <div class="kpi">
         <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("trend")</span><span class="kpi-label">Previsão</span></div>
         <div class="kpi-value">@Money(_fcYear)</div>
@@ -107,7 +121,7 @@
 </div>
 
 @* ===================== 2 · HERO EXECUTIVO ===================== *@
-<div class="hero">
+<div class="hero" data-pnl="hero">
     <div class="hero-main">
         <div class="hero-eyebrow">Realizado × Meta · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? Fmt.MonthLong(_monthFilter) + " " + _repYear : "Ano " + _repYear)</div>
         <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(_heroReal))</div>
@@ -132,7 +146,7 @@
 </div>
 
 @* ---- Vendas x Meta (NB+AFM) · fonte: Controle · REPORT HSA ---- *@
-<div class="panel" style="margin-top:16px">
+<div class="panel" style="margin-top:16px" data-pnl="vendas-meta">
     <div class="panel-head">
         <div class="panel-title">Vendas x Meta · NB+AFM
             <span class="hint">realizado x budget mensal · fonte: Controle · REPORT HSA · R$ · @_repYear</span>
@@ -160,7 +174,7 @@
 </div>
 
 @* ============ SALES FUNNEL + PREVISÃO INDICADA (lado a lado) ============ *@
-<div class="xsec">
+<div class="xsec" data-pnl="sec-funil">
     <span class="xsec-t">Funil de Vendas por Etapa</span>
     <span class="xsec-s">sequência do funil · @_currency</span>
     <span class="xsec-line"></span>
@@ -168,7 +182,7 @@
     @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Etapa</button> }
 </div>
 <div class="g12">
-    <div class="c6"><div class="xcard pf-card">
+    <div class="c6" data-pnl="funil"><div class="xcard pf-card">
     @if (_funnel.Count == 0)
     {
         <div class="empty">Sem dados no recorte. Importe a base do Funil de Vendas HSA na guia <a href="/oportunidades">Oportunidades</a>.</div>
@@ -217,7 +231,7 @@
         </div>
     }
     </div></div>
-    <div class="c6">
+    <div class="c6" data-pnl="funil-indicadas">
     @if (_indicadas.Count == 0)
     {
         <div class="xcard ind-card"><div class="ind-empty">
@@ -302,7 +316,7 @@
 @if (_indicadas.Count > 0)
 {
     <div class="g12" style="margin-top:16px">
-        <div class="c12"><div class="xcard ind-card">
+        <div class="c12" data-pnl="lista-indicadas"><div class="xcard ind-card">
             <div class="xcard-head">
                 <span class="xcard-ico ind-ico">@Icons.Svg("flag")</span>
                 <div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div>
@@ -327,7 +341,7 @@
     var _buTot = Math.Max(_byBu2.Sum(x => x.Value), 1);
     var _smMax = _bySubMarket.Count > 0 ? _bySubMarket.Max(x => x.Value) : 1;
 }
-<div class="xsec">
+<div class="xsec" data-pnl="sec-distribuicao">
     <span class="xsec-t">Distribuição de Receita &amp; Desempenho</span>
     <span class="xsec-s">de onde vem a receita · quem está gerando · @_currency</span>
     <span class="xsec-line"></span>
@@ -336,7 +350,7 @@
 <div id="xf-charts">
     <div class="g12">
         @* ---- Commercial Segment (donut + lista) ---- *@
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="segmento"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Segmento Comercial</div><div class="xcard-sub">@_bySegment.Count segmentos · arraste para reordenar</div></div>@ChartToolsFor("segment")<TelaCheia /></div>
             @if (_bySegment.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -364,7 +378,7 @@
         </div></div>
 
         @* ---- Forecast by Market (ranking) ---- *@
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="mercado"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por Mercado</div><div class="xcard-sub">@_byMarket.Count mercados · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("market")<TelaCheia /></div>
             @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -388,7 +402,7 @@
 
     @* ---- Sales Rep Performance | Forecast by Product (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="vendedor"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Desempenho por Vendedor</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span>@ChartToolsFor("kam")<TelaCheia /></div>
             @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -411,7 +425,7 @@
                 </div>
             }
         </div></div>
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="produto"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por Produto</div><div class="xcard-sub">@_byProduct.Count produtos · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span>@ChartToolsFor("product")<TelaCheia /></div>
             @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -442,7 +456,7 @@
     </div>
     <div class="g12">
         @* ---- Sub-Market Performance (lollipop) ---- *@
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="submercado"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Desempenho por Sub-Mercado</div><div class="xcard-sub">@_bySubMarket.Count sub-mercados · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("submarket")<TelaCheia /></div>
             @if (_bySubMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -461,7 +475,7 @@
         </div></div>
 
         @* ---- Business Unit Performance (donut + lista) ---- *@
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="unidade"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Desempenho por Unidade de Negócio</div><div class="xcard-sub">@_byBu2.Count unidades · arraste para reordenar</div></div>@ChartToolsFor("bu")<TelaCheia /></div>
             @if (_byBu2.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
@@ -491,12 +505,12 @@
 
     @* ---- Valor por trimestre + Aftermarket × New Business (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="trimestre"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Valor por trimestre</div><div class="xcard-sub">1º a 4º tri · @_currency</div></div><TelaCheia /></div>
             @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
             @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">Sem dados no recorte.</div> }
         </div></div>
-        <div class="c6"><div class="xcard">
+        <div class="c6" data-pnl="afm-nb"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Aftermarket × New Business</div><div class="xcard-sub">participação no pipeline · por setor</div></div><TelaCheia /></div>
             @if (_bySetor.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else { <div class="chart-body donut">@RenderDonut(_bySetor)</div> }
@@ -506,7 +520,7 @@
 
     @* ---- Forecast by Month (timing) ---- *@
     <div class="g12" style="margin-top:16px">
-        <div class="c12"><div class="xcard">
+        <div class="c12" data-pnl="previsao-mensal"><div class="xcard">
             <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Previsão por Mês</div><div class="xcard-sub">Data de fechamento · clique num mês para filtrar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_monthAmt.Sum())</b></span><TelaCheia /></div>
             <div class="chart-body">@RenderXfColumns(_monthAmt)</div>
         </div></div>
@@ -514,12 +528,12 @@
 </div>
 
 @* ===================== EXECUTIVE INSIGHTS ===================== *@
-<div class="xsec">
+<div class="xsec" data-pnl="sec-insights">
     <span class="xsec-t">Análises Executivas</span>
     <span class="xsec-s">calculado a partir dos dados reais do recorte</span>
     <span class="xsec-line"></span>
 </div>
-<div class="exi-grid">
+<div class="exi-grid" data-pnl="insights">
     @{
         var _topMkt = _byMarket.Take(2).Select(m => m.Name).ToList();
         var _mktTxt = _topMkt.Count > 0 ? string.Join(" & ", _topMkt) : "—";
@@ -543,20 +557,22 @@
 </div>
 
 @* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
-<div class="section-head">
+<div class="section-head" data-pnl="sec-top10">
     <span class="st-title">Oportunidades mais quentes</span>
     <span class="st-sub">indicadas na previsão + marcadas como TOP 10 · @_top10Opps.Count oport. · @MoneyBrl(_top10Opps.Sum(o => o.AmountBrl))</span>
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Ver todas</a>
 </div>
-<OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
-                  EmptyText="Nenhuma oportunidade indicada na previsão ou marcada como TOP 10 no recorte." OnChanged="ReloadOpps"
-                  ShowColumnPicker="false" />
+<div class="c12" data-pnl="top10">
+    <OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
+                      EmptyText="Nenhuma oportunidade indicada na previsão ou marcada como TOP 10 no recorte." OnChanged="ReloadOpps"
+                      ShowColumnPicker="false" />
+</div>
 
 @* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
-<div class="section-head"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
+<div class="section-head" data-pnl="sec-composicao"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
 <div class="g12">
-    <div class="c12">
+    <div class="c12" data-pnl="composicao">
         <div class="panel" style="height:100%">
             <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por % de ganho</span></div><TelaCheia /></div>
             <div class="comp-bar">
@@ -587,9 +603,9 @@
 </div>
 
 @* ---- Distribuição da carteira: país · GM ---- *@
-<div class="section-head"><span class="st-title">Distribuição da carteira</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
+<div class="section-head" data-pnl="sec-carteira"><span class="st-title">Distribuição da carteira</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
 <div class="g12 top">
-    <div class="c12">
+    <div class="c12" data-pnl="mapa">
         <div class="panel">
             <div class="panel-head">
                 <div class="panel-title">Por país <span class="hint">clique num país p/ filtrar a página · duplo clique no oceano p/ limpar · roda p/ zoom · arraste p/ mover</span></div>
@@ -617,7 +633,7 @@
     </div>
 </div>
 <div class="g12" style="margin-top:14px">
-    <div class="c12">
+    <div class="c12" data-pnl="gm-mensal">
         <div class="panel">
             <div class="panel-head"><div class="panel-title">GM médio mensal <span class="hint">margem bruta média das oportunidades por mês · meta 30%</span></div><TelaCheia /></div>
             <div class="chart-body" style="min-height:200px">@RenderGmColumns()</div>
@@ -626,20 +642,24 @@
 </div>
 
 @* ===================== 4c · ESTÚDIO DE GRÁFICOS (Power BI) ===================== *@
-<ChartStudio Data="_filtered" Currency="_currency" Rate="Rate" Sym="_sym" />
+<div class="c12" data-pnl="estudio">
+    <ChartStudio Data="_filtered" Currency="_currency" Rate="Rate" Sym="_sym" />
+</div>
 
 @* ===================== 4b · OPORTUNIDADES ===================== *@
-<div class="section-head">
+<div class="section-head" data-pnl="sec-oportunidades">
     <span class="st-title">Oportunidades</span>
     <span class="st-sub">@_filtered.Count no recorte · @MoneyBrl(_filtered.Sum(o => o.AmountBrl)) em valor</span>
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
 </div>
-<OpportunityTable Rows="_filteredSorted" CssClass="tbl-compact" Style="max-height:780px;overflow:auto" OnChanged="ReloadOpps" />
+<div class="c12" data-pnl="tabela-oportunidades">
+    <OpportunityTable Rows="_filteredSorted" CssClass="tbl-compact" Style="max-height:780px;overflow:auto" OnChanged="ReloadOpps" />
+</div>
 
 @* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
-<div class="section-head"><span class="st-title">@Icons.Svg("alert", "nav-ico") Atenção executiva</span><span class="st-sub">sinais que exigem decisão da liderança</span><span class="st-line"></span></div>
-<div class="attn2">
+<div class="section-head" data-pnl="sec-atencao"><span class="st-title">@Icons.Svg("alert", "nav-ico") Atenção executiva</span><span class="st-sub">sinais que exigem decisão da liderança</span><span class="st-line"></span></div>
+<div class="attn2" data-pnl="atencao">
     @foreach (var a in _attn)
     {
         <div class="attn-card sev-@a.Sev">
@@ -669,6 +689,7 @@
             </div>
         </div>
     }
+</div>
 </div>
 
 @code {
@@ -976,6 +997,35 @@
         { "#0b4f6f", "#0a6285", "#007A9E", "#1092b0", "#2aa5c0", "#5bb0c9", "#86c4d8", "#aed7e5" };
     private static string FunnelColor(int i) => FunnelColors[Math.Min(i, FunnelColors.Length - 1)];
 
+    // ---- painel montável: posição e largura de cada gráfico, por usuário -----
+    // Guardado como "chave:largura|chave:largura" na mesma prateleira das
+    // preferências de gráfico, sob a chave "layout".
+    private const string ChaveLayout = "layout";
+    private bool _organizando;
+
+    private string LayoutSalvo => ChartPrefs.Get(_login, ChaveLayout).Ordem;
+
+    /// <summary>Nova disposição depois de arrastar (ou de mudar a largura).</summary>
+    [JSInvokable]
+    public Task SaveLayout(string layout) => InvokeAsync(() =>
+    {
+        ChartPrefs.Save(_login, ChaveLayout, layout ?? "", ChartPrefsRepository.BarraPadrao);
+        RecarregarChartPrefs();
+    });
+
+    private async Task AlternarOrganizar()
+    {
+        _organizando = !_organizando;
+        try { await JS.InvokeVoidAsync("appLayout.organizar", _organizando, _ref); } catch { }
+    }
+
+    private async Task RestaurarLayout()
+    {
+        ChartPrefs.Reset(_login, ChaveLayout);
+        RecarregarChartPrefs();
+        try { await JS.InvokeVoidAsync("appLayout.aplicar", ""); } catch { }
+    }
+
     // ---- gráficos de barras: ordem (arraste) e espessura, por usuário --------
     private string _login = "";
     private int _chartVersion = -1;
@@ -1078,6 +1128,9 @@
         try { await JS.InvokeVoidAsync("xfilter.init", "xf-charts", _ref); } catch { }
         foreach (var chave in ChartKeys)
             try { await JS.InvokeVoidAsync("chartOrder.init", "ch-" + chave, _ref, chave); } catch { }
+        // A disposição é reaplicada a cada render: o Blazor redesenha os painéis
+        // e levaria junto o "order" que o navegador tinha posto neles.
+        try { await JS.InvokeVoidAsync("appLayout.ligar", _ref, LayoutSalvo); } catch { }
     }
 
     public void Dispose() => _ref?.Dispose();
