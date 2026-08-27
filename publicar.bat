@@ -105,6 +105,11 @@ powershell -NoProfile -Command ^
 
 rmdir /s /q "%TEMPO%"
 
+REM Tamanho do que cada pessoa vai baixar quando pegar esta versao.
+for %%F in ("%DESTINO%\Howden Sales Forecast.exe") do set /a MB=%%~zF/1048576
+echo.
+echo  Programa publicado: %MB% MB (baixado uma vez por pessoa, por versao).
+
 echo.
 echo  Publicacao concluida.
 echo  Para usar: abra o atalho "Howden Sales Forecast" na pasta publicada.
