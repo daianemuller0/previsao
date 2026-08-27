@@ -2,6 +2,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject HowdenSalesForecast.Data.BrandRepository Brand
+@implements IDisposable
 
 <aside class="sidebar no-print @(Collapsed ? "collapsed" : "")">
     <div class="brand @(Collapsed ? "center" : "")">
@@ -93,16 +94,31 @@
             var role = state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
             if (!string.IsNullOrEmpty(role)) { _role = HowdenSalesForecast.Models.AccessRoles.Normalize(role); }
         }
+        // O menu fica FORA da área que troca ao navegar, então o Blazor não o
+        // redesenha sozinho: sem isso, o destaque azul continuava na guia
+        // anterior. Aqui ele pede o próprio redesenho a cada mudança de página.
+        Nav.LocationChanged += AoNavegar;
     }
+
+    private void AoNavegar(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= AoNavegar;
 
     // Abas visíveis conforme o papel do login (controle de acesso).
     private bool Allowed(string key) => HowdenSalesForecast.Models.AccessRoles.CanTab(_role, key);
 
     private bool IsActive(string route)
     {
-        var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
-        if (route == "/executivo" && (path == "/" || path == "")) { return true; }
-        return path.StartsWith(route, StringComparison.OrdinalIgnoreCase);
+        // Só o caminho interessa: "?filtro=x" e "#ancora" não mudam a guia.
+        var rel = Nav.ToBaseRelativePath(Nav.Uri);
+        var corte = rel.IndexOfAny(new[] { '?', '#' });
+        if (corte >= 0) rel = rel[..corte];
+        var path = "/" + rel.TrimEnd('/');
+
+        if (route == "/executivo" && path == "/") return true;
+        // "/oportunidades/123" conta como Oportunidades; "/oportunidades-x", não.
+        return path.Equals(route, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(route + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task Toggle()
