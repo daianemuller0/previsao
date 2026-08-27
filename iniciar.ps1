@@ -18,7 +18,6 @@ $nome  = 'Howden Sales Forecast.exe'
 
 $exeRede  = Join-Path $rede  $nome
 $exeLocal = Join-Path $local $nome
-$carimbo  = Join-Path $local 'versao.txt'
 
 if (-not (Test-Path $exeRede)) {
     Write-Host " Nao encontrei o programa em: $rede" -ForegroundColor Red
@@ -27,13 +26,18 @@ if (-not (Test-Path $exeRede)) {
     exit 1
 }
 
-# Identidade desta versao: data de modificacao + tamanho do executavel. Ler isso
-# custa um acesso minusculo a rede, contra os 130 MB de copiar o programa.
-$fi     = Get-Item $exeRede
-$versao = "$($fi.LastWriteTimeUtc.Ticks)|$($fi.Length)"
-$atual  = if (Test-Path $carimbo) { (Get-Content $carimbo -Raw).Trim() } else { '' }
+# Identidade desta versao: tamanho + data de modificacao do executavel. O
+# robocopy preserva a data ao copiar, entao os dois batem exatamente enquanto
+# nao houver publicacao nova. Ler isso custa um acesso minusculo a rede, contra
+# os 130 MB de copiar o programa.
+$rd = Get-Item $exeRede
+$ok = $false
+if (Test-Path $exeLocal) {
+    $lc = Get-Item $exeLocal
+    $ok = ($rd.Length -eq $lc.Length) -and ($rd.LastWriteTimeUtc -eq $lc.LastWriteTimeUtc)
+}
 
-if ($atual -ne $versao -or -not (Test-Path $exeLocal)) {
+if (-not $ok) {
     Write-Host ''
     Write-Host ' Versao nova encontrada. Copiando o programa para esta maquina...' -ForegroundColor Cyan
     Write-Host ' (so acontece quando sai atualizacao; as proximas aberturas sao imediatas)'
@@ -52,14 +56,13 @@ if ($atual -ne $versao -or -not (Test-Path $exeLocal)) {
 
     # /MIR espelha (remove sobras de versoes antigas). O launcher e os atalhos
     # ficam de fora: sao da pasta de rede, nao do programa.
-    $log = robocopy $rede $local /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:2 `
-                    /XF 'iniciar.ps1' 'iniciar.cmd' '*.lnk' 'old_*.exe' '*.old_*.exe' 'versao.txt'
+    robocopy $rede $local /MIR /NFL /NDL /NJH /NJS /NP /R:2 /W:2 `
+             /XF 'iniciar.ps1' 'iniciar.cmd' 'iniciar.vbs' '*.lnk' 'old_*.exe' '*.old_*.exe' | Out-Null
     if ($LASTEXITCODE -ge 8) {
         Write-Host ' Falha ao copiar o programa. Verifique o acesso a pasta de rede.' -ForegroundColor Red
         Read-Host ' Enter para fechar'
         exit 1
     }
-    Set-Content -Path $carimbo -Value $versao -Encoding ASCII
 }
 
-Start-Process -FilePath $exeLocal -WorkingDirectory $local
+Start-Process -FilePath $exeLocal -WorkingDirectory $local -WindowStyle Hidden

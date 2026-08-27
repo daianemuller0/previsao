@@ -6,6 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>HowdenSalesForecast</RootNamespace>
 
+    <!-- Sem janela de console: o programa aparece só no navegador. Quem o
+         encerra é o fechamento da última aba (ver DesligaAoFechar). -->
+    <OutputType>WinExe</OutputType>
+
     <!-- Ícone do executável: é o que aparece no atalho do Windows. -->
     <ApplicationIcon>wwwroot\howden.ico</ApplicationIcon>
     <!-- Identificação exibida nas propriedades do arquivo (.exe). -->
