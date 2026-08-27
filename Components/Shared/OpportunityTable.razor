@@ -43,6 +43,10 @@
                 <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "")" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
                     <td class="center actions-col">
                         <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? "Remover da Previsão" : "Indicar na Previsão")" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
+                        @if (o.PrevisaoIncompleta)
+                        {
+                            <button class="row-act pend" title="Indicada na previsão, mas faltam dados: @string.Join(", ", o.PendenciasPrevisao)" @onclick="() => AbrirPendencias(o)" @onclick:stopPropagation="true">@Icons.Svg("alert")</button>
+                        }
                         <button class="row-act sell" title="Indicar venda — mover para o Controle (Ofertas e pedidos)" @onclick="() => OpenSell(o)" @onclick:stopPropagation="true">@Icons.Svg("dollar")</button>
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
                         <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
@@ -68,7 +72,7 @@
                             case "ganho":     <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td> break;
                             case "sairmes":   <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td> break;
                             case "conversao": <td class="right num">@Fmt.Brl(ForecastCalc.ConversionBrl(o))</td> break;
-                            case "nbafm":     <td class="center">@Dash(o.CommercialCategory)</td> break;
+                            case "nbafm":     <td class="center">@Dash(o.CategoriaNbAfm)</td> break;
                             case "servico":   <td>@Dash(o.ServicoPrevisto)</td> break;
                             case "onestream": <td>@Dash(o.MarketOnestream)</td> break;
                             case "unidade":   <td>@Dash(Cat.BuCode(o.PvBusinessUnitId))</td> break;
@@ -100,6 +104,31 @@
     <datalist id="@id">
         @foreach (var v in Lists.Items(key)) { <option value="@v" /> }
     </datalist>
+}
+
+@* ---- Dados obrigatórios da previsão (ao indicar a oportunidade) ---- *@
+@if (_pend is not null)
+{
+    <div class="drawer-backdrop" @onclick="FecharPendencias"></div>
+    <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
+        <div class="confirm-head" style="color:var(--warn, #b7791f)">@Icons.Svg("alert")<span>Complete os dados da previsão</span></div>
+        <p class="confirm-text">
+            <strong>@_pend.Name</strong> entrou na previsão. Falta preencher:
+            <strong>@string.Join(", ", _pendFaltam)</strong>.
+        </p>
+        <div class="form-grid">
+            <label class="fld">% de Ganho<input class="field num" @bind="_pend.WinProbability" /></label>
+            <label class="fld">% de Sair no Mês<input class="field num" @bind="_pend.CloseInPeriodProbability" /></label>
+            <label class="fld">RAMP<input class="field" @bind="_pend.Ramp" /></label>
+            <label class="fld">OTP<select class="field" @bind="_pend.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">TOP 10<select class="field" @bind="_pend.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">KYC<select class="field" @bind="_pend.Kyc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="FecharPendencias">Preencher depois</button>
+            <button class="btn-primary" @onclick="SalvarPendencias">@Icons.Svg("check")Salvar</button>
+        </div>
+    </div>
 }
 
 @* ---- Confirmar exclusão de uma oportunidade ---- *@
@@ -188,10 +217,9 @@
             <label class="fld">PlantName<input class="field" @bind="_edit.EndUserSite" /></label>
 
             <label class="fld">Categoria (NB/AFM) <span class="hint">vem do setor de origem</span>
-                <input class="field" value="@_edit.CommercialCategory" readonly />
+                <input class="field" value="@_edit.CategoriaNbAfm" readonly />
             </label>
             <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_edit.ServicoPrevisto" /></label>
-            <label class="fld">Market onestream<input class="field" list="dl-onestream" @bind="_edit.MarketOnestream" /></label>
             <label class="fld">Etapa do funil
                 <select class="field" @bind="_edit.Stage">
                     <option value="">—</option>
@@ -354,7 +382,7 @@
         ("dl-pais", "pais"), ("dl-market_var", "market_var"), ("dl-market", "market"),
         ("dl-product", "product"), ("dl-key_account", "key_account"),
         ("dl-customer", "customer"), ("dl-servico", "servico_previsto"),
-        ("dl-onestream", "market_onestream"), ("dl-unidade", "unidade_venda"), ("dl-bu_inter", "bu_intercompany"),
+        ("dl-unidade", "unidade_venda"), ("dl-bu_inter", "bu_intercompany"),
     };
 
     // ---- edição completa ----
@@ -409,12 +437,39 @@
     }
 
     // ---- Indicar na Previsão (marcador do vendedor) ----
+    // Ao indicar, a previsão precisa de % de ganho, % de sair no mês, RAMP, OTP,
+    // TOP 10 e KYC. Se faltar algo, o formulário curto abre na hora — é o momento
+    // em que a pessoa tem o negócio na cabeça.
+    private Opportunity? _pend;
+    private IReadOnlyList<string> _pendFaltam = Array.Empty<string>();
+
     private async Task ToggleIndicada(Opportunity o)
     {
         var full = Repo.Get(o.Id) ?? o;
-        full.Indicada = full.IndicadaValue ? "" : "Sim";
+        var indicando = !full.IndicadaValue;
+        full.Indicada = indicando ? "Sim" : "";
         full.UpdatedAt = _today.ToString("yyyy-MM-dd");
         Repo.Save(full);
+        await OnChanged.InvokeAsync();
+
+        if (indicando && full.PendenciasPrevisao.Count > 0) AbrirPendencias(full);
+    }
+
+    private void AbrirPendencias(Opportunity o)
+    {
+        _pend = Repo.Get(o.Id) ?? o;              // cópia isolada do cache
+        _pendFaltam = _pend.PendenciasPrevisao;
+    }
+
+    private void FecharPendencias() { _pend = null; _pendFaltam = Array.Empty<string>(); }
+
+    private async Task SalvarPendencias()
+    {
+        if (_pend is null) return;
+        _pend.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        _pend.UpdatedBy = _user;
+        Repo.Save(_pend);
+        FecharPendencias();
         await OnChanged.InvokeAsync();
     }
 

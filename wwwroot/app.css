@@ -381,6 +381,9 @@ tr:hover .row-act { opacity: .85; }
 .row-act:hover { opacity: 1; background: var(--panel-2); color: var(--text-2); }
 .row-act.del:hover { color: var(--neg); background: var(--neg-bg); }
 .row-act.sell:hover { color: var(--pos); background: var(--pos-bg, #e7f6ec); }
+/* Indicada na previsão, mas faltando dados obrigatórios: sempre visível. */
+.row-act.pend { color: #b7791f; opacity: 1; }
+.row-act.pend:hover { background: #fdf3dc; }
 .row-act svg { width: 15px; height: 15px; }
 
 /* Caixa de confirmação (exclusão) */
