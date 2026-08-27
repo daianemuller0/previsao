@@ -37,7 +37,7 @@
             @foreach (var o in Rows)
             {
                 var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
-                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "")" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
+                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "")" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
                     <td class="center actions-col">
                         <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? "Remover da Previsão" : "Indicar na Previsão")" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
                         <button class="row-act sell" title="Indicar venda — mover para o Controle (Ofertas e pedidos)" @onclick="() => OpenSell(o)" @onclick:stopPropagation="true">@Icons.Svg("dollar")</button>
@@ -308,6 +308,8 @@
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
+    // Marcador "Sim" (OTP, TOP 10, KYC) vindo da planilha ou preenchido na tela.
+    private static bool Sim(string? s) => string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase);
     private static MarkupString Mark(string? s) =>
         string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase) ? new("<span class='mk yes'>Sim</span>")
         : (string.Equals(s, "Não", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "Nao", StringComparison.OrdinalIgnoreCase)) ? new MarkupString("<span class='mk no'>Não</span>")
