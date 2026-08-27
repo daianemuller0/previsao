@@ -1,0 +1,8 @@
+@* Botão "tela cheia" de um gráfico. O clique é resolvido no próprio navegador
+   (atributo onclick, não @onclick): não vale gastar uma ida ao servidor para
+   ampliar um painel. O JS sobe até o card que contém o botão e pede tela cheia
+   dele — assim o mesmo botão serve a qualquer painel, sem receber parâmetro. *@
+
+<button type="button" class="fs-btn" title="Tela cheia (Esc para sair)" onclick="appTelaCheia(this)">
+    @Icons.Svg("expand")
+</button>

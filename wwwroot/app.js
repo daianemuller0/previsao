@@ -383,3 +383,19 @@ window.chartOrder = {
 window.colOrder = {
     init: (id, ref, tabela) => window.dragOrder.init(id, ref, tabela, 'SaveColumnOrder', true)
 };
+
+// ---------------------------------------------------------------------------
+// Tela cheia de um painel de gráfico. O botão não sabe em qual card está: sobe
+// pela árvore até achar o card e pede tela cheia dele. Assim o mesmo botão
+// serve a qualquer painel, sem precisar de id nem de parâmetro.
+// ---------------------------------------------------------------------------
+window.appTelaCheia = function (btn) {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        return;
+    }
+    const card = btn.closest('.xcard, .panel');
+    if (!card) return;
+    const pedir = card.requestFullscreen || card.webkitRequestFullscreen;
+    if (pedir) pedir.call(card);
+};

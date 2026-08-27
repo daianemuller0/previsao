@@ -89,6 +89,8 @@ builder.Services.AddSingleton<ChartConfigRepository>();
 builder.Services.AddSingleton<BrandRepository>();
 // Compactação periódica dos Parquet em segundo plano.
 builder.Services.AddHostedService<CompactionService>();
+// Atualização da base às 08:00 e às 13:00, para quem deixa o programa aberto.
+builder.Services.AddHostedService<AtualizacaoAgendada>();
 // Sincronização das bases (planilhas do CRM na rede): New Business + Aftermarket.
 builder.Services.AddSingleton<DataSyncService>();
 
