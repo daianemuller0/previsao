@@ -13,8 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 //   "Howden Sales Forecast.exe" --urls http://0.0.0.0:5080
 // Se a 5080 já estiver ocupada (o programa aberto noutra janela, por exemplo),
 // usa a próxima porta livre em vez de encerrar com erro de bind do Kestrel.
-if (string.IsNullOrEmpty(builder.Configuration["urls"]) &&
-    string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+var modoPessoal = string.IsNullOrEmpty(builder.Configuration["urls"]) &&
+                  string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS"));
+if (modoPessoal)
 {
     builder.WebHost.UseUrls($"http://localhost:{PortaLivre(5080)}");
 }
@@ -39,6 +40,12 @@ static int PortaLivre(int inicial)
 // --- Blazor Server (componentes interativos no servidor) ---
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// O programa roda sem janela: quem o fecha é o navegador. No modo por-usuário,
+// encerra o processo quando a última aba some — num servidor central isso
+// derrubaria o serviço para todos, então lá fica desligado.
+if (modoPessoal)
+    builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, DesligaAoFechar>();
 
 // --- Autenticação por cookie (sessão no navegador do usuário) ---
 builder.Services.AddCascadingAuthenticationState();
@@ -91,18 +98,28 @@ var app = builder.Build();
 // levou. Quando alguém reclamar de demora para abrir, o console diz onde o
 // tempo foi — em vez de adivinharmos.
 var _t0 = System.Diagnostics.Stopwatch.StartNew();
+var _log = Path.Combine(AppContext.BaseDirectory, "subida.log");
+
+// Sem janela não há console para ler: as medições vão para "subida.log", ao lado
+// do programa. É o que responde "por que demorou para abrir?".
+void Anota(string linha)
+{
+    Console.WriteLine(linha);
+    try { File.AppendAllText(_log, $"{DateTime.Now:dd/MM HH:mm:ss}  {linha}{Environment.NewLine}"); } catch { }
+}
+
 void Etapa(string nome, Action acao)
 {
     var t = System.Diagnostics.Stopwatch.StartNew();
     try { acao(); }
-    finally { Console.WriteLine($"[subida] {nome}: {t.ElapsedMilliseconds} ms (total {_t0.ElapsedMilliseconds} ms)"); }
+    finally { Anota($"[subida] {nome}: {t.ElapsedMilliseconds} ms (total {_t0.ElapsedMilliseconds} ms)"); }
 }
 
 // Semente dos dados demonstrativos na primeira execução (pasta vazia).
 using (var scope = app.Services.CreateScope())
 {
     var store = scope.ServiceProvider.GetRequiredService<ParquetStore>();
-    Console.WriteLine($"[subida] pasta de dados: {store.Folder}");
+    Anota($"[subida] pasta de dados: {store.Folder}");
     Etapa("catálogo", () => DbInitializer.Initialize(store, scope.ServiceProvider.GetRequiredService<Catalog>()));
     Etapa("listas", () => scope.ServiceProvider.GetRequiredService<ListRepository>().SeedIfEmpty());
     var controleRepo = scope.ServiceProvider.GetRequiredService<ControleRepository>();
@@ -134,8 +151,8 @@ _ = Task.Run(() =>
         // caminhos; a cada abertura do programa reimportamos o estado mais recente.
         var sync = app.Services.GetRequiredService<DataSyncService>();
         Etapa("sincronização das planilhas", () => sync.SyncAll());
-        Console.WriteLine($"[subida] {sync.LastNb.Message}");
-        Console.WriteLine($"[subida] {sync.LastAfm.Message}");
+        Anota($"[subida] {sync.LastNb.Message}");
+        Anota($"[subida] {sync.LastAfm.Message}");
     }
     catch { /* pasta indisponível ou lenta: o app segue no ar */ }
 });
