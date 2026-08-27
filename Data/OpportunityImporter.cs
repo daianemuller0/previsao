@@ -1,13 +1,14 @@
 using System.Globalization;
 using System.Text;
 using ClosedXML.Excel;
+using ExcelDataReader;
 using HowdenSalesForecast.Models;
 
 namespace HowdenSalesForecast.Data;
 
 // ---------------------------------------------------------------------------
-// Importador da base de oportunidades a partir de um arquivo Excel (.xlsx) ou
-// CSV. Leitura TOLERANTE (nunca lança): cada problema vira um aviso no relatório.
+// Importador da base de oportunidades a partir de um arquivo Excel (.xlsx, .xlsm
+// ou .xls) ou CSV. Leitura TOLERANTE (nunca lança): cada problema vira um aviso no relatório.
 // As colunas seguem exatamente o layout da planilha do forecast (Quarter, Date,
 // País, Market Variável, Market, Product, Tipo de Equipamento, Key Account,
 // Customer, Proposta, Net Value, PM %, % de Ganho, % de Sair no Mês, Chance
@@ -20,6 +21,13 @@ public sealed class OpportunityImporter
 {
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    static OpportunityImporter()
+    {
+        // O .xls guarda o texto em codificações antigas (windows-1252 e afins),
+        // que o .NET só conhece depois de registrar este provedor.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
 
     // Cabeçalhos conhecidos (novo layout Funil HSA + legado) para localizar a linha
     // de cabeçalho da planilha, que não é a primeira (há metadados acima).
@@ -64,9 +72,13 @@ public sealed class OpportunityImporter
     {
         try
         {
-            return fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
-                ? ParseCsv(stream, source, rate, onCurrency)
-                : ParseXlsx(stream, source, rate, onCurrency);
+            if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+                return ParseCsv(stream, source, rate, onCurrency);
+            // .xls (formato binário antigo) tem um leitor próprio: o ClosedXML só
+            // entende OpenXML (.xlsx/.xlsm) e falharia no arquivo do CRM.
+            if (fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
+                return ParseGrid(GradeXls(stream), source, rate, onCurrency);
+            return ParseGrid(GradeXlsx(stream), source, rate, onCurrency);
         }
         catch (Exception ex)
         {
@@ -76,15 +88,18 @@ public sealed class OpportunityImporter
         }
     }
 
-    // ---- Excel ------------------------------------------------------------
-    private Result ParseXlsx(Stream stream, Source source, Func<string, double?>? rate, Action<string>? onCurrency)
+    // ---- Excel: uma grade única para os dois formatos ----------------------
+    // Célula já normalizada: o TEXTO (para casar cabeçalho e ler campos) e o
+    // NÚMERO cru quando a célula é numérica — assim o separador decimal da
+    // planilha nunca entra na conta.
+    private readonly record struct Cel(string Text, double? Num);
+
+    private static readonly Cel Vazia = new("", null);
+
+    private Result ParseGrid(List<Cel[]> rows, Source source,
+        Func<string, double?>? rate, Action<string>? onCurrency)
     {
         var r = new Result();
-        using var wb = new XLWorkbook(stream);
-        var ws = wb.Worksheets.FirstOrDefault();
-        if (ws is null) { r.Warnings.Add("A planilha está vazia."); return r; }
-
-        var rows = ws.RowsUsed().ToList();
         if (rows.Count < 2) { r.Warnings.Add("Nenhuma linha de dados encontrada abaixo do cabeçalho."); return r; }
 
         // Acha a linha de CABEÇALHO (a planilha do Funil HSA tem 14 linhas de
@@ -93,16 +108,16 @@ public sealed class OpportunityImporter
         int hi = 0, best = 0;
         for (var i = 0; i < rows.Count; i++)
         {
-            var hits = rows[i].CellsUsed().Count(c => KnownHeaders.Contains(Norm(c.GetString())));
+            var hits = rows[i].Count(c => c.Text != "" && KnownHeaders.Contains(Norm(c.Text)));
             if (hits > best) { best = hits; hi = i; }
         }
 
         var header = rows[hi];
         var map = new Dictionary<string, int>();
-        foreach (var cell in header.CellsUsed())
+        for (var i = 0; i < header.Length; i++)
         {
-            var key = Norm(cell.GetString());
-            if (key != "" && !map.ContainsKey(key)) map[key] = cell.Address.ColumnNumber;
+            var key = Norm(header[i].Text);
+            if (key != "" && !map.ContainsKey(key)) map[key] = i;
         }
 
         foreach (var row in rows.Skip(hi + 1))
@@ -110,29 +125,74 @@ public sealed class OpportunityImporter
             string Get(params string[] names)
             {
                 foreach (var n in names)
-                    if (map.TryGetValue(Norm(n), out var col))
-                        return row.Cell(col).GetString().Trim();
+                    if (map.TryGetValue(Norm(n), out var i))
+                        return i < row.Length ? row[i].Text.Trim() : "";
                 return "";
             }
-            // Lê o VALOR NUMÉRICO direto da célula quando ela é numérica — evita a
-            // ambiguidade de separador (ponto/vírgula) ao converter para texto.
             double? GetN(params string[] names)
             {
                 foreach (var n in names)
-                    if (map.TryGetValue(Norm(n), out var col))
-                    {
-                        var cell = row.Cell(col);
-                        return cell.Value.IsNumber ? cell.Value.GetNumber() : (double?)null;
-                    }
+                    if (map.TryGetValue(Norm(n), out var i))
+                        return i < row.Length ? row[i].Num : null;
                 return null;
             }
             // Região de TOTAIS/rodapé no fim da planilha (posição varia): dessa
             // linha para baixo nada é importado.
-            if (IsStopRow(row.CellsUsed().Select(c => c.GetString()), Get)) break;
+            if (IsStopRow(row.Select(c => c.Text), Get)) break;
             if (source == Source.Afm) BuildAfmRow(r, Get, GetN, rate, onCurrency);
             else BuildRow(r, Get, GetN);
         }
         return r;
+    }
+
+    // ---- Excel moderno (.xlsx / .xlsm) via ClosedXML -----------------------
+    private static List<Cel[]> GradeXlsx(Stream stream)
+    {
+        using var wb = new XLWorkbook(stream);
+        var ws = wb.Worksheets.FirstOrDefault();
+        var grade = new List<Cel[]>();
+        if (ws is null) return grade;
+
+        foreach (var row in ws.RowsUsed())
+        {
+            var last = row.LastCellUsed()?.Address.ColumnNumber ?? 0;
+            var linha = new Cel[last];
+            for (var c = 1; c <= last; c++)
+            {
+                var cell = row.Cell(c);
+                linha[c - 1] = new Cel(cell.GetString(),
+                    cell.Value.IsNumber ? cell.Value.GetNumber() : null);
+            }
+            grade.Add(linha);
+        }
+        return grade;
+    }
+
+    // ---- Excel antigo (.xls, binário BIFF) via ExcelDataReader --------------
+    // Mesma grade do .xlsx: daí para frente o tratamento é idêntico.
+    private static List<Cel[]> GradeXls(Stream stream)
+    {
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+        var grade = new List<Cel[]>();
+        while (reader.Read())                    // só a primeira planilha
+        {
+            var linha = new Cel[reader.FieldCount];
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                var v = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                linha[i] = v switch
+                {
+                    null => Vazia,
+                    // "0.##########" evita notação científica em valores grandes.
+                    double d => new Cel(d.ToString("0.##########", Inv), d),
+                    DateTime dt => new Cel(dt.ToString("yyyy-MM-dd"), null),
+                    bool b => new Cel(b ? "TRUE" : "FALSE", null),
+                    _ => new Cel(v.ToString()?.Trim() ?? "", null),
+                };
+            }
+            grade.Add(linha);
+        }
+        return grade;
     }
 
     // ---- CSV --------------------------------------------------------------
@@ -312,6 +372,9 @@ public sealed class OpportunityImporter
             UpdatedAt = DateTime.Today.ToString("yyyy-MM-dd"),
             UpdatedBy = "Importação",
 
+            // OTP do New Business: coluna Stage (R) — "E1 Order Entry" = Sim.
+            Otp = OtpDoStage(get(new[] { "Stage" })),
+
             // ---- Colunas do Funil de Vendas HSA ----
             Stage = get(new[] { "Stage" }),
             CommercialSegment = get(new[] { "Commercial Segment" }),
@@ -403,6 +466,7 @@ public sealed class OpportunityImporter
             ProductId = product,
             KamId = kam,                        // Vendedor (equivalência AFM → NB)
             CustomerId = customer,              // ContractorName (col K) → Customer
+            Otp = OtpDoStatus(status),          // Status (col S) — "OTP" = Sim
             CommercialCategory = "AFM",         // esta base é sempre Aftermarket
             PvBusinessUnitId = puv,
             CurrencyCode = cur,                  // moeda de origem preservada
@@ -438,6 +502,18 @@ public sealed class OpportunityImporter
     // Numeração inicial da etapa na planilha AFM ("5.", "6)", "3 -" etc.).
     private static readonly System.Text.RegularExpressions.Regex StageNumPrefix =
         new(@"^\d+\s*[\.\)\-]?\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // ---- OTP: marcador Sim/Não derivado da planilha de origem ---------------
+    // New Business → coluna Stage (R): "E1 Order Entry" = Sim, o resto = Não.
+    // Aftermarket  → coluna Status (S): "OTP" = Sim, o resto = Não.
+    // Célula em branco fica em branco: ausência de informação não é "Não".
+    public static string OtpDoStage(string stage) =>
+        string.IsNullOrWhiteSpace(stage) ? ""
+        : StageNumPrefix.Replace(Norm(stage), "").Contains("order entry") ? "Sim" : "Não";
+
+    public static string OtpDoStatus(string status) =>
+        string.IsNullOrWhiteSpace(status) ? ""
+        : Norm(status).Split(' ').Contains("otp") ? "Sim" : "Não";
 
     // Converte a etapa do funil do AFM para o nome equivalente do nosso funil (NB).
     // Regra especial: Status marcado OTP entra direto em "E1 Order Entry".

@@ -20,8 +20,13 @@
     <!-- Provider ADO.NET do DuckDB (inclui a lib nativa). Mesma versão do projeto
          de Licenças, para manter o padrão de dados aprovado internamente. -->
     <PackageReference Include="DuckDB.NET.Data.Full" Version="1.1.3" />
-    <!-- Leitura de Excel (.xlsx) no módulo de importação de forecast -->
+    <!-- Leitura/escrita de Excel moderno (.xlsx/.xlsm) -->
     <PackageReference Include="ClosedXML" Version="0.102.2" />
+    <!-- Leitura do Excel ANTIGO (.xls, formato binário BIFF). O CRM exporta a
+         planilha do Aftermarket nesse formato e o ClosedXML só lê OpenXML. -->
+    <PackageReference Include="ExcelDataReader" Version="3.7.0" />
+    <!-- Codificações legadas (windows-1252 etc.) exigidas pelo .xls no .NET. -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

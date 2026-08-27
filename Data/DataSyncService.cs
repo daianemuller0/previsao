@@ -61,7 +61,7 @@ public sealed class DataSyncService
     // Entra na marca: quando o mapeamento das planilhas muda (uma coluna nova
     // passa a ser lida), a versão sobe e todo mundo reimporta na próxima abertura,
     // mesmo que a planilha da rede continue exatamente a mesma.
-    private const string ImportVersion = "v2";
+    private const string ImportVersion = "v3";
 
     private string? MarcaGravada(string prefix)
     {
@@ -121,7 +121,7 @@ public sealed class DataSyncService
                     st.Ok = false;
                     st.Message = string.IsNullOrWhiteSpace(p.Path)
                         ? "Caminho da planilha não configurado."
-                        : "Nenhuma planilha (.xlsx/.csv) encontrada no caminho configurado.";
+                        : "Nenhuma planilha (.xlsx/.xlsm/.xls/.csv) encontrada no caminho configurado.";
                     return Finish(st);
                 }
                 st.File = file;
