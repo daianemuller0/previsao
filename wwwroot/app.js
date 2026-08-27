@@ -508,3 +508,146 @@ window.appFonte = (function () {
     document.addEventListener('DOMContentLoaded', () => aplicar(ler()));
     return { mudar, aplicar, ler };
 })();
+
+// ---------------------------------------------------------------------------
+// Painel montável da Visão Executiva.
+//
+// Cada peça é um elemento com data-pnl. A posição e a largura vêm de uma
+// preferência gravada por usuário, no formato "chave:largura|chave:largura".
+// Aplicar é só mexer em style.order e style.gridColumn — nada de mover nós,
+// que o DOM é do Blazor.
+//
+// No modo organizar: arrastar move a peça e o duplo clique alterna entre meia
+// largura e largura inteira.
+// ---------------------------------------------------------------------------
+window.appLayout = (function () {
+    let ref = null, organizando = false;
+
+    function board() { return document.getElementById('exec-board'); }
+    function pecas() {
+        const b = board();
+        return b ? Array.from(b.querySelectorAll('[data-pnl]')) : [];
+    }
+
+    // "chave:12|outra:6" → Map(chave → largura)
+    function ler(pref) {
+        const m = new Map();
+        (pref || '').split('|').filter(Boolean).forEach(par => {
+            const [k, l] = par.split(':');
+            if (k) m.set(k, Math.max(3, Math.min(12, parseInt(l, 10) || 12)));
+        });
+        return m;
+    }
+
+    function aplicar(pref) {
+        const m = ler(pref);
+        pecas().forEach(el => {
+            const k = el.getAttribute('data-pnl');
+            // Peça que não está na preferência (ex.: criada numa versão nova)
+            // fica onde o HTML a colocou, no fim da ordem gravada.
+            const i = Array.from(m.keys()).indexOf(k);
+            el.style.order = i >= 0 ? i : 999;
+            const larg = m.get(k);
+            if (larg) el.style.gridColumn = 'span ' + larg;
+        });
+    }
+
+    // Ordem atual = ordem visual (o que está na tela), com a largura de cada um.
+    function serializar() {
+        return pecas()
+            .slice()
+            .sort((a, b) => (parseInt(a.style.order || 999, 10)) - (parseInt(b.style.order || 999, 10)))
+            .map(el => {
+                const span = (el.style.gridColumn || '').match(/span\s+(\d+)/);
+                const cls = el.classList.contains('c6') ? 6 : 12;
+                return el.getAttribute('data-pnl') + ':' + (span ? span[1] : cls);
+            })
+            .join('|');
+    }
+
+    function gravar() {
+        if (ref) ref.invokeMethodAsync('SaveLayout', serializar());
+    }
+
+    // ---- modo organizar ----
+    // A largura é alternada com DUPLO CLIQUE na peça, não por um botão criado
+    // aqui: inserir um filho a mais num elemento do Blazor bagunça o diff dele
+    // no próximo render. Zero nós novos, zero conflito.
+    function organizar(ligado, dotref) {
+        ref = dotref || ref;
+        const b = board();
+        if (!b) return;
+        organizando = ligado;
+        b.classList.toggle('organizando', ligado);
+        pecas().forEach(el => { el.draggable = ligado; });
+    }
+
+    // ---- arraste (grade: decide antes/depois pelo eixo que separa as peças) ----
+    function ligar(dotref, pref) {
+        ref = dotref || ref;
+        const b = board();
+        if (!b) return;
+        aplicar(pref);
+        if (b.__lay) return;
+        b.__lay = true;
+
+        let arrastando = null, alvo = null, depois = false;
+
+        b.addEventListener('dragstart', e => {
+            if (!organizando) return;
+            const el = e.target.closest('[data-pnl]');
+            if (!el) return;
+            arrastando = el; alvo = null;
+            el.classList.add('co-drag');
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', el.getAttribute('data-pnl')); } catch (_) { }
+        });
+
+        b.addEventListener('dragover', e => {
+            if (!arrastando) return;
+            e.preventDefault();
+            const el = e.target.closest('[data-pnl]');
+            if (!el || el === arrastando) return;
+            const r = el.getBoundingClientRect();
+            // Peça larga: decide por cima/baixo. Peça estreita ao lado de outra:
+            // decide por esquerda/direita.
+            depois = r.width < b.clientWidth * 0.7
+                ? (e.clientX - r.left) > r.width / 2
+                : (e.clientY - r.top) > r.height / 2;
+            alvo = el;
+            pecas().forEach(x => x.classList.remove('co-before', 'co-after'));
+            el.classList.add(depois ? 'co-after' : 'co-before');
+        });
+
+        function soltar() {
+            pecas().forEach(x => x.classList.remove('co-drag', 'co-before', 'co-after'));
+            if (!arrastando || !alvo) { arrastando = null; alvo = null; return; }
+
+            const ordem = pecas()
+                .slice()
+                .sort((x, y) => (parseInt(x.style.order || 999, 10)) - (parseInt(y.style.order || 999, 10)));
+            const de = ordem.indexOf(arrastando);
+            ordem.splice(de, 1);
+            let para = ordem.indexOf(alvo);
+            if (depois) para++;
+            ordem.splice(para, 0, arrastando);
+            ordem.forEach((el, i) => { el.style.order = i; });
+
+            arrastando = null; alvo = null;
+            gravar();
+        }
+        b.addEventListener('drop', e => { e.preventDefault(); soltar(); });
+        b.addEventListener('dragend', () => soltar());
+
+        b.addEventListener('dblclick', e => {
+            if (!organizando) return;
+            const el = e.target.closest('[data-pnl]');
+            if (!el) return;
+            const meia = (el.style.gridColumn || '').includes('span 6');
+            el.style.gridColumn = 'span ' + (meia ? 12 : 6);
+            gravar();
+        });
+    }
+
+    return { ligar, aplicar, organizar };
+})();
