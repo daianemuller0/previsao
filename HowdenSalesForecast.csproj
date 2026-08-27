@@ -6,9 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>HowdenSalesForecast</RootNamespace>
 
-    <!-- Sem janela de console: o programa aparece só no navegador. Quem o
-         encerra é o fechamento da última aba (ver DesligaAoFechar). -->
-    <OutputType>WinExe</OutputType>
+    <!-- Sem janela de console NO PROGRAMA PUBLICADO: ele aparece só no
+         navegador, e quem o encerra é o fechamento da última aba (ver
+         DesligaAoFechar). Em Debug fica como aplicação de console, senão o
+         "dotnet run" não mostraria nada no terminal — nem erro, nem as
+         medições da subida. -->
+    <OutputType Condition="'$(Configuration)' == 'Release'">WinExe</OutputType>
 
     <!-- O executável é self-contained (leva o .NET e o DuckDB dentro), e é ele
          que atravessa a rede quando alguém pega uma versão nova. Comprimir o
