@@ -182,7 +182,10 @@ window.xfilter = (function () {
 })();
 
 window.worldMap = (function () {
-    const S = {};
+    function estado(id) {
+        const wrap = document.getElementById(id);
+        return wrap ? wrap.__wm : null;
+    }
     function apply(s) { s.inner.style.transform = `translate(${s.tx}px, ${s.ty}px) scale(${s.scale})`; }
     function zoomAt(s, factor, clientX, clientY) {
         const ns = Math.min(Math.max(s.scale * factor, 1), 14);
@@ -200,12 +203,24 @@ window.worldMap = (function () {
         if (!wrap) return;
         const inner = wrap.querySelector('.worldmap-inner');
         if (!inner) return;
-        if (S[id]) { S[id].inner = inner; if (ref) S[id].ref = ref; apply(S[id]); return; }
-        const s = { wrap, inner, scale: 1, tx: 0, ty: 0, drag: null, ref: ref || null, downX: 0, downY: 0, moved: 0 };
-        S[id] = s;
+
+        // O estado mora NO ELEMENTO. Guardá-lo num mapa por id fazia o mapa
+        // parar de responder ao voltar para a página: o id continuava o mesmo,
+        // mas o <div> era outro e os eventos ficavam presos ao antigo.
+        if (wrap.__wm) {
+            const s = wrap.__wm;
+            s.inner = inner;
+            if (ref) s.ref = ref;
+            apply(s);
+            return;
+        }
+
+        const s = { wrap, inner, scale: 1, tx: 0, ty: 0, drag: null, ref: ref || null, moved: 0, alvo: null };
+        wrap.__wm = s;
         inner.style.transformOrigin = '0 0';
         let tip = wrap.querySelector('.wm-tip');
         if (!tip) { tip = document.createElement('div'); tip.className = 'wm-tip'; wrap.appendChild(tip); }
+
         wrap.addEventListener('mousemove', e => {
             const p = e.target.closest && e.target.closest('path[data-country]');
             if (p && !s.drag) {
@@ -223,45 +238,63 @@ window.worldMap = (function () {
         });
         wrap.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
         wrap.addEventListener('wheel', e => { e.preventDefault(); zoomAt(s, e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX, e.clientY); }, { passive: false });
+
         wrap.addEventListener('pointerdown', e => {
-            s.drag = { x: e.clientX, y: e.clientY, tx: s.tx, ty: s.ty };
-            s.downX = e.clientX; s.downY = e.clientY; s.moved = 0;
-            wrap.setPointerCapture(e.pointerId); wrap.classList.add('grabbing'); tip.style.display = 'none';
+            // Guarda QUAL país estava sob o cursor: depois de capturar o ponteiro
+            // o clique é entregue no wrapper, não no <path>, e procurar pelo
+            // e.target do clique não acharia mais o país.
+            s.alvo = (e.target.closest && e.target.closest('path[data-xf-val]')) || null;
+            s.drag = { x: e.clientX, y: e.clientY, tx: s.tx, ty: s.ty, capturado: false, id: e.pointerId };
+            s.moved = 0;
+            tip.style.display = 'none';
         });
         wrap.addEventListener('pointermove', e => {
             if (!s.drag) return;
+            s.moved = Math.max(s.moved, Math.abs(e.clientX - s.drag.x) + Math.abs(e.clientY - s.drag.y));
+            // Só vira arraste depois de sair do lugar: assim um clique simples
+            // nunca captura o ponteiro e o navegador entrega o click normalmente.
+            if (!s.drag.capturado) {
+                if (s.moved <= 4) return;
+                s.drag.capturado = true;
+                try { wrap.setPointerCapture(s.drag.id); } catch (_) { }
+                wrap.classList.add('grabbing');
+            }
             s.tx = s.drag.tx + (e.clientX - s.drag.x);
             s.ty = s.drag.ty + (e.clientY - s.drag.y);
-            s.moved = Math.max(s.moved, Math.abs(e.clientX - s.downX) + Math.abs(e.clientY - s.downY));
             apply(s);
         });
-        const end = () => { if (s.drag) { s.drag = null; wrap.classList.remove('grabbing'); } };
+        const end = () => {
+            if (!s.drag) return;
+            if (s.drag.capturado) { try { wrap.releasePointerCapture(s.drag.id); } catch (_) { } }
+            s.drag = null;
+            wrap.classList.remove('grabbing');
+        };
         wrap.addEventListener('pointerup', end);
         wrap.addEventListener('pointercancel', end);
-        // Clique num país (sem arrastar) dispara o cross-filter no componente Blazor.
+
+        // Clique num país (sem arrastar) dispara o cross-filter no componente.
         wrap.addEventListener('click', e => {
             if (s.moved > 6 || !s.ref) return;
-            const p = e.target.closest && e.target.closest('path[data-xf-val]');
-            if (!p) return;
-            const val = p.getAttribute('data-xf-val');
+            const p = (e.target.closest && e.target.closest('path[data-xf-val]')) || s.alvo;
+            const val = p && p.getAttribute('data-xf-val');
             if (val) s.ref.invokeMethodAsync('ApplyCrossFilter', 'country', val);
         });
         // Duplo clique fora de qualquer país (oceano / país sem dados): limpa
         // todos os filtros da página — a saída rápida depois de ir clicando.
         wrap.addEventListener('dblclick', e => {
             if (!s.ref) return;
-            const p = e.target.closest && e.target.closest('path[data-xf-val]');
+            const p = (e.target.closest && e.target.closest('path[data-xf-val]')) || s.alvo;
             if (p) return;
             s.ref.invokeMethodAsync('ClearAllFilters');
         });
         apply(s);
     }
     function zoom(id, factor) {
-        const s = S[id]; if (!s) return;
+        const s = estado(id); if (!s) return;
         const r = s.wrap.getBoundingClientRect();
         zoomAt(s, factor, r.left + r.width / 2, r.top + r.height / 2);
     }
-    function reset(id) { const s = S[id]; if (!s) return; s.scale = 1; s.tx = 0; s.ty = 0; apply(s); }
+    function reset(id) { const s = estado(id); if (!s) return; s.scale = 1; s.tx = 0; s.ty = 0; apply(s); }
     return { init, zoom, reset };
 })();
 
