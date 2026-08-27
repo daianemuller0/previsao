@@ -264,3 +264,74 @@ window.worldMap = (function () {
     function reset(id) { const s = S[id]; if (!s) return; s.scale = 1; s.tx = 0; s.ty = 0; apply(s); }
     return { init, zoom, reset };
 })();
+
+// ---------------------------------------------------------------------------
+// Reordenar barras de um gráfico arrastando.
+//
+// Regra de ouro: o DOM é do Blazor. Durante o arraste só mexemos em CLASSES
+// (que o Blazor reescreve no próximo render, sem estrago); a nova ordem é
+// calculada em memória e devolvida ao componente, que redesenha a lista já
+// ordenada. Mover nós de verdade embaralharia o diff do Blazor.
+// ---------------------------------------------------------------------------
+window.chartOrder = (function () {
+    function itens(box) { return Array.from(box.querySelectorAll('[data-key]')); }
+    function limpar(box) {
+        itens(box).forEach(x => x.classList.remove('co-drag', 'co-before', 'co-after'));
+    }
+
+    function init(id, ref, chave) {
+        const box = document.getElementById(id);
+        if (!box) return;
+        if (box.__co) { box.__co.ref = ref; box.__co.chave = chave; return; }
+
+        const st = { ref, chave, key: null, alvo: null, depois: false };
+        box.__co = st;
+
+        box.addEventListener('dragstart', e => {
+            const it = e.target.closest('[data-key]');
+            if (!it || !box.contains(it)) return;
+            st.key = it.getAttribute('data-key');
+            st.alvo = null;
+            it.classList.add('co-drag');
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', st.key); } catch (_) { }
+        });
+
+        box.addEventListener('dragover', e => {
+            if (st.key === null) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const over = e.target.closest('[data-key]');
+            if (!over || !box.contains(over) || over.getAttribute('data-key') === st.key) return;
+            const r = over.getBoundingClientRect();
+            st.alvo = over.getAttribute('data-key');
+            st.depois = (e.clientY - r.top) > r.height / 2;
+            itens(box).forEach(x => x.classList.remove('co-before', 'co-after'));
+            over.classList.add(st.depois ? 'co-after' : 'co-before');
+        });
+
+        function soltar() {
+            const key = st.key, alvo = st.alvo, depois = st.depois;
+            st.key = null; st.alvo = null;
+            limpar(box);
+            if (key === null || alvo === null || !st.ref) return;
+
+            const ordem = itens(box).map(x => x.getAttribute('data-key'));
+            const de = ordem.indexOf(key);
+            if (de < 0) return;
+            ordem.splice(de, 1);
+            let para = ordem.indexOf(alvo);
+            if (para < 0) return;
+            if (depois) para++;
+            ordem.splice(para, 0, key);
+            st.ref.invokeMethodAsync('SaveChartOrder', st.chave, ordem);
+        }
+
+        box.addEventListener('drop', e => { e.preventDefault(); soltar(); });
+        box.addEventListener('dragend', () => { st.alvo = null; st.key = null; limpar(box); });
+        box.addEventListener('dragleave', e => {
+            if (!box.contains(e.relatedTarget)) itens(box).forEach(x => x.classList.remove('co-before', 'co-after'));
+        });
+    }
+    return { init };
+})();

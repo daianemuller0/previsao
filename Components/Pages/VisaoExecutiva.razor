@@ -4,6 +4,7 @@
 @inject OpportunityRepository Repo
 @inject Catalog Cat
 @inject ControleRepository ControleRepo
+@inject ChartPrefsRepository ChartPrefs
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @implements IDisposable
@@ -310,7 +311,7 @@
     <div class="g12">
         @* ---- Commercial Segment (donut + lista) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Segmento Comercial</div><div class="xcard-sub">@_bySegment.Count segmentos · participação</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Segmento Comercial</div><div class="xcard-sub">@_bySegment.Count segmentos · arraste para reordenar</div></div>@ChartToolsFor("segment")</div>
             @if (_bySegment.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -319,12 +320,12 @@
                         @RenderDonutRing(_bySegment, "segment")
                         <div class="seg-center"><div><div class="lab">Total</div><div class="val">@MoneyBrl(_bySegment.Sum(x => x.Value))</div></div></div>
                     </div>
-                    <div class="seg-list scroll-y" style="max-height:230px">
+                    <div class="seg-list scroll-y ch-drag" id="ch-segment" style="max-height:230px;@BarStyle("segment")">
                         @{ var si = 0; }
-                        @foreach (var s in _bySegment)
+                        @foreach (var s in Ord("segment", _bySegment, x => x.Label))
                         {
                             var c = SegColors[si++ % SegColors.Length];
-                            <div class="seg-row @(IsActive("segment", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("segment", s.Label)' title="@s.Label">
+                            <div class="seg-row @(IsActive("segment", s.Label) ? "xf-on" : "")" draggable="true" data-key="@s.Label" @onclick='() => CrossFilter("segment", s.Label)' title="@s.Label">
                                 <span class="seg-dot" style="background:@c"></span>
                                 <span class="seg-name">@s.Label</span>
                                 <span class="seg-val">@MoneyBrl(s.Value)</span>
@@ -338,15 +339,15 @@
 
         @* ---- Forecast by Market (ranking) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por Mercado</div><div class="xcard-sub">@_byMarket.Count mercados · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por Mercado</div><div class="xcard-sub">@_byMarket.Count mercados · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("market")</div>
             @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="ibar @(DimActive("market") ? "has-active" : "") scroll-y" style="max-height:340px">
-                    @foreach (var m in _byMarket)
+                <div class="ibar @(DimActive("market") ? "has-active" : "") scroll-y ch-drag" id="ch-market" style="max-height:340px;@BarStyle("market")">
+                    @foreach (var m in Ord("market", _byMarket, x => x.Name))
                     {
                         var sh = m.Value / _marketTotal * 100;
-                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Previsão @Money(m.Value) · Participação @Fmt.Pct(sh)">
+                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" draggable="true" data-key="@m.Name" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Previsão @Money(m.Value) · Participação @Fmt.Pct(sh)">
                             <div class="ibar-head">
                                 <span class="ibar-name">@m.Name</span>
                                 <span class="ibar-metrics"><span class="ibar-val">@Money(m.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span></span>
@@ -362,17 +363,17 @@
     @* ---- Sales Rep Performance | Forecast by Product (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Desempenho por Vendedor</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · maior → menor</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Desempenho por Vendedor</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span>@ChartToolsFor("kam")</div>
             @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="ibar @(DimActive("kam") ? "has-active" : "") scroll-y" style="max-height:460px">
+                <div class="ibar @(DimActive("kam") ? "has-active" : "") scroll-y ch-drag" id="ch-kam" style="max-height:460px;@BarStyle("kam")">
                     @{ var ri = 0; }
-                    @foreach (var s in _byRep)
+                    @foreach (var s in Ord("kam", _byRep, x => x.Label))
                     {
                         ri++;
                         var sh = s.Value / _repTot * 100;
-                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — Previsão @MoneyBrl(s.Value) · Participação @Fmt.Pct(sh)">
+                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" draggable="true" data-key="@s.Label" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — Previsão @MoneyBrl(s.Value) · Participação @Fmt.Pct(sh)">
                             <div class="ibar-head">
                                 <span class="ibar-num">@ri</span>
                                 <span class="ibar-name">@s.Label</span>
@@ -385,16 +386,16 @@
             }
         </div></div>
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por Produto</div><div class="xcard-sub">@_byProduct.Count produtos · Margem Bruta em destaque</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por Produto</div><div class="xcard-sub">@_byProduct.Count produtos · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span>@ChartToolsFor("product")</div>
             @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="ibar @(DimActive("product") ? "has-active" : "") scroll-y" style="max-height:400px">
-                    @foreach (var p in _byProduct)
+                <div class="ibar @(DimActive("product") ? "has-active" : "") scroll-y ch-drag" id="ch-product" style="max-height:400px;@BarStyle("product")">
+                    @foreach (var p in Ord("product", _byProduct, x => x.Name))
                     {
                         var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
                         var sh = p.Value / _productTotal * 100;
-                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Previsão @Money(p.Value) · Participação @Fmt.Pct(sh) · Margem @Fmt.Pct(p.Margin)">
+                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" draggable="true" data-key="@p.Name" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Previsão @Money(p.Value) · Participação @Fmt.Pct(sh) · Margem @Fmt.Pct(p.Margin)">
                             <div class="ibar-head">
                                 <span class="ibar-name">@p.Name</span>
                                 <span class="ibar-metrics"><span class="ibar-val">@Money(p.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span></span>
@@ -416,14 +417,14 @@
     <div class="g12">
         @* ---- Sub-Market Performance (lollipop) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Desempenho por Sub-Mercado</div><div class="xcard-sub">@_bySubMarket.Count sub-mercados · todos exibidos</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Desempenho por Sub-Mercado</div><div class="xcard-sub">@_bySubMarket.Count sub-mercados · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("submarket")</div>
             @if (_bySubMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
-                <div class="lolli scroll-y" style="max-height:380px">
-                    @foreach (var s in _bySubMarket)
+                <div class="lolli scroll-y ch-drag" id="ch-submarket" style="max-height:380px;@BarStyle("submarket")">
+                    @foreach (var s in Ord("submarket", _bySubMarket, x => x.Label))
                     {
-                        <div class="lolli-row @(IsActive("submarket", s.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("submarket", s.Label)' title="@s.Label">
+                        <div class="lolli-row @(IsActive("submarket", s.Label) ? "xf-on" : "")" draggable="true" data-key="@s.Label" @onclick='() => CrossFilter("submarket", s.Label)' title="@s.Label">
                             <span class="lolli-name">@s.Label</span>
                             <span class="lolli-track"><span class="lolli-line" style="width:calc(@Share(s.Value, _smMax)% - 12px)"></span><span class="lolli-dot"></span></span>
                             <span class="lolli-val">@MoneyBrl(s.Value)</span>
@@ -435,7 +436,7 @@
 
         @* ---- Business Unit Performance (donut + lista) ---- *@
         <div class="c6"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Desempenho por Unidade de Negócio</div><div class="xcard-sub">@_byBu2.Count unidades · participação</div></div></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Desempenho por Unidade de Negócio</div><div class="xcard-sub">@_byBu2.Count unidades · arraste para reordenar</div></div>@ChartToolsFor("bu")</div>
             @if (_byBu2.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
             else
             {
@@ -444,12 +445,12 @@
                         @RenderDonutRing(_byBu2, "bu")
                         <div class="seg-center"><div><div class="lab">Total</div><div class="val">@MoneyBrl(_byBu2.Sum(x => x.Value))</div></div></div>
                     </div>
-                    <div class="seg-list scroll-y" style="max-height:230px">
+                    <div class="seg-list scroll-y ch-drag" id="ch-bu" style="max-height:230px;@BarStyle("bu")">
                         @{ var bi = 0; }
-                        @foreach (var b in _byBu2)
+                        @foreach (var b in Ord("bu", _byBu2, x => x.Label))
                         {
                             var c = SegColors[bi++ % SegColors.Length];
-                            <div class="seg-row @(IsActive("bu", b.Label) ? "xf-on" : "")" @onclick='() => CrossFilter("bu", b.Label)' title="@b.Label">
+                            <div class="seg-row @(IsActive("bu", b.Label) ? "xf-on" : "")" draggable="true" data-key="@b.Label" @onclick='() => CrossFilter("bu", b.Label)' title="@b.Label">
                                 <span class="seg-dot" style="background:@c"></span>
                                 <span class="seg-name">@b.Label</span>
                                 <span class="seg-val">@MoneyBrl(b.Value)</span>
@@ -950,6 +951,67 @@
 
     // Chamado pelo mapa (JS) ao clicar num país. Reentra no contexto do componente.
     [JSInvokable]
+    // ---- gráficos de barras: ordem (arraste) e espessura, por usuário --------
+    private string _login = "";
+    private int _chartVersion = -1;
+    private readonly Dictionary<string, ChartPrefsRepository.Pref> _chart = new(StringComparer.OrdinalIgnoreCase);
+
+    // Chaves dos gráficos que aceitam arraste — usadas para (re)ligar o JS.
+    private static readonly string[] ChartKeys = { "segment", "market", "kam", "product", "submarket", "bu" };
+
+    private ChartPrefsRepository.Pref Pref(string chave)
+    {
+        if (_chart.TryGetValue(chave, out var p)) return p;
+        p = ChartPrefs.Get(_login, chave);
+        _chart[chave] = p;
+        return p;
+    }
+
+    private void RecarregarChartPrefs()
+    {
+        if (_chartVersion == ChartPrefs.Version) return;
+        _chart.Clear();
+        _chartVersion = ChartPrefs.Version;
+    }
+
+    /// <summary>Espessura da barra deste gráfico, como variável CSS.</summary>
+    private string BarStyle(string chave) => $"--bar-h:{Pref(chave).Barra}px";
+
+    /// <summary>Aplica a ordem que a pessoa montou arrastando (o resto segue por valor).</summary>
+    private List<T> Ord<T>(string chave, List<T> itens, Func<T, string> rótulo) =>
+        ChartPrefsRepository.Aplicar(Pref(chave).Ordem, itens, rótulo);
+
+    private RenderFragment ChartToolsFor(string chave) => builder =>
+    {
+        builder.OpenComponent<ChartTools>(0);
+        builder.AddAttribute(1, "Barra", Pref(chave).Barra);
+        builder.AddAttribute(2, "OnBarra", EventCallback.Factory.Create<int>(this, px => AjustarBarra(chave, px)));
+        builder.AddAttribute(3, "OnReset", EventCallback.Factory.Create(this, () => ResetChart(chave)));
+        builder.CloseComponent();
+    };
+
+    private void AjustarBarra(string chave, int px)
+    {
+        var p = Pref(chave);
+        ChartPrefs.Save(_login, chave, p.Ordem, px);
+        RecarregarChartPrefs();
+    }
+
+    private void ResetChart(string chave)
+    {
+        ChartPrefs.Reset(_login, chave);
+        RecarregarChartPrefs();
+    }
+
+    /// <summary>Nova ordem das barras depois de arrastar (vem do navegador).</summary>
+    [JSInvokable]
+    public Task SaveChartOrder(string chave, string[] ordem) => InvokeAsync(() =>
+    {
+        ChartPrefs.Save(_login, chave, ChartPrefsRepository.Serializar(ordem), Pref(chave).Barra);
+        RecarregarChartPrefs();
+        StateHasChanged();
+    });
+
     public Task ApplyCrossFilter(string dim, string val) =>
         InvokeAsync(() => { CrossFilter(dim, val); StateHasChanged(); });
 
@@ -963,7 +1025,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (AuthState is not null) _scope = AccessScope.Resolve((await AuthState).User);
+        if (AuthState is not null)
+        {
+            var user = (await AuthState).User;
+            _scope = AccessScope.Resolve(user);
+            _login = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? user.Identity?.Name ?? "";
+            _chart.Clear();          // o 1º render acontece antes daqui: recarrega já com o login
+        }
         _opps = LoadScoped();
         LoadReport();
     }
@@ -980,6 +1049,8 @@
         if (firstRender) _ref ??= DotNetObjectReference.Create(this);
         try { await JS.InvokeVoidAsync("worldMap.init", MapId, _ref); } catch { }
         try { await JS.InvokeVoidAsync("xfilter.init", "xf-charts", _ref); } catch { }
+        foreach (var chave in ChartKeys)
+            try { await JS.InvokeVoidAsync("chartOrder.init", "ch-" + chave, _ref, chave); } catch { }
     }
 
     public void Dispose() => _ref?.Dispose();
@@ -1136,6 +1207,7 @@
 
     private void Build()
     {
+        RecarregarChartPrefs();      // alguém ajustou um gráfico: relê antes de desenhar
         _sym = _currency == "BRL" ? "R$" : "US$";
         // Ano de referência: o selecionado no filtro, ou o ano atual quando "Todos".
         _year = _yearFilter > 0 ? _yearFilter : _today.Year;

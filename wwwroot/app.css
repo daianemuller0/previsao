@@ -1217,9 +1217,9 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .lolli-row:hover { background: var(--panel-2); }
 .lolli-row.xf-on { background: var(--teal-050); box-shadow: inset 3px 0 0 var(--teal); }
 .lolli-name { font-size: 12.5px; font-weight: 600; color: var(--text-2); white-space: normal; line-height: 1.25; }
-.lolli-track { position: relative; height: 16px; display: flex; align-items: center; }
-.lolli-line { height: 2px; border-radius: 2px; background: linear-gradient(90deg, #cfe1ea, var(--teal)); }
-.lolli-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--teal); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--teal); margin-left: -2px; flex: none; }
+.lolli-track { position: relative; height: calc(var(--bar-h, 15px) + 1px); display: flex; align-items: center; }
+.lolli-line { height: calc(var(--bar-h, 15px) / 6 + 1px); border-radius: 2px; background: linear-gradient(90deg, #cfe1ea, var(--teal)); }
+.lolli-dot { width: calc(var(--bar-h, 15px) * .8); height: calc(var(--bar-h, 15px) * .8); border-radius: 50%; background: var(--teal); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--teal); margin-left: -2px; flex: none; }
 .lolli-val { font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; min-width: 96px; }
 
 /* ---- Commercial Segment donut + lista ---- */
@@ -1230,7 +1230,7 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 .seg-center .lab { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted-2); }
 .seg-center .val { font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--text); font-variant-numeric: tabular-nums; }
 .seg-list { display: flex; flex-direction: column; gap: 2px; }
-.seg-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; cursor: pointer; transition: background .12s ease; }
+.seg-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 12px; padding: calc(var(--bar-h, 15px) / 2 - 1px) 6px; border-radius: 8px; cursor: pointer; transition: background .12s ease; }
 .seg-row + .seg-row { border-top: 1px solid #f1f4f9; }
 .seg-row:hover { background: var(--panel-2); }
 .seg-row.xf-on { background: var(--teal-050); box-shadow: inset 3px 0 0 var(--teal); }
@@ -1365,7 +1365,7 @@ tr.clickable.xf-on { background: var(--primary-050, #e8f4f8); box-shadow: inset 
 
 /* A BARRA (herói) — grossa, viva, com track suave e cantos arredondados */
 .ibar-track {
-    display: block; height: 15px; border-radius: 999px; background: #e9eff6; overflow: hidden;
+    display: block; height: var(--bar-h, 15px); border-radius: 999px; background: #e9eff6; overflow: hidden;
     box-shadow: inset 0 1px 2px rgba(18,38,63,.06); transition: box-shadow .15s ease;
 }
 .ibar-fill {
@@ -1753,3 +1753,25 @@ td .fu-sub svg { width: 12px; height: 12px; vertical-align: -1px; margin-right: 
 .cols-move { display: flex; gap: 2px; }
 .cols-move .row-act svg { width: 14px; height: 14px; }
 .cols-move .row-act:disabled { opacity: .3; cursor: default; }
+
+/* ==========================================================================
+   Gráficos de barras: reordenar arrastando + espessura da barra
+   ========================================================================== */
+.ch-tools { display: inline-flex; align-items: center; gap: 3px; margin-left: 10px; }
+.ch-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text-2); border-radius: 6px;
+    font-size: 13px; line-height: 1; cursor: pointer;
+}
+.ch-btn:hover:not(:disabled) { background: var(--panel-2); color: var(--primary); border-color: var(--teal); }
+.ch-btn:disabled { opacity: .35; cursor: default; }
+.ch-btn svg { width: 12px; height: 12px; }
+.ch-size { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 30px; text-align: center; }
+
+/* A barra inteira é a alça: o cursor avisa que dá para arrastar. */
+.ch-drag > [data-key] { cursor: grab; }
+.ch-drag > [data-key].co-drag { opacity: .45; cursor: grabbing; }
+/* Linha de destino durante o arraste (só classe — o DOM continua sendo do Blazor). */
+.ch-drag > [data-key].co-before { box-shadow: inset 0 2px 0 var(--teal); }
+.ch-drag > [data-key].co-after { box-shadow: inset 0 -2px 0 var(--teal); }
