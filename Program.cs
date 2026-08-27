@@ -39,7 +39,13 @@ static int PortaLivre(int inicial)
 
 // --- Blazor Server (componentes interativos no servidor) ---
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(o =>
+    {
+        // Quanto tempo um circuito sem conexão fica guardado esperando a volta.
+        // O padrão (3 min) segura recursos de abas que ninguém vai reabrir; um
+        // minuto cobre F5 e oscilação de rede com folga.
+        o.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(1);
+    });
 
 // O programa roda sem janela: quem o fecha é o navegador. No modo por-usuário,
 // encerra o processo quando a última aba some — num servidor central isso
