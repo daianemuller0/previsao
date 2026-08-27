@@ -1786,27 +1786,33 @@ td .fu-sub svg { width: 12px; height: 12px; vertical-align: -1px; margin-right: 
 .th-drag > th[data-key].co-after { box-shadow: inset -2px 0 0 var(--teal); }
 
 /* ==========================================================================
-   Tela cheia dos gráficos
+   Painel ampliado (ocupa a tela abaixo do topo e dos filtros)
    ========================================================================== */
 .fs-btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 24px; height: 24px; padding: 0; margin-left: 8px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 24px; padding: 0 6px; margin-left: 8px; flex: none;
     border: 1px solid var(--border); background: var(--panel); color: var(--muted);
-    border-radius: 6px; cursor: pointer;
+    border-radius: 6px; cursor: pointer; font-size: 11.5px; white-space: nowrap;
 }
 .fs-btn:hover { background: var(--panel-2); color: var(--primary); border-color: var(--teal); }
 .fs-btn svg { width: 13px; height: 13px; }
 
-/* Em tela cheia o card vira a página: fundo próprio (senão o navegador pinta
-   de preto), rolagem quando o conteúdo passa da tela e os limites de altura
-   dos gráficos liberados para eles ocuparem o espaço que ganharam. */
-.xcard:fullscreen, .panel:fullscreen {
-    background: var(--panel); padding: 24px 28px; overflow: auto;
-    border-radius: 0; box-shadow: none;
+/* Um botão por vez: "ampliar" no normal, "voltar" no ampliado. */
+.fs-voltar { display: none; }
+.zoom-card .fs-abrir { display: none; }
+.zoom-card .fs-voltar { display: inline-flex; color: var(--primary); border-color: var(--teal); }
+
+/* O painel ampliado começa logo abaixo da barra de filtros (--zoom-top é
+   medido na hora do clique, porque a barra muda de altura ao quebrar linha).
+   Os filtros continuam clicáveis: o painel para exatamente onde eles terminam. */
+.zoom-card {
+    position: fixed; left: var(--zoom-left, 0); right: 0; bottom: 0; top: var(--zoom-top, 120px);
+    z-index: 20; margin: 0; border-radius: 0; overflow: auto;
+    background: var(--panel); padding: 18px 24px; box-shadow: 0 -8px 24px rgba(9, 27, 50, .10);
 }
-.xcard:fullscreen .chart-body, .panel:fullscreen .chart-body,
-.xcard:fullscreen .scroll-y, .panel:fullscreen .scroll-y,
-.xcard:fullscreen .table-wrap, .panel:fullscreen .table-wrap {
-    max-height: none !important;
-}
-.xcard:fullscreen .worldmap, .panel:fullscreen .worldmap { height: calc(100vh - 190px); }
+/* Ampliado, o gráfico usa o espaço que ganhou. */
+.zoom-card .chart-body, .zoom-card .scroll-y, .zoom-card .table-wrap { max-height: none !important; }
+.zoom-card .worldmap { height: calc(100vh - var(--zoom-top, 120px) - 150px); }
+
+/* O resto da página não rola por baixo do painel ampliado. */
+body.zoom-mode { overflow: hidden; }

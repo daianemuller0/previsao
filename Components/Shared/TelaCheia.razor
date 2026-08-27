@@ -1,8 +1,20 @@
-@* Botão "tela cheia" de um gráfico. O clique é resolvido no próprio navegador
-   (atributo onclick, não @onclick): não vale gastar uma ida ao servidor para
-   ampliar um painel. O JS sobe até o card que contém o botão e pede tela cheia
-   dele — assim o mesmo botão serve a qualquer painel, sem receber parâmetro. *@
+@* Ampliar/voltar um painel de gráfico.
 
-<button type="button" class="fs-btn" title="Tela cheia (Esc para sair)" onclick="appTelaCheia(this)">
+   Não usa a tela cheia do navegador: ela esconderia a barra de filtros, que é
+   justamente o que a pessoa quer continuar mexendo com o gráfico grande. Em vez
+   disso o painel ocupa a tela ABAIXO do topo e dos filtros, que seguem
+   funcionando normalmente.
+
+   Os dois botões são renderizados sempre; o CSS mostra um ou outro conforme o
+   painel esteja ampliado. Assim o "Voltar" não precisa ser criado pelo
+   JavaScript — mexer no DOM que é do Blazor dá problema.
+
+   O clique é resolvido no navegador (onclick, não @onclick): ampliar um painel
+   não justifica uma ida ao servidor. *@
+
+<button type="button" class="fs-btn fs-abrir" title="Ampliar (Esc para voltar)" onclick="appAmpliar(this)">
     @Icons.Svg("expand")
+</button>
+<button type="button" class="fs-btn fs-voltar" title="Voltar ao tamanho normal" onclick="appAmpliarSair()">
+    @Icons.Svg("chevron-left")<span>Voltar</span>
 </button>
