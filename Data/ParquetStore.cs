@@ -52,10 +52,18 @@ public sealed class ParquetStore
         }
     }
 
+    // Diretórios já garantidos nesta execução. Em pasta de rede (ainda mais por
+    // VPN) cada CreateDirectory é uma ida ao servidor, e EntityDir é chamado em
+    // toda leitura e toda gravação.
+    private readonly HashSet<string> _dirsOk = new(StringComparer.OrdinalIgnoreCase);
+
     private string EntityDir(string entity)
     {
         var dir = Path.Combine(Folder, entity);
-        Directory.CreateDirectory(dir);
+        lock (_dirsOk)
+        {
+            if (_dirsOk.Add(dir)) Directory.CreateDirectory(dir);
+        }
         return dir;
     }
 

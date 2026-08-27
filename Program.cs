@@ -119,8 +119,12 @@ _ = Task.Run(() =>
     try
     {
         var oppRepo = app.Services.GetRequiredService<OpportunityRepository>();
-        Etapa("limpeza demo", () => oppRepo.RemoveDemo());   // remove oportunidades demo antigas
-        Etapa("leitura da base", () => oppRepo.Refresh());
+        // RemoveDemo já carrega o cache; só vale reler se ele tiver apagado algo.
+        // Antes eram DUAS leituras completas da base a cada abertura — caro em
+        // qualquer rede, proibitivo por VPN.
+        var demos = 0;
+        Etapa("leitura da base", () => demos = oppRepo.RemoveDemo());
+        if (demos > 0) Etapa("releitura (demos removidas)", () => oppRepo.Refresh());
         // A compactação NÃO roda aqui: reescrever a base inteira na rede a cada
         // abertura é caro. O CompactionService cuida disso em segundo plano,
         // só quando há arquivos demais.
