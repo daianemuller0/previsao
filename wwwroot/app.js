@@ -671,3 +671,60 @@ addEventListener('pagehide', function (e) {
     if (e.persisted) return;
     try { navigator.sendBeacon('/app/saindo'); } catch (_) { }
 });
+
+// ---------------------------------------------------------------------------
+// Volta sozinho depois de uma ausência longa (almoço, reunião, máquina
+// bloqueada).
+//
+// Quando a conexão cai, o Blazor tenta reconectar algumas vezes e desiste em
+// meio minuto — e o circuito da aba é descartado no servidor pouco depois. Quem
+// volta duas horas mais tarde encontra a tela travada com o aviso de reconexão,
+// mesmo com o programa vivo, e precisa saber que basta um F5.
+//
+// Aqui a página faz isso por conta própria: assim que o Blazor desiste, ela
+// pergunta ao servidor se ele ainda está de pé e recarrega quando ele responde.
+// Se estiver fora, continua perguntando — a tela volta assim que o programa
+// voltar, sem ninguém precisar tocar em nada.
+// ---------------------------------------------------------------------------
+(function () {
+    var tentando = false;
+
+    function voltarQuandoDer() {
+        if (tentando) return;
+        tentando = true;
+
+        (function perguntar() {
+            fetch('/app/vivo', { cache: 'no-store' })
+                .then(function (r) {
+                    if (r.ok || r.status === 204) location.reload();
+                    else setTimeout(perguntar, 4000);
+                })
+                .catch(function () { setTimeout(perguntar, 4000); });
+        })();
+    }
+
+    // O Blazor sinaliza pelo próprio modal de reconexão: "failed" = desistiu de
+    // tentar, "rejected" = o servidor não reconhece mais o circuito. Nos dois
+    // casos recarregar é o caminho, e é a página que sabe disso primeiro.
+    function observar(modal) {
+        var ver = function () {
+            var c = modal.className || '';
+            if (c.indexOf('components-reconnect-failed') >= 0 ||
+                c.indexOf('components-reconnect-rejected') >= 0) voltarQuandoDer();
+        };
+        new MutationObserver(ver).observe(modal, { attributes: true, attributeFilter: ['class'] });
+        ver();
+    }
+
+    var modal = document.getElementById('components-reconnect-modal');
+    if (modal) { observar(modal); return; }
+
+    // O modal só entra no DOM na primeira queda de conexão: espera por ele.
+    var raiz = new MutationObserver(function () {
+        var m = document.getElementById('components-reconnect-modal');
+        if (!m) return;
+        raiz.disconnect();
+        observar(m);
+    });
+    raiz.observe(document.body, { childList: true, subtree: true });
+})();

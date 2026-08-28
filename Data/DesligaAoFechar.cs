@@ -25,8 +25,10 @@ namespace HowdenSalesForecast.Data;
 // aba de verdade ele dispara "pagehide", e o app.js manda um aviso ao servidor.
 //
 //   • com aviso de saída  → FecharAoSairSegundos (20s): a pessoa fechou mesmo
-//   • sem aviso nenhum    → FecharSemConexaoMinutos (10 min): provavelmente a
-//                            aba ainda está aberta e a conexão é que caiu
+//   • sem aviso nenhum    → FecharSemConexaoMinutos (4h): a aba provavelmente
+//                            continua aberta e a pessoa volta — almoço, reunião,
+//                            máquina bloqueada. Voltar e achar o programa morto
+//                            é pior do que um processo parado algumas horas.
 //
 // ZERO em FecharAoSairSegundos desliga de vez o encerramento automático, para
 // quem prefere fechar pelo Gerenciador de Tarefas.
@@ -46,8 +48,9 @@ public sealed class DesligaAoFechar : CircuitHandler
     public const int PadraoSegundos = 20;
 
     /// <summary>Prazo quando a conexão cai SEM aviso: aí o mais provável é que a
-    /// aba continue aberta, e derrubar o programa seria tirá-lo de quem usa.</summary>
-    public const int PadraoSemConexaoMinutos = 10;
+    /// aba continue aberta e a pessoa volte depois do almoço ou de uma reunião.
+    /// Derrubar o programa nesse meio-tempo seria tirá-lo de quem ainda usa.</summary>
+    public const int PadraoSemConexaoMinutos = 240;
 
     private static bool _avisouSaida;             // o navegador disse que fechou
 

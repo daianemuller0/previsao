@@ -256,6 +256,10 @@ app.MapPost("/app/saindo", (IHostApplicationLifetime vida, IConfiguration cfg) =
     return Results.NoContent();
 }).AllowAnonymous().DisableAntiforgery();
 
+// "O programa ainda está de pé?" — usado pela página quando a reconexão falha,
+// para saber a hora certa de recarregar sozinha. Precisa ser barato e anônimo.
+app.MapGet("/app/vivo", () => Results.NoContent()).AllowAnonymous();
+
 // Exporta o forecast consolidado em CSV (BOM UTF-8, separador ';' p/ Excel pt-BR).
 app.MapGet("/forecast/export", (HttpContext http, OpportunityRepository repo, Catalog cat) =>
 {
