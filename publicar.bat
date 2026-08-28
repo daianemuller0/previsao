@@ -67,6 +67,10 @@ REM VPN isso levava minutos, toda vez. A janela do .cmd fica visivel: e por ela
 REM que se acompanha a copia quando sai versao nova.
 copy /y "%~dp0iniciar.ps1" "%TEMPO%\iniciar.ps1" >nul
 copy /y "%~dp0iniciar.cmd" "%TEMPO%\iniciar.cmd" >nul
+REM O logo vai como arquivo .ico proprio: apontar o atalho para ele e mais
+REM confiavel do que depender do icone embutido no executavel — que muda de
+REM lugar quando o alvo do atalho deixa de ser o .exe.
+copy /y "%~dp0wwwroot\howden.ico" "%TEMPO%\howden.ico" >nul
 
 REM --- 3) Espelha no destino (remove sobras de versoes antigas) --------------
 echo.
@@ -90,14 +94,18 @@ REM Limpa os executaveis antigos que ninguem esta mais usando (os em uso ficam
 REM para a proxima publicacao — a exclusao simplesmente falha e e ignorada).
 del /q "%DESTINO%\*.old_*.exe" >nul 2>&1
 
-REM --- 4) Cria o atalho com o icone (logo Howden, embutido no .exe) ----------
+REM --- 4) Cria o atalho com o logo da Howden --------------------------------
+REM O atalho e APAGADO antes de ser recriado: o Windows guarda o icone em cache
+REM e, so regravando por cima, continuaria mostrando o antigo.
 powershell -NoProfile -Command ^
   "$d='%DESTINO%';" ^
-  "$exe=Join-Path $d 'Howden Sales Forecast.exe';" ^
   "$cmd=Join-Path $d 'iniciar.cmd';" ^
+  "$ico=Join-Path $d 'howden.ico';" ^
   "$lnk=Join-Path $d 'Howden Sales Forecast.lnk';" ^
+  "if (Test-Path $lnk) { Remove-Item $lnk -Force };" ^
   "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($lnk);" ^
-  "$s.TargetPath=$cmd; $s.WorkingDirectory=$d; $s.IconLocation=\"$exe,0\";" ^
+  "$s.TargetPath=$cmd; $s.WorkingDirectory=$d;" ^
+  "$s.IconLocation=$ico + ',0';" ^
   "$s.Description='Howden Sales Forecast - Sales & Revenue Intelligence';" ^
   "$s.Save(); Write-Host ' Atalho criado: ' $lnk"
 
