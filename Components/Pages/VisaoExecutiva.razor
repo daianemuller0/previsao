@@ -41,20 +41,6 @@
     </div>
 </div>
 
-@* ---- Controle da apresentação ----
-   Fica escondido e só aparece no modo apresentação (o app.js põe a classe
-   "apresentando" na página). Os dois botões de pausa são sempre desenhados e o
-   CSS mostra um de cada vez: assim o estado vive no JS, que é quem manda na
-   rolagem, sem ter de ficar sincronizando com o Blazor. *@
-<div class="apres-controle">
-    <button type="button" class="apres-btn apres-pausar" title="Pausar a rolagem (espaço)"
-            onclick="presentation.alternarPausa()">@Icons.Svg("pause")<span>Pausar</span></button>
-    <button type="button" class="apres-btn apres-continuar" title="Continuar a rolagem (espaço)"
-            onclick="presentation.alternarPausa()">@Icons.Svg("play")<span>Continuar</span></button>
-    <button type="button" class="apres-btn apres-sair" title="Sair da apresentação (Esc)"
-            onclick="presentation.stop()">@Icons.Svg("x")<span>Sair</span></button>
-</div>
-
 @* ---- Filtros globais ---- *@
 <div class="filterbar filterbar-sticky">
     <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" @bind="_search" @bind:event="oninput" /></div>
@@ -90,6 +76,24 @@
     }
     <button class="btn-link" @onclick="SaveView">Salvar visualização</button>
     @if (_savedMsg) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
+
+    @* ---- Controle da apresentação ----
+       Mora DENTRO da barra de filtros de propósito: ela congela abaixo do
+       topbar, então o controle congela junto e continua ao alcance enquanto a
+       página passa. Fica escondido fora do modo apresentação — o app.js marca a
+       página com "apresentando".
+
+       Os dois botões de pausa são sempre desenhados e o CSS mostra um de cada
+       vez: o estado mora no JS, que é quem manda na rolagem, sem sincronizar
+       nada com o Blazor. *@
+    <div class="apres-controle">
+        <button type="button" class="apres-btn apres-pausar" title="Pausar a rolagem (espaço)"
+                onclick="presentation.alternarPausa()">@Icons.Svg("pause")<span>Pausar</span></button>
+        <button type="button" class="apres-btn apres-continuar" title="Continuar a rolagem (espaço)"
+                onclick="presentation.alternarPausa()">@Icons.Svg("play")<span>Continuar</span></button>
+        <button type="button" class="apres-btn apres-sair" title="Sair da apresentação (Esc)"
+                onclick="presentation.stop()">@Icons.Svg("x")<span>Sair</span></button>
+    </div>
 </div>
 
 @* ===========================================================================
