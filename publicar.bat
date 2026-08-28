@@ -72,6 +72,13 @@ REM confiavel do que depender do icone embutido no executavel — que muda de
 REM lugar quando o alvo do atalho deixa de ser o .exe.
 copy /y "%~dp0wwwroot\howden.ico" "%TEMPO%\howden.ico" >nul
 
+REM --- 2c) Cria o atalho JUNTO com os arquivos, antes de espelhar ------------
+REM O atalho e gravado aqui na pasta temporaria (apontando para a rede) para
+REM que o robocopy /MIR o leve junto com o resto. Antes ele era criado depois
+REM do espelhamento e, como o /MIR apaga o que nao existe na origem, qualquer
+REM tropeco na criacao deixava a pasta publicada sem atalho nenhum.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0atalho.ps1" -Destino "%TEMPO%" -Alvo "%DESTINO%"
+
 REM --- 3) Espelha no destino (remove sobras de versoes antigas) --------------
 echo.
 echo  Copiando para o destino...
@@ -94,13 +101,31 @@ REM Limpa os executaveis antigos que ninguem esta mais usando (os em uso ficam
 REM para a proxima publicacao — a exclusao simplesmente falha e e ignorada).
 del /q "%DESTINO%\*.old_*.exe" >nul 2>&1
 
-REM --- 4) Cria o atalho com o logo da Howden --------------------------------
-REM Feito por um .ps1 separado, chamado com -File: montar o comando dentro do
-REM .bat fazia o caminho de rede (que tem "$" no nome) e as aspas atravessarem
-REM cmd -> PowerShell, e era ali que a gravacao do icone sumia em silencio.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0atalho.ps1" -Destino "%DESTINO%"
+REM --- 4) Confere se o atalho chegou -----------------------------------------
+REM O atalho vem do passo 2c pelo espelhamento. Se por algum motivo ele nao
+REM estiver la, tenta gravar direto na pasta de destino; e so entao desiste,
+REM avisando — nunca terminar a publicacao sem atalho e sem dizer nada.
+set "LNK=%DESTINO%\Howden Sales Forecast.lnk"
+if not exist "%LNK%" (
+  echo.
+  echo  O atalho nao veio na copia. Gravando direto na pasta de destino...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0atalho.ps1" -Destino "%DESTINO%"
+)
 
 rmdir /s /q "%TEMPO%"
+
+if not exist "%LNK%" (
+  echo.
+  echo  *** O atalho "Howden Sales Forecast" NAO foi criado na pasta. ***
+  echo.
+  echo  O programa foi publicado e funciona: da para abrir o "iniciar.cmd"
+  echo  na pasta de destino enquanto isso nao se resolve.
+  echo  Veja a mensagem de erro logo acima e, no VS Code, use a tarefa
+  echo  "Consertar o atalho da rede" para tentar de novo.
+  echo.
+  pause
+  exit /b 1
+)
 
 REM Tamanho do que cada pessoa vai baixar quando pegar esta versao.
 for %%F in ("%DESTINO%\Howden Sales Forecast.exe") do set /a MB=%%~zF/1048576
