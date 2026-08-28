@@ -61,7 +61,7 @@ public sealed class DataSyncService
     // Entra na marca: quando o mapeamento das planilhas muda (uma coluna nova
     // passa a ser lida), a versão sobe e todo mundo reimporta na próxima abertura,
     // mesmo que a planilha da rede continue exatamente a mesma.
-    private const string ImportVersion = "v4";
+    private const string ImportVersion = "v5";
 
     private string? MarcaGravada(string prefix)
     {
@@ -181,8 +181,8 @@ public sealed class DataSyncService
                     // que a re-sincronização NUNCA apague o trabalho de quem está
                     // usando o sistema.
                     foreach (var row in result.Rows)
-                        if (existing.TryGetValue(row.Id, out var prev))
-                            Preservar(row, prev);
+                        if (existing.TryGetValue(row.Id, out var prev)) Preservar(row, prev);
+                        else MarcarCrm(row);
 
                     _repo.SaveMany(result.Rows);
 
@@ -311,8 +311,63 @@ public sealed class DataSyncService
         || (!string.IsNullOrWhiteSpace(o.UpdatedBy)
             && !CarimboImportacao.Contains(o.UpdatedBy, StringComparer.OrdinalIgnoreCase));
 
+    // ---- campos que a planilha traz, mas que o sistema também deixa editar ----
+    // Vendedor sem acesso ao CRM só tem o nosso sistema para corrigir a data, o
+    // valor e as probabilidades. Se a planilha simplesmente vencesse, a correção
+    // dele voltaria atrás na sincronização seguinte e o trabalho se perderia.
+    //
+    // A regra: o que ele escreveu vale ENQUANTO O CRM NÃO MUDAR DE IDEIA. Para
+    // saber isso, guardamos em CrmSnapshot o valor que a planilha trouxe na
+    // última importação. Se a planilha repetir aquele mesmo valor, ela não tem
+    // novidade e o preenchimento do sistema fica. Se ela vier com outro valor, o
+    // CRM realmente mexeu e passa a mandar de novo.
+    private static readonly System.Reflection.PropertyInfo[] CamposProtegidos =
+        new[]
+        {
+            nameof(Opportunity.ExpectedDate),              // data prevista
+            nameof(Opportunity.AmountOriginal),            // Net Value
+            nameof(Opportunity.WinProbability),            // % de ganho
+            nameof(Opportunity.CloseInPeriodProbability),  // % de sair no mês
+            nameof(Opportunity.GmPercent),                 // PM %
+            nameof(Opportunity.Ramp),
+            nameof(Opportunity.Otp),
+            nameof(Opportunity.Notes),                     // observação
+        }
+        .Select(n => typeof(Opportunity).GetProperty(n)!)
+        .ToArray();
+
+    // Separadores fora do teclado: observação e nomes de cliente podem conter
+    // ";" e "=", que quebrariam um formato mais óbvio.
+    private const char SepCampo = '\u001F', SepValor = '\u001E';
+
+    private static string SerializarCrm(Opportunity o) =>
+        string.Join(SepCampo, CamposProtegidos
+            .Select(p => p.Name + SepValor + ((string?)p.GetValue(o) ?? "")));
+
+    private static Dictionary<string, string> LerCrm(string s)
+    {
+        var d = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrEmpty(s)) return d;
+        foreach (var item in s.Split(SepCampo))
+        {
+            var i = item.IndexOf(SepValor);
+            if (i > 0) d[item[..i]] = item[(i + 1)..];
+        }
+        return d;
+    }
+
+    /// <summary>Primeira vez que a linha entra: a planilha é a referência, e o que
+    /// ela trouxe vira a memória contra a qual as próximas leituras são comparadas.</summary>
+    private static void MarcarCrm(Opportunity nova) => nova.CrmSnapshot = SerializarCrm(nova);
+
     private static void Preservar(Opportunity nova, Opportunity antiga)
     {
+        // A memória do CRM tem de ser tirada ANTES de qualquer campo de "nova"
+        // ser trocado pelo do app — senão ela guardaria o valor do app.
+        var doCrm = SerializarCrm(nova);
+        var agora = LerCrm(doCrm);
+        var antes = LerCrm(antiga.CrmSnapshot);
+
         foreach (var campo in Campos)
         {
             var doApp = (string?)campo.GetValue(antiga);
@@ -320,6 +375,28 @@ public sealed class DataSyncService
             if (SoDoApp.Contains(campo.Name) || SemInfo((string?)campo.GetValue(nova)))
                 campo.SetValue(nova, doApp);
         }
+
+        foreach (var campo in CamposProtegidos)
+        {
+            // Sem memória (linha guardada antes desta regra existir): a planilha
+            // manda desta vez, e a memória passa a valer da próxima em diante.
+            if (!antes.TryGetValue(campo.Name, out var anterior)) continue;
+            var doCrmAgora = agora.TryGetValue(campo.Name, out var c) ? c : "";
+
+            if (!string.Equals(anterior, doCrmAgora, StringComparison.Ordinal))
+            {
+                // O CRM mexeu de verdade: volta a mandar. Só que "mexeu para
+                // vazio" não é informação — nesse caso fica o que está no sistema.
+                if (!SemInfo(doCrmAgora)) campo.SetValue(nova, doCrmAgora);
+                continue;
+            }
+
+            // Planilha repetindo o mesmo de sempre: fica o que está no sistema.
+            var doApp = (string?)campo.GetValue(antiga) ?? "";
+            if (!string.IsNullOrWhiteSpace(doApp)) campo.SetValue(nova, doApp);
+        }
+
+        nova.CrmSnapshot = doCrm;
     }
 
     // ---- carteiras definidas pelo market -----------------------------------

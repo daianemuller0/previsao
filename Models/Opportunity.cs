@@ -83,6 +83,10 @@ public class Opportunity
     public string UpdatedBy { get; set; } = "";
     public string ValueChangedAt { get; set; } = "";
     public string DateChangedAt { get; set; } = "";
+    // Valores que a planilha do CRM trouxe na última importação, só dos campos
+    // que o sistema protege (data, valor, %…). É a memória que permite saber se
+    // o CRM mudou de ideia ou se está repetindo o mesmo valor de sempre.
+    public string CrmSnapshot { get; set; } = "";
 
     // ---- acessores tipados -------------------------------------------------
 
