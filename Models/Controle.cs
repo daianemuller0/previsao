@@ -60,6 +60,9 @@ public class ControleRegistro
     public string Semana { get; set; } = "";
     public string Mes { get; set; } = "";
     public string Poc { get; set; } = "";            // "Sim" / "Não"
+    public string Tipo { get; set; } = "";           // Revenda / Manufaturado
+    public string Classificacao { get; set; } = "";  // como ler o valor (ver Classificacoes)
+    public string Status { get; set; } = "";         // situação da oferta (lista editável)
     public string Moeda { get; set; } = "BRL";       // moeda de origem da oferta
     public string ValorOriginal { get; set; } = "";  // valor na moeda de origem
     public string Observacao { get; set; } = "";     // observação livre
@@ -79,6 +82,28 @@ public class ControleRegistro
 
     /// <summary>Tem nota de atenção pendente para o Controle?</summary>
     public bool TemAtencao => !string.IsNullOrWhiteSpace(Atencao);
+
+    // ---- tipo da oferta ----------------------------------------------------
+    public static readonly string[] Tipos = { "Revenda", "Manufaturado" };
+
+    // ---- como o valor deve ser lido ---------------------------------------
+    // A classificação não muda o número: muda a confiança que se pode ter nele.
+    // Por isso ela vira COR na tabela, e não mais uma coluna de texto para
+    // alguém ter de cruzar com o valor ao lado.
+    public const string ClassEstimado = "Estimado";
+    public const string ClassConsolidado = "Consolidado";
+    public const string ClassReportado = "Reportado pela Bianca";
+    public static readonly string[] Classificacoes = { ClassEstimado, ClassConsolidado, ClassReportado };
+
+    /// <summary>Classe CSS do valor conforme a classificação: estimado sai em
+    /// vermelho e negrito, consolidado em preto, reportado com fundo rosa.</summary>
+    public string ClasseValor => Classificacao switch
+    {
+        ClassEstimado => "val-estimado",
+        ClassConsolidado => "val-consolidado",
+        ClassReportado => "val-reportado",
+        _ => "",
+    };
 }
 
 // Taxa de conversão de moeda usada na importação do Aftermarket.
