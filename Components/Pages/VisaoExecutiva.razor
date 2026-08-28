@@ -29,7 +29,7 @@
             <button class="@(_currency == "USD" ? "active" : "")" @onclick='() => _currency = "USD"'>USD</button>
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
-        <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (Esc para sair)">@Icons.Svg("play")Apresentação</button>
+        <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (espaço pausa, Esc sai)">@Icons.Svg("play")Apresentação</button>
         <button class="btn-ghost" title="Exportar as oportunidades do recorte atual (respeita os filtros da página)" @onclick="ExportarFiltradas">@Icons.Svg("download")Exportar</button>
         @* Montar a página: arrastar os painéis e escolher a largura de cada um. *@
         <button class="btn-ghost @(_organizando ? "active" : "")" title="Arrastar os painéis para montar a página do seu jeito" @onclick="AlternarOrganizar">@Icons.Svg("layers")@(_organizando ? "Concluir" : "Organizar")</button>
@@ -39,6 +39,20 @@
         }
         <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
     </div>
+</div>
+
+@* ---- Controle da apresentação ----
+   Fica escondido e só aparece no modo apresentação (o app.js põe a classe
+   "apresentando" na página). Os dois botões de pausa são sempre desenhados e o
+   CSS mostra um de cada vez: assim o estado vive no JS, que é quem manda na
+   rolagem, sem ter de ficar sincronizando com o Blazor. *@
+<div class="apres-controle">
+    <button type="button" class="apres-btn apres-pausar" title="Pausar a rolagem (espaço)"
+            onclick="presentation.alternarPausa()">@Icons.Svg("pause")<span>Pausar</span></button>
+    <button type="button" class="apres-btn apres-continuar" title="Continuar a rolagem (espaço)"
+            onclick="presentation.alternarPausa()">@Icons.Svg("play")<span>Continuar</span></button>
+    <button type="button" class="apres-btn apres-sair" title="Sair da apresentação (Esc)"
+            onclick="presentation.stop()">@Icons.Svg("x")<span>Sair</span></button>
 </div>
 
 @* ---- Filtros globais ---- *@

@@ -46,7 +46,8 @@ window.appSidebarState = () => {
 // ficar passando numa TV. Rola alguns pixels por segundo, faz uma pausa no fim
 // e volta ao topo. Sai com Esc, ao fechar a tela cheia ou clicando de novo.
 window.presentation = (function () {
-    let raf = null, running = false, pos = 0, ultimo = 0, pausaAte = 0;
+    let raf = null, running = false, pausado = false;
+    let pos = 0, ultimo = 0, pausaAte = 0, voltarAoTopo = false;
     const PPS = 22;          // pixels por segundo — devagar, dá para ler
     const PAUSA = 4000;      // ms parado no fim antes de voltar ao topo
 
@@ -54,12 +55,38 @@ window.presentation = (function () {
         const doc = document.scrollingElement || document.documentElement;
         return Math.max(0, doc.scrollHeight - window.innerHeight);
     }
+
+    // A barra de controle é desenhada pelo Blazor e fica escondida por CSS: aqui
+    // só entram e saem classes. Inserir botão pela mão em página do Blazor é
+    // pedir para o próximo render apagá-lo.
+    function marcar() {
+        const c = document.documentElement.classList;
+        c.toggle('apresentando', running);
+        c.toggle('apresentacao-pausada', running && pausado);
+    }
+
     function passo(agora) {
         if (!running) return;
         const dt = ultimo ? (agora - ultimo) : 0;
         ultimo = agora;
 
+        // Pausado: o laço continua vivo (para retomar na hora), mas a página não
+        // anda — e a pausa do fim não corre enquanto está parado.
+        if (pausado) {
+            if (pausaAte > agora) pausaAte += dt;
+            raf = requestAnimationFrame(passo);
+            return;
+        }
+
         if (agora < pausaAte) { raf = requestAnimationFrame(passo); return; }
+
+        if (voltarAoTopo) {
+            voltarAoTopo = false;
+            pos = 0;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            raf = requestAnimationFrame(passo);
+            return;
+        }
 
         const fim = maxScroll();
         pos += (dt / 1000) * PPS;
@@ -68,33 +95,59 @@ window.presentation = (function () {
             pos = fim;
             window.scrollTo(0, pos);
             pausaAte = agora + PAUSA;
-            pos = 0;
-            setTimeout(() => { if (running) window.scrollTo({ top: 0, behavior: 'smooth' }); }, PAUSA);
+            voltarAoTopo = true;
         } else {
             window.scrollTo(0, pos);
         }
         raf = requestAnimationFrame(passo);
     }
+
     function onFsChange() { if (!document.fullscreenElement) stop(); }
-    function onKey(e) { if (e.key === 'Escape') stop(); }
+    function onKey(e) {
+        if (e.key === 'Escape') { stop(); return; }
+        // Espaço pausa e retoma, como em qualquer player.
+        if (e.key === ' ' || e.code === 'Space') {
+            const alvo = e.target;
+            const digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable);
+            if (digitando) return;
+            e.preventDefault();
+            alternarPausa();
+        }
+    }
+
     function start() {
         if (running) { stop(); return; }
         const el = document.documentElement;
         if (el.requestFullscreen) { try { el.requestFullscreen(); } catch (e) { } }
-        running = true; pos = 0; ultimo = 0; pausaAte = 0;
+        running = true; pausado = false;
+        pos = 0; ultimo = 0; pausaAte = 0; voltarAoTopo = false;
         window.scrollTo(0, 0);
         document.addEventListener('fullscreenchange', onFsChange);
         document.addEventListener('keydown', onKey);
+        marcar();
         raf = requestAnimationFrame(passo);
     }
+
     function stop() {
-        running = false;
+        running = false; pausado = false;
         if (raf) { cancelAnimationFrame(raf); raf = null; }
         document.removeEventListener('fullscreenchange', onFsChange);
         document.removeEventListener('keydown', onKey);
+        marcar();
         if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) { } }
     }
-    return { start, stop };
+
+    // Pausa mantém a apresentação de pé, só congela a rolagem: quem está
+    // comentando um gráfico não quer perder a tela cheia nem voltar ao topo.
+    function alternarPausa() {
+        if (!running) return;
+        pausado = !pausado;
+        ultimo = 0;              // não pula ao retomar
+        pos = window.scrollY || window.pageYOffset || pos;
+        marcar();
+    }
+
+    return { start, stop, alternarPausa };
 })();
 
 // Comando por voz (Web Speech API · Edge/Chrome). Escuta em pt-BR e manda o
