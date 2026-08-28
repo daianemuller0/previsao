@@ -21,8 +21,8 @@ publish/
 # Visual Studio cache/options
 .vs/
 .vscode/settings.json
-.vscode/launch.json
-.vscode/tasks.json
+# launch.json e tasks.json ficam VERSIONADOS: são os botões de rodar e publicar
+# do projeto, e a ideia é que quem clonar já tenha tudo funcionando.
 
 # User-specific files
 *.rsuser

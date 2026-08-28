@@ -1,0 +1,71 @@
+{
+  // Tarefas do projeto — Terminal › Executar Tarefa (ou Ctrl+Shift+P › "Run Task").
+  // A ideia é não precisar digitar comando nenhum: cada coisa que a gente faz no
+  // dia a dia virou um item desta lista.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1 · Atualizar do GitHub",
+      "detail": "Traz as últimas alterações (git pull).",
+      "type": "shell",
+      "command": "git pull",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "2 · Compilar",
+      "detail": "Compila e mostra os erros — sempre rode isto antes de publicar.",
+      "type": "shell",
+      "command": "dotnet build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "3 · Rodar o programa",
+      "detail": "Sobe o sistema e abre o navegador. Ctrl+C no terminal encerra.",
+      "type": "shell",
+      "command": "dotnet run",
+      "problemMatcher": "$msCompile",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "4 · Publicar na rede",
+      "detail": "Compila em Release e publica na pasta da rede, com atalho e logo.",
+      "type": "shell",
+      "windows": { "command": "${workspaceFolder}\\publicar.bat" },
+      "command": "./publicar.bat",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Consertar o atalho da rede",
+      "detail": "Recria só o atalho (com a logo), sem republicar o programa.",
+      "type": "shell",
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-ExecutionPolicy", "Bypass",
+          "-File", "${workspaceFolder}\\atalho.ps1",
+          "-Destino", "\\\\BZVCPFIL003\\proj_ramires$\\DB\\AFM_HSA\\previsao\\arquivo\\02"
+        ]
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Encerrar o programa aberto",
+      "detail": "Mata uma instância presa (aquela que trava o build com 'arquivo em uso').",
+      "type": "shell",
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-Command",
+          "Get-Process 'Howden Sales Forecast' -ErrorAction SilentlyContinue | Stop-Process -Force; 'Pronto.'"
+        ]
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    }
+  ]
+}
