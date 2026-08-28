@@ -149,10 +149,11 @@ public class UserRepository
         ("Rodrigo Ugas",       AccessRoles.Vendedor, new[]{ "Rodrigo Ugas","Manuel Gutierrez" }),
         ("Manuel Gutierrez",   AccessRoles.Vendedor, new[]{ "Manuel Gutierrez","Rodrigo Ugas" }),
         ("Paula Vilela",       AccessRoles.Vendedor, new[]{ "Paula Vilela","Douglas","Thiago Veiga" }),
+        // Douglas não tem CRM: a carteira dele vem do market (tudo que começa
+        // com Water), não da coluna de vendedor da planilha. Enxerga a carteira
+        // da Paula, e ela a dele — inclusive as de Water que ficaram com ela.
+        ("Douglas Matavelli",  AccessRoles.Vendedor, new[]{ "Douglas Matavelli","Paula Vilela" }),
         // Vendedores com acesso só à própria carteira.
-        // Douglas não tem CRM: a carteira dele vem do market (Water e
-        // Water (Municipal)), não da coluna de vendedor da planilha.
-        ("Douglas Matavelli",  AccessRoles.Vendedor, new[]{ "Douglas Matavelli" }),
         ("Andre Carvalho",     AccessRoles.Vendedor, new[]{ "Andre Carvalho" }),
         ("Jose Moura",         AccessRoles.Vendedor, new[]{ "Jose Moura" }),
         ("Leonardo Silva",     AccessRoles.Vendedor, new[]{ "Leonardo Silva" }),
