@@ -123,6 +123,37 @@ public class CurrencyRate
         DateTime.TryParse(UpdatedAt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 }
 
+// ---------------------------------------------------------------------------
+// Cotação de UM DIA de UMA moeda (R$ por 1 unidade).
+//
+// O fechamento do mês não é um campo à parte: é a última cotação daquele mês.
+// Guardar o diário e derivar o fechamento evita a pergunta "quem digitou este
+// número e de quando ele é?" — a resposta está na própria série.
+//
+// Id determinístico ("cb-USD-2026-08-27"): a consolidação por id do Parquet
+// vira upsert, então buscar o mesmo dia duas vezes não duplica nada.
+// ---------------------------------------------------------------------------
+public class CambioDia
+{
+    public string Id { get; set; } = "";
+    public string Code { get; set; } = "";       // USD, EUR, GBP …
+    public string Data { get; set; } = "";        // ISO yyyy-MM-dd
+    public string Rate { get; set; } = "0";       // R$ por 1 unidade
+    public string Fonte { get; set; } = "";       // "Banco Central" / "Manual"
+    public string UpdatedBy { get; set; } = "";
+    public string UpdatedAt { get; set; } = "";
+
+    public double RateV =>
+        double.TryParse(Rate, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    public DateTime? DataValue =>
+        DateTime.TryParse(Data, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+    public bool HasRate => RateV > 0;
+    public bool Manual => string.Equals(Fonte, "Manual", StringComparison.OrdinalIgnoreCase);
+
+    public static string IdDe(string code, DateTime dia) =>
+        $"cb-{(code ?? "").Trim().ToUpperInvariant()}-{dia:yyyy-MM-dd}";
+}
+
 // Observação de fechamento.
 public class ControleObs
 {
