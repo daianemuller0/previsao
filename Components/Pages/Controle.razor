@@ -274,7 +274,7 @@ else
                                     case "status":   <td>@Dash(g.Status)</td> break;
                                     case "cambio":   <td class="right num" title="@CambioTitulo(g)">@CambioTexto(g)</td> break;
                                     case "semana":   <td class="center">@Dash(g.Semana)</td> break;
-                                    case "mes":      <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td> break;
+                                    case "mes":      <td class="center">@(MesDoRegistro(g) is var mn && mn > 0 ? Fmt.MonthName(mn) : Dash(g.Mes))</td> break;
                                     case "poc":      <td class="center">@Mark(g.Poc)</td> break;
                                     case "obs":      <td title="@g.Observacao">@Dash(g.Observacao)</td> break;
                                 }
@@ -717,8 +717,18 @@ else
     }
 
     // ---- conversão das ofertas em moeda estrangeira ------------------------
-    private static int MesDoRegistro(ControleRegistro g) =>
-        int.TryParse(g.Mes, out var m) && m is >= 1 and <= 12 ? m : 0;
+    // Aceita número e nome: registros antigos (e a carga inicial) gravaram o mês
+    // por extenso, e eles também precisam achar o câmbio de fechamento.
+    private static int MesDoRegistro(ControleRegistro g)
+    {
+        if (int.TryParse(g.Mes, out var m) && m is >= 1 and <= 12) return m;
+        if (string.IsNullOrWhiteSpace(g.Mes)) return 0;
+        for (var i = 1; i <= 12; i++)
+            if (string.Equals(Fmt.MonthLong(i), g.Mes.Trim(), StringComparison.OrdinalIgnoreCase)
+             || string.Equals(Fmt.MonthName(i), g.Mes.Trim(), StringComparison.OrdinalIgnoreCase))
+                return i;
+        return 0;
+    }
 
     /// <summary>Fechamento do mês da oferta — a taxa que converte o valor dela.
     /// Null em BRL, sem mês informado, ou enquanto o mês não tiver cotação.</summary>
