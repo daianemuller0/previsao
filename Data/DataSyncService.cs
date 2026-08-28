@@ -332,9 +332,10 @@ public sealed class DataSyncService
         var ajustadas = new List<Opportunity>();
         foreach (var o in _repo.All())
         {
-            var dono = OpportunityImporter.VendedorDoMarket(_cat.MarketName(o.MarketId));
+            var vendedorAtual = _cat.KamName(o.KamId);
+            var dono = OpportunityImporter.VendedorDoMarket(_cat.MarketName(o.MarketId), vendedorAtual);
             if (dono == "") continue;
-            if (string.Equals(_cat.KamName(o.KamId), dono, StringComparison.OrdinalIgnoreCase)) continue;
+            if (string.Equals(vendedorAtual, dono, StringComparison.OrdinalIgnoreCase)) continue;
             o.KamId = OpportunityImporter.KamIdDe(_cat, dono);
             ajustadas.Add(o);
         }
