@@ -105,9 +105,16 @@ powershell -NoProfile -Command ^
   "if (Test-Path $lnk) { Remove-Item $lnk -Force };" ^
   "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($lnk);" ^
   "$s.TargetPath=$cmd; $s.WorkingDirectory=$d;" ^
-  "$s.IconLocation=$ico + ',0';" ^
+  "$s.IconLocation='{0},0' -f $ico;" ^
   "$s.Description='Howden Sales Forecast - Sales & Revenue Intelligence';" ^
-  "$s.Save(); Write-Host ' Atalho criado: ' $lnk"
+  "$s.Save();" ^
+  "$v=(New-Object -ComObject WScript.Shell).CreateShortcut($lnk);" ^
+  "Write-Host ' Atalho criado: ' $lnk;" ^
+  "Write-Host ' Icone do atalho: ' $v.IconLocation"
+
+REM O Windows guarda os icones em cache: sem limpar, o atalho continuaria
+REM mostrando o anterior mesmo com o arquivo ja corrigido.
+ie4uinit.exe -show >nul 2>&1
 
 rmdir /s /q "%TEMPO%"
 
