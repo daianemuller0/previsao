@@ -7,8 +7,10 @@
 #  silêncio. Aqui o script recebe a pasta como parâmetro e mais nada é
 #  interpretado pelo cmd.
 #
-#  -Destino  pasta onde o .lnk é GRAVADO (e onde estão os arquivos consultados)
-#  -Alvo     pasta para onde o atalho APONTA; por padrão, a mesma do -Destino
+#  -Destino          pasta onde o .lnk é GRAVADO
+#  -AreaDeTrabalho   grava na área de trabalho de quem está rodando
+#  -Alvo             pasta para onde o atalho APONTA (padrão: a mesma do -Destino)
+#  -IconeLocal       guarda uma cópia do logo na máquina e aponta o ícone para ela
 #
 #  A publicação grava o atalho na pasta temporária apontando para a rede, e o
 #  robocopy /MIR leva o .lnk junto com o resto. Antes o atalho era criado
@@ -16,10 +18,13 @@
 #  sem atalho nenhum — porque o /MIR já tinha apagado o antigo.
 # ============================================================================
 param(
-    [Parameter(Mandatory = $true)][string]$Destino,
-    [string]$Alvo
+    [Parameter(Mandatory = $true, ParameterSetName = 'Pasta')][string]$Destino,
+    [Parameter(Mandatory = $true, ParameterSetName = 'Desktop')][switch]$AreaDeTrabalho,
+    [string]$Alvo,
+    [switch]$IconeLocal
 )
 
+if ($AreaDeTrabalho) { $Destino = [Environment]::GetFolderPath('Desktop') }
 if ([string]::IsNullOrWhiteSpace($Alvo)) { $Alvo = $Destino }
 
 # Sem 'Stop' global: um erro solto aqui encerrava o script no meio e a única
@@ -29,13 +34,37 @@ $ErrorActionPreference = 'Continue'
 
 $lnk = Join-Path $Destino 'Howden Sales Forecast.lnk'
 $cmd = Join-Path $Alvo 'iniciar.cmd'
-$ico = Join-Path $Alvo 'howden.ico'
 $exe = Join-Path $Alvo 'Howden Sales Forecast.exe'
 
-# O .ico ao lado é a fonte mais confiável; o ícone embutido no .exe é a reserva.
-# A existência é conferida na pasta de gravação (é lá que os arquivos acabaram
-# de ser colocados), mas o que vai escrito no atalho é o caminho do alvo.
-$temIco = Test-Path (Join-Path $Destino 'howden.ico')
+# ---------------------------------------------------------------------------
+#  Onde o atalho vai buscar o logo
+# ---------------------------------------------------------------------------
+# O .ico ao lado do programa é a fonte mais confiável; o ícone embutido no .exe
+# é a reserva. Procuramos o arquivo na pasta de gravação (na publicação é lá que
+# ele acabou de ser colocado) e depois na pasta de destino do atalho.
+$fonteIco = $null
+foreach ($p in @((Join-Path $Destino 'howden.ico'), (Join-Path $Alvo 'howden.ico'))) {
+    if (Test-Path $p) { $fonteIco = $p; break }
+}
+
+$ico = if ($fonteIco) { Join-Path $Alvo 'howden.ico' } else { $null }
+
+# Ícone em caminho de rede é lido pelo Explorer toda vez que ele desenha o
+# atalho — e quando a VPN está fora do ar, ou o compartilhamento demora a
+# responder, ele desiste e mostra o quadrado branco. Para atalho pessoal (área
+# de trabalho) vale mais guardar o logo na própria máquina.
+if ($IconeLocal -and $fonteIco) {
+    $pastaLocal = Join-Path $env:LOCALAPPDATA 'HowdenSalesForecast'
+    $icoLocal = Join-Path $pastaLocal 'howden.ico'
+    try {
+        New-Item -ItemType Directory -Force -Path $pastaLocal -ErrorAction Stop | Out-Null
+        Copy-Item $fonteIco $icoLocal -Force -ErrorAction Stop
+        $ico = $icoLocal
+    }
+    catch {
+        Write-Host " Nao consegui guardar o logo em $pastaLocal - usando o da pasta de origem." -ForegroundColor Yellow
+    }
+}
 
 try {
     # Apaga antes de recriar: o Windows guarda o ícone em cache e, regravando
@@ -47,7 +76,7 @@ try {
     $s.TargetPath = $cmd
     $s.WorkingDirectory = $Alvo
     $s.Description = 'Howden Sales Forecast - Sales & Revenue Intelligence'
-    $s.IconLocation = if ($temIco) { "$ico,0" } else { "$exe,0" }
+    $s.IconLocation = if ($ico) { "$ico,0" } else { "$exe,0" }
     $s.Save()
 }
 catch {

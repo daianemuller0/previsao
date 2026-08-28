@@ -54,6 +54,23 @@
       "presentation": { "reveal": "always", "panel": "shared", "clear": true }
     },
     {
+      "label": "Criar o atalho na minha área de trabalho",
+      "detail": "Põe o atalho com a logo na sua área de trabalho (logo guardado na máquina).",
+      "type": "shell",
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-ExecutionPolicy", "Bypass",
+          "-File", "${workspaceFolder}\\atalho.ps1",
+          "-AreaDeTrabalho",
+          "-Alvo", "\\\\BZVCPFIL003\\proj_ramires$\\DB\\AFM_HSA\\previsao\\arquivo\\02",
+          "-IconeLocal"
+        ]
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
       "label": "Encerrar o programa aberto",
       "detail": "Mata uma instância presa (aquela que trava o build com 'arquivo em uso').",
       "type": "shell",
