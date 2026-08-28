@@ -66,7 +66,7 @@
     <button class="btn-link" @onclick="() => _showMore = !_showMore">@(_showMore ? "Menos filtros" : "Mais filtros")</button>
     <div class="filterbar-spacer"></div>
     <div class="fb-summary">
-        <div class="fb-sum"><span class="fb-sum-k">Vendido@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span><span class="fb-sum-v pos">@MoneyBrl(_heroReal)</span></div>
+        <div class="fb-sum"><span class="fb-sum-k">Vendido@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span><span class="fb-sum-v pos">@MoneyBrl(FocoValor)</span></div>
         <div class="fb-sum"><span class="fb-sum-k">Previsão</span><span class="fb-sum-v">@Money(_fcYear)</span></div>
     </div>
     @if (_activeFilters > 0)
@@ -90,7 +90,7 @@
 @{
     var _fcBrl = _fcYear * Rate;   // sempre em R$ (Amount converted), independe do toggle
     var _fcAtt = _metaYear > 0 ? _fcBrl / _metaYear * 100 : 0;
-    var _wonAtt = _heroMeta > 0 ? _heroReal / _heroMeta * 100 : 0;
+    var _wonAtt = _heroMeta > 0 ? FocoValor / _heroMeta * 100 : 0;
     var _gapTgt = Math.Max(_metaYear - _fcBrl, 0);
     var _gmPp = _gmAvg - 30.0;
 }
@@ -107,8 +107,8 @@
         <div class="kpi-spark"><Sparkline Values="@_monthAmt" Stroke="#17a2c0" /></div>
     </div>
     <div class="kpi accent-pos">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("check")</span><span class="kpi-label">Ganho / Fechado</span></div>
-        <div class="kpi-value">@MoneyBrl(_heroReal)</div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("check")</span><span class="kpi-label">@FocoNome</span></div>
+        <div class="kpi-value">@MoneyBrl(FocoValor)</div>
         <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">da meta</span></div>
         <div class="kpi-spark"><Sparkline Values="@_mReal" Stroke="#1f9254" /></div>
     </div>
@@ -123,27 +123,26 @@
 @* ===================== 2 · HERO EXECUTIVO ===================== *@
 <div class="hero" data-pnl="hero">
     <div class="hero-main">
-        <div class="hero-eyebrow">Realizado × Meta · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? Fmt.MonthLong(_monthFilter) + " " + _repYear : "Ano " + _repYear)</div>
-        <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(_heroReal))</div>
+        <div class="hero-eyebrow">@FocoNome × Meta · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? Fmt.MonthLong(_monthFilter) + " " + _repYear : "Ano " + _repYear)</div>
+        <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(FocoValor))</div>
         <div class="hero-target-line">
-            Meta NB+AFM @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - _heroReal, 0))<br />
-            Meta Vendas HSA @MoneyBrl(_heroMetaHsa) · @Fmt.Pct(_heroAttainHsa) da meta · gap @MoneyBrl(Math.Max(_heroMetaHsa - _heroReal, 0))
-            @* As realizadas só aparecem quando existem: enquanto o Controle não
-               tiver a linha preenchida, uma segunda cifra zerada só confundiria. *@
-            @if (_heroRealizada > 0)
+            Meta NB+AFM @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - FocoValor, 0))<br />
+            Meta Vendas HSA @MoneyBrl(_heroMetaHsa) · @Fmt.Pct(_heroAttainHsa) da meta · gap @MoneyBrl(Math.Max(_heroMetaHsa - FocoValor, 0))
+            @* O outro número fica na linha de baixo, para comparação. Só aparece
+               quando existe: uma cifra zerada ali só confundiria a leitura. *@
+            @if (OutroValor > 0)
             {
                 <br />
-                <span>Vendas realizadas @MoneyBrl(_heroRealizada) · @Fmt.Pct(_heroMeta > 0 ? _heroRealizada / _heroMeta * 100 : 0) da meta NB+AFM</span>
+                <span>@OutroNome @MoneyBrl(OutroValor) · @Fmt.Pct(_heroMeta > 0 ? OutroValor / _heroMeta * 100 : 0) da meta NB+AFM</span>
             }
         </div>
-        @* Reportadas e realizadas lado a lado: o que o CRM reporta e o que de
-           fato se concretizou são números diferentes, e ler os dois juntos é
-           justamente o ponto. *@
+        @* O foco vem primeiro. O que o CRM reporta e o que de fato se
+           concretizou são números diferentes, e ler os dois juntos é o ponto. *@
         <div class="hero-chips">
+            <div class="hero-chip destaque"><div class="k">@FocoNome</div><div class="v">@MoneyBrl(FocoValor)</div></div>
+            <div class="hero-chip"><div class="k">@OutroNome</div><div class="v">@(OutroValor > 0 ? MoneyBrl(OutroValor) : "—")</div></div>
             <div class="hero-chip"><div class="k">Meta NB+AFM</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
             <div class="hero-chip"><div class="k">Meta Vendas HSA</div><div class="v">@MoneyBrl(_heroMetaHsa)</div></div>
-            <div class="hero-chip"><div class="k">Vendas reportadas</div><div class="v">@MoneyBrl(_heroReal)</div></div>
-            <div class="hero-chip"><div class="k">Vendas realizadas</div><div class="v">@(_heroRealizada > 0 ? MoneyBrl(_heroRealizada) : "—")</div></div>
         </div>
         <div class="hero-gauge">
             <div class="gt"><div class="gf" style="width:@Clamp(_heroAttain)%"></div></div>
@@ -237,8 +236,8 @@
         </div>
         @* Base do funil: valor efetivamente vendido (Realizado · REPORT HSA). *@
         <div class="fn5-bottom">
-            <span class="fn5-bottom-l">@Icons.Svg("check")Vendas totais · Realizado@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
-            <span class="fn5-bottom-v">@MoneyBrl(_heroReal)</span>
+            <span class="fn5-bottom-l">@Icons.Svg("check")@FocoNome@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
+            <span class="fn5-bottom-v">@MoneyBrl(FocoValor)</span>
         </div>
     }
     </div></div>
@@ -296,8 +295,8 @@
             </div>
             @* Mesma base do outro funil: o valor efetivamente vendido. *@
             <div class="fn5-bottom">
-                <span class="fn5-bottom-l">@Icons.Svg("check")Vendas totais · Realizado@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
-                <span class="fn5-bottom-v">@MoneyBrl(_heroReal)</span>
+                <span class="fn5-bottom-l">@Icons.Svg("check")@FocoNome@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
+                <span class="fn5-bottom-v">@MoneyBrl(FocoValor)</span>
             </div>
         </div>
 
@@ -820,6 +819,17 @@
     // Hero (Meta × Realizado do REPORT HSA), sensível ao filtro de mês.
     private double _heroReal, _heroRealizada, _heroMeta, _heroMetaHsa, _heroAttain, _heroAttainHsa;
 
+    // ---- foco da Visão Executiva: as vendas REALIZADAS ---------------------
+    // O número que se lê primeiro aqui é o que de fato se concretizou; as
+    // reportadas continuam à vista, um degrau abaixo. Enquanto o Controle não
+    // tiver a linha das realizadas, o foco cai nas reportadas — e o rótulo
+    // sempre diz qual dos dois está na tela, para ninguém ler um pelo outro.
+    private bool TemRealizada => _repRealizada.Any(v => v > 0);
+    private double FocoValor => TemRealizada ? _heroRealizada : _heroReal;
+    private double OutroValor => TemRealizada ? _heroReal : _heroRealizada;
+    private string FocoNome => TemRealizada ? "Vendas realizadas" : "Vendas reportadas";
+    private string OutroNome => TemRealizada ? "Vendas reportadas" : "Vendas realizadas";
+
     // Conversão de valores em R$ (REPORT HSA é nativo em R$) respeitando o toggle.
     private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
     private string MoneyBrl(double brl) => _sym + " " + Fmt.Compact(CvBrl(brl));
@@ -1146,7 +1156,9 @@
     {
         var (reportado, realizada, meta, metaHsa) = ControleRepo.ReportSeries(_repYear);
         _repReal = reportado; _repRealizada = realizada; _repMeta = meta; _repMetaHsa = metaHsa;
-        double tr = reportado.Sum(), tm = meta.Sum(), tmh = metaHsa.Sum();
+        // Atendimento anual medido pelo número em foco (realizadas, quando houver).
+        var foco = realizada.Any(v => v > 0) ? realizada : reportado;
+        double tr = foco.Sum(), tm = meta.Sum(), tmh = metaHsa.Sum();
         _repAttain = tm > 0 ? tr / tm * 100 : 0;
         _repAttainHsa = tmh > 0 ? tr / tmh * 100 : 0;
     }
@@ -1357,8 +1369,9 @@
             _heroMeta = _repMeta.Sum();
             _heroMetaHsa = _repMetaHsa.Sum();
         }
-        _heroAttain = _heroMeta > 0 ? _heroReal / _heroMeta * 100 : 0;
-        _heroAttainHsa = _heroMetaHsa > 0 ? _heroReal / _heroMetaHsa * 100 : 0;
+        // Atingimento medido pelo número em foco (realizadas, quando houver).
+        _heroAttain = _heroMeta > 0 ? FocoValor / _heroMeta * 100 : 0;
+        _heroAttainHsa = _heroMetaHsa > 0 ? FocoValor / _heroMetaHsa * 100 : 0;
 
         // "Todos os anos" (_yearFilter == 0): considera qualquer oportunidade com
         // data; senão, restringe ao ano selecionado.
@@ -1792,9 +1805,11 @@
     };
 
     // Gráfico de linhas Vendas x Meta (NB+AFM), puxando o REPORT HSA do Controle.
-    // Quatro linhas: vendas reportadas (área + linha cheia), vendas realizadas
-    // (linha cheia mais fina), Meta/Budget (tracejada) e Meta Vendas HSA
-    // (pontilhada). Valores em R$ (moeda nativa do Controle), como string SVG.
+    // Quatro linhas: vendas realizadas, vendas reportadas, Meta/Budget
+    // (tracejada) e Meta Vendas HSA (pontilhada). A ÊNFASE — área sob a curva,
+    // traço mais grosso e os valores escritos acima dos pontos — fica com as
+    // realizadas; sem elas lançadas no Controle, volta para as reportadas.
+    // Valores em R$ (moeda nativa do Controle), construído como string SVG.
     private RenderFragment RenderReportLine() => builder =>
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -1808,11 +1823,20 @@
         double Y(double val) => bot - val / max * (bot - top);
         const string cReal = "#007A9E", cVreal = "#8b5cf6", cMeta = "#b7791f", cMhsa = "#1f9254";
 
+        // Quem manda no gráfico são as realizadas; sem elas, as reportadas.
+        var foco = TemRealizada;
+        var focoSerie = foco ? _repRealizada : _repReal;
+        var outraSerie = foco ? _repReal : _repRealizada;
+        var cFoco = foco ? cVreal : cReal;
+        var cOutra = foco ? cReal : cVreal;
+        var nomeFoco = foco ? "Vendas realizadas" : "Vendas reportadas";
+        var nomeOutra = foco ? "Vendas reportadas" : "Vendas realizadas";
+
         var sb = new System.Text.StringBuilder();
         sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas x Meta NB+AFM'>");
 
         sb.Append("<defs><linearGradient id='rlarea' x1='0' y1='0' x2='0' y2='1'>");
-        sb.Append($"<stop offset='0%' stop-color='{cReal}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cReal}' stop-opacity='0.02'/>");
+        sb.Append($"<stop offset='0%' stop-color='{cFoco}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cFoco}' stop-opacity='0.02'/>");
         sb.Append("</linearGradient></defs>");
 
         // legenda
@@ -1822,8 +1846,8 @@
             sb.Append($"<line x1='{(left + dx).ToString(inv)}' y1='20' x2='{(left + dx + 20).ToString(inv)}' y2='20' stroke='{cor}' stroke-width='3'{risco} stroke-linecap='round'/>");
             sb.Append($"<text x='{(left + dx + 26).ToString(inv)}' y='23.5' font-size='10.5' font-weight='600' fill='#3b4a61'>{Esc(texto)}</text>");
         }
-        Legenda(0, cReal, "", "Vendas reportadas");
-        Legenda(160, cVreal, "", "Vendas realizadas");
+        Legenda(0, cFoco, "", nomeFoco);
+        Legenda(160, cOutra, "", nomeOutra);
         Legenda(325, cMeta, "5 3", "Meta NB+AFM");
         Legenda(460, cMhsa, "2 3", "Meta Vendas HSA");
 
@@ -1837,21 +1861,21 @@
 
         // destaque do mês atual
         double hx = X(_month - 1);
-        sb.Append($"<line x1='{hx.ToString("0.#", inv)}' y1='{top.ToString(inv)}' x2='{hx.ToString("0.#", inv)}' y2='{bot.ToString(inv)}' stroke='{cReal}' stroke-width='1' stroke-dasharray='3 3' opacity='0.3'/>");
+        sb.Append($"<line x1='{hx.ToString("0.#", inv)}' y1='{top.ToString(inv)}' x2='{hx.ToString("0.#", inv)}' y2='{bot.ToString(inv)}' stroke='{cFoco}' stroke-width='1' stroke-dasharray='3 3' opacity='0.3'/>");
 
-        // linha Realizado (área + linha)
-        var lr = new System.Text.StringBuilder();
-        for (var m = 0; m < 12; m++) lr.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repReal[m]).ToString("0.#", inv)}");
-        sb.Append($"<polygon points='{left.ToString(inv)},{bot.ToString(inv)} {lr} {(Wd - right).ToString(inv)},{bot.ToString(inv)}' fill='url(#rlarea)'/>");
-        sb.Append($"<polyline points='{lr}' fill='none' stroke='{cReal}' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'/>");
-
-        // linha Vendas realizadas (cheia, mais fina — anda junto do reportado)
-        if (_repRealizada.Any(v => v > 0))
+        // Série em foco: área preenchida + traço grosso. A outra vai de linha fina.
+        string Pontos(double[] serie)
         {
-            var lv = new System.Text.StringBuilder();
-            for (var m = 0; m < 12; m++) lv.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(_repRealizada[m]).ToString("0.#", inv)}");
-            sb.Append($"<polyline points='{lv}' fill='none' stroke='{cVreal}' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>");
+            var sbp = new System.Text.StringBuilder();
+            for (var m = 0; m < 12; m++) sbp.Append($"{(m == 0 ? "" : " ")}{X(m).ToString("0.#", inv)},{Y(serie[m]).ToString("0.#", inv)}");
+            return sbp.ToString();
         }
+        var lr = Pontos(focoSerie);
+        sb.Append($"<polygon points='{left.ToString(inv)},{bot.ToString(inv)} {lr} {(Wd - right).ToString(inv)},{bot.ToString(inv)}' fill='url(#rlarea)'/>");
+        sb.Append($"<polyline points='{lr}' fill='none' stroke='{cFoco}' stroke-width='2.8' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        if (outraSerie.Any(v => v > 0))
+            sb.Append($"<polyline points='{Pontos(outraSerie)}' fill='none' stroke='{cOutra}' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round' opacity='0.85'/>");
 
         // linha Meta (tracejada)
         var lm = new System.Text.StringBuilder();
@@ -1866,21 +1890,22 @@
         // pontos + rótulos + meses
         for (var m = 0; m < 12; m++)
         {
-            double cx = X(m), yr = Y(_repReal[m]), yv = Y(_repRealizada[m]), ym = Y(_repMeta[m]), yh = Y(_repMetaHsa[m]);
+            double cx = X(m), yf = Y(focoSerie[m]), yo = Y(outraSerie[m]), ym = Y(_repMeta[m]), yh = Y(_repMetaHsa[m]);
             bool cur = (m + 1) == _month;
-            double att = _repMeta[m] > 0 && _repReal[m] > 0 ? _repReal[m] / _repMeta[m] * 100 : 0;
-            var tip = $"{Fmt.MonthName(m + 1)} · Reportado R$ {Fmt.Compact(_repReal[m])}"
-                    + (_repRealizada[m] > 0 ? $" · Realizado R$ {Fmt.Compact(_repRealizada[m])}" : "")
+            double att = _repMeta[m] > 0 && focoSerie[m] > 0 ? focoSerie[m] / _repMeta[m] * 100 : 0;
+            var tip = $"{Fmt.MonthName(m + 1)} · {nomeFoco} R$ {Fmt.Compact(focoSerie[m])}"
+                    + (outraSerie[m] > 0 ? $" · {nomeOutra} R$ {Fmt.Compact(outraSerie[m])}" : "")
                     + $" · Meta R$ {Fmt.Compact(_repMeta[m])} · Meta HSA R$ {Fmt.Compact(_repMetaHsa[m])}"
                     + (att > 0 ? $" · {Fmt.Pct(att)}" : "");
 
             if (_repMetaHsa[m] > 0) sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yh.ToString("0.#", inv)}' r='2.5' fill='{cMhsa}'><title>{Esc(tip)}</title></circle>");
-            if (_repRealizada[m] > 0) sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yv.ToString("0.#", inv)}' r='3' fill='{cVreal}'><title>{Esc(tip)}</title></circle>");
+            if (outraSerie[m] > 0) sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yo.ToString("0.#", inv)}' r='2.5' fill='{cOutra}'><title>{Esc(tip)}</title></circle>");
             sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{ym.ToString("0.#", inv)}' r='2.5' fill='{cMeta}'><title>{Esc(tip)}</title></circle>");
-            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yr.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cReal}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
-            if (_repReal[m] > 0)
-                sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(yr - 9).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? "#0b4f6f" : "#5b6b82")}'>{Esc(Fmt.Compact(_repReal[m]))}</text>");
-            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 7).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? cReal : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
+            sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yf.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cFoco}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
+            // O valor escrito acima do ponto é o do número em foco.
+            if (focoSerie[m] > 0)
+                sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(yf - 9).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? "#0b4f6f" : "#5b6b82")}'>{Esc(Fmt.Compact(focoSerie[m]))}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 7).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? cFoco : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
         }
 
         sb.Append("</svg>");
