@@ -52,9 +52,9 @@ else
 
     @* ---- Cartões por semestre ---- *@
     <div class="exec-grid cols-4" style="margin-bottom:18px">
-        <div class="stat accent-left"><div class="stat-label">1º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div><div class="stat-context">Realizado @Brl(Sum(_real, 0, 6))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 0, 6))</div></div>
+        <div class="stat accent-left"><div class="stat-label">1º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div><div class="stat-context">Reportado @Brl(Sum(_real, 0, 6))</div><div class="stat-context">Realizado @Brl(Sum(_realizada, 0, 6))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 0, 6))</div></div>
         <div class="stat accent-left"><div class="stat-label">1º semestre · Atingimento</div><div class="stat-value sm" style="color:@AtCol(Attain(0, 6))">@Pct(Attain(0, 6))</div><div class="stat-context">Realizado ÷ Budget (Jan–Jun)</div></div>
-        <div class="stat accent-left"><div class="stat-label">2º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 6, 12))</div><div class="stat-context">Realizado @Brl(Sum(_real, 6, 12))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 6, 12))</div></div>
+        <div class="stat accent-left"><div class="stat-label">2º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 6, 12))</div><div class="stat-context">Reportado @Brl(Sum(_real, 6, 12))</div><div class="stat-context">Realizado @Brl(Sum(_realizada, 6, 12))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 6, 12))</div></div>
         <div class="stat accent-left"><div class="stat-label">2º semestre · Atingimento</div><div class="stat-value sm" style="color:@AtCol(Attain(6, 12))">@(Sum(_real, 6, 12) > 0 ? Pct(Attain(6, 12)) : "—")</div><div class="stat-context">Realizado ÷ Budget (Jul–Dez)</div></div>
     </div>
 
@@ -73,9 +73,16 @@ else
                         <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(x => Real("INTER", x)))</td>
                     </tr>
                     <tr>
-                        <td class="rname">Vendas NB+AFM (Realizado)</td>
+                        <td class="rname">Vendas Reportadas (NB+AFM)</td>
                         @for (var m = 1; m <= 12; m++){var mm = m;<td class="right @(mm == _month ? "cur" : "")">@CellVendas(mm)</td>}
                         <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(VendasReal))</td>
+                    </tr>
+                    @* O que de fato se concretizou. Anda ao lado das reportadas
+                       porque nem tudo que o CRM reporta vira venda no mesmo mês. *@
+                    <tr>
+                        <td class="rname">Vendas Realizadas</td>
+                        @for (var m = 1; m <= 12; m++){var mm = m;<td class="right @(mm == _month ? "cur" : "")">@Cell(RealizadaCat, mm, "Realizado")</td>}
+                        <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(x => Real(RealizadaCat, x)))</td>
                     </tr>
                     <tr>
                         <td class="rname">Meta NB+AFM (Budget)</td>
@@ -338,7 +345,7 @@ else
     private List<ControleEntry> _entries = new();
     private Dictionary<(int, string), ControleEntry> _map = new();
     private Dictionary<string, string> _pending = new();  // "m|cat|field" -> raw
-    private double[] _real = new double[13], _budget = new double[13], _metaHsa = new double[13];
+    private double[] _real = new double[13], _realizada = new double[13], _budget = new double[13], _metaHsa = new double[13];
 
     // Ofertas / pedidos (tabela livre)
     private List<ControleRegistro> _registros = new();
@@ -440,7 +447,7 @@ else
     {
         _map = new();
         foreach (var e in _entries) _map[(e.MonthV, e.Category)] = e;
-        for (var m = 1; m <= 12; m++) { _real[m] = VendasReal(m); _budget[m] = Budget(m); _metaHsa[m] = BudgetOf("MHSA", m); }
+        for (var m = 1; m <= 12; m++) { _real[m] = VendasReal(m); _realizada[m] = Real(RealizadaCat, m); _budget[m] = Budget(m); _metaHsa[m] = BudgetOf("MHSA", m); }
 
         var q = _registros.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(_regSearch))
@@ -585,6 +592,8 @@ else
     // Vendas NB+AFM (Realizado) editável: usa o valor digitado direto (categoria
     // VNBAFM) quando informado; senão, cai para a soma da composição (ConsReal).
     private const string VendasCat = "VNBAFM";
+    // Vendas Realizadas: linha própria, digitada mês a mês (nunca calculada).
+    private const string RealizadaCat = ControleRepository.RealizadaCat;
     private double VendasReal(int m) =>
         Pend(m, VendasCat, "Realizado") ?? (Entry(m, VendasCat)?.RealizadoV ?? ConsReal(m));
 
