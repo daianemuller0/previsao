@@ -61,26 +61,34 @@ public class ControleRepository
     // Categorias que compõem "Vendas NB+AFM (Realizado)" no REPORT HSA.
     private static readonly string[] ReportCats = { "NB", "AFM", "SV", "LTSA" };
 
+    /// <summary>Categoria das VENDAS REALIZADAS — o que de fato se concretizou,
+    /// lançado mês a mês na guia Controle. Anda ao lado das vendas reportadas
+    /// (VNBAFM), que são o que o CRM reporta; as duas convivem porque nem tudo
+    /// que entra reportado vira venda no mesmo mês.</summary>
+    public const string RealizadaCat = "VREAL";
+
     // Séries mensais do REPORT HSA (índice 0 = janeiro … 11 = dezembro) para uso
     // em dashboards externos (ex.: Visão Executiva). Reproduz exatamente as linhas
-    // da planilha: Realizado = soma de NB+AFM+SV+LTSA; Meta = orçamento consolidado.
-    public (double[] Realizado, double[] Meta, double[] MetaHsa) ReportSeries(int year)
+    // da planilha: Reportado = soma de NB+AFM+SV+LTSA; Meta = orçamento consolidado.
+    public (double[] Reportado, double[] Realizada, double[] Meta, double[] MetaHsa) ReportSeries(int year)
     {
         var entries = Entries(year);
         double Real(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.RealizadoV ?? 0;
         double Budget(string cat, int m) => entries.FirstOrDefault(e => e.MonthV == m && e.Category == cat)?.BudgetV ?? 0;
-        // Realizado NB+AFM: valor digitado direto (VNBAFM) quando existir; senão soma a composição.
+        // Reportado NB+AFM: valor digitado direto (VNBAFM) quando existir; senão soma a composição.
         bool HasVendas(int m) => entries.Any(e => e.MonthV == m && e.Category == "VNBAFM");
-        var real = new double[12];
+        var reportado = new double[12];
+        var realizada = new double[12];
         var meta = new double[12];
         var metaHsa = new double[12];
         for (var m = 1; m <= 12; m++)
         {
-            real[m - 1] = HasVendas(m) ? Real("VNBAFM", m) : ReportCats.Sum(c => Real(c, m));
+            reportado[m - 1] = HasVendas(m) ? Real("VNBAFM", m) : ReportCats.Sum(c => Real(c, m));
+            realizada[m - 1] = Real(RealizadaCat, m);
             meta[m - 1] = Budget("CONS", m);
             metaHsa[m - 1] = Budget("MHSA", m);
         }
-        return (real, meta, metaHsa);
+        return (reportado, realizada, meta, metaHsa);
     }
 
     public void Refresh()
