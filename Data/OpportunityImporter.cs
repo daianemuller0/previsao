@@ -315,9 +315,10 @@ public sealed class OpportunityImporter
         var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "Product Type", "Product", "Produto" }));
         var equip = Match(_cat.EquipmentTypes, e => e.Name, e => e.Id, get(new[] { "Tipo de Equipamento", "Tipo de equipamento" }));
         // Outside Sales Rep = "Vendedor" (reaproveita a dimensão KAM).
-        var kam = Match(_cat.Kams, k => k.Name, k => k.Id, get(new[] { "Outside Sales Rep", "Key Account", "KAM" }));
-        // Market com carteira definida manda no vendedor (ver CarteiraPorMarket).
-        var donoNb = VendedorDoMarket(marketRaw);
+        var vendedorNb = get(new[] { "Outside Sales Rep", "Key Account", "KAM" });
+        var kam = Match(_cat.Kams, k => k.Name, k => k.Id, vendedorNb);
+        // Market com carteira definida manda no vendedor (ver CarteirasPorMarket).
+        var donoNb = VendedorDoMarket(marketRaw, vendedorNb);
         if (donoNb != "") kam = KamIdDe(_cat, donoNb);
         var customer = Match(_cat.Customers, c => c.Name, c => c.Id, customerRaw);
         var puv = MatchBu(get(new[] { "Business Unit", "Unidade de Venda", "BU do PV", "Unidade de venda" }));
@@ -428,8 +429,8 @@ public sealed class OpportunityImporter
         // NÃO usar ContractorName aqui: aquela coluna é o CLIENTE, não o vendedor.
         var vendedor = CanonicalVendedor(get(new[] { "Sales person", "Salesperson", "Sales Person", "Vendedor", "Outside Sales Rep" }));
         var kam = Match(_cat.Kams, k => k.Name, k => k.Id, vendedor);
-        // Market com carteira definida manda no vendedor (ver CarteiraPorMarket).
-        var donoAfm = VendedorDoMarket(marketRaw);
+        // Market com carteira definida manda no vendedor (ver CarteirasPorMarket).
+        var donoAfm = VendedorDoMarket(marketRaw, vendedor);
         if (donoAfm != "") kam = KamIdDe(_cat, donoAfm);
         // Cliente do AFM: coluna "ContractorName" (equivalente ao "Account Name"
         // do New Business). Casa com o catálogo; sem correspondência, fica o texto.
@@ -563,22 +564,44 @@ public sealed class OpportunityImporter
     // cada sincronização. Sem isto, alguém teria de corrigir as linhas na mão
     // depois de toda importação, e a correção se perderia na importação seguinte.
     //
-    // Para passar um market para outra pessoa, mude o nome nesta lista.
-    private static readonly (string Market, string Vendedor)[] CarteiraPorMarket =
+    // A regra vale para o market inteiro a partir do prefixo: "Water" pega
+    // "Water" e "Water (Municipal)" — e qualquer variação que o CRM venha a
+    // exportar depois, sem precisar mexer aqui. As exceções são vendedores que
+    // ficam com o que já é deles dentro daquele market.
+    private sealed record RegraCarteira(string Prefixo, string Vendedor, string[] Excecoes);
+
+    private static readonly RegraCarteira[] CarteirasPorMarket =
     {
-        ("Water",             "Douglas Matavelli"),
-        ("Water (Municipal)", "Douglas Matavelli"),
+        new("Water", "Douglas Matavelli", new[] { "Paula Vilela" }),
     };
 
     /// <summary>Vendedor dono da carteira deste market, ou "" quando o market não
-    /// tem dono definido — aí vale o vendedor que a planilha trouxer.</summary>
-    public static string VendedorDoMarket(string market)
+    /// tem dono definido — ou quando o vendedor atual é uma exceção da regra. Nos
+    /// dois casos vale o vendedor que a planilha trouxer.</summary>
+    public static string VendedorDoMarket(string market, string vendedorAtual)
     {
         if (string.IsNullOrWhiteSpace(market)) return "";
-        var n = Norm(market);
-        foreach (var (mk, vendedor) in CarteiraPorMarket)
-            if (Norm(mk) == n) return vendedor;
+        var m = Norm(market);
+        var v = Norm(vendedorAtual);
+        foreach (var regra in CarteirasPorMarket)
+        {
+            if (!ComecaCom(m, Norm(regra.Prefixo))) continue;
+            foreach (var excecao in regra.Excecoes)
+            {
+                var e = Norm(excecao);
+                if (v == e || v.StartsWith(e + " ", StringComparison.Ordinal)) return "";
+            }
+            return regra.Vendedor;
+        }
         return "";
+    }
+
+    // Prefixo de palavra inteira: "Water" pega "Water (Municipal)" e "Water
+    // Treatment", mas não pegaria um "Waterloo" que aparecesse por aí.
+    private static bool ComecaCom(string valor, string prefixo)
+    {
+        if (prefixo.Length == 0 || !valor.StartsWith(prefixo, StringComparison.Ordinal)) return false;
+        return valor.Length == prefixo.Length || !char.IsLetterOrDigit(valor[prefixo.Length]);
     }
 
     /// <summary>Id do vendedor no catálogo; sem correspondência, o próprio nome
