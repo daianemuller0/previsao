@@ -1895,10 +1895,10 @@ body.zoom-mode { overflow: hidden; }
 /* ---------------------------------------------------------------------------
    Controle do modo apresentação.
 
-   Fica fora da tela no uso normal e só aparece quando o app.js marca a página
-   com "apresentando". Flutua no canto, acima de tudo, porque a página inteira
-   está rolando por baixo — se acompanhasse a rolagem, sumiria no primeiro
-   segundo, que é justamente quando se precisa dele.
+   Ele vive DENTRO da barra de filtros, que já congela abaixo do topbar — então
+   fica ao alcance o tempo todo enquanto a página passa, junto dos filtros e dos
+   botões do cabeçalho. Flutuando no canto ele competia com o conteúdo; aqui ele
+   pertence à mesma faixa fixa que todo o resto do controle da tela.
 
    Os botões Pausar e Continuar são desenhados os dois; o CSS mostra um de cada
    vez conforme a classe "apresentacao-pausada". Assim o estado mora no JS, que
@@ -1909,38 +1909,47 @@ body.zoom-mode { overflow: hidden; }
 html.apresentando .apres-controle {
     display: flex;
     gap: 8px;
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    z-index: 4000;
-    padding: 8px;
-    border-radius: 999px;
-    background: rgba(11, 32, 51, .82);
-    backdrop-filter: blur(6px);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
-    /* Discreto enquanto ninguém precisa dele; inteiro ao aproximar o mouse. */
-    opacity: .35;
-    transition: opacity .25s ease;
+    align-items: center;
+    margin-left: 10px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
 }
-html.apresentando .apres-controle:hover,
-html.apresentacao-pausada .apres-controle { opacity: 1; }
 
 .apres-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
-    border: 1px solid rgba(255, 255, 255, .22);
+    padding: 6px 14px;
+    border: 1px solid var(--teal);
     border-radius: 999px;
-    background: rgba(255, 255, 255, .1);
+    background: var(--primary);
     color: #fff;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12.5px;
+    font-weight: 700;
     cursor: pointer;
 }
-.apres-btn:hover { background: rgba(255, 255, 255, .2); border-color: rgba(255, 255, 255, .4); }
+.apres-btn:hover { filter: brightness(1.12); }
 .apres-btn svg { width: 14px; height: 14px; }
+/* Sair é ação secundária: não disputa atenção com o Pausar. */
+.apres-sair { background: none; color: var(--text-2); border-color: var(--border); }
+.apres-sair:hover { color: var(--neg); border-color: var(--neg); filter: none; }
 
 .apres-continuar { display: none; }
 html.apresentacao-pausada .apres-pausar { display: none; }
 html.apresentacao-pausada .apres-continuar { display: inline-flex; }
+
+/* Durante a apresentação o cabeçalho da página também congela, para o botão de
+   Apresentação e os demais continuarem à mão. O título e o subtítulo saem: numa
+   TV eles só comeriam altura, e a faixa precisa ser fina. A barra de filtros
+   desce exatamente a altura dessa faixa para as duas não se sobreporem. */
+html.apresentando .page-head {
+    position: sticky;
+    top: var(--topbar-h);
+    z-index: 26;
+    align-items: center;
+    background: var(--bg);
+    margin: 0 0 10px;
+    padding: 9px 0;
+}
+html.apresentando .page-head > div:first-child { display: none; }
+html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
