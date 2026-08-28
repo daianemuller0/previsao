@@ -215,9 +215,12 @@ else
                                     case "cliente":  <td>@Dash(g.Cliente)</td> break;
                                     case "mercado":  <td>@Dash(g.Mercado)</td> break;
                                     case "kam":      <td>@Dash(g.Kam)</td> break;
-                                    case "liquido":  <td class="right num">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td> break;
+                                    case "tipo":     <td class="center">@Dash(g.Tipo)</td> break;
+                                    // A cor do valor diz como ele deve ser lido (ClasseValor).
+                                    case "liquido":  <td class="right num @g.ClasseValor" title="@ClassTitulo(g)">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td> break;
                                     case "moeda":    <td class="center">@Dash(g.Moeda)</td> break;
-                                    case "origem":   <td class="right num">@(g.ValorOriginalV != 0 ? g.ValorOriginalV.ToString("#,##0.##", Pt) : "—")</td> break;
+                                    case "origem":   <td class="right num @g.ClasseValor" title="@ClassTitulo(g)">@(g.ValorOriginalV != 0 ? g.ValorOriginalV.ToString("#,##0.##", Pt) : "—")</td> break;
+                                    case "status":   <td>@Dash(g.Status)</td> break;
                                     case "semana":   <td class="center">@Dash(g.Semana)</td> break;
                                     case "mes":      <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td> break;
                                     case "poc":      <td class="center">@Mark(g.Poc)</td> break;
@@ -245,7 +248,20 @@ else
             <label class="fld full">Cliente<input class="field" @bind="_regEdit.Cliente" /></label>
             <label class="fld">Mercado<input class="field" list="dl-market" @bind="_regEdit.Mercado" /></label>
             <label class="fld">KAM<input class="field" list="dl-key_account" @bind="_regEdit.Kam" /></label>
+            <label class="fld">Tipo
+                <select class="field" @bind="_regEdit.Tipo">
+                    <option value="">—</option>
+                    @foreach (var t in ControleRegistro.Tipos){<option value="@t">@t</option>}
+                </select>
+            </label>
+            <label class="fld">Status<input class="field" list="dl-status-oferta" @bind="_regEdit.Status" placeholder="situação da oferta" /></label>
             <label class="fld">Valor Líquido (R$)<input class="field num" @bind="_regEdit.ValorLiquido" /></label>
+            <label class="fld">Classificação do valor <span class="hint">define a cor na tabela</span>
+                <select class="field" @bind="_regEdit.Classificacao">
+                    <option value="">—</option>
+                    @foreach (var c in ControleRegistro.Classificacoes){<option value="@c">@c</option>}
+                </select>
+            </label>
             <label class="fld">POC
                 <select class="field" @bind="_regEdit.Poc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
             </label>
@@ -269,6 +285,7 @@ else
     </div>
     <datalist id="dl-market">@foreach (var v in Lists?.Items("market") ?? new()){<option value="@v" />}</datalist>
     <datalist id="dl-key_account">@foreach (var v in Lists?.Items("key_account") ?? new()){<option value="@v" />}</datalist>
+    <datalist id="dl-status-oferta">@foreach (var v in Lists?.Items("status_oferta") ?? new()){<option value="@v" />}</datalist>
 }
 
 @* ---- Confirmar exclusão ---- *@
@@ -395,9 +412,11 @@ else
         new("cliente", "Cliente"),
         new("mercado", "Mercado"),
         new("kam",     "KAM"),
+        new("tipo",    "Tipo",          "center"),
         new("liquido", "Valor Líquido", "right"),
         new("moeda",   "Moeda",         "center"),
         new("origem",  "Valor origem",  "right"),
+        new("status",  "Status"),
         new("semana",  "Semana",        "center"),
         new("mes",     "Mês",           "center"),
         new("poc",     "POC",           "center"),
@@ -579,6 +598,11 @@ else
         _registros = Repo.Registros();
         _toast = $"<strong>Importação concluída.</strong> {n} oferta(s) adicionada(s).";
     }
+
+    /// <summary>Texto de apoio na célula do valor: a cor sozinha não diz o que
+    /// significa para quem chega agora, e passar o mouse resolve.</summary>
+    private static string ClassTitulo(ControleRegistro g) =>
+        string.IsNullOrWhiteSpace(g.Classificacao) ? "" : "Valor " + g.Classificacao.ToLowerInvariant();
 
     private ControleEntry? Entry(int m, string cat) => _map.GetValueOrDefault((m, cat));
     private string PKey(int m, string cat, string field) => $"{m}|{cat}|{field}";

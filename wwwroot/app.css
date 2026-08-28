@@ -988,6 +988,15 @@ details.ctx > summary svg { width: 16px; height: 16px; }
 .reg-atencao > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 .reg-alert { display: inline-flex; color: var(--warn); cursor: help; }
 .reg-alert svg { width: 15px; height: 15px; }
+
+/* Classificação do valor em Ofertas e pedidos. A cor é a informação: mostra de
+   relance quanta confiança o número merece, sem gastar mais uma coluna. */
+.reg-tbl td.val-estimado { color: #c0392b; font-weight: 700; }
+.reg-tbl td.val-consolidado { color: #111827; font-weight: 600; }
+.reg-tbl td.val-reportado { background: #fde7f0; color: #7a2348; font-weight: 600; }
+/* A linha com nota de atenção já pinta o fundo; o rosa do reportado tem de
+   continuar aparecendo por cima dela. */
+.reg-atencao > td.val-reportado { background: #fbdbe8; }
 /* Ícone solto num rótulo de formulário: sem limite o SVG ocupa a largura toda. */
 .fld > svg { width: 14px; height: 14px; vertical-align: -2px; }
 
