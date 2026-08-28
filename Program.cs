@@ -42,9 +42,10 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(o =>
     {
         // Quanto tempo um circuito sem conexão fica guardado esperando a volta.
-        // O padrão (3 min) segura recursos de abas que ninguém vai reabrir; um
-        // minuto cobre F5 e oscilação de rede com folga.
-        o.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(1);
+        // Tem de ser MAIOR que a carência de encerramento (FecharAoSairSegundos,
+        // 60s por padrão): senão a aba reconecta dentro do prazo, não acha mais o
+        // circuito dela e mostra "falha ao reconectar" com o programa vivo.
+        o.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(2);
     });
 
 // O programa roda sem janela: quem o fecha é o navegador. No modo por-usuário,

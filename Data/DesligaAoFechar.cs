@@ -15,9 +15,15 @@ namespace HowdenSalesForecast.Data;
 // contrário, é imediata.
 //
 // A carência existe porque nem toda queda de conexão é uma saída: um F5, o
-// redirecionamento depois do login e qualquer navegação com recarga derrubam e
-// refazem a conexão em segundos. Sem ela, entrar no sistema encerraria o
-// programa. Ajustável em "FecharAoSairSegundos" no appsettings.
+// redirecionamento depois do login, qualquer navegação com recarga, uma
+// oscilação da VPN ou o navegador suspendendo uma aba em segundo plano derrubam
+// a conexão e a refazem em seguida. E o Blazor não reconecta na hora: ele tenta
+// de novo algumas vezes, com intervalos crescentes, o que passa fácil de meio
+// minuto numa rede lenta. Carência curta demais encerra o programa DEBAIXO de
+// quem está usando — por isso o padrão é generoso.
+//
+// Ajustável em "FecharAoSairSegundos" no appsettings; ZERO desliga de vez o
+// encerramento automático, para quem prefere fechar pelo Gerenciador.
 //
 // Só vale no modo por-usuário; num servidor central, encerrar ao sair da última
 // aba derrubaria o serviço para todo mundo.
@@ -29,16 +35,22 @@ public sealed class DesligaAoFechar : CircuitHandler
     private static bool _jaAbriu;                 // nunca encerra antes da 1ª aba
     private static CancellationTokenSource? _agendado;
 
+    /// <summary>Padrão da carência. Cobre com folga a sequência de tentativas de
+    /// reconexão do Blazor, que numa rede lenta passa de meio minuto.</summary>
+    public const int PadraoSegundos = 60;
+
     private readonly IHostApplicationLifetime _vida;
     private readonly TimeSpan _carencia;
+    private readonly bool _desativado;
 
     public DesligaAoFechar(IHostApplicationLifetime vida, IConfiguration cfg)
     {
         _vida = vida;
         // Curto o bastante para o programa sumir logo depois de fechar a aba, e
         // longo o bastante para uma recarga de página voltar antes do prazo.
-        var s = Math.Clamp(cfg.GetValue("FecharAoSairSegundos", 10), 3, 300);
-        _carencia = TimeSpan.FromSeconds(s);
+        var s = cfg.GetValue("FecharAoSairSegundos", PadraoSegundos);
+        _desativado = s <= 0;
+        _carencia = TimeSpan.FromSeconds(Math.Clamp(s, 5, 600));
     }
 
     /// <summary>Alguma aba já se conectou nesta execução?</summary>
@@ -61,7 +73,7 @@ public sealed class DesligaAoFechar : CircuitHandler
         lock (_trava)
         {
             _conectados = Math.Max(0, _conectados - 1);
-            if (_conectados > 0 || !_jaAbriu) return Task.CompletedTask;
+            if (_desativado || _conectados > 0 || !_jaAbriu) return Task.CompletedTask;
 
             _agendado?.Cancel();
             var cts = new CancellationTokenSource();
@@ -88,16 +100,26 @@ public sealed class DesligaAoFechar : CircuitHandler
 // ---------------------------------------------------------------------------
 public sealed class EncerraSemNinguem : BackgroundService
 {
-    private static readonly TimeSpan Espera = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan Espera = TimeSpan.FromMinutes(5);
 
     private readonly IHostApplicationLifetime _vida;
-    public EncerraSemNinguem(IHostApplicationLifetime vida) => _vida = vida;
+    private readonly bool _desativado;
+
+    public EncerraSemNinguem(IHostApplicationLifetime vida, IConfiguration cfg)
+    {
+        _vida = vida;
+        _desativado = cfg.GetValue("FecharAoSairSegundos", DesligaAoFechar.PadraoSegundos) <= 0;
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (_desativado) return;
+
         try { await Task.Delay(Espera, stoppingToken); }
         catch (TaskCanceledException) { return; }
 
+        // Só encerra se NINGUÉM chegou a abrir. Quem abriu e saiu é assunto da
+        // carência ali em cima, que sabe se a pessoa está voltando.
         if (!DesligaAoFechar.JaAbriu) _vida.StopApplication();
     }
 }
