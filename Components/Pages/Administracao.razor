@@ -81,7 +81,7 @@
 
         <div class="form-grid">
             <label class="fld full">Nome<input class="field" @bind="_edit.Nome" placeholder="Nome do vendedor" /></label>
-            <label class="fld">Login@(_editNew ? "" : " (fixo)")<input class="field" @bind="_edit.Login" readonly="@(!_editNew)" placeholder="gerado do nome" /></label>
+            <label class="fld">Login @(_editNew ? "" : "· é com ele que a pessoa entra")<input class="field" @bind="_edit.Login" placeholder="gerado do nome" /></label>
             <label class="fld">Papel
                 <select class="field" @bind="_edit.Role">@foreach (var r in AccessRoles.All){<option value="@r.Role">@r.Label</option>}</select>
             </label>
@@ -127,6 +127,10 @@
     private string _msg = "";
 
     private AppUser? _edit;
+    /// <summary>Login com que a conta foi aberta. Trocar o login significa
+    /// gravar sob a chave nova e apagar a antiga — sem isto a conta velha
+    /// continuaria de pé, e a pessoa teria dois acessos.</summary>
+    private string _loginOriginal = "";
     private bool _editNew;
     private string _editErr = "";
     private string _editPass = "";
@@ -152,7 +156,7 @@
     private void OpenNew()
     {
         _edit = new AppUser { Role = AccessRoles.Vendedor, Ativo = "Sim" };
-        _editNew = true; _editErr = ""; _editPass = "";
+        _editNew = true; _editErr = ""; _editPass = ""; _loginOriginal = "";
         _editVend = new(StringComparer.CurrentCultureIgnoreCase);
         _editVendOptions = _vendOptions.ToList();
     }
@@ -164,7 +168,7 @@
             Login = u.Login, Nome = u.Nome, Role = u.Role, Salt = u.Salt, Hash = u.Hash,
             Vendedores = u.Vendedores, Ativo = u.Ativo,
         };
-        _editNew = false; _editErr = ""; _editPass = "";
+        _editNew = false; _editErr = ""; _editPass = ""; _loginOriginal = u.Login;
         _editVend = new(u.VendedorList, StringComparer.CurrentCultureIgnoreCase);
         // Garante que nomes já atribuídos apareçam mesmo se não estiverem no catálogo.
         _editVendOptions = _vendOptions.Union(u.VendedorList, StringComparer.CurrentCultureIgnoreCase)
@@ -182,11 +186,16 @@
         _edit.Nome = (_edit.Nome ?? "").Trim();
         if (_edit.Nome == "") { _editErr = "Informe o nome."; return; }
 
-        if (_editNew)
+        // Login em branco vira "nome.sobrenome"; o resto é normalizado igual.
+        if (string.IsNullOrWhiteSpace(_edit.Login)) _edit.Login = UserRepository.LoginFor(_edit.Nome);
+        _edit.Login = _edit.Login.Trim().ToLowerInvariant();
+        if (_edit.Login == "") { _editErr = "Informe o login."; return; }
+
+        var renomeou = !_editNew && !string.Equals(_edit.Login, _loginOriginal, StringComparison.OrdinalIgnoreCase);
+        if ((_editNew || renomeou) && Users.Get(_edit.Login) is not null)
         {
-            if (string.IsNullOrWhiteSpace(_edit.Login)) _edit.Login = UserRepository.LoginFor(_edit.Nome);
-            _edit.Login = _edit.Login.Trim().ToLowerInvariant();
-            if (Users.Get(_edit.Login) is not null) { _editErr = "Já existe um login com esse identificador."; return; }
+            _editErr = $"Já existe um login \"{_edit.Login}\". Escolha outro.";
+            return;
         }
 
         _edit.Vendedores = _edit.Role == AccessRoles.Vendedor ? string.Join(";", _editVend) : "";
@@ -196,7 +205,13 @@
         else if (_editNew) Users.SetPassword(_edit, UserRepository.DefaultPassword);
 
         Users.Save(_edit, _actor);
-        _msg = $"Login \"{_edit.Login}\" salvo.";
+        // Grava sob a chave nova PRIMEIRO e só então apaga a antiga: se algo
+        // falhar no meio, sobra uma conta a mais — nunca nenhuma.
+        if (renomeou) Users.Delete(_loginOriginal);
+
+        _msg = renomeou
+            ? $"Login \"{_loginOriginal}\" passou a ser \"{_edit.Login}\". Avise a pessoa — a senha continua a mesma."
+            : $"Login \"{_edit.Login}\" salvo.";
         _edit = null;
         Load();
     }

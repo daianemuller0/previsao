@@ -90,11 +90,22 @@ public class UserRepository
     // Idempotente: se nada muda, não grava. Não mexe em senha de conta existente.
     public void SeedIfEmpty(string actor = "sistema")
     {
-        var existing = All().ToDictionary(u => u.Login, StringComparer.OrdinalIgnoreCase);
+        var todos = All();
+        var existing = todos.ToDictionary(u => u.Login, StringComparer.OrdinalIgnoreCase);
+        // Também por NOME: o admin pode ter trocado o login da pessoa na tela de
+        // Administração. Procurando só pelo login, a conta antiga seria recriada
+        // na próxima subida e a pessoa acabaria com dois acessos.
+        var porNome = todos
+            .Where(u => !string.IsNullOrWhiteSpace(u.Nome))
+            .GroupBy(u => u.Nome.Trim(), StringComparer.CurrentCultureIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.CurrentCultureIgnoreCase);
+
         foreach (var (nome, role, vendedores) in SeedList)
         {
             var login = LoginFor(nome);
-            if (!existing.TryGetValue(login, out var u))
+            if (!existing.TryGetValue(login, out var u) && porNome.TryGetValue(nome, out var porNomeHit))
+                u = porNomeHit;
+            if (u is null)
             {
                 var novo = new AppUser
                 {
