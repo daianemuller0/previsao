@@ -215,6 +215,7 @@ public sealed class DataSyncService
                         }
                     }
                     _repo.Refresh();
+                    st.Carteira = AplicarCarteiras();
                 }
 
                 if (result.Rows.Count > 0 && marca != "") GravarMarca(p.Prefix, marca);
@@ -231,6 +232,7 @@ public sealed class DataSyncService
                               ? $" ATENÇÃO: a planilha veio com bem menos linhas que a base — {st.Kept} oportunidade(s) foram MANTIDAS por segurança. Confira a exportação do CRM."
                               : $" {st.Kept} não estão mais na planilha, mas foram mantidas porque têm preenchimento feito no sistema."
                           : "")
+                      + (st.Carteira > 0 ? $" {st.Carteira} passaram para o vendedor dono do market." : "")
                     : "Planilha lida, mas nenhuma oportunidade reconhecida — confira o cabeçalho das colunas.";
                 return Finish(st);
             }
@@ -320,6 +322,30 @@ public sealed class DataSyncService
         }
     }
 
+    // ---- carteiras definidas pelo market -----------------------------------
+    /// <summary>Reaplica as carteiras por market na base inteira. O importador já
+    /// resolve o que vem da planilha; esta passagem alcança as linhas que ficaram
+    /// guardadas sem aparecer na exportação da vez e as criadas à mão. Só grava o
+    /// que realmente muda, então na maioria das rodadas não escreve nada.</summary>
+    private int AplicarCarteiras()
+    {
+        var ajustadas = new List<Opportunity>();
+        foreach (var o in _repo.All())
+        {
+            var dono = OpportunityImporter.VendedorDoMarket(_cat.MarketName(o.MarketId));
+            if (dono == "") continue;
+            if (string.Equals(_cat.KamName(o.KamId), dono, StringComparison.OrdinalIgnoreCase)) continue;
+            o.KamId = OpportunityImporter.KamIdDe(_cat, dono);
+            ajustadas.Add(o);
+        }
+        if (ajustadas.Count > 0)
+        {
+            _repo.SaveMany(ajustadas);
+            _repo.Refresh();
+        }
+        return ajustadas.Count;
+    }
+
     private static DataSyncStatus Finish(DataSyncStatus s)
     {
         s.FinishedAt = DateTime.Now;
@@ -356,6 +382,8 @@ public sealed class DataSyncStatus
     public int Kept { get; set; }
     /// <summary>A planilha veio com bem menos linhas que a base — nada foi apagado.</summary>
     public bool ShortRead { get; set; }
+    /// <summary>Linhas que passaram para o vendedor dono do market (carteira por market).</summary>
+    public int Carteira { get; set; }
     public List<string> Currencies { get; set; } = new();
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }

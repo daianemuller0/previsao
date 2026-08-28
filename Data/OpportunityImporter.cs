@@ -309,12 +309,16 @@ public sealed class OpportunityImporter
         var dateIso = ResolveDate(get(new[] { "Close Date", "Date", "Data", "Data prevista" }), get(new[] { "Quarter" }));
         // Installation Location = país do mapa.
         var country = Match(_cat.Countries, c => c.Name, c => c.Id, get(new[] { "Installation Location", "País", "Pais", "Country" }));
-        var market = Match(_cat.Markets, m => m.Name, m => m.Id, get(new[] { "Market" }));
+        var marketRaw = get(new[] { "Market" });
+        var market = Match(_cat.Markets, m => m.Name, m => m.Id, marketRaw);
         var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "Sub-Market", "Market Variável", "Market Variavel", "Sub_Market", "Submercado" }));
         var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "Product Type", "Product", "Produto" }));
         var equip = Match(_cat.EquipmentTypes, e => e.Name, e => e.Id, get(new[] { "Tipo de Equipamento", "Tipo de equipamento" }));
         // Outside Sales Rep = "Vendedor" (reaproveita a dimensão KAM).
         var kam = Match(_cat.Kams, k => k.Name, k => k.Id, get(new[] { "Outside Sales Rep", "Key Account", "KAM" }));
+        // Market com carteira definida manda no vendedor (ver CarteiraPorMarket).
+        var donoNb = VendedorDoMarket(marketRaw);
+        if (donoNb != "") kam = KamIdDe(_cat, donoNb);
         var customer = Match(_cat.Customers, c => c.Name, c => c.Id, customerRaw);
         var puv = MatchBu(get(new[] { "Business Unit", "Unidade de Venda", "BU do PV", "Unidade de venda" }));
         var buInter = MatchBu(get(new[] { "BU Intercompany", "BU  Intercompany" }));
@@ -414,7 +418,8 @@ public sealed class OpportunityImporter
         r.Read++;
 
         var country = Match(_cat.Countries, c => c.Name, c => c.Id, get(new[] { "Country", "Installation Location" }));
-        var market = Match(_cat.Markets, m => m.Name, m => m.Id, get(new[] { "Industry", "Market" }));
+        var marketRaw = get(new[] { "Industry", "Market" });
+        var market = Match(_cat.Markets, m => m.Name, m => m.Id, marketRaw);
         var submarket = Match(_cat.SubMarkets, s => s.Name, s => s.Id, get(new[] { "SubIndustry", "Sub-Market" }));
         var product = Match(_cat.Products, p => p.Name, p => p.Id, get(new[] { "ProductType", "Product Type" }));
         var puv = MatchBu(get(new[] { "BU", "Business Unit" }));
@@ -423,6 +428,9 @@ public sealed class OpportunityImporter
         // NÃO usar ContractorName aqui: aquela coluna é o CLIENTE, não o vendedor.
         var vendedor = CanonicalVendedor(get(new[] { "Sales person", "Salesperson", "Sales Person", "Vendedor", "Outside Sales Rep" }));
         var kam = Match(_cat.Kams, k => k.Name, k => k.Id, vendedor);
+        // Market com carteira definida manda no vendedor (ver CarteiraPorMarket).
+        var donoAfm = VendedorDoMarket(marketRaw);
+        if (donoAfm != "") kam = KamIdDe(_cat, donoAfm);
         // Cliente do AFM: coluna "ContractorName" (equivalente ao "Account Name"
         // do New Business). Casa com o catálogo; sem correspondência, fica o texto.
         var customer = Match(_cat.Customers, c => c.Name, c => c.Id,
@@ -548,6 +556,35 @@ public sealed class OpportunityImporter
         ("Rafael Ribeiro Toledo",  "Rafael Toledo"),
         ("Thiago Cesar Veiga",     "Thiago Veiga"),
     };
+
+    // ---- carteiras definidas pelo market ------------------------------------
+    // Vendedor que não tem acesso ao CRM nunca aparece na coluna de vendedor da
+    // planilha — a carteira dele é definida aqui, pelo market, e reaplicada a
+    // cada sincronização. Sem isto, alguém teria de corrigir as linhas na mão
+    // depois de toda importação, e a correção se perderia na importação seguinte.
+    //
+    // Para passar um market para outra pessoa, mude o nome nesta lista.
+    private static readonly (string Market, string Vendedor)[] CarteiraPorMarket =
+    {
+        ("Water",             "Douglas Matavelli"),
+        ("Water (Municipal)", "Douglas Matavelli"),
+    };
+
+    /// <summary>Vendedor dono da carteira deste market, ou "" quando o market não
+    /// tem dono definido — aí vale o vendedor que a planilha trouxer.</summary>
+    public static string VendedorDoMarket(string market)
+    {
+        if (string.IsNullOrWhiteSpace(market)) return "";
+        var n = Norm(market);
+        foreach (var (mk, vendedor) in CarteiraPorMarket)
+            if (Norm(mk) == n) return vendedor;
+        return "";
+    }
+
+    /// <summary>Id do vendedor no catálogo; sem correspondência, o próprio nome
+    /// (é o que acontece com a equipe real, que não está no catálogo de exemplo).</summary>
+    public static string KamIdDe(Catalog cat, string nome) =>
+        Match(cat.Kams, k => k.Name, k => k.Id, nome);
 
     // Converte o nome do vendedor para o contato canônico (NB). Sem equivalência,
     // devolve o próprio nome aparado. Idempotente: nomes NB não casam e ficam iguais.
