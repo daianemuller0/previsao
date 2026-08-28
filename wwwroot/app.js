@@ -651,3 +651,23 @@ window.appLayout = (function () {
 
     return { ligar, aplicar, organizar };
 })();
+
+// ---------------------------------------------------------------------------
+// Avisa o servidor quando a aba está sendo FECHADA de verdade.
+//
+// O programa roda sem janela e se encerra quando ninguém está mais usando. Só
+// que o servidor enxerga apenas o socket sumindo — e ele some tanto quando a
+// pessoa fecha o navegador quanto quando a VPN oscila, o computador dorme ou a
+// página recarrega. Este aviso é o que separa os dois casos: com ele, o
+// encerramento é rápido; sem ele, o programa espera bem mais, supondo que a aba
+// continua aberta e a conexão é que caiu.
+//
+// "pagehide" em vez de "beforeunload": dispara também quando a aba é fechada
+// pelo gerenciador do navegador e não trava a saída da página. Quando o
+// navegador guarda a página para voltar depois (persisted), não é saída.
+// sendBeacon porque a requisição precisa sobreviver à página que morre.
+// ---------------------------------------------------------------------------
+addEventListener('pagehide', function (e) {
+    if (e.persisted) return;
+    try { navigator.sendBeacon('/app/saindo'); } catch (_) { }
+});

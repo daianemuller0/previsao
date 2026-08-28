@@ -244,6 +244,18 @@ app.MapPost("/auth/logout", async (HttpContext http) =>
     return Results.Redirect("/login");
 }).DisableAntiforgery();
 
+// Aviso de que a aba está sendo FECHADA de verdade (beacon do "pagehide", em
+// app.js). É o que separa "a pessoa saiu" de "a conexão caiu": sem ele, o
+// programa não teria como distinguir os dois e teria de escolher entre encerrar
+// cedo demais ou tarde demais. Anônimo de propósito — o aviso também chega
+// quando alguém fecha a aba na tela de login.
+app.MapPost("/app/saindo", (IHostApplicationLifetime vida, IConfiguration cfg) =>
+{
+    var s = cfg.GetValue("FecharAoSairSegundos", DesligaAoFechar.PadraoSegundos);
+    if (s > 0) DesligaAoFechar.AvisarSaida(vida, TimeSpan.FromSeconds(Math.Clamp(s, 5, 600)));
+    return Results.NoContent();
+}).AllowAnonymous().DisableAntiforgery();
+
 // Exporta o forecast consolidado em CSV (BOM UTF-8, separador ';' p/ Excel pt-BR).
 app.MapGet("/forecast/export", (HttpContext http, OpportunityRepository repo, Catalog cat) =>
 {

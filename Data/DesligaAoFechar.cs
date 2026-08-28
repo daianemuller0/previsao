@@ -14,16 +14,22 @@ namespace HowdenSalesForecast.Data;
 // tempo demais para o processo ficar de pé sem ninguém. A queda da conexão, ao
 // contrário, é imediata.
 //
-// A carência existe porque nem toda queda de conexão é uma saída: um F5, o
-// redirecionamento depois do login, qualquer navegação com recarga, uma
-// oscilação da VPN ou o navegador suspendendo uma aba em segundo plano derrubam
-// a conexão e a refazem em seguida. E o Blazor não reconecta na hora: ele tenta
-// de novo algumas vezes, com intervalos crescentes, o que passa fácil de meio
-// minuto numa rede lenta. Carência curta demais encerra o programa DEBAIXO de
-// quem está usando — por isso o padrão é generoso.
+// Só que perder a conexão NÃO é a mesma coisa que sair. Um F5, o login (que
+// recarrega a página), uma oscilação da VPN, o computador dormindo ou o
+// navegador suspendendo uma aba derrubam a conexão do mesmo jeito — e o Blazor
+// não reconecta na hora, tenta de novo algumas vezes. Tratar os dois casos
+// igual obrigava a escolher entre encerrar debaixo de quem está usando ou
+// deixar o processo vivo depois que a pessoa fechou o navegador.
 //
-// Ajustável em "FecharAoSairSegundos" no appsettings; ZERO desliga de vez o
-// encerramento automático, para quem prefere fechar pelo Gerenciador.
+// Então são DOIS prazos, e quem os distingue é o próprio navegador: ao fechar a
+// aba de verdade ele dispara "pagehide", e o app.js manda um aviso ao servidor.
+//
+//   • com aviso de saída  → FecharAoSairSegundos (20s): a pessoa fechou mesmo
+//   • sem aviso nenhum    → FecharSemConexaoMinutos (10 min): provavelmente a
+//                            aba ainda está aberta e a conexão é que caiu
+//
+// ZERO em FecharAoSairSegundos desliga de vez o encerramento automático, para
+// quem prefere fechar pelo Gerenciador de Tarefas.
 //
 // Só vale no modo por-usuário; num servidor central, encerrar ao sair da última
 // aba derrubaria o serviço para todo mundo.
@@ -35,12 +41,19 @@ public sealed class DesligaAoFechar : CircuitHandler
     private static bool _jaAbriu;                 // nunca encerra antes da 1ª aba
     private static CancellationTokenSource? _agendado;
 
-    /// <summary>Padrão da carência. Cobre com folga a sequência de tentativas de
-    /// reconexão do Blazor, que numa rede lenta passa de meio minuto.</summary>
-    public const int PadraoSegundos = 60;
+    /// <summary>Prazo depois do aviso de saída do navegador. Curto, mas com
+    /// folga para o recarregamento do login voltar antes numa rede lenta.</summary>
+    public const int PadraoSegundos = 20;
+
+    /// <summary>Prazo quando a conexão cai SEM aviso: aí o mais provável é que a
+    /// aba continue aberta, e derrubar o programa seria tirá-lo de quem usa.</summary>
+    public const int PadraoSemConexaoMinutos = 10;
+
+    private static bool _avisouSaida;             // o navegador disse que fechou
 
     private readonly IHostApplicationLifetime _vida;
-    private readonly TimeSpan _carencia;
+    private readonly TimeSpan _carenciaSaida;
+    private readonly TimeSpan _carenciaSemAviso;
     private readonly bool _desativado;
 
     public DesligaAoFechar(IHostApplicationLifetime vida, IConfiguration cfg)
@@ -50,7 +63,9 @@ public sealed class DesligaAoFechar : CircuitHandler
         // longo o bastante para uma recarga de página voltar antes do prazo.
         var s = cfg.GetValue("FecharAoSairSegundos", PadraoSegundos);
         _desativado = s <= 0;
-        _carencia = TimeSpan.FromSeconds(Math.Clamp(s, 5, 600));
+        _carenciaSaida = TimeSpan.FromSeconds(Math.Clamp(s, 5, 600));
+        _carenciaSemAviso = TimeSpan.FromMinutes(Math.Clamp(
+            cfg.GetValue("FecharSemConexaoMinutos", PadraoSemConexaoMinutos), 1, 720));
     }
 
     /// <summary>Alguma aba já se conectou nesta execução?</summary>
@@ -62,6 +77,7 @@ public sealed class DesligaAoFechar : CircuitHandler
         {
             _conectados++;
             _jaAbriu = true;
+            _avisouSaida = false;                 // aviso antigo não vale mais
             _agendado?.Cancel();                  // voltou: desiste de encerrar
             _agendado = null;
         }
@@ -75,21 +91,39 @@ public sealed class DesligaAoFechar : CircuitHandler
             _conectados = Math.Max(0, _conectados - 1);
             if (_desativado || _conectados > 0 || !_jaAbriu) return Task.CompletedTask;
 
-            _agendado?.Cancel();
-            var cts = new CancellationTokenSource();
-            _agendado = cts;
-            _ = EncerrarDepois(cts.Token, _carencia);
+            Agendar(_vida, _avisouSaida ? _carenciaSaida : _carenciaSemAviso);
         }
         return Task.CompletedTask;
     }
 
-    private async Task EncerrarDepois(CancellationToken ct, TimeSpan carencia)
+    /// <summary>O navegador avisou que a aba está sendo fechada (app.js manda um
+    /// beacon no "pagehide"). Se a conexão já tinha caído e o programa estava
+    /// esperando os 10 minutos, agora dá para encurtar: foi saída mesmo.</summary>
+    public static void AvisarSaida(IHostApplicationLifetime vida, TimeSpan carencia)
+    {
+        lock (_trava)
+        {
+            _avisouSaida = true;
+            if (_conectados == 0 && _jaAbriu && _agendado is not null) Agendar(vida, carencia);
+        }
+    }
+
+    // Sempre chamado com _trava tomada.
+    private static void Agendar(IHostApplicationLifetime vida, TimeSpan carencia)
+    {
+        _agendado?.Cancel();
+        var cts = new CancellationTokenSource();
+        _agendado = cts;
+        _ = EncerrarDepois(vida, cts.Token, carencia);
+    }
+
+    private static async Task EncerrarDepois(IHostApplicationLifetime vida, CancellationToken ct, TimeSpan carencia)
     {
         try { await Task.Delay(carencia, ct); }
         catch (TaskCanceledException) { return; }   // alguém reconectou
 
         lock (_trava) { if (_conectados > 0) return; }
-        _vida.StopApplication();
+        vida.StopApplication();
     }
 }
 
