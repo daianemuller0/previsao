@@ -1146,7 +1146,7 @@
     {
         var (reportado, realizada, meta, metaHsa) = ControleRepo.ReportSeries(_repYear);
         _repReal = reportado; _repRealizada = realizada; _repMeta = meta; _repMetaHsa = metaHsa;
-        double tr = real.Sum(), tm = meta.Sum(), tmh = metaHsa.Sum();
+        double tr = reportado.Sum(), tm = meta.Sum(), tmh = metaHsa.Sum();
         _repAttain = tm > 0 ? tr / tm * 100 : 0;
         _repAttainHsa = tmh > 0 ? tr / tmh * 100 : 0;
     }
