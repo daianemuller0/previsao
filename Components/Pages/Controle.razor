@@ -6,6 +6,7 @@
 @inject ListRepository Lists
 @inject OpportunityRepository Opps
 @inject ColumnPrefsRepository ColPrefs
+@inject CambioDiarioService Cambio
 @inject IJSRuntime JS
 @implements IDisposable
 @using HowdenSalesForecast.Models
@@ -172,6 +173,56 @@ else
         }
     </div>
 
+    @* ---- Câmbio: cotação diária do BC e o fechamento de cada mês ---- *@
+    @if (_moedasEstrangeiras.Count > 0)
+    {
+        <div class="panel" style="margin-top:16px">
+            <div class="panel-head">
+                <div class="panel-title">Câmbio · fechamento do mês
+                    <span class="hint">R$ por 1 unidade · a última cotação do mês é o fechamento</span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    @if (_cambioMsg is not null) { <span class="ctrl-upd">@_cambioMsg</span> }
+                    <button class="btn-ghost sm" disabled="@_cambioBuscando" @onclick="AtualizarCambio">
+                        @Icons.Svg("history")@(_cambioBuscando ? "Buscando…" : "Atualizar cotações")
+                    </button>
+                </div>
+            </div>
+            <div class="table-wrap rep-wrap">
+                <table class="grid-tbl rep-tbl">
+                    <thead>
+                        <tr>
+                            <th>Moeda</th>
+                            @for (var m = 1; m <= 12; m++){<th class="right @(m == _month ? "cur" : "")">@Fmt.MonthName(m)</th>}
+                            <th class="right">Hoje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var code in _moedasEstrangeiras)
+                        {
+                            var cc = code;
+                            <tr>
+                                <td class="rname">@cc</td>
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    var mm = m;
+                                    var fech = Repo.FechamentoMes(cc, _year, mm);
+                                    <td class="right @(mm == _month ? "cur" : "")" title="@FechamentoTitulo(fech)">@CelulaCambio(cc, mm, fech)</td>
+                                }
+                                <td class="right strong" title="@FechamentoTitulo(Repo.UltimaCotacao(cc))">@Cotacao(Repo.UltimaCotacao(cc))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="hint" style="margin:10px 2px 0">
+                As cotações vêm do Banco Central (PTAX) sozinhas, algumas vezes por dia. Se a rede bloquear a
+                saída para a internet, dá para digitar a cotação em <strong>Editar dados</strong> — o valor
+                digitado entra como fechamento daquele mês e passa a valer para as ofertas em moeda estrangeira.
+            </p>
+        </div>
+    }
+
     @* ---- Ofertas / Pedidos (tabela livre com CRUD + importação) ---- *@
     <div class="panel" style="margin-top:16px">
         <div class="panel-head">
@@ -217,10 +268,11 @@ else
                                     case "kam":      <td>@Dash(g.Kam)</td> break;
                                     case "tipo":     <td class="center">@Dash(g.Tipo)</td> break;
                                     // A cor do valor diz como ele deve ser lido (ClasseValor).
-                                    case "liquido":  <td class="right num @g.ClasseValor" title="@ClassTitulo(g)">@(g.ValorLiquidoV != 0 ? Brl(g.ValorLiquidoV) : "—")</td> break;
+                                    case "liquido":  <td class="right num @g.ClasseValor" title="@ClassTitulo(g)">@(ValorBrl(g) != 0 ? Brl(ValorBrl(g)) : "—")</td> break;
                                     case "moeda":    <td class="center">@Dash(g.Moeda)</td> break;
                                     case "origem":   <td class="right num @g.ClasseValor" title="@ClassTitulo(g)">@(g.ValorOriginalV != 0 ? g.ValorOriginalV.ToString("#,##0.##", Pt) : "—")</td> break;
                                     case "status":   <td>@Dash(g.Status)</td> break;
+                                    case "cambio":   <td class="right num" title="@CambioTitulo(g)">@CambioTexto(g)</td> break;
                                     case "semana":   <td class="center">@Dash(g.Semana)</td> break;
                                     case "mes":      <td class="center">@(int.TryParse(g.Mes, out var mn) && mn is >= 1 and <= 12 ? Fmt.MonthName(mn) : Dash(g.Mes))</td> break;
                                     case "poc":      <td class="center">@Mark(g.Poc)</td> break;
@@ -416,6 +468,7 @@ else
         new("liquido", "Valor Líquido", "right"),
         new("moeda",   "Moeda",         "center"),
         new("origem",  "Valor origem",  "right"),
+        new("cambio",  "Câmbio do mês", "right"),
         new("status",  "Status"),
         new("semana",  "Semana",        "center"),
         new("mes",     "Mês",           "center"),
@@ -458,6 +511,9 @@ else
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList();
+        // Só as estrangeiras têm câmbio: o real não se converte contra si mesmo.
+        _moedasEstrangeiras = _moedas
+            .Where(c => !string.Equals(c, "BRL", StringComparison.OrdinalIgnoreCase)).ToList();
         _pending.Clear();
         _loading = false;
     }
@@ -475,8 +531,8 @@ else
             q = q.Where(g => (g.Oferta + g.Pedido + g.Cliente + g.Mercado + g.Kam + g.Poc).ToLowerInvariant().Contains(s));
         }
         // Linhas com nota de atenção primeiro — o Controle vê logo o que precisa de ação.
-        _regFiltered = q.OrderByDescending(g => g.TemAtencao).ThenByDescending(g => g.ValorLiquidoV).ToList();
-        _regValor = _regFiltered.Sum(g => g.ValorLiquidoV);
+        _regFiltered = q.OrderByDescending(g => g.TemAtencao).ThenByDescending(ValorBrl).ToList();
+        _regValor = _regFiltered.Sum(ValorBrl);
         _regAtencao = _regFiltered.Count(g => g.TemAtencao);
 
         // Vendas por semana: soma o valor líquido das ofertas de cada semana.
@@ -484,7 +540,7 @@ else
             .Where(g => g.SemanaV > 0)
             .Where(g => _regMes == 0 || MesNum(g.Mes) == _regMes)
             .GroupBy(g => g.SemanaV)
-            .Select(g => new SemanaRow(g.Key, g.Sum(x => x.ValorLiquidoV), g.Count()))
+            .Select(g => new SemanaRow(g.Key, g.Sum(ValorBrl), g.Count()))
             .OrderBy(x => x.Semana)
             .ToList();
     }
@@ -597,6 +653,110 @@ else
         _showRegImport = false; _regImp = null;
         _registros = Repo.Registros();
         _toast = $"<strong>Importação concluída.</strong> {n} oferta(s) adicionada(s).";
+    }
+
+    // ---- câmbio ------------------------------------------------------------
+    private List<string> _moedasEstrangeiras = new();
+    private bool _cambioBuscando;
+    private string? _cambioMsg;
+
+    private async Task AtualizarCambio()
+    {
+        _cambioBuscando = true;
+        try
+        {
+            var r = await Cambio.AtualizarAsync();
+            _cambioMsg = r.Mensagem;
+        }
+        catch (Exception ex) { _cambioMsg = "Falha ao buscar: " + ex.Message; }
+        finally { _cambioBuscando = false; }
+    }
+
+    private static string Cotacao(CambioDia? c) =>
+        c is { HasRate: true } ? c.RateV.ToString("#,##0.0000", Pt) : "—";
+
+    private static string FechamentoTitulo(CambioDia? c) =>
+        c is { HasRate: true } && c.DataValue is { } d
+            ? $"Cotação de {d:dd/MM/yyyy} · {(string.IsNullOrWhiteSpace(c.Fonte) ? "origem não informada" : c.Fonte)}"
+            : "Sem cotação lançada.";
+
+    // Célula do fechamento: texto normalmente, campo no modo de edição. O valor
+    // digitado entra como cotação MANUAL do último dia do mês — assim ele vira o
+    // fechamento sem precisar de um campo paralelo só para a digitação.
+    private RenderFragment CelulaCambio(string code, int mes, CambioDia? fech) => builder =>
+    {
+        if (_edit)
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "class", "cell-in");
+            builder.AddAttribute(2, "value", fech is { HasRate: true } ? fech.RateV.ToString("0.0000", CultureInfo.InvariantCulture) : "");
+            builder.AddAttribute(3, "onchange", Microsoft.AspNetCore.Components.EventCallback.Factory.Create<ChangeEventArgs>(
+                this, e => SalvarCambioManual(code, mes, e.Value?.ToString())));
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.AddContent(4, Cotacao(fech));
+        }
+    };
+
+    private void SalvarCambioManual(string code, int mes, string? raw)
+    {
+        var v = ParseVal(raw);
+        if (v is null || v.Value <= 0) return;
+        // Último dia do mês: é o que faz o valor digitado ser o fechamento dele.
+        var dia = new DateTime(_year, mes, DateTime.DaysInMonth(_year, mes));
+        Repo.SaveCambio(new CambioDia
+        {
+            Code = code,
+            Data = dia.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            Rate = v.Value.ToString(CultureInfo.InvariantCulture),
+            Fonte = "Manual",
+        }, _user ?? "—");
+        _cambioMsg = $"{code} de {Fmt.MonthLong(mes)} gravado na mão.";
+    }
+
+    // ---- conversão das ofertas em moeda estrangeira ------------------------
+    private static int MesDoRegistro(ControleRegistro g) =>
+        int.TryParse(g.Mes, out var m) && m is >= 1 and <= 12 ? m : 0;
+
+    /// <summary>Fechamento do mês da oferta — a taxa que converte o valor dela.
+    /// Null em BRL, sem mês informado, ou enquanto o mês não tiver cotação.</summary>
+    private CambioDia? FechamentoDoRegistro(ControleRegistro g)
+    {
+        if (string.IsNullOrWhiteSpace(g.Moeda) || string.Equals(g.Moeda, "BRL", StringComparison.OrdinalIgnoreCase))
+            return null;
+        var m = MesDoRegistro(g);
+        return m == 0 ? null : Repo.FechamentoMes(g.Moeda, _year, m);
+    }
+
+    /// <summary>Valor da oferta em R$. Em moeda estrangeira, converte pelo
+    /// fechamento do mês; sem fechamento ainda, fica o valor guardado — nada é
+    /// zerado só porque a cotação do mês não chegou.</summary>
+    private double ValorBrl(ControleRegistro g)
+    {
+        var f = FechamentoDoRegistro(g);
+        return f is { HasRate: true } && g.ValorOriginalV != 0 ? g.ValorOriginalV * f.RateV : g.ValorLiquidoV;
+    }
+
+    private string CambioTexto(ControleRegistro g)
+    {
+        if (string.IsNullOrWhiteSpace(g.Moeda) || string.Equals(g.Moeda, "BRL", StringComparison.OrdinalIgnoreCase))
+            return "—";
+        var f = FechamentoDoRegistro(g);
+        return f is { HasRate: true } ? f.RateV.ToString("#,##0.0000", Pt) : "sem cotação";
+    }
+
+    private string CambioTitulo(ControleRegistro g)
+    {
+        if (string.IsNullOrWhiteSpace(g.Moeda) || string.Equals(g.Moeda, "BRL", StringComparison.OrdinalIgnoreCase))
+            return "Oferta em reais — não usa câmbio.";
+        var m = MesDoRegistro(g);
+        if (m == 0) return "Informe o mês da oferta para o câmbio de fechamento ser aplicado.";
+        var f = FechamentoDoRegistro(g);
+        return f is { HasRate: true }
+            ? $"Fechamento de {Fmt.MonthLong(m)} · {FechamentoTitulo(f)}"
+            : $"{Fmt.MonthLong(m)} ainda não tem cotação de {g.Moeda} — o valor mostrado é o guardado no registro.";
     }
 
     /// <summary>Texto de apoio na célula do valor: a cor sozinha não diz o que

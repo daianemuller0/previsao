@@ -104,6 +104,12 @@ builder.Services.AddHostedService<CompactionService>();
 builder.Services.AddHostedService<AtualizacaoAgendada>();
 // Sincronização das bases (planilhas do CRM na rede): New Business + Aftermarket.
 builder.Services.AddSingleton<DataSyncService>();
+// Cotações diárias do Banco Central (PTAX) — o fechamento do mês sai dessa série.
+// Timeout curto de propósito: se a rede da empresa bloquear a saída, o programa
+// não pode ficar pendurado esperando; o Controle digita a cotação e segue.
+builder.Services.AddHttpClient("bcb", c => c.Timeout = TimeSpan.FromSeconds(12));
+builder.Services.AddSingleton<CambioDiarioService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CambioDiarioService>());
 
 var app = builder.Build();
 

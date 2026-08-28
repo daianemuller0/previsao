@@ -308,6 +308,105 @@ public class ControleRepository
         });
     }
 
+    // ---- câmbio diário -----------------------------------------------------
+    // Série de cotações por dia. O FECHAMENTO DO MÊS é derivado dela — a última
+    // cotação do mês —, e não um campo separado que alguém teria de manter em
+    // dia à parte. Cache em memória porque a tabela é lida em toda linha de
+    // Ofertas e pedidos para converter o valor.
+    private const string EntCambio = "controle_cambio";
+    private List<CambioDia>? _cambios;
+
+    private List<CambioDia> CacheCambio()
+    {
+        lock (_lock)
+        {
+            _cambios ??= _store.ReadLatest(EntCambio, "id, code, data, rate, fonte, updated_by, updated_at",
+                r => new CambioDia
+                {
+                    Id = S(r, 0), Code = S(r, 1), Data = S(r, 2),
+                    Rate = string.IsNullOrWhiteSpace(S(r, 3)) ? "0" : S(r, 3),
+                    Fonte = S(r, 4), UpdatedBy = S(r, 5), UpdatedAt = S(r, 6),
+                })
+                .Where(c => !string.IsNullOrWhiteSpace(c.Code) && c.DataValue is not null)
+                .ToList();
+            return _cambios;
+        }
+    }
+
+    public List<CambioDia> Cambios()
+    {
+        lock (_lock) return CacheCambio().Select(CloneCambio).ToList();
+    }
+
+    public void RefreshCambio() { lock (_lock) _cambios = null; }
+
+    private static CambioDia CloneCambio(CambioDia c) => new()
+    {
+        Id = c.Id, Code = c.Code, Data = c.Data, Rate = c.Rate,
+        Fonte = c.Fonte, UpdatedBy = c.UpdatedBy, UpdatedAt = c.UpdatedAt,
+    };
+
+    /// <summary>Grava as cotações e invalida o cache. Id determinístico por
+    /// (moeda, dia): regravar o mesmo dia atualiza, não duplica.</summary>
+    public void SaveCambios(IEnumerable<CambioDia> lista, string user)
+    {
+        var rows = new List<IReadOnlyList<KeyValuePair<string, object?>>>();
+        foreach (var c in lista)
+        {
+            if (c.DataValue is not { } d || string.IsNullOrWhiteSpace(c.Code)) continue;
+            c.Id = CambioDia.IdDe(c.Code, d);
+            c.Code = c.Code.Trim().ToUpperInvariant();
+            c.UpdatedBy = user;
+            c.UpdatedAt = Iso(DateTime.Now);
+            rows.Add(new KeyValuePair<string, object?>[]
+            {
+                new("id", c.Id), new("code", c.Code), new("data", c.Data), new("rate", c.Rate),
+                new("fonte", c.Fonte), new("updated_by", c.UpdatedBy), new("updated_at", c.UpdatedAt),
+            });
+        }
+        if (rows.Count == 0) return;
+        _store.WriteBatch(EntCambio, rows);
+        RefreshCambio();
+    }
+
+    public void SaveCambio(CambioDia c, string user) => SaveCambios(new[] { c }, user);
+
+    /// <summary>Dias que já têm cotação daquela moeda (para não rebuscar).</summary>
+    public HashSet<DateTime> DiasComCotacao(string code)
+    {
+        var set = new HashSet<DateTime>();
+        foreach (var c in CacheCambio())
+            if (string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase) && c.HasRate && c.DataValue is { } d)
+                set.Add(d.Date);
+        return set;
+    }
+
+    /// <summary>Fechamento do mês: a última cotação lançada dentro dele.
+    /// Null quando o mês ainda não tem nenhuma.</summary>
+    public CambioDia? FechamentoMes(string code, int year, int month)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.Equals(code, "BRL", StringComparison.OrdinalIgnoreCase))
+            return null;
+        return CacheCambio()
+            .Where(c => string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase) && c.HasRate
+                        && c.DataValue is { } d && d.Year == year && d.Month == month)
+            .OrderByDescending(c => c.DataValue!.Value)
+            .Select(CloneCambio)
+            .FirstOrDefault();
+    }
+
+    /// <summary>Cotação mais recente até hoje (o "fechamento do dia" à vista).</summary>
+    public CambioDia? UltimaCotacao(string code)
+    {
+        var hoje = DateTime.Today;
+        return CacheCambio()
+            .Where(c => string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase) && c.HasRate
+                        && c.DataValue is { } d && d.Date <= hoje)
+            .OrderByDescending(c => c.DataValue!.Value)
+            .Select(CloneCambio)
+            .FirstOrDefault();
+    }
+
     // ---- seed --------------------------------------------------------------
     public void SeedIfEmpty()
     {
