@@ -44,12 +44,13 @@
 @* ---- Filtros globais ---- *@
 <div class="filterbar filterbar-sticky">
     <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" @bind="_search" @bind:event="oninput" /></div>
-    <MultiFilter Label="Ano" AllText="Todos" Options="YearOptions.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
-    <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
-    <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
-    <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
-    <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
+    @* Ordem pedida: quem usa procura primeiro pelo vendedor, depois estreita o
+       período. O intervalo "de tal dia a tal dia" saiu — a previsão é mensal, e
+       os filtros de Mês e Ano já dão o recorte que se usa no dia a dia. *@
     <MultiFilter Label="KAM" AllText="Todos" EmptyText="Nenhum vendedor nos dados." Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Ano" AllText="Todos" Options="YearOptions.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
+    <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
     <MultiFilter Label="Setor" AllText="Ambos" Options="SetorOptions" Selected="_setores" OnChanged="StateHasChanged" />
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     <label class="flt-toggle @(_semOtp ? "on" : "")" title="Tirar do recorte as oportunidades já marcadas como OTP"><input type="checkbox" @bind="_semOtp" />@Icons.Svg("x")<span>Sem OTP</span></label>
@@ -758,7 +759,6 @@
     // Meses selecionados (1..12); vazio = todos.
     private List<int> SelectedMonths => _months.Select(MonthNum).Where(m => m is >= 1 and <= 12).ToList();
     private static string SetorCode(string label) => label.StartsWith("After", StringComparison.OrdinalIgnoreCase) ? "AFM" : "NB";
-    private DateTime? _dateFrom, _dateTo;  // filtro por intervalo de datas
     private string _valMetric = "total";   // total (Net Value) | conv (Chance de conversão)
     private double? _valMin, _valMax;      // faixa de valor (R$) do métrico escolhido
 
@@ -1303,8 +1303,6 @@
             q = q.Where(o => (o.Name + o.ProposalNumber + Cat.CustomerName(o.CustomerId)).ToLowerInvariant().Contains(b));
         }
         if (SelectedMonths is { Count: > 0 } ms) q = q.Where(o => o.ExpectedDateValue is { } d && ms.Contains(d.Month));
-        if (_dateFrom is { } df) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date >= df.Date);
-        if (_dateTo is { } dt) q = q.Where(o => o.ExpectedDateValue is { } d && d.Date <= dt.Date);
         if (_valMin is { } vmin) q = q.Where(o => MetricBrl(o, _valMetric) >= vmin);
         if (_valMax is { } vmax) q = q.Where(o => MetricBrl(o, _valMetric) <= vmax);
         return q;
@@ -1314,7 +1312,6 @@
     {
         _commercial = _stage = _segment = _submarket = "";
         foreach (var s in AllSets) s.Clear();
-        _dateFrom = _dateTo = null;
         _onlyIndicated = false;
         _semOtp = false;
         _search = "";
@@ -1334,7 +1331,6 @@
             + (_onlyIndicated ? 1 : 0)
             + (_semOtp ? 1 : 0)
             + (_search != "" ? 1 : 0)
-            + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
 
         var opps = Filtered().ToList();
