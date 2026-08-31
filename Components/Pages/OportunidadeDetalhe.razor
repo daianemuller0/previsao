@@ -72,17 +72,16 @@ else
                         <div class="dl"><dt>Última atualização</dt><dd>@Fmt.Date(_o.UpdatedAt) · @_o.UpdatedBy</dd></div>
                     </dl>
                 </div>
-                <div class="panel">
-                    <div class="panel-title mb-16">Score de risco</div>
-                    <div style="display:flex;align-items:center;gap:16px;">
-                        <Donut Percent="@ForecastCalc.RiskScore(_o, _today)" Color="@RiskColor(lvl)" CenterLabel="@ForecastCalc.RiskScore(_o, _today).ToString()"
-                               Caption="@($"Classificação <strong>{RiskLevels.Label(lvl)}</strong><br/>Postergações: {_o.PostponeCountValue}")" />
+                @* O medidor de score saiu: era um número calculado pelo sistema,
+                   e quem lê a proposta quer o risco que a pessoa escreveu. Sem
+                   risco anotado, o painel nem aparece. *@
+                @if (!string.IsNullOrWhiteSpace(_o.Risks))
+                {
+                    <div class="panel">
+                        <div class="panel-title mb-16">Riscos</div>
+                        <div class="info-banner">@_o.Risks</div>
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(_o.Risks))
-                    {
-                        <div class="info-banner" style="margin-top:14px">@_o.Risks</div>
-                    }
-                </div>
+                }
             </div>
             break;
 
@@ -160,7 +159,6 @@ else
                 <div class="panel-title mb-16">Riscos e dependências</div>
                 <dl class="detail-grid">
                     <div class="dl"><dt>Riscos comerciais</dt><dd>@(string.IsNullOrWhiteSpace(_o.Risks) ? "—" : _o.Risks)</dd></div>
-                    <div class="dl"><dt>Score de risco</dt><dd>@ForecastCalc.RiskScore(_o, _today) · @RiskLevels.Label(lvl)</dd></div>
                     <div class="dl"><dt>Postergações</dt><dd>@_o.PostponeCountValue</dd></div>
                     <div class="dl"><dt>Dias sem atualização</dt><dd>@ForecastCalc.DaysSinceUpdate(_o, _today)</dd></div>
                     <div class="dl"><dt>Margem</dt><dd>@Fmt.Pct(_o.GmPercentValue)</dd></div>
@@ -250,10 +248,4 @@ else
         list.Add(new(Fmt.Date(_o.CreatedAt), "Criação", "—", "Oportunidade criada", _o.UpdatedBy));
         return list;
     }
-
-    private static string RiskColor(RiskLevel l) => l switch
-    {
-        RiskLevel.Baixo => "#1f9254", RiskLevel.Moderado => "#a97613",
-        RiskLevel.Alto => "#b4590a", _ => "#c0392b",
-    };
 }
