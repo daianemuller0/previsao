@@ -208,7 +208,14 @@
             <label class="fld">% de Ganho<input class="field num" @bind="_new.WinProbability" /></label>
             <label class="fld">% de Sair no Mês<input class="field num" @bind="_new.CloseInPeriodProbability" /></label>
             <label class="fld">Chance Conversão<input class="field num" value="@Conf(_new)" readonly /></label>
-            <label class="fld">NB/AFM<input class="field" list="dl-nb_afm" @bind="_new.CommercialCategory" /></label>
+            @* Oportunidade criada à mão não tem planilha por trás: quem diz o
+               setor é a pessoa, e é essa escolha que aparece na coluna Setor. *@
+            <label class="fld">Categoria (NB/AFM) <span class="hint">define a coluna Setor</span>
+                <select class="field" @bind="_new.Setor">
+                    <option value="">—</option>
+                    @foreach (var st in Opportunity.SetoresManuais){<option value="@st">@st</option>}
+                </select>
+            </label>
             <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_new.ServicoPrevisto" /></label>
             <label class="fld">Market onestream<input class="field" list="dl-onestream" @bind="_new.MarketOnestream" /></label>
             <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_new.PvBusinessUnitId" /></label>
