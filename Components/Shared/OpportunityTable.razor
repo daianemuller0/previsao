@@ -59,7 +59,9 @@
                     {
                         switch (c.Def.Key)
                         {
-                            case "setor":     <td class="center">@if (!string.IsNullOrEmpty(o.Setor)) { <span class="setor-tag setor-@o.Setor.ToLower()">@o.Setor</span> }</td> break;
+                            // SetorEfetivo, e nao o campo cru: cobre as linhas antigas sem o
+                            // campo gravado e as criadas a mao, que escolhem o setor.
+                            case "setor":     <td class="center">@if (o.SetorEfetivo != "") { <span class="setor-tag setor-@o.SetorEfetivo.ToLower()">@o.SetorEfetivo</span> }</td> break;
                             case "quarter":   <td class="nowrap">@q</td> break;
                             case "date":      <td class="nowrap">@MonthLabel(o)</td> break;
                             case "pais":      <td>@Cat.CountryName(o.CountryId)</td> break;
@@ -235,9 +237,24 @@
             @* PlantName vem da planilha (AFM: coluna PlantName; NB: End User Site). *@
             <label class="fld">PlantName<input class="field" @bind="_edit.EndUserSite" /></label>
 
-            <label class="fld">Categoria (NB/AFM) <span class="hint">vem do setor de origem</span>
-                <input class="field" value="@_edit.CategoriaNbAfm" readonly />
-            </label>
+            @* Veio de planilha: a categoria é o setor de origem e não se inventa.
+               Criada à mão: não há planilha por trás, então é a pessoa que diz —
+               e a escolha alimenta a coluna Setor. *@
+            @if (_edit.VeioDePlanilha)
+            {
+                <label class="fld">Categoria (NB/AFM) <span class="hint">vem do setor de origem</span>
+                    <input class="field" value="@_edit.CategoriaNbAfm" readonly />
+                </label>
+            }
+            else
+            {
+                <label class="fld">Categoria (NB/AFM) <span class="hint">define a coluna Setor</span>
+                    <select class="field" @bind="_edit.Setor">
+                        <option value="">—</option>
+                        @foreach (var st in Opportunity.SetoresManuais){<option value="@st">@st</option>}
+                    </select>
+                </label>
+            }
             <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_edit.ServicoPrevisto" /></label>
             <label class="fld">Etapa do funil
                 <select class="field" @bind="_edit.Stage">
@@ -407,8 +424,9 @@
         ("dl-product", "product"), ("dl-key_account", "key_account"),
         ("dl-customer", "customer"), ("dl-servico", "servico_previsto"),
         ("dl-unidade", "unidade_venda"), ("dl-bu_inter", "bu_intercompany"),
-        // Usados pelo formulário de "Nova oportunidade" (criada à mão, sem planilha).
-        ("dl-nb_afm", "nb_afm"), ("dl-onestream", "market_onestream"),
+        // Usado pelo formulário de "Nova oportunidade" (criada à mão, sem planilha).
+        // NB/AFM saiu daqui: virou uma escolha fechada, que alimenta a coluna Setor.
+        ("dl-onestream", "market_onestream"),
     };
 
     // ---- edição completa ----

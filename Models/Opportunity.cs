@@ -112,6 +112,13 @@ public class Opportunity
 
     // Setor de origem (NB/AFM). Registros antigos ficaram sem o campo; nesses o
     // prefixo do id ainda conta de qual planilha vieram.
+    /// <summary>Veio de planilha do CRM? Os ids "imp-" (New Business) e "afm-"
+    /// (Aftermarket) são das origens sincronizadas; qualquer outro foi criado à
+    /// mão no sistema. É o que separa o setor que se deduz do que se escolhe.</summary>
+    public bool VeioDePlanilha =>
+        Id.StartsWith("imp-", StringComparison.OrdinalIgnoreCase)
+        || Id.StartsWith("afm-", StringComparison.OrdinalIgnoreCase);
+
     public string SetorEfetivo =>
         !string.IsNullOrWhiteSpace(Setor) ? Setor.Trim()
         : Id.StartsWith("afm-", StringComparison.OrdinalIgnoreCase) ? "AFM"
@@ -122,6 +129,9 @@ public class Opportunity
     // as oportunidades criadas à mão, que não têm planilha por trás.
     public string CategoriaNbAfm =>
         SetorEfetivo != "" ? SetorEfetivo : CommercialCategory;
+
+    /// <summary>Opções da categoria para as oportunidades criadas à mão.</summary>
+    public static readonly string[] SetoresManuais = { "NB", "AFM" };
 
     // A previsão só está completa quando estes campos estão preenchidos — é o
     // que o vendedor precisa informar ao indicar a oportunidade.
