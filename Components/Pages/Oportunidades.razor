@@ -49,6 +49,13 @@
 
 @* Tabela compartilhada com a Visão Executiva: mesmas colunas, mesmas ações e a
    configuração de colunas por usuário (ordem + o que fica visível). *@
+@if (!string.IsNullOrEmpty(_criadaMsg))
+{
+    <div class="info-banner" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        @Icons.Svg("check")<span>@_criadaMsg</span>
+        <button class="icon-btn" style="margin-left:auto" @onclick='() => _criadaMsg = ""'>@Icons.Svg("x")</button>
+    </div>
+}
 <OpportunityTable Rows="Rows" EmptyText="Nenhuma oportunidade encontrada." OnChanged="Reload" />
 
 @* ---- Desindicar em massa: limpa a flag "Indicada" de todas ---- *@
@@ -601,6 +608,7 @@
     }
 
     private string _newErro = "";
+    private string _criadaMsg = "";
 
     /// <summary>Vendedor sugerido ao criar: quem está logado, que é quem vai
     /// tocar a oportunidade. Para quem enxerga a base inteira (diretoria e
@@ -615,7 +623,7 @@
 
     private void NewOpp()
     {
-        _newErro = "";
+        _newErro = ""; _criadaMsg = "";
         // Proposta e PV vêm do Salesforce — preenchidos manualmente, não gerados.
         _new = new Opportunity
         {
@@ -653,9 +661,22 @@
             _new.Name = string.IsNullOrWhiteSpace(_new.ProposalNumber) ? "Oportunidade" : _new.ProposalNumber;
         _new.UpdatedAt = _today.ToString("yyyy-MM-dd");
         _new.UpdatedBy = _new.KamId;
+        var id = _new.Id;
+        var nome = _new.Name;
         Repo.Save(_new);
         _all = LoadScoped();
         Recompute();
         _new = null;
+
+        // A linha recém-criada não pode sumir atrás de um filtro que já estava
+        // ligado antes de ela existir. "Somente indicadas" e uma busca em curso
+        // são os casos comuns: a oportunidade nasce sem indicação e sem casar com
+        // o termo buscado, some da tela, e quem criou conclui que não salvou —
+        // e cria de novo. Se o recorte atual a esconderia, o recorte cede.
+        var escondida = !Rows.Any(o => o.Id == id);
+        if (escondida) ClearFilters();
+        _criadaMsg = escondida
+            ? $"Oportunidade \"{nome}\" criada. Os filtros foram limpos para ela aparecer na lista."
+            : $"Oportunidade \"{nome}\" criada.";
     }
 }
