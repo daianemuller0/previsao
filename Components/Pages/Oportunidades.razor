@@ -200,7 +200,11 @@
             <label class="fld">Market Variável<input class="field" list="dl-market_var" @bind="_new.SubMarketId" /></label>
             <label class="fld">Market<input class="field" list="dl-market" @bind="_new.MarketId" /></label>
             <label class="fld">Product<input class="field" list="dl-product" @bind="_new.ProductId" /></label>
-            <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_new.KamId" /></label>
+            @* Já vem com quem está logado: a oportunidade é criada por quem vai
+               tocá-la. Continua editável para quem cria em nome de outro. *@
+            <label class="fld">Key Account <span class="hint">de quem é a oportunidade</span>
+                <input class="field" list="dl-key_account" @bind="_new.KamId" />
+            </label>
             <label class="fld">Customer<input class="field" list="dl-customer" @bind="_new.CustomerId" /></label>
             <label class="fld">Proposta<input class="field" @bind="_new.ProposalNumber" /></label>
             <label class="fld">Net Value<input class="field num" @bind="_new.AmountOriginal" /></label>
@@ -230,6 +234,7 @@
             <label class="fld">TOP 10<select class="field" @bind="_new.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
             <label class="fld">KYC<select class="field" @bind="_new.Kyc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
         </div>
+        @if (!string.IsNullOrEmpty(_newErro)) { <div class="confirm-err">@_newErro</div> }
         <div class="modal-actions">
             <button class="btn-ghost" @onclick="() => _new = null">Cancelar</button>
             <button class="btn-primary" @onclick="SaveNew">@Icons.Svg("check")Criar</button>
@@ -595,8 +600,22 @@
         CancelImport();
     }
 
+    private string _newErro = "";
+
+    /// <summary>Vendedor sugerido ao criar: quem está logado, que é quem vai
+    /// tocar a oportunidade. Para quem enxerga a base inteira (diretoria e
+    /// controle) o campo nasce vazio — essa gente cria em nome de outros, e
+    /// carimbar o próprio nome atribuiria a venda à pessoa errada.</summary>
+    private string VendedorPadrao()
+    {
+        if (_scope.All) return "";
+        var eu = OpportunityImporter.CanonicalVendedor(_scope.Nome ?? "");
+        return eu != "" && _scope.CanSeeVendedor(eu) ? eu : "";
+    }
+
     private void NewOpp()
     {
+        _newErro = "";
         // Proposta e PV vêm do Salesforce — preenchidos manualmente, não gerados.
         _new = new Opportunity
         {
@@ -604,6 +623,7 @@
             CurrencyCode = "BRL", ExchangeRate = Cat.RateToUsd("USD").ToString(System.Globalization.CultureInfo.InvariantCulture),
             AmountOriginal = "0", GmPercent = "25", WinProbability = "40", CloseInPeriodProbability = "40",
             ForecastCategory = "Pipeline", PipelineStageId = "st-qual", CreatedAt = _today.ToString("yyyy-MM-dd"),
+            KamId = VendedorPadrao(),
         };
         _newMonthNum = _today.AddMonths(2).Month;
         _newYear = _today.AddMonths(2).Year;
@@ -612,6 +632,18 @@
     private void SaveNew()
     {
         if (_new is null) return;
+
+        // Sem um Key Account da carteira, a linha até é gravada, mas o recorte de
+        // acesso a esconde de quem acabou de criá-la — e a pessoa acha que não
+        // salvou e cria de novo. Melhor barrar aqui e dizer o porquê.
+        if (!_scope.CanSeeVendedor(OpportunityImporter.CanonicalVendedor(_new.KamId)))
+        {
+            _newErro = "Informe um Key Account da sua carteira. Sem isso a oportunidade é salva, "
+                     + "mas não aparece na sua listagem.";
+            return;
+        }
+        _newErro = "";
+
         if (_newMonthNum is >= 1 and <= 12 && _newYear >= 2000)
             _new.ExpectedDate = new DateTime(_newYear, _newMonthNum, 1).ToString("yyyy-MM-dd");
         // Nome (para dashboards): usa Product — Customer quando não informado.
