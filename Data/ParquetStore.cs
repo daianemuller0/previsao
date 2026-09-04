@@ -230,7 +230,15 @@ public sealed class ParquetStore
     // fazer isso em toda leitura dobrava as idas à rede sem necessidade.
     private readonly Dictionary<string, (string Chave, HashSet<string> Cols)> _esquemas = new(StringComparer.OrdinalIgnoreCase);
 
-    public List<T> ReadLatest<T>(string entity, string selectCols, Func<IDataReader, T> map, string orderBy = "")
+    /// <summary>Lê UMA linha direto dos Parquet, sem passar por cache nenhum.
+    /// Serve para conferir, na hora de gravar, se alguém mexeu no registro desde
+    /// que o formulário foi aberto — a base é compartilhada, e cada programa
+    /// guarda a sua cópia em memória entre uma sincronização e outra.</summary>
+    public T? ReadLatestById<T>(string entity, string selectCols, Func<IDataReader, T> map, string id)
+        where T : class
+        => ReadLatest(entity, selectCols, map, filtroId: id).FirstOrDefault();
+
+    public List<T> ReadLatest<T>(string entity, string selectCols, Func<IDataReader, T> map, string orderBy = "", string? filtroId = null)
     {
         var dir = EntityDir(entity);
         // GetFiles traz nome, tamanho e data numa varredura só (uma ida à rede);
@@ -274,16 +282,21 @@ public sealed class ParquetStore
             : "*";   // arquivo fora do padrão: lê tudo, correção antes de economia
 
         var order = string.IsNullOrWhiteSpace(orderBy) ? "" : $" ORDER BY {orderBy}";
+        // O filtro entra DENTRO da subconsulta: assim o DuckDB descarta as linhas
+        // antes de numerar as versões, em vez de consolidar a base inteira para
+        // depois jogar fora tudo menos uma.
+        var onde = filtroId is null ? "" : " WHERE id = ?";
         var sql = $@"
 SELECT {cols}
 FROM (
     SELECT {lidas}, row_number() OVER (PARTITION BY id ORDER BY _ts DESC) AS _rn
-    FROM read_parquet('{glob}', union_by_name=true)
+    FROM read_parquet('{glob}', union_by_name=true){onde}
 )
 WHERE _rn = 1 AND NOT _deleted{order};";
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
+        if (filtroId is not null) AddParam(cmd, filtroId);
         using var r = cmd.ExecuteReader();
         var list = new List<T>();
         while (r.Read()) list.Add(map(r));

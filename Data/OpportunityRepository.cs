@@ -37,7 +37,10 @@ public class OpportunityRepository
 
     // Leitura crua do ParquetStore (consolidada por id, sem apagados).
     private List<Opportunity> LoadFromStore() =>
-        _store.ReadLatest(Entity, Cols, r => new Opportunity
+        _store.ReadLatest(Entity, Cols, Map, orderBy: "expected_date");
+
+    private static Opportunity Map(IDataReader r) =>
+        new()
         {
             Id = S(r, 0),
             Name = S(r, 1),
@@ -97,7 +100,61 @@ public class OpportunityRepository
             MovidaControle = S(r, 55),
             Kyc = S(r, 56),
             CrmSnapshot = S(r, 57),
-        }, orderBy: "expected_date");
+        };
+
+    /// <summary>Relê UMA oportunidade direto dos Parquet, ignorando o cache.
+    /// É o estado que está valendo para todo mundo agora — usado antes de gravar,
+    /// para não escrever por cima do que outra pessoa mexeu nesse meio-tempo.</summary>
+    public Opportunity? GetFresh(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        try { return _store.ReadLatestById(Entity, Cols, Map, id); }
+        catch { return null; }   // rede fora do ar não pode impedir de salvar
+    }
+
+    /// <summary>Assinatura do conteúdo da linha. Duas leituras com a mesma
+    /// assinatura são o mesmo estado; assinatura diferente quer dizer que alguém
+    /// mexeu. Serve para detectar edição concorrente sem coluna nova na base.</summary>
+    public static string Assinatura(Opportunity o)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var p in Textos) sb.Append((string?)p.GetValue(o) ?? "").Append('\u001f');
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(sb.ToString())));
+    }
+
+    /// <summary>Campos com conteúdo diferente entre duas versões da mesma linha.
+    /// É o que se mostra a quem tentou gravar sobre a alteração de outra pessoa —
+    /// "mudou" sem dizer o quê não ajuda ninguém a decidir.</summary>
+    public static List<string> CamposDiferentes(Opportunity a, Opportunity b) =>
+        Textos.Where(p => !string.Equals((string?)p.GetValue(a) ?? "", (string?)p.GetValue(b) ?? "", StringComparison.Ordinal))
+              .Select(p => Rotulos.TryGetValue(p.Name, out var r) ? r : p.Name)
+              .ToList();
+
+    // Todo o conteúdo é texto; percorrer as propriedades de texto cobre a
+    // entidade inteira e continua cobrindo o que for criado depois. Fora ficam
+    // as marcas de gravação, que mudam a cada salvamento sem serem conteúdo.
+    private static readonly System.Reflection.PropertyInfo[] Textos =
+        typeof(Opportunity).GetProperties()
+            .Where(x => x.PropertyType == typeof(string) && x.CanRead && x.CanWrite
+                        && x.Name is not (nameof(Opportunity.UpdatedAt) or nameof(Opportunity.UpdatedBy)
+                                          or nameof(Opportunity.CrmSnapshot)))
+            .ToArray();
+
+    private static readonly Dictionary<string, string> Rotulos = new()
+    {
+        [nameof(Opportunity.Name)] = "Nome", [nameof(Opportunity.ProposalNumber)] = "Proposta",
+        [nameof(Opportunity.PvNumber)] = "PV", [nameof(Opportunity.CustomerId)] = "Cliente",
+        [nameof(Opportunity.KamId)] = "Key Account", [nameof(Opportunity.MarketId)] = "Market",
+        [nameof(Opportunity.AmountOriginal)] = "Net Value", [nameof(Opportunity.ExpectedDate)] = "Data prevista",
+        [nameof(Opportunity.WinProbability)] = "% de Ganho", [nameof(Opportunity.CloseInPeriodProbability)] = "% de Sair no Mês",
+        [nameof(Opportunity.GmPercent)] = "PM %", [nameof(Opportunity.Ramp)] = "RAMP",
+        [nameof(Opportunity.Otp)] = "OTP", [nameof(Opportunity.Top10)] = "TOP 10",
+        [nameof(Opportunity.Kyc)] = "KYC", [nameof(Opportunity.Indicada)] = "Indicada na Previsão",
+        [nameof(Opportunity.Notes)] = "Observação", [nameof(Opportunity.NextAction)] = "Próxima ação",
+        [nameof(Opportunity.Risks)] = "Riscos", [nameof(Opportunity.Stage)] = "Etapa do funil",
+        [nameof(Opportunity.Setor)] = "Setor", [nameof(Opportunity.MovidaControle)] = "Movida para o Controle",
+    };
 
     // Garante o cache carregado (dentro do lock).
     private List<Opportunity> EnsureCache()

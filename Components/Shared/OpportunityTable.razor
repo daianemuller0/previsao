@@ -295,6 +295,19 @@
             <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
         </div>
+        @if (!string.IsNullOrEmpty(_editConflito))
+        {
+            <div class="confirm-err">
+                <strong>@_editConflito</strong>
+                @if (_editMudou.Count > 0)
+                {
+                    <br />
+                    <span>Mudou: @string.Join(", ", _editMudou).</span>
+                }
+                <br />
+                <span>Cancele e abra de novo para ver o que está valendo, ou clique em Salvar mais uma vez para gravar a sua versão por cima.</span>
+            </div>
+        }
         <div class="modal-actions">
             @if (!_editDup) { <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")Excluir</button> }
             <div class="filterbar-spacer"></div>
@@ -430,10 +443,18 @@
     };
 
     // ---- edição completa ----
+    /// <summary>Estado da linha no momento em que o formulário abriu. Se ela
+    /// mudar antes de salvar, foi outra pessoa — e a gravação para para avisar.</summary>
+    private string _editAssinatura = "";
+    private string _editConflito = "";
+    private List<string> _editMudou = new();
+
     private void OpenEdit(Opportunity o)
     {
         _editDup = false;
+        _editConflito = ""; _editMudou = new();
         _edit = Repo.Get(o.Id) ?? o;                       // cópia isolada do cache
+        _editAssinatura = OpportunityRepository.Assinatura(_edit);
         var d = _edit.ExpectedDateValue ?? _today;
         _editMonthNum = d.Month;
         _editYear = d.Year;
@@ -464,6 +485,26 @@
     private async Task SaveEdit()
     {
         if (_edit is null) return;
+
+        // A base é compartilhada e cada programa guarda a sua cópia em memória
+        // entre uma sincronização e outra. Sem esta conferência, quem salvasse
+        // por último gravaria a linha inteira a partir de uma cópia velha e
+        // apagaria, sem aviso, o que outra pessoa tinha acabado de mexer.
+        if (!_editDup)
+        {
+            var agora = Repo.GetFresh(_edit.Id);
+            if (agora is not null && OpportunityRepository.Assinatura(agora) != _editAssinatura)
+            {
+                _editMudou = OpportunityRepository.CamposDiferentes(agora, _edit);
+                _editConflito = "Esta oportunidade foi alterada por outra pessoa enquanto você editava.";
+                // A partir daqui a referência passa a ser o estado atual: se a
+                // pessoa insistir, ela sobrescreve sabendo o que está fazendo.
+                _editAssinatura = OpportunityRepository.Assinatura(agora);
+                return;
+            }
+        }
+        _editConflito = ""; _editMudou = new();
+
         if (_editMonthNum is >= 1 and <= 12 && _editYear >= 2000)
             _edit.ExpectedDate = new DateTime(_editYear, _editMonthNum, 1).ToString("yyyy-MM-dd");
         _edit.UpdatedAt = _today.ToString("yyyy-MM-dd");
@@ -489,7 +530,9 @@
 
     private async Task ToggleIndicada(Opportunity o)
     {
-        var full = Repo.Get(o.Id) ?? o;
+        // Estado atual do disco, não o do cache: a gravação regrava a linha
+        // inteira, e partir de uma cópia velha apagaria o que outra pessoa mexeu.
+        var full = Repo.GetFresh(o.Id) ?? Repo.Get(o.Id) ?? o;
         var indicando = !full.IndicadaValue;
         full.Indicada = indicando ? "Sim" : "";
         full.UpdatedAt = _today.ToString("yyyy-MM-dd");
@@ -501,7 +544,7 @@
 
     private void AbrirPendencias(Opportunity o)
     {
-        _pend = Repo.Get(o.Id) ?? o;              // cópia isolada do cache
+        _pend = Repo.GetFresh(o.Id) ?? Repo.Get(o.Id) ?? o;   // estado que está valendo
         _pendFaltam = _pend.PendenciasPrevisao;
     }
 
@@ -569,7 +612,7 @@
             {
                 Controle.SaveRegistro(reg, _user);   // usa os valores (possivelmente editados)
 
-                var full = Repo.Get(o.Id) ?? o;
+                var full = Repo.GetFresh(o.Id) ?? Repo.Get(o.Id) ?? o;
                 full.MovidaControle = "Sim";
                 full.UpdatedAt = _today.ToString("yyyy-MM-dd");
                 full.UpdatedBy = _user;
