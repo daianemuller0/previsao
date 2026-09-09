@@ -44,7 +44,9 @@
 
 @* ---- Filtros globais ---- *@
 <div class="filterbar filterbar-sticky">
-    <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" @bind="_search" @bind:event="oninput" /></div>
+    @* A busca espera a pessoa parar de digitar (ver BuscarDigitando): a cada tecla
+       a página inteira era refeita sobre milhares de oportunidades. *@
+    <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" value="@_search" @oninput="BuscarDigitando" /></div>
     @* Ordem pedida: quem usa procura primeiro pelo vendedor, depois estreita o
        período. O intervalo "de tal dia a tal dia" saiu — a previsão é mensal, e
        os filtros de Mês e Ano já dão o recorte que se usa no dia a dia. *@
@@ -674,7 +676,7 @@
 @* ===================== 4b · OPORTUNIDADES ===================== *@
 <div class="section-head" data-pnl="sec-oportunidades">
     <span class="st-title">Oportunidades</span>
-    <span class="st-sub">@_filtered.Count no recorte · @MoneyBrl(_filtered.Sum(o => o.AmountBrl)) em valor</span>
+    <span class="st-sub">@_filtered.Count no recorte · @MoneyBrl(_filtered.Sum(o => o.AmountBrl)) em valor@(_filtered.Count > TetoTabela ? $" · mostrando as {TetoTabela} maiores" : "")</span>
     <span class="st-line"></span>
     <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
 </div>
@@ -721,7 +723,13 @@
     // ---- estado / filtros ----
     private List<Opportunity> _opps = new();
     private List<Opportunity> _filtered = new();
-    private List<Opportunity> _filteredSorted => _filtered.OrderByDescending(o => o.AmountBrl).ToList();
+    // Campo, não propriedade: como propriedade ela reordenava a lista inteira a
+    // cada render — e um render acontece a cada tecla, clique e abertura de menu.
+    // A lista é limitada: este painel é panorama, e mandar milhares de linhas
+    // para o navegador a cada mudança de filtro é o que travava a tela. A
+    // listagem completa está a um clique, na aba Oportunidades.
+    private const int TetoTabela = 200;
+    private List<Opportunity> _filteredSorted = new();
     private DateTime _today = DateTime.Today;
     private DateTime _updated = DateTime.Now;
     private int _year, _month, _quarter;
@@ -1199,7 +1207,33 @@
         try { await JS.InvokeVoidAsync("appLayout.ligar", _ref, LayoutSalvo); } catch { }
     }
 
-    public void Dispose() => _ref?.Dispose();
+    // ---- busca com espera -------------------------------------------------
+    // Filtrar é caro: refaz funis, rankings, mapa e tabela sobre todo o recorte.
+    // Fazer isso a cada tecla engasgava a tela letra a letra. Aqui a última tecla
+    // cancela a espera da anterior, e o recorte só é refeito quando a digitação
+    // para — o texto na caixa continua aparecendo na hora, é a página que aguarda.
+    private CancellationTokenSource? _buscaCts;
+
+    private async Task BuscarDigitando(ChangeEventArgs e)
+    {
+        var texto = e.Value?.ToString() ?? "";
+        // Só cancela: descartar aqui correria com a espera que acabou de acordar.
+        _buscaCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _buscaCts = cts;
+
+        try { await Task.Delay(350, cts.Token); }
+        catch (OperationCanceledException) { return; }   // veio outra tecla
+
+        _search = texto;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _ref?.Dispose();
+        _buscaCts?.Cancel();
+    }
 
     private void LoadReport()
     {
@@ -1216,7 +1250,14 @@
 
     // Recarrega as oportunidades após editar/duplicar/excluir na tabela.
     // Build() é chamado no topo do render e recomputa Top 10 e listagem.
-    private void ReloadOpps() => _opps = LoadScoped();
+    private void ReloadOpps()
+    {
+        _opps = LoadScoped();
+        // Editar uma linha muda o conteúdo sem mudar a contagem nem a hora da
+        // última leitura — a assinatura não perceberia. Zerar aqui obriga o
+        // recálculo, senão os gráficos ficariam mostrando o valor antigo.
+        _assinaturaBuild = "";
+    }
 
     // Exporta as oportunidades do recorte atual (todos os filtros da página).
     private Task ExportarFiltradas() =>
@@ -1351,9 +1392,39 @@
     }
     private void SaveView() { _savedMsg = true; }
 
+    // Assinatura do que Build() consome. O Blazor redesenha a página por muitos
+    // motivos — abrir um menu de filtro, o mouse num gráfico, a tabela mexendo no
+    // próprio estado — e refazer 200 linhas de agrupamento em cima de milhares de
+    // oportunidades em cada um desses renders é o que faz a tela travar.
+    private string AssinaturaRecorte()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append(_commercial).Append('|').Append(_stage).Append('|')
+          .Append(_segment).Append('|').Append(_submarket).Append('|');
+        foreach (var conj in AllSets)
+        {
+            foreach (var v in conj.OrderBy(x => x, StringComparer.Ordinal)) sb.Append(v).Append(',');
+            sb.Append('|');
+        }
+        sb.Append(_search).Append('|').Append(_onlyIndicated).Append('|').Append(_semOtp).Append('|')
+          .Append(_currency).Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
+          .Append(_valMin).Append('|').Append(_valMax).Append('|')
+          // Identidade dos dados: recarga da base ou edição numa linha invalidam.
+          .Append(_opps.Count).Append('|').Append(Repo.LoadedAt.Ticks);
+        return sb.ToString();
+    }
+
+    private string _assinaturaBuild = "";
+
     private void Build()
     {
         RecarregarChartPrefs();      // alguém ajustou um gráfico: relê antes de desenhar
+
+        // Nada do que interessa mudou desde o último cálculo: a tela já está certa.
+        var assinatura = AssinaturaRecorte();
+        if (assinatura == _assinaturaBuild) return;
+        _assinaturaBuild = assinatura;
+
         _sym = _currency == "BRL" ? "R$" : "US$";
         // Ano de referência: o selecionado no filtro, ou o ano atual quando "Todos".
         _year = _yearFilter > 0 ? _yearFilter : _today.Year;
@@ -1367,6 +1438,7 @@
 
         var opps = Filtered().ToList();
         _filtered = opps;
+        _filteredSorted = opps.OrderByDescending(o => o.AmountBrl).Take(TetoTabela).ToList();
 
         // Funil de Vendas por Stage — valor = Amount (converted) em R$ (AmountBrl),
         // sobre TODO o recorte filtrado, em ordem decrescente de valor.
