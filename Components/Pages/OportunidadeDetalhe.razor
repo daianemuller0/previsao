@@ -6,7 +6,7 @@
 @inject NavigationManager Nav
 
 <div class="breadcrumbs">
-    <a href="/oportunidades">Oportunidades</a><span class="sep">/</span>
+    <a href="@_de">Oportunidades</a><span class="sep">/</span>
     <span class="strong" style="color:var(--text-2)">@(_o?.ProposalNumber ?? "—")</span>
 </div>
 
@@ -36,7 +36,9 @@ else
                 </div>
             </div>
             <div class="page-actions">
-                <a class="btn-ghost" href="/oportunidades">@Icons.Svg("chevron-left")Voltar</a>
+                @* Volta para a tela de origem, e não sempre para Oportunidades:
+                   quem abriu a proposta pela Visão Executiva quer voltar para lá. *@
+                <a class="btn-ghost" href="@_de">@Icons.Svg("chevron-left")Voltar</a>
                 <a class="btn-primary" href="/oportunidades">@Icons.Svg("edit")Editar</a>
             </div>
         </div>
@@ -223,8 +225,17 @@ else
         new("historico", "Histórico"), new("documentos", "Documentos"),
     };
 
+    /// <summary>Tela de onde a pessoa veio, para o "Voltar" devolvê-la ao lugar
+    /// certo — a lista de Oportunidades ou a Visão Executiva — com o recorte
+    /// intacto. Só aceita caminho interno; qualquer outra coisa cai no padrão.</summary>
+    private string _de = "/oportunidades";
+
     protected override async Task OnParametersSetAsync()
     {
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query);
+        if (q.TryGetValue("de", out var de) && de.ToString() is { Length: > 1 } d && d.StartsWith('/'))
+            _de = d;
+
         if (AuthState is not null) _scope = AccessScope.Resolve((await AuthState).User);
         _o = Repo.Get(Id);
         // Fora da carteira permitida: não expõe a oportunidade.

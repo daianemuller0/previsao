@@ -105,6 +105,9 @@ builder.Services.AddHostedService<CompactionService>();
 builder.Services.AddHostedService<AtualizacaoAgendada>();
 // Sincronização das bases (planilhas do CRM na rede): New Business + Aftermarket.
 builder.Services.AddSingleton<DataSyncService>();
+// Recorte das telas durante a sessão: abrir uma proposta e voltar não refaz os
+// filtros. Scoped = por circuito, ou seja, por pessoa e por aba do navegador.
+builder.Services.AddScoped<FiltroMemoria>();
 // Cotações diárias do Banco Central (PTAX) — o fechamento do mês sai dessa série.
 // Timeout curto de propósito: se a rede da empresa bloquear a saída, o programa
 // não pode ficar pendurado esperando; o Controle digita a cotação e segue.

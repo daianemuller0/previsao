@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject OpportunityRepository Repo
 @inject Catalog Cat
+@inject FiltroMemoria Filtros
 @inject OpportunityImporter Importer
 @inject IJSRuntime JS
 
@@ -56,7 +57,7 @@
         <button class="icon-btn" style="margin-left:auto" @onclick='() => _criadaMsg = ""'>@Icons.Svg("x")</button>
     </div>
 }
-<OpportunityTable Rows="Rows" EmptyText="Nenhuma oportunidade encontrada." OnChanged="Reload" />
+<OpportunityTable Rows="Rows" EmptyText="Nenhuma oportunidade encontrada." OnChanged="Reload" OnAbrirDetalhe="GuardarFiltros" />
 
 @* ---- Desindicar em massa: limpa a flag "Indicada" de todas ---- *@
 @if (_unind)
@@ -290,12 +291,35 @@
         + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
         + (_onlyIndicated ? 1 : 0);
 
+    // ---- recorte guardado durante a sessão ---------------------------------
+    // Abrir uma proposta recria esta tela do zero na volta. Sem guardar, o filtro
+    // que a pessoa montou some a cada ida e vinda — e ela refaz na mão.
+    private const string Tela = "oportunidades";
+
+    private sealed record Recorte(string Search, HashSet<string> Cats, HashSet<string> Kams,
+        HashSet<string> Markets, HashSet<string> Risks, HashSet<string> Years, HashSet<string> Months,
+        bool OnlyIndicated, DateTime? De, DateTime? Ate);
+
+    private void GuardarFiltros() => Filtros.Guardar(Tela,
+        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo));
+
+    private void RestaurarFiltros()
+    {
+        if (Filtros.Ler<Recorte>(Tela) is not { } r) return;
+        _search = r.Search;
+        _cats = r.Cats; _kams = r.Kams; _markets = r.Markets;
+        _risks = r.Risks; _years = r.Years; _months = r.Months;
+        _onlyIndicated = r.OnlyIndicated;
+        _dateFrom = r.De; _dateTo = r.Ate;
+    }
+
     private void ClearFilters()
     {
         _search = "";
         foreach (var s in AllSets) s.Clear();
         _dateFrom = _dateTo = null;
         _onlyIndicated = false;
+        GuardarFiltros();     // limpou de propósito: a memória acompanha
     }
     private Opportunity? _new;
     private int _newMonthNum = DateTime.Today.Month, _newYear = DateTime.Today.Year;
@@ -327,6 +351,7 @@
             _user = st.User.Identity?.Name ?? "—";
             _isAdmin = _scope.Role == AccessRoles.Admin;
         }
+        RestaurarFiltros();
         _all = LoadScoped();
         Recompute();
     }
