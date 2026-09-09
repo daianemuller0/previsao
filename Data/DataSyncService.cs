@@ -61,7 +61,7 @@ public sealed class DataSyncService
     // Entra na marca: quando o mapeamento das planilhas muda (uma coluna nova
     // passa a ser lida), a versão sobe e todo mundo reimporta na próxima abertura,
     // mesmo que a planilha da rede continue exatamente a mesma.
-    private const string ImportVersion = "v5";
+    private const string ImportVersion = "v6";
 
     private string? MarcaGravada(string prefix)
     {
@@ -187,16 +187,25 @@ public sealed class DataSyncService
                     _repo.SaveMany(result.Rows);
 
                     // ---- baixa das linhas que sumiram da planilha ----------------
-                    // Duas travas, porque apagar aqui destrói trabalho de vendedor:
+                    // Sair da exportação do CRM quer dizer que a oportunidade
+                    // FECHOU — ganha ou perde. Então ela sai da previsão, mesmo
+                    // com preenchimento feito no sistema: manter uma linha
+                    // fechada inflaria o funil e a previsão do mês seguinte.
+                    //
+                    // Duas ressalvas continuam de pé:
                     //
                     //  1. Leitura curta demais. Se a planilha veio com bem menos
                     //     linhas do que a base tem (arquivo truncado, exportação
                     //     pela metade, mudança de layout), NÃO apaga nada nesta
                     //     rodada — linha a mais é ruído, linha a menos é perda.
-                    //  2. Linha com trabalho no app (indicada, movida para o
-                    //     Controle, KYC, TOP 10, observação, próxima ação…) nunca
-                    //     sai sozinha, mesmo que o CRM não a exporte mais. Quem
-                    //     quiser removê-la faz isso pela tela, de propósito.
+                    //  2. Venda já indicada para o Controle. Ela some da listagem
+                    //     de qualquer jeito, e o registro da oferta aponta para
+                    //     ela para poder ser desfeito. Apagá-la quebraria o
+                    //     "Voltar para Oportunidades" de toda venda fechada — que
+                    //     é justamente o caso em que o CRM para de exportar.
+                    //
+                    // Nada some de verdade: a baixa grava uma marca e os arquivos
+                    // anteriores ficam 30 dias no histórico da pasta de dados.
                     var sumiram = existing.Where(kv => !newIds.Contains(kv.Key)).Select(kv => kv.Value).ToList();
                     var leituraCurta = existing.Count > 0 && result.Rows.Count < existing.Count * 0.75;
 
@@ -209,7 +218,7 @@ public sealed class DataSyncService
                     {
                         foreach (var o in sumiram)
                         {
-                            if (TemTrabalhoDoApp(o)) { st.Kept++; continue; }
+                            if (o.MovidaControleValue) { st.Kept++; continue; }
                             _repo.Delete(o.Id);
                             st.Removed++;
                         }
@@ -230,7 +239,7 @@ public sealed class DataSyncService
                       + (st.Kept > 0
                           ? st.ShortRead
                               ? $" ATENÇÃO: a planilha veio com bem menos linhas que a base — {st.Kept} oportunidade(s) foram MANTIDAS por segurança. Confira a exportação do CRM."
-                              : $" {st.Kept} não estão mais na planilha, mas foram mantidas porque têm preenchimento feito no sistema."
+                              : $" {st.Kept} saíram da planilha mas foram mantidas por já estarem no Controle como venda."
                           : "")
                       + (st.Carteira > 0 ? $" {st.Carteira} passaram para o vendedor dono do market." : "")
                     : "Planilha lida, mas nenhuma oportunidade reconhecida — confira o cabeçalho das colunas.";
@@ -286,30 +295,6 @@ public sealed class DataSyncService
     // "0" conta como ausência: os campos numéricos nascem em "0" e o importador
     // devolve "0" quando a coluna vem vazia — não é uma informação da planilha.
     private static bool SemInfo(string? v) => string.IsNullOrWhiteSpace(v) || v == "0";
-
-    // Assinatura de quem importou (o importador carimba isto em UpdatedBy).
-    private static readonly string[] CarimboImportacao = { "Importação", "Importação AFM" };
-
-    /// <summary>A oportunidade carrega algo que só existe por alguém ter mexido
-    /// nela no sistema? Se sim, ela NÃO é apagada por sincronização — some da
-    /// planilha, continua aqui, e quem quiser removê-la faz isso pela tela.
-    /// Repare que ForecastCategory e etapa ficam de fora: o importador já os
-    /// preenche, então serviriam de "trabalho" em toda linha e a baixa nunca
-    /// aconteceria.</summary>
-    private static bool TemTrabalhoDoApp(Opportunity o) =>
-        !string.IsNullOrWhiteSpace(o.Indicada)
-        || !string.IsNullOrWhiteSpace(o.MovidaControle)
-        || !string.IsNullOrWhiteSpace(o.Kyc)
-        || !string.IsNullOrWhiteSpace(o.Top10)
-        || !string.IsNullOrWhiteSpace(o.PlantId)
-        || !string.IsNullOrWhiteSpace(o.NextAction)
-        || !string.IsNullOrWhiteSpace(o.NextActionDate)
-        || !string.IsNullOrWhiteSpace(o.Risks)
-        || !string.IsNullOrWhiteSpace(o.Justification)
-        || !string.IsNullOrWhiteSpace(o.ManagerProbability)
-        // Editada por gente: o importador carimba a própria assinatura.
-        || (!string.IsNullOrWhiteSpace(o.UpdatedBy)
-            && !CarimboImportacao.Contains(o.UpdatedBy, StringComparer.OrdinalIgnoreCase));
 
     // ---- campos que a planilha traz, mas que o sistema também deixa editar ----
     // Vendedor sem acesso ao CRM só tem o nosso sistema para corrigir a data, o
@@ -456,7 +441,8 @@ public sealed class DataSyncStatus
     public int Warnings { get; set; }
     /// <summary>Linhas que sumiram da planilha e foram baixadas.</summary>
     public int Removed { get; set; }
-    /// <summary>Linhas que sumiram da planilha mas foram MANTIDAS (trava de segurança).</summary>
+    /// <summary>Linhas que sumiram da planilha mas foram MANTIDAS: leitura curta
+    /// demais, ou venda já indicada para o Controle.</summary>
     public int Kept { get; set; }
     /// <summary>A planilha veio com bem menos linhas que a base — nada foi apagado.</summary>
     public bool ShortRead { get; set; }
