@@ -43,7 +43,11 @@
             @foreach (var o in Rows)
             {
                 var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
-                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "")" @onclick='() => Nav.NavigateTo($"/oportunidades/{o.Id}")'>
+                @* Duplo clique, não clique simples: um toque errado na lista tirava
+                   a pessoa da tela e levava embora o recorte que ela montou. *@
+                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "")"
+                    title="Dois cliques abrem os detalhes desta oportunidade"
+                    @ondblclick="() => AbrirDetalhe(o)">
                     <td class="center actions-col">
                         <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? "Remover da Previsão" : "Indicar na Previsão")" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
                         @if (o.PrevisaoIncompleta)
@@ -323,6 +327,9 @@
     [Parameter] public string CssClass { get; set; } = "";
     [Parameter] public string Style { get; set; } = "";
     [Parameter] public EventCallback OnChanged { get; set; }
+    /// <summary>Avisa a página antes de sair para os detalhes, para ela guardar o
+    /// recorte atual. Sem isso, voltar significaria refazer os filtros na mão.</summary>
+    [Parameter] public EventCallback OnAbrirDetalhe { get; set; }
     /// <summary>Mostra o botão "Colunas" (a mesma tabela aparece em vários blocos
     /// da Visão Executiva; só o principal precisa oferecer a configuração).</summary>
     [Parameter] public bool ShowColumnPicker { get; set; } = true;
@@ -441,6 +448,15 @@
         // NB/AFM saiu daqui: virou uma escolha fechada, que alimenta a coluna Setor.
         ("dl-onestream", "market_onestream"),
     };
+
+    /// <summary>Abre os detalhes levando de onde veio: é o que permite ao botão
+    /// "Voltar" devolver a pessoa à tela certa, com o recorte intacto.</summary>
+    private async Task AbrirDetalhe(Opportunity o)
+    {
+        await OnAbrirDetalhe.InvokeAsync();
+        var de = new Uri(Nav.Uri).PathAndQuery;
+        Nav.NavigateTo($"/oportunidades/{o.Id}?de={Uri.EscapeDataString(de)}");
+    }
 
     // ---- edição completa ----
     /// <summary>Estado da linha no momento em que o formulário abriu. Se ela

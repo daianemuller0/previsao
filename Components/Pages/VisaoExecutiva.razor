@@ -5,6 +5,7 @@
 @inject Catalog Cat
 @inject ControleRepository ControleRepo
 @inject ChartPrefsRepository ChartPrefs
+@inject FiltroMemoria Filtros
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @implements IDisposable
@@ -358,7 +359,7 @@
             </div>
             <OpportunityTable Rows="_indicadas" CssClass="tbl-compact" Style="max-height:380px;overflow:auto"
                               EmptyText="Nenhuma oportunidade indicada no recorte." OnChanged="ReloadOpps"
-                              ShowColumnPicker="false" />
+                              OnAbrirDetalhe="GuardarFiltros" ShowColumnPicker="false" />
         </div></div>
     </div>
 }
@@ -590,7 +591,7 @@
 <div class="c12" data-pnl="top10">
     <OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
                       EmptyText="Nenhuma oportunidade indicada na previsão ou marcada como TOP 10 no recorte." OnChanged="ReloadOpps"
-                      ShowColumnPicker="false" />
+                      OnAbrirDetalhe="GuardarFiltros" ShowColumnPicker="false" />
 </div>
 
 @* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
@@ -678,7 +679,7 @@
     <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
 </div>
 <div class="c12" data-pnl="tabela-oportunidades">
-    <OpportunityTable Rows="_filteredSorted" CssClass="tbl-compact" Style="max-height:780px;overflow:auto" OnChanged="ReloadOpps" />
+    <OpportunityTable Rows="_filteredSorted" CssClass="tbl-compact" Style="max-height:780px;overflow:auto" OnChanged="ReloadOpps" OnAbrirDetalhe="GuardarFiltros" />
 </div>
 
 @* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
@@ -740,6 +741,35 @@
     private HashSet<string> _months = NewSet();      // meses por nome ("Janeiro")
     private IEnumerable<HashSet<string>> AllSets =>
         new[] { _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months };
+
+    // ---- recorte guardado durante a sessão ---------------------------------
+    // Abrir uma proposta recria esta tela do zero na volta. Sem guardar, o recorte
+    // some a cada ida e vinda — e aqui ele costuma ter vários filtros somados.
+    private const string Tela = "executivo";
+
+    private sealed record Recorte(string Commercial, string Stage, string Segment, string Submarket,
+        HashSet<string> Kams, HashSet<string> Markets, HashSet<string> Setores, HashSet<string> Countries,
+        HashSet<string> Products, HashSet<string> Customers, HashSet<string> Bus,
+        HashSet<string> Years, HashSet<string> Months,
+        string Search, bool OnlyIndicated, bool SemOtp, bool ShowMore,
+        string Currency, string ValMetric, double? ValMin, double? ValMax);
+
+    private void GuardarFiltros() => Filtros.Guardar(Tela,
+        new Recorte(_commercial, _stage, _segment, _submarket,
+            _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months,
+            _search, _onlyIndicated, _semOtp, _showMore, _currency, _valMetric, _valMin, _valMax));
+
+    private void RestaurarFiltros()
+    {
+        if (Filtros.Ler<Recorte>(Tela) is not { } r) return;
+        _commercial = r.Commercial; _stage = r.Stage; _segment = r.Segment; _submarket = r.Submarket;
+        _kams = r.Kams; _markets = r.Markets; _setores = r.Setores; _countries = r.Countries;
+        _products = r.Products; _customers = r.Customers; _bus = r.Bus;
+        _years = r.Years; _months = r.Months;
+        _search = r.Search; _onlyIndicated = r.OnlyIndicated; _semOtp = r.SemOtp; _showMore = r.ShowMore;
+        _currency = r.Currency; _valMetric = r.ValMetric; _valMin = r.ValMin; _valMax = r.ValMax;
+    }
+
     private DotNetObjectReference<VisaoExecutiva>? _ref;
     private string _currency = "BRL", _chartMode = "monthly"; // R$ é o padrão da plataforma
     // Derivados (rótulos e REPORT usam um único mês/ano quando há exatamente um).
@@ -1145,6 +1175,7 @@
                      ?? user.Identity?.Name ?? "";
             _chart.Clear();          // o 1º render acontece antes daqui: recarrega já com o login
         }
+        RestaurarFiltros();
         _opps = LoadScoped();
         LoadReport();
     }
@@ -1316,6 +1347,7 @@
         _semOtp = false;
         _search = "";
         _valMin = _valMax = null; _valMetric = "total";
+        GuardarFiltros();     // limpou de propósito: a memória acompanha
     }
     private void SaveView() { _savedMsg = true; }
 
