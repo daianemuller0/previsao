@@ -31,6 +31,8 @@
     }
 </div>
 
+@implements IDisposable
+
 @code {
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public string AllText { get; set; } = "Todos";
@@ -47,12 +49,34 @@
     private async Task Pick(string v)
     {
         if (!Selected.Remove(v)) Selected.Add(v);
-        await OnChanged.InvokeAsync();
+        await Avisar();
     }
 
     private async Task ClearAll()
     {
         Selected.Clear();
+        await Avisar();
+    }
+
+    // Avisar a página custa caro: ela refaz funis, rankings, mapa e tabela sobre
+    // todo o recorte. Quem marca quatro vendedores seguidos pagava esse preço
+    // quatro vezes, e a tela travava entre um clique e outro.
+    //
+    // A marcação continua aparecendo na hora — quem redesenha é só este painel.
+    // O que espera é o aviso: cada clique novo cancela a espera do anterior, e a
+    // página é refeita uma vez só, quando a escolha termina. Mesma ideia da
+    // busca, que já espera a digitação parar.
+    private CancellationTokenSource? _espera;
+
+    private async Task Avisar()
+    {
+        _espera?.Cancel();
+        var cts = new CancellationTokenSource();
+        _espera = cts;
+        try { await Task.Delay(300, cts.Token); }
+        catch (OperationCanceledException) { return; }   // veio outro clique: quem avisa é o último
         await OnChanged.InvokeAsync();
     }
+
+    public void Dispose() => _espera?.Cancel();
 }

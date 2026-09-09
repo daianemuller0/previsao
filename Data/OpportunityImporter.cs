@@ -609,15 +609,20 @@ public sealed class OpportunityImporter
     public static string KamIdDe(Catalog cat, string nome) =>
         Match(cat.Kams, k => k.Name, k => k.Id, nome);
 
+    // A tabela de equivalências já normalizada, montada uma única vez. Antes,
+    // cada consulta renormalizava os seis nomes da lista — e a Visão Executiva
+    // pergunta o vendedor de cada oportunidade em cada agrupamento, o que dava
+    // dezenas de milhares de normalizações a cada clique no filtro de KAM.
+    // É a mesma tabela e o mesmo resultado: muda só a hora em que é preparada.
+    private static readonly Dictionary<string, string> VendedorCanonico =
+        VendedorPairs.ToDictionary(p => Norm(p.Afm), p => p.Nb, StringComparer.Ordinal);
+
     // Converte o nome do vendedor para o contato canônico (NB). Sem equivalência,
     // devolve o próprio nome aparado. Idempotente: nomes NB não casam e ficam iguais.
     public static string CanonicalVendedor(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "";
-        var n = Norm(name);
-        foreach (var (afm, nb) in VendedorPairs)
-            if (Norm(afm) == n) return nb;
-        return name.Trim();
+        return VendedorCanonico.TryGetValue(Norm(name), out var nb) ? nb : name.Trim();
     }
 
     // Normaliza o código da moeda: símbolos e nomes → ISO (USD, EUR, GBP, BRL).
