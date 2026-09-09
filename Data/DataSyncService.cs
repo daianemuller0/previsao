@@ -61,7 +61,7 @@ public sealed class DataSyncService
     // Entra na marca: quando o mapeamento das planilhas muda (uma coluna nova
     // passa a ser lida), a versão sobe e todo mundo reimporta na próxima abertura,
     // mesmo que a planilha da rede continue exatamente a mesma.
-    private const string ImportVersion = "v6";
+    private const string ImportVersion = "v7";
 
     private string? MarcaGravada(string prefix)
     {
@@ -188,21 +188,22 @@ public sealed class DataSyncService
 
                     // ---- baixa das linhas que sumiram da planilha ----------------
                     // Sair da exportação do CRM quer dizer que a oportunidade
-                    // FECHOU — ganha ou perde. Então ela sai da previsão, mesmo
-                    // com preenchimento feito no sistema: manter uma linha
-                    // fechada inflaria o funil e a previsão do mês seguinte.
+                    // FECHOU — ganha ou perde. Então ela sai da previsão, sem
+                    // exceção: manter uma linha fechada inflaria o funil e a
+                    // previsão do mês seguinte.
                     //
-                    // Duas ressalvas continuam de pé:
+                    // Repare em "existing": ele só tem os ids do prefixo desta
+                    // origem ("imp-" ou "afm-"). Oportunidade que o KAM criou do
+                    // zero nasce com "opp-" e NUNCA entra nesta conta — ela não
+                    // veio de planilha nenhuma, então não faz sentido cobrar
+                    // presença numa. Essa é a garantia de que o trabalho feito do
+                    // zero no sistema não é apagado por sincronização.
                     //
-                    //  1. Leitura curta demais. Se a planilha veio com bem menos
-                    //     linhas do que a base tem (arquivo truncado, exportação
-                    //     pela metade, mudança de layout), NÃO apaga nada nesta
-                    //     rodada — linha a mais é ruído, linha a menos é perda.
-                    //  2. Venda já indicada para o Controle. Ela some da listagem
-                    //     de qualquer jeito, e o registro da oferta aponta para
-                    //     ela para poder ser desfeito. Apagá-la quebraria o
-                    //     "Voltar para Oportunidades" de toda venda fechada — que
-                    //     é justamente o caso em que o CRM para de exportar.
+                    // A única trava que sobra é contra arquivo quebrado: se a
+                    // planilha veio com bem menos linhas do que a base tem
+                    // (truncada, exportação pela metade, mudança de layout), NÃO
+                    // apaga nada nesta rodada — linha a mais é ruído, linha a
+                    // menos é perda.
                     //
                     // Nada some de verdade: a baixa grava uma marca e os arquivos
                     // anteriores ficam 30 dias no histórico da pasta de dados.
@@ -218,7 +219,6 @@ public sealed class DataSyncService
                     {
                         foreach (var o in sumiram)
                         {
-                            if (o.MovidaControleValue) { st.Kept++; continue; }
                             _repo.Delete(o.Id);
                             st.Removed++;
                         }
@@ -236,10 +236,8 @@ public sealed class DataSyncService
                 st.Message = result.Rows.Count > 0
                     ? $"{result.Rows.Count} oportunidade(s) de {p.Label} sincronizada(s)."
                       + (st.Removed > 0 ? $" {st.Removed} saíram da planilha e foram baixadas." : "")
-                      + (st.Kept > 0
-                          ? st.ShortRead
-                              ? $" ATENÇÃO: a planilha veio com bem menos linhas que a base — {st.Kept} oportunidade(s) foram MANTIDAS por segurança. Confira a exportação do CRM."
-                              : $" {st.Kept} saíram da planilha mas foram mantidas por já estarem no Controle como venda."
+                      + (st.Kept > 0 && st.ShortRead
+                          ? $" ATENÇÃO: a planilha veio com bem menos linhas que a base — {st.Kept} oportunidade(s) foram MANTIDAS por segurança. Confira a exportação do CRM."
                           : "")
                       + (st.Carteira > 0 ? $" {st.Carteira} passaram para o vendedor dono do market." : "")
                     : "Planilha lida, mas nenhuma oportunidade reconhecida — confira o cabeçalho das colunas.";
@@ -441,8 +439,8 @@ public sealed class DataSyncStatus
     public int Warnings { get; set; }
     /// <summary>Linhas que sumiram da planilha e foram baixadas.</summary>
     public int Removed { get; set; }
-    /// <summary>Linhas que sumiram da planilha mas foram MANTIDAS: leitura curta
-    /// demais, ou venda já indicada para o Controle.</summary>
+    /// <summary>Linhas que sumiram da planilha mas foram MANTIDAS porque a
+    /// leitura veio curta demais (única trava que sobrou).</summary>
     public int Kept { get; set; }
     /// <summary>A planilha veio com bem menos linhas que a base — nada foi apagado.</summary>
     public bool ShortRead { get; set; }
