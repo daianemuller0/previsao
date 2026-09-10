@@ -34,12 +34,17 @@ if exist "%TEMPO%" rmdir /s /q "%TEMPO%"
 
 REM Self-contained em ARQUIVO UNICO: nao exige .NET instalado e deixa a pasta
 REM publicada limpa (poucos arquivos).
+REM DebugType=embedded: os simbolos (numeros de linha dos erros) vao DENTRO do
+REM executavel, em vez de num .pdb separado. O .pdb solto era o unico arquivo
+REM que o Windows nao deixa renomear quando alguem abre o .exe direto da rede —
+REM e uma publicacao inteira falhava por causa de um arquivo que nem roda.
 dotnet publish "%~dp0HowdenSalesForecast.csproj" ^
   -c Release ^
   -r win-x64 ^
   --self-contained true ^
   -p:PublishSingleFile=true ^
   -p:IncludeNativeLibrariesForSelfExtract=true ^
+  -p:DebugType=embedded ^
   -o "%TEMPO%"
 
 if errorlevel 1 (
@@ -82,8 +87,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0atalho.ps1" -Destino "
 REM --- 3) Espelha no destino (remove sobras de versoes antigas) --------------
 echo.
 echo  Copiando para o destino...
-REM /XF: nao mexe nos executaveis antigos renomeados (podem estar em uso).
-robocopy "%TEMPO%" "%DESTINO%" /MIR /NFL /NDL /NJH /NP /R:2 /W:2 /XF "*.old_*.exe"
+REM /XF: nao mexe nos executaveis antigos renomeados (podem estar em uso) nem
+REM num .pdb que tenha sobrado de versao anterior — o /MIR tentaria apaga-lo, e
+REM se alguem o estiver segurando a publicacao falharia de novo por ele.
+robocopy "%TEMPO%" "%DESTINO%" /MIR /NFL /NDL /NJH /NP /R:2 /W:2 /XF "*.old_*.exe" "*.pdb"
 REM robocopy: codigos 0..7 = sucesso; 8+ = erro real.
 if errorlevel 8 (
   echo.
@@ -99,7 +106,9 @@ if errorlevel 8 (
 
 REM Limpa os executaveis antigos que ninguem esta mais usando (os em uso ficam
 REM para a proxima publicacao — a exclusao simplesmente falha e e ignorada).
+REM O mesmo vale para o .pdb de versoes anteriores: some quando soltarem.
 del /q "%DESTINO%\*.old_*.exe" >nul 2>&1
+del /q "%DESTINO%\*.pdb" >nul 2>&1
 
 REM --- 4) Confere se o atalho chegou -----------------------------------------
 REM O atalho vem do passo 2c pelo espelhamento. Se por algum motivo ele nao
