@@ -151,6 +151,9 @@ public class UserRepository
     private static readonly (string Nome, string Role, string[] Vendedores)[] SeedList =
     {
         // Vendedores com acesso ampliado (grupos e vice-versa).
+        // "Elmer" (só o primeiro nome) pega as propostas dele, que ficam no nome
+        // dele e são do Rafael — menos as de Oil, que a sincronização passa para
+        // o Bruno (ver OpportunityImporter.CarteirasPorMarket).
         ("Rafael Toledo",      AccessRoles.Vendedor, new[]{ "Rafael Toledo","Andre Carvalho","Jose Moura","Leonardo Silva","Paulo Agostinho","Elmer" }),
         ("Bruno Castro",       AccessRoles.Vendedor, new[]{ "Bruno Castro","Leonardo Macachero","Emerson Barbosa" }),
         ("Leonardo Macachero", AccessRoles.Vendedor, new[]{ "Leonardo Macachero","Bruno Castro","Emerson Barbosa" }),

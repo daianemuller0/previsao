@@ -568,16 +568,24 @@ public sealed class OpportunityImporter
     // "Water" e "Water (Municipal)" — e qualquer variação que o CRM venha a
     // exportar depois, sem precisar mexer aqui. As exceções são vendedores que
     // ficam com o que já é deles dentro daquele market.
-    private sealed record RegraCarteira(string Prefixo, string Vendedor, string[] Excecoes);
+    //
+    // SoDe restringe a regra às propostas de UM vendedor (pelo primeiro nome):
+    // é o caso de quem saiu e teve a carteira repartida por market. Vazio = a
+    // regra vale para o market inteiro, de quem quer que seja.
+    private sealed record RegraCarteira(string Prefixo, string Vendedor, string[] Excecoes, string SoDe = "");
 
     private static readonly RegraCarteira[] CarteirasPorMarket =
     {
         new("Water", "Douglas Matavelli", new[] { "Paula Vilela" }),
+        // Carteira do Elmer: Oil vai para o Bruno; o resto fica no nome do Elmer
+        // e o Rafael enxerga pela carteira dele (ver UserRepository.SeedList).
+        new("Oil", "Bruno Castro", Array.Empty<string>(), SoDe: "Elmer"),
     };
 
     /// <summary>Vendedor dono da carteira deste market, ou "" quando o market não
-    /// tem dono definido — ou quando o vendedor atual é uma exceção da regra. Nos
-    /// dois casos vale o vendedor que a planilha trouxer.</summary>
+    /// tem dono definido — ou quando o vendedor atual é uma exceção da regra, ou
+    /// a regra é só para as propostas de outra pessoa. Em todos esses casos vale
+    /// o vendedor que a planilha trouxer.</summary>
     public static string VendedorDoMarket(string market, string vendedorAtual)
     {
         if (string.IsNullOrWhiteSpace(market)) return "";
@@ -586,15 +594,17 @@ public sealed class OpportunityImporter
         foreach (var regra in CarteirasPorMarket)
         {
             if (!ComecaCom(m, Norm(regra.Prefixo))) continue;
-            foreach (var excecao in regra.Excecoes)
-            {
-                var e = Norm(excecao);
-                if (v == e || v.StartsWith(e + " ", StringComparison.Ordinal)) return "";
-            }
+            if (regra.SoDe != "" && !MesmaPessoa(v, Norm(regra.SoDe))) continue;
+            if (regra.Excecoes.Any(e => MesmaPessoa(v, Norm(e)))) return "";
             return regra.Vendedor;
         }
         return "";
     }
+
+    // "Elmer" casa com "Elmer Souza" e com "Elmer"; não casa com "Elmerson".
+    // Os dois lados já vêm normalizados (Norm).
+    private static bool MesmaPessoa(string vendedor, string nome) =>
+        nome != "" && (vendedor == nome || vendedor.StartsWith(nome + " ", StringComparison.Ordinal));
 
     // Prefixo de palavra inteira: "Water" pega "Water (Municipal)" e "Water
     // Treatment", mas não pegaria um "Waterloo" que aparecesse por aí.
