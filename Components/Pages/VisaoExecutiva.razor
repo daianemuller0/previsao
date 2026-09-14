@@ -57,6 +57,7 @@
     <MultiFilter Label="Setor" AllText="Ambos" Options="SetorOptions" Selected="_setores" OnChanged="StateHasChanged" />
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     <label class="flt-toggle @(_semOtp ? "on" : "")" title="Tirar do recorte as oportunidades já marcadas como OTP"><input type="checkbox" @bind="_semOtp" />@Icons.Svg("x")<span>Sem OTP</span></label>
+    <label class="flt-toggle @(_onlyLost ? "on" : "")" title="Mostrar somente as oportunidades indicadas como perdidas"><input type="checkbox" @bind="_onlyLost" />@Icons.Svg("x")<span>Perdidas</span></label>
     @if (_showMore)
     {
         <MultiFilter Label="País" AllText="Todos" Options="CountryOptions" Selected="_countries" OnChanged="StateHasChanged" />
@@ -760,12 +761,12 @@
         HashSet<string> Products, HashSet<string> Customers, HashSet<string> Bus,
         HashSet<string> Years, HashSet<string> Months,
         string Search, bool OnlyIndicated, bool SemOtp, bool ShowMore,
-        string Currency, string ValMetric, double? ValMin, double? ValMax);
+        string Currency, string ValMetric, double? ValMin, double? ValMax, bool OnlyLost);
 
     private void GuardarFiltros() => Filtros.Guardar(Tela,
         new Recorte(_commercial, _stage, _segment, _submarket,
             _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months,
-            _search, _onlyIndicated, _semOtp, _showMore, _currency, _valMetric, _valMin, _valMax));
+            _search, _onlyIndicated, _semOtp, _showMore, _currency, _valMetric, _valMin, _valMax, _onlyLost));
 
     private void RestaurarFiltros()
     {
@@ -775,6 +776,7 @@
         _products = r.Products; _customers = r.Customers; _bus = r.Bus;
         _years = r.Years; _months = r.Months;
         _search = r.Search; _onlyIndicated = r.OnlyIndicated; _semOtp = r.SemOtp; _showMore = r.ShowMore;
+        _onlyLost = r.OnlyLost;
         _currency = r.Currency; _valMetric = r.ValMetric; _valMin = r.ValMin; _valMax = r.ValMax;
     }
 
@@ -786,6 +788,7 @@
     private bool _onlyIndicated;           // mostrar só as oportunidades indicadas na previsão
     private string _search = "";           // busca livre: oportunidade, cliente, proposta
     private bool _semOtp;                  // tirar do recorte o que já é OTP
+    private bool _onlyLost;                // só as indicadas como perdidas
     private IEnumerable<int> YearOptions => _opps.Select(o => o.ExpectedDateValue?.Year ?? 0).Where(y => y > 0).Distinct().OrderByDescending(y => y);
     private static IEnumerable<string> MonthOptions => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private static readonly string[] SetorOptions = { "New Business", "Aftermarket" };
@@ -1369,6 +1372,7 @@
         if (_years.Count > 0) q = q.Where(o => _years.Contains((o.ExpectedDateValue?.Year ?? 0).ToString()));
         if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
         if (_semOtp) q = q.Where(o => !Sim(o.Otp));
+        if (_onlyLost) q = q.Where(o => o.PerdidaValue);
         if (!string.IsNullOrWhiteSpace(_search))
         {
             var b = _search.Trim().ToLowerInvariant();
@@ -1386,6 +1390,7 @@
         foreach (var s in AllSets) s.Clear();
         _onlyIndicated = false;
         _semOtp = false;
+        _onlyLost = false;
         _search = "";
         _valMin = _valMax = null; _valMetric = "total";
         GuardarFiltros();     // limpou de propósito: a memória acompanha
@@ -1407,6 +1412,7 @@
             sb.Append('|');
         }
         sb.Append(_search).Append('|').Append(_onlyIndicated).Append('|').Append(_semOtp).Append('|')
+          .Append(_onlyLost).Append('|')
           .Append(_currency).Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
           .Append(_valMin).Append('|').Append(_valMax).Append('|')
           // Identidade dos dados: recarga da base ou edição numa linha invalidam.
@@ -1433,6 +1439,7 @@
             + AllSets.Count(s => s.Count > 0)
             + (_onlyIndicated ? 1 : 0)
             + (_semOtp ? 1 : 0)
+            + (_onlyLost ? 1 : 0)
             + (_search != "" ? 1 : 0)
             + (_valMin is not null || _valMax is not null ? 1 : 0);
 

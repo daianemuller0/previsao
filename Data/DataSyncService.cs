@@ -266,6 +266,7 @@ public sealed class DataSyncService
         nameof(Opportunity.Indicada),         // indicada na previsão
         nameof(Opportunity.MovidaControle),   // venda indicada → Controle
         nameof(Opportunity.Kyc),
+        nameof(Opportunity.Perdida),          // indicada como perdida pelo vendedor
         nameof(Opportunity.Top10),
         nameof(Opportunity.PlantId),
         nameof(Opportunity.ForecastCategory), // escolha do usuário na tela

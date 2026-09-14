@@ -43,6 +43,7 @@
     <MultiFilter Label="Categoria" AllText="Todas" Options="CategoriaOptions" Selected="_cats" OnChanged="StateHasChanged" />
     <MultiFilter Label="Risco" AllText="Todos" Options="RiscoOptions" Selected="_risks" OnChanged="StateHasChanged" />
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
+    <label class="flt-toggle @(_onlyLost ? "on" : "")" title="Mostrar somente as oportunidades indicadas como perdidas"><input type="checkbox" @bind="_onlyLost" />@Icons.Svg("x")<span>Perdidas</span></label>
     <div class="filterbar-spacer"></div>
     @if (_activeFilters > 0) { <span class="tag">@_activeFilters ativo(s)</span> }
     <button class="btn-link" @onclick="ClearFilters">@Icons.Svg("x")Limpar filtros</button>
@@ -260,6 +261,7 @@
     private HashSet<string> _cats = NewSet(), _kams = NewSet(), _markets = NewSet(),
                             _risks = NewSet(), _years = NewSet(), _months = NewSet();
     private bool _onlyIndicated;
+    private bool _onlyLost;                // só as indicadas como perdidas
     private DateTime? _dateFrom, _dateTo;
     private int _openCount;
     private bool _isAdmin;                            // manutenção da base só p/ admin
@@ -289,7 +291,8 @@
     private int _activeFilters => (_search != "" ? 1 : 0)
         + AllSets.Count(s => s.Count > 0)
         + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
-        + (_onlyIndicated ? 1 : 0);
+        + (_onlyIndicated ? 1 : 0)
+        + (_onlyLost ? 1 : 0);
 
     // ---- recorte guardado durante a sessão ---------------------------------
     // Abrir uma proposta recria esta tela do zero na volta. Sem guardar, o filtro
@@ -298,10 +301,10 @@
 
     private sealed record Recorte(string Search, HashSet<string> Cats, HashSet<string> Kams,
         HashSet<string> Markets, HashSet<string> Risks, HashSet<string> Years, HashSet<string> Months,
-        bool OnlyIndicated, DateTime? De, DateTime? Ate);
+        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost);
 
     private void GuardarFiltros() => Filtros.Guardar(Tela,
-        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo));
+        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost));
 
     private void RestaurarFiltros()
     {
@@ -310,6 +313,7 @@
         _cats = r.Cats; _kams = r.Kams; _markets = r.Markets;
         _risks = r.Risks; _years = r.Years; _months = r.Months;
         _onlyIndicated = r.OnlyIndicated;
+        _onlyLost = r.OnlyLost;
         _dateFrom = r.De; _dateTo = r.Ate;
     }
 
@@ -319,6 +323,7 @@
         foreach (var s in AllSets) s.Clear();
         _dateFrom = _dateTo = null;
         _onlyIndicated = false;
+        _onlyLost = false;
         GuardarFiltros();     // limpou de propósito: a memória acompanha
     }
     private Opportunity? _new;
@@ -552,6 +557,7 @@
         {
             IEnumerable<Opportunity> q = _all;
             if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
+            if (_onlyLost) q = q.Where(o => o.PerdidaValue);
             if (_cats.Count > 0) q = q.Where(o => _cats.Contains(ForecastCategories.Label(o.Category)));
             if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KamName(o)));
             if (_markets.Count > 0) q = q.Where(o => _markets.Contains(Cat.MarketName(o.MarketId)));

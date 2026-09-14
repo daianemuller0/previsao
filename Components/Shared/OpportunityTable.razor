@@ -45,7 +45,7 @@
                 var q = o.ExpectedDateValue is { } dt ? $"Q{Fmt.QuarterOf(dt.Month)} {dt.Year}" : "—";
                 @* Duplo clique, não clique simples: um toque errado na lista tirava
                    a pessoa da tela e levava embora o recorte que ela montou. *@
-                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "")"
+                <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "") @(o.PerdidaValue ? "row-perdida" : "")"
                     title="Dois cliques abrem os detalhes desta oportunidade"
                     @ondblclick="() => AbrirDetalhe(o)">
                     <td class="center actions-col">
@@ -55,6 +55,7 @@
                             <button class="row-act pend" title="Indicada na previsão, mas faltam dados: @string.Join(", ", o.PendenciasPrevisao)" @onclick="() => AbrirPendencias(o)" @onclick:stopPropagation="true">@Icons.Svg("alert")</button>
                         }
                         <button class="row-act sell" title="Indicar venda — mover para o Controle (Ofertas e pedidos)" @onclick="() => OpenSell(o)" @onclick:stopPropagation="true">@Icons.Svg("dollar")</button>
+                        <button class="row-act lost @(o.PerdidaValue ? "on" : "")" title="@(o.PerdidaValue ? "Reabrir — tirar a marca de perdida" : "Indicar perdido — a oportunidade fica onde está, só ganha a marca")" @onclick="() => AskPerdida(o)" @onclick:stopPropagation="true">@Icons.Svg("x")</button>
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
                         <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
                         <button class="row-act del" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
@@ -73,7 +74,7 @@
                             case "market":    <td>@Cat.MarketName(o.MarketId)</td> break;
                             case "product":   <td>@Cat.ProductName(o.ProductId)</td> break;
                             case "kam":       <td>@Cat.KamName(o.KamId)</td> break;
-                            case "customer":  <td class="col-strong">@Cat.CustomerName(o.CustomerId)</td> break;
+                            case "customer":  <td class="col-strong">@Cat.CustomerName(o.CustomerId)@if (o.PerdidaValue) { <span class="perdida-tag">Perdido</span> }</td> break;
                             case "plantname": <td>@Dash(o.EndUserSite)</td> break;
                             case "proposta":  <td>@o.ProposalNumber</td> break;
                             case "netvalue":  <td class="right num">@Fmt.Brl(o.AmountBrl)</td> break;
@@ -150,6 +151,34 @@
         <div class="modal-actions">
             <button class="btn-ghost" @onclick="() => _delTarget = null">Cancelar</button>
             <button class="btn-danger" @onclick="ConfirmDelete">@Icons.Svg("trash")Excluir</button>
+        </div>
+    </div>
+}
+
+@* ---- Indicar perdido: só a marca; a oportunidade não sai de lugar nenhum ---- *@
+@if (_perdida is not null)
+{
+    <div class="drawer-backdrop" @onclick="() => _perdida = null"></div>
+    <div class="confirm-box">
+        <div class="confirm-head">@Icons.Svg("x")<span>@(_perdida.PerdidaValue ? "Reabrir oportunidade" : "Indicar perdido")</span></div>
+        @if (_perdida.PerdidaValue)
+        {
+            <p class="confirm-text">Tirar a marca de perdida de <strong>@_perdida.Name</strong> (@_perdida.ProposalNumber)? Ela volta a aparecer como em aberto.</p>
+        }
+        else
+        {
+            <p class="confirm-text">Marcar <strong>@_perdida.Name</strong> (@_perdida.ProposalNumber) como <strong>perdida</strong>? Ela continua na listagem, com os mesmos valores — só ganha a marca e a linha fica vermelha. Dá para desfazer pelo mesmo botão.</p>
+        }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _perdida = null">Cancelar</button>
+            @if (_perdida.PerdidaValue)
+            {
+                <button class="btn-primary" @onclick="ConfirmPerdida">@Icons.Svg("check")Reabrir</button>
+            }
+            else
+            {
+                <button class="btn-danger" @onclick="ConfirmPerdida">@Icons.Svg("x")Indicar perdido</button>
+            }
         </div>
     </div>
 }
@@ -584,6 +613,23 @@
         if (_delTarget is null) return;
         Repo.Delete(_delTarget.Id);
         _delTarget = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    // ---- Indicar perdido: marca (ou desmarca) sem mexer em mais nada ----
+    private Opportunity? _perdida;
+    private void AskPerdida(Opportunity o) => _perdida = o;
+
+    private async Task ConfirmPerdida()
+    {
+        if (_perdida is null) return;
+        // Estado do disco, não do cache: a gravação regrava a linha inteira.
+        var full = Repo.GetFresh(_perdida.Id) ?? Repo.Get(_perdida.Id) ?? _perdida;
+        full.Perdida = full.PerdidaValue ? "" : "Sim";
+        full.UpdatedAt = _today.ToString("yyyy-MM-dd");
+        full.UpdatedBy = _user;
+        Repo.Save(full);
+        _perdida = null;
         await OnChanged.InvokeAsync();
     }
 

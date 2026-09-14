@@ -54,6 +54,7 @@ public class Opportunity
     public string Setor { get; set; } = "";                 // Origem: NB (planilha NB) ou AFM (planilha AFM)
     public string MovidaControle { get; set; } = "";        // "Sim" = venda indicada → movida p/ Controle (some das Oportunidades)
     public string Kyc { get; set; } = "";                   // KYC (Know Your Customer): "Sim"/"Não"
+    public string Perdida { get; set; } = "";               // "Sim" = o vendedor indicou como perdida (fica onde está, só ganha a marca)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
@@ -154,6 +155,10 @@ public class Opportunity
 
     // Venda indicada: movida para o Controle (Ofertas e pedidos) e retirada das Oportunidades.
     public bool MovidaControleValue => string.Equals(MovidaControle, "Sim", StringComparison.OrdinalIgnoreCase);
+
+    // Perdida: marcada pelo vendedor. Não sai de lugar nenhum nem muda valor —
+    // é só a marca, para a linha ficar vermelha e o filtro achar.
+    public bool PerdidaValue => string.Equals(Perdida, "Sim", StringComparison.OrdinalIgnoreCase);
 
     private bool IsBrl => CurrencyCode.Equals("BRL", StringComparison.OrdinalIgnoreCase);
     private bool IsUsd => CurrencyCode.Equals("USD", StringComparison.OrdinalIgnoreCase);
