@@ -23,7 +23,7 @@
             <button class="btn-ghost" @onclick="OpenUnindicate">@Icons.Svg("x")Desindicar todas</button>
             <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
         }
-        <button class="btn-ghost" title="Lista e Excel das oportunidades com valores alterados no sistema em relação ao CRM (no recorte atual)" @onclick="() => _altOpen = true">@Icons.Svg("history")Alteradas no sistema@if (AlteradasNoRecorte.Count > 0) { <span class="tag" style="margin-left:6px">@AlteradasNoRecorte.Count</span> }</button>
+        <button class="btn-ghost" title="Lista e Excel das oportunidades com valores alterados no sistema em relação ao CRM (no recorte atual)" @onclick="() => _altOpen = true">@Icons.Svg("history")<span>Alteradas no sistema</span>@if (AlteradasNoRecorte.Count > 0) { <span class="tag" style="margin-left:6px">@AlteradasNoRecorte.Count</span> }</button>
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
 </div>
@@ -39,6 +39,14 @@
             Campos cujo valor no sistema é <strong>diferente do que o CRM trouxe</strong> na última sincronização,
             no recorte atual da tela: <strong>@AlteradasNoRecorte.Count</strong> oportunidade(s), <strong>@linhas.Count</strong> campo(s).
             Preencher um campo que o CRM trouxe vazio não conta como alteração.
+        </p>
+        @{ var comMemoria = Rows.Count(o => !string.IsNullOrEmpty(o.CrmSnapshot)); }
+        <p class="confirm-text" style="color:var(--muted);font-size:12px">
+            Memória do CRM: <strong>@comMemoria</strong> de @Rows.Count oportunidade(s) do recorte têm o valor do CRM guardado para comparar.
+            @if (comMemoria < Rows.Count)
+            {
+                <text>As outras @(Rows.Count - comMemoria) foram criadas à mão ou ainda não passaram por uma sincronização desde que a memória existe — nelas não há com o que comparar.</text>
+            }
         </p>
         @if (linhas.Count == 0)
         {
