@@ -1626,7 +1626,6 @@ tr.row-perdida td:first-child { box-shadow: inset 3px 0 0 var(--neg); }
 .row-act.lost:hover, .row-act.lost.on { color: var(--neg); background: var(--neg-bg); }
 /* Considerar dados do CRM: aceso quando há algo alterado no sistema para desfazer. */
 .row-act.crm.on { color: var(--info); }
-.row-act .crm-lbl { font-size: 9px; font-weight: 800; letter-spacing: .04em; line-height: 1; }
 .row-act.crm:hover { color: var(--info); background: var(--info-bg); }
 
 /* ---- Alterado no sistema (valor diferente do que o CRM trouxe) ---------

@@ -54,7 +54,7 @@
                         {
                             <button class="row-act pend" title="Indicada na previsão, mas faltam dados: @string.Join(", ", o.PendenciasPrevisao)" @onclick="() => AbrirPendencias(o)" @onclick:stopPropagation="true">@Icons.Svg("alert")</button>
                         }
-                        <button class="row-act crm @(AlteracoesCrm.Alterada(o) ? "on" : "")" title="@(AlteracoesCrm.Alterada(o) ? "Considerar dados do CRM — desfaz as alterações feitas no sistema e volta aos valores do CRM" : "Considerar dados do CRM — nada diferente do CRM nesta oportunidade")" @onclick="() => AskCrm(o)" @onclick:stopPropagation="true"><span class="crm-lbl">CRM</span></button>
+                        <button class="row-act crm @(AlteracoesCrm.Alterada(o) ? "on" : "")" title="@(AlteracoesCrm.Alterada(o) ? "Considerar dados do CRM — desfaz as alterações feitas no sistema e volta aos valores do CRM" : "Considerar dados do CRM — nada diferente do CRM nesta oportunidade")" @onclick="() => AskCrm(o)" @onclick:stopPropagation="true">@Icons.Svg("history")</button>
                         <button class="row-act lost @(o.PerdidaValue ? "on" : "")" title="@(o.PerdidaValue ? "Reabrir — tirar a marca de perdida" : "Indicar perdido — a oportunidade fica onde está, só ganha a marca")" @onclick="() => AskPerdida(o)" @onclick:stopPropagation="true">@Icons.Svg("x")</button>
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
                         <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
