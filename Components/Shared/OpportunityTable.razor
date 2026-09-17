@@ -68,7 +68,7 @@
                             // campo gravado e as criadas a mao, que escolhem o setor.
                             case "setor":     <td class="center">@if (o.SetorEfetivo != "") { <span class="setor-tag setor-@o.SetorEfetivo.ToLower()">@o.SetorEfetivo</span> }</td> break;
                             case "quarter":   <td class="nowrap">@q</td> break;
-                            case "date":      <td class="nowrap">@MonthLabel(o)</td> break;
+                            case "date":      <td class="nowrap @Alt(o, nameof(Opportunity.ExpectedDate))" title="@AltTip(o, nameof(Opportunity.ExpectedDate))">@MonthLabel(o)</td> break;
                             case "pais":      <td>@Cat.CountryName(o.CountryId)</td> break;
                             case "marketvar": <td>@Cat.SubMarketName(o.SubMarketId)</td> break;
                             case "market":    <td>@Cat.MarketName(o.MarketId)</td> break;
@@ -77,23 +77,23 @@
                             case "customer":  <td class="col-strong">@Cat.CustomerName(o.CustomerId)@if (o.PerdidaValue) { <span class="perdida-tag">Perdido</span> }</td> break;
                             case "plantname": <td>@Dash(o.EndUserSite)</td> break;
                             case "proposta":  <td>@o.ProposalNumber</td> break;
-                            case "netvalue":  <td class="right num">@Fmt.Brl(o.AmountBrl)</td> break;
-                            case "pm":        <td class="right num">@Fmt.Pct(o.GmPercentValue)</td> break;
-                            case "ganho":     <td class="right num">@Fmt.Pct(o.WinProbabilityValue)</td> break;
-                            case "sairmes":   <td class="right num">@Fmt.Pct(o.CloseProbabilityValue)</td> break;
+                            case "netvalue":  <td class="right num @Alt(o, nameof(Opportunity.AmountOriginal))" title="@AltTip(o, nameof(Opportunity.AmountOriginal))">@Fmt.Brl(o.AmountBrl)</td> break;
+                            case "pm":        <td class="right num @Alt(o, nameof(Opportunity.GmPercent))" title="@AltTip(o, nameof(Opportunity.GmPercent))">@Fmt.Pct(o.GmPercentValue)</td> break;
+                            case "ganho":     <td class="right num @Alt(o, nameof(Opportunity.WinProbability))" title="@AltTip(o, nameof(Opportunity.WinProbability))">@Fmt.Pct(o.WinProbabilityValue)</td> break;
+                            case "sairmes":   <td class="right num @Alt(o, nameof(Opportunity.CloseInPeriodProbability))" title="@AltTip(o, nameof(Opportunity.CloseInPeriodProbability))">@Fmt.Pct(o.CloseProbabilityValue)</td> break;
                             case "conversao": <td class="right num">@Fmt.Brl(ForecastCalc.ConversionBrl(o))</td> break;
                             case "nbafm":     <td class="center">@Dash(o.CategoriaNbAfm)</td> break;
                             case "servico":   <td>@Dash(o.ServicoPrevisto)</td> break;
                             case "onestream": <td>@Dash(o.MarketOnestream)</td> break;
                             case "unidade":   <td>@Dash(Cat.BuCode(o.PvBusinessUnitId))</td> break;
                             case "buinter":   <td>@Dash(Cat.BuCode(o.IntercompanyBu))</td> break;
-                            case "obs":       <td>@Dash(o.Notes)</td> break;
+                            case "obs":       <td class="@Alt(o, nameof(Opportunity.Notes))" title="@AltTip(o, nameof(Opportunity.Notes))">@Dash(o.Notes)</td> break;
                             case "pv":        <td>@Dash(o.PvNumber)</td> break;
-                            case "ramp":      <td>@Dash(o.Ramp)</td> break;
+                            case "ramp":      <td class="@Alt(o, nameof(Opportunity.Ramp))" title="@AltTip(o, nameof(Opportunity.Ramp))">@Dash(o.Ramp)</td> break;
                             case "usd":       <td class="right num">@Fmt.Usd(o.AmountUsd)</td> break;
                             case "taxa":      <td class="right num">@o.ExchangeRateValue.ToString("0.00", _pt)</td> break;
                             case "coluna1":   <td>@Dash(o.Coluna1)</td> break;
-                            case "otp":       <td class="center">@Mark(o.Otp)</td> break;
+                            case "otp":       <td class="center @Alt(o, nameof(Opportunity.Otp))" title="@AltTip(o, nameof(Opportunity.Otp))">@Mark(o.Otp)</td> break;
                             case "top10":     <td class="center">@Mark(o.Top10)</td> break;
                             case "kyc":       <td class="center">@Mark(o.Kyc)</td> break;
                         }
@@ -252,7 +252,7 @@
         <div class="form-grid">
             <label class="fld full">Nome da oportunidade<input class="field" @bind="_edit.Name" /></label>
 
-            <label class="fld">Mês da previsão
+            <label class="fld">Mês da previsão@MarcaCrm(nameof(Opportunity.ExpectedDate))
                 <select class="field" @bind="_editMonthNum">@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
             </label>
             <label class="fld">Ano da previsão
@@ -300,13 +300,13 @@
             <label class="fld">Moeda
                 <select class="field" @bind="_edit.CurrencyCode">@foreach (var c in Cat.Currencies) { <option value="@c.Code">@c.Code</option> }</select>
             </label>
-            <label class="fld">Net Value (valor)<input class="field num" @bind="_edit.AmountOriginal" /></label>
+            <label class="fld">Net Value (valor)@MarcaCrm(nameof(Opportunity.AmountOriginal))<input class="field num" @bind="_edit.AmountOriginal" /></label>
             <label class="fld">Taxa (BRL/USD)<input class="field num" @bind="_edit.ExchangeRate" /></label>
             <label class="fld">Valor USD (calculado)<input class="field num" value="@Fmt.Usd(_edit.AmountUsd)" readonly /></label>
 
-            <label class="fld">PM % (GM)<input class="field num" @bind="_edit.GmPercent" /></label>
-            <label class="fld">% de Ganho<input class="field num" @bind="_edit.WinProbability" /></label>
-            <label class="fld">% de Sair no Mês<input class="field num" @bind="_edit.CloseInPeriodProbability" /></label>
+            <label class="fld">PM % (GM)@MarcaCrm(nameof(Opportunity.GmPercent))<input class="field num" @bind="_edit.GmPercent" /></label>
+            <label class="fld">% de Ganho@MarcaCrm(nameof(Opportunity.WinProbability))<input class="field num" @bind="_edit.WinProbability" /></label>
+            <label class="fld">% de Sair no Mês@MarcaCrm(nameof(Opportunity.CloseInPeriodProbability))<input class="field num" @bind="_edit.CloseInPeriodProbability" /></label>
 
             <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_edit.PvBusinessUnitId" /></label>
             <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_edit.IntercompanyBu" /></label>
@@ -320,12 +320,12 @@
             <label class="fld">Customer Ref#<input class="field" @bind="_edit.CustomerRef" /></label>
             <label class="fld full">Description<input class="field" @bind="_edit.Description" /></label>
 
-            <label class="fld">RAMP<input class="field" @bind="_edit.Ramp" /></label>
+            <label class="fld">RAMP@MarcaCrm(nameof(Opportunity.Ramp))<input class="field" @bind="_edit.Ramp" /></label>
             <label class="fld">Coluna1<input class="field" @bind="_edit.Coluna1" /></label>
-            <label class="fld">OTP<select class="field" @bind="_edit.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">OTP@MarcaCrm(nameof(Opportunity.Otp))<select class="field" @bind="_edit.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
             <label class="fld">TOP 10<select class="field" @bind="_edit.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
             <label class="fld">KYC<select class="field" @bind="_edit.Kyc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
-            <label class="fld full">Observação<input class="field" @bind="_edit.Notes" /></label>
+            <label class="fld full">Observação@MarcaCrm(nameof(Opportunity.Notes))<input class="field" @bind="_edit.Notes" /></label>
             <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
         </div>
         @if (!string.IsNullOrEmpty(_editConflito))
@@ -456,6 +456,49 @@
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
+
+    // ---- Alterado no sistema: o valor gravado é diferente do que o CRM trouxe ----
+    // Na tabela, a célula ganha um cantinho e a dica com quem/quando/valor do CRM.
+    // Null na dica = atributo omitido, para não engolir a dica da linha.
+    private static string Alt(Opportunity o, string campo) => AlteracoesCrm.Diferente(o, campo) ? "alt" : "";
+    private static string? AltTip(Opportunity o, string campo) => AlteracoesCrm.Descricao(o, campo);
+
+    // No formulário, a comparação é com o que está sendo digitado (inclusive o
+    // mês/ano, que ficam em campos próprios até salvar).
+    private Opportunity _editAntes = new();
+
+    private string ValorEmEdicao(string campo)
+    {
+        if (_edit is null) return "";
+        if (campo == nameof(Opportunity.ExpectedDate))
+            return _editMonthNum is >= 1 and <= 12 && _editYear >= 2000
+                ? new DateTime(_editYear, _editMonthNum, 1).ToString("yyyy-MM-dd") : _edit.ExpectedDate;
+        return AlteracoesCrm.Valor(_edit, campo);
+    }
+
+    private (bool Mostra, string Crm, string Dica) Marca(string campo)
+    {
+        if (_edit is null || AlteracoesCrm.ValorCrm(_edit, campo) is not { } crm) return (false, "", "");
+        var aqui = ValorEmEdicao(campo);
+        if (!AlteracoesCrm.Diferente(campo, crm, aqui)) return (false, "", "");
+        var crmFmt = AlteracoesCrm.Mostrar(campo, crm);
+        return (true, crmFmt, $"No CRM: {crmFmt} · Aqui: {AlteracoesCrm.Mostrar(campo, aqui)}{AlteracoesCrm.QuemQuando(_edit, campo)}");
+    }
+
+    private RenderFragment<string> MarcaCrm => campo => @<text>@{ var m = Marca(campo); }@if (m.Mostra) { <span class="alt-row"><span class="alt-tip" title="@m.Dica">≠ CRM</span><button type="button" class="alt-voltar" title="Voltar ao valor do CRM: @m.Crm" @onclick="() => VoltarCrm(campo)">@Icons.Svg("history")Voltar ao CRM</button></span> }</text>;
+
+    private void VoltarCrm(string campo)
+    {
+        if (_edit is null || AlteracoesCrm.ValorCrm(_edit, campo) is not { } crm) return;
+        if (campo == nameof(Opportunity.ExpectedDate))
+        {
+            if (DateTime.TryParse(crm, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var d))
+            { _editMonthNum = d.Month; _editYear = d.Year; _edit.ExpectedDate = crm; }
+            return;
+        }
+        typeof(Opportunity).GetProperty(campo)?.SetValue(_edit, crm);
+    }
     // Marcador "Sim" (OTP, TOP 10, KYC) vindo da planilha ou preenchido na tela.
     private static bool Sim(string? s) => string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase);
     private static MarkupString Mark(string? s) =>
@@ -499,6 +542,7 @@
         _editDup = false;
         _editConflito = ""; _editMudou = new();
         _edit = Repo.Get(o.Id) ?? o;                       // cópia isolada do cache
+        _editAntes = Repo.Get(o.Id) ?? o;                  // como estava ao abrir (carimbos de data/valor)
         _editAssinatura = OpportunityRepository.Assinatura(_edit);
         var d = _edit.ExpectedDateValue ?? _today;
         _editMonthNum = d.Month;
@@ -552,8 +596,14 @@
 
         if (_editMonthNum is >= 1 and <= 12 && _editYear >= 2000)
             _edit.ExpectedDate = new DateTime(_editYear, _editMonthNum, 1).ToString("yyyy-MM-dd");
-        _edit.UpdatedAt = _today.ToString("yyyy-MM-dd");
-        _edit.UpdatedBy = Cat.KamName(_edit.KamId);
+        var hoje = _today.ToString("yyyy-MM-dd");
+        // Data e valor ganham carimbo próprio: é o que a dica "alterado no
+        // sistema" mostra quando alguém pergunta desde quando aquilo vale.
+        if (AlteracoesCrm.Diferente(nameof(Opportunity.ExpectedDate), _editAntes.ExpectedDate, _edit.ExpectedDate)) _edit.DateChangedAt = hoje;
+        if (AlteracoesCrm.Diferente(nameof(Opportunity.AmountOriginal), _editAntes.AmountOriginal, _edit.AmountOriginal)) _edit.ValueChangedAt = hoje;
+        _edit.UpdatedAt = hoje;
+        // Quem está logado, não o vendedor da carteira: é a pessoa que mexeu.
+        _edit.UpdatedBy = _user;
         Repo.Save(_edit);
         _edit = null;
         await OnChanged.InvokeAsync();
