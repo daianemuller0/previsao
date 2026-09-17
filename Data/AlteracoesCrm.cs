@@ -104,29 +104,55 @@ public static class AlteracoesCrm
         return !string.Equals((crm ?? "").Trim(), (sistema ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool Diferente(Opportunity o, string campo) =>
-        ValorCrm(o, campo) is { } crm && Diferente(campo, crm, Valor(o, campo));
+    /// <summary>Os dois valores são outros, pelo tipo do campo — SEM a isenção
+    /// do "CRM vazio". É a pergunta "mudou?" entre antes e depois de uma edição,
+    /// usada para carimbar data e valor ao salvar.</summary>
+    public static bool Mudou(string campo, string? antes, string? depois)
+    {
+        if (SemInfo(antes) && SemInfo(depois)) return false;
+        if (SemInfo(antes) != SemInfo(depois)) return true;
+        return Diferente(campo, antes, depois);
+    }
+
+    // Carimbo de edição à mão: data e valor têm o seu (gravado ao salvar no
+    // formulário). É o que faz a alteração aparecer mesmo quando o CRM não
+    // tinha nada naquele campo — a pessoa mudou o que estava no sistema, e é
+    // isso que ela lembra (ou esquece) ter feito.
+    private static string? Carimbo(Opportunity o, string campo) => campo switch
+    {
+        nameof(Opportunity.ExpectedDate) => o.DateChangedAt,
+        nameof(Opportunity.AmountOriginal) => o.ValueChangedAt,
+        _ => null,
+    };
+
+    /// <summary>O campo foi alterado no sistema? Sim quando (a) o valor gravado
+    /// substitui um valor que o CRM trouxe, ou (b) tem carimbo de edição à mão e
+    /// o CRM não tem esse valor (não trouxe, ou trouxe vazio).</summary>
+    private static bool Avalia(Opportunity o, string campo, Dictionary<string, string> crm, out string? valorCrm)
+    {
+        valorCrm = crm.TryGetValue(campo, out var v) ? v : null;
+        var aqui = Valor(o, campo);
+        if (valorCrm is not null && Diferente(campo, valorCrm, aqui)) return true;
+        if (string.IsNullOrWhiteSpace(Carimbo(o, campo)) || SemInfo(aqui)) return false;
+        return valorCrm is null || Mudou(campo, valorCrm, aqui);
+    }
+
+    public static bool Diferente(Opportunity o, string campo) => Avalia(o, campo, Ler(o.CrmSnapshot), out _);
 
     public static bool Alterada(Opportunity o)
     {
-        if (string.IsNullOrEmpty(o.CrmSnapshot)) return false;
         var crm = Ler(o.CrmSnapshot);
         foreach (var campo in Protegidos)
-            if (crm.TryGetValue(campo, out var v) && Diferente(campo, v, Valor(o, campo))) return true;
+            if (Avalia(o, campo, crm, out _)) return true;
         return false;
     }
 
     public static List<Campo> Alterados(Opportunity o)
     {
         var lista = new List<Campo>();
-        if (string.IsNullOrEmpty(o.CrmSnapshot)) return lista;
         var crm = Ler(o.CrmSnapshot);
         foreach (var campo in Protegidos)
-        {
-            if (!crm.TryGetValue(campo, out var v)) continue;
-            var atual = Valor(o, campo);
-            if (Diferente(campo, v, atual)) lista.Add(new Campo(campo, Rotulo(campo), v, atual));
-        }
+            if (Avalia(o, campo, crm, out var v)) lista.Add(new Campo(campo, Rotulo(campo), v ?? "", Valor(o, campo)));
         return lista;
     }
 
@@ -168,10 +194,8 @@ public static class AlteracoesCrm
     /// (assim o atributo nem é gerado).</summary>
     public static string? Descricao(Opportunity o, string campo)
     {
-        if (ValorCrm(o, campo) is not { } crm) return null;
-        var atual = Valor(o, campo);
-        if (!Diferente(campo, crm, atual)) return null;
-        return $"Alterado no sistema{QuemQuando(o, campo)} · No CRM: {Mostrar(campo, crm)} · Aqui: {Mostrar(campo, atual)}";
+        if (!Avalia(o, campo, Ler(o.CrmSnapshot), out var crm)) return null;
+        return $"Alterado no sistema{QuemQuando(o, campo)} · No CRM: {Mostrar(campo, crm)} · Aqui: {Mostrar(campo, Valor(o, campo))}";
     }
 
     private static double Num(string? s)

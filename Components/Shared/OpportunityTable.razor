@@ -599,8 +599,8 @@
         var hoje = _today.ToString("yyyy-MM-dd");
         // Data e valor ganham carimbo próprio: é o que a dica "alterado no
         // sistema" mostra quando alguém pergunta desde quando aquilo vale.
-        if (AlteracoesCrm.Diferente(nameof(Opportunity.ExpectedDate), _editAntes.ExpectedDate, _edit.ExpectedDate)) _edit.DateChangedAt = hoje;
-        if (AlteracoesCrm.Diferente(nameof(Opportunity.AmountOriginal), _editAntes.AmountOriginal, _edit.AmountOriginal)) _edit.ValueChangedAt = hoje;
+        if (AlteracoesCrm.Mudou(nameof(Opportunity.ExpectedDate), _editAntes.ExpectedDate, _edit.ExpectedDate)) _edit.DateChangedAt = hoje;
+        if (AlteracoesCrm.Mudou(nameof(Opportunity.AmountOriginal), _editAntes.AmountOriginal, _edit.AmountOriginal)) _edit.ValueChangedAt = hoje;
         _edit.UpdatedAt = hoje;
         // Quem está logado, não o vendedor da carteira: é a pessoa que mexeu.
         _edit.UpdatedBy = _user;
