@@ -1624,6 +1624,9 @@ tr.row-perdida td.col-strong { color: #a52a1f; }
 tr.row-perdida td:first-child { box-shadow: inset 3px 0 0 var(--neg); }
 .perdida-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #fff; background: var(--neg); vertical-align: middle; }
 .row-act.lost:hover, .row-act.lost.on { color: var(--neg); background: var(--neg-bg); }
+/* Considerar dados do CRM: aceso quando há algo alterado no sistema para desfazer. */
+.row-act.crm.on { color: var(--info); }
+.row-act.crm:hover { color: var(--info); background: var(--info-bg); }
 
 /* ---- Alterado no sistema (valor diferente do que o CRM trouxe) ---------
    Cantinho no canto da célula, como o Excel marca comentário: discreto na

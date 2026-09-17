@@ -54,7 +54,7 @@
                         {
                             <button class="row-act pend" title="Indicada na previsão, mas faltam dados: @string.Join(", ", o.PendenciasPrevisao)" @onclick="() => AbrirPendencias(o)" @onclick:stopPropagation="true">@Icons.Svg("alert")</button>
                         }
-                        <button class="row-act sell" title="Indicar venda — mover para o Controle (Ofertas e pedidos)" @onclick="() => OpenSell(o)" @onclick:stopPropagation="true">@Icons.Svg("dollar")</button>
+                        <button class="row-act crm @(AlteracoesCrm.Alterada(o) ? "on" : "")" title="@(AlteracoesCrm.Alterada(o) ? "Considerar dados do CRM — desfaz as alterações feitas no sistema e volta aos valores do CRM" : "Considerar dados do CRM — nada diferente do CRM nesta oportunidade")" @onclick="() => AskCrm(o)" @onclick:stopPropagation="true">@Icons.Svg("history")</button>
                         <button class="row-act lost @(o.PerdidaValue ? "on" : "")" title="@(o.PerdidaValue ? "Reabrir — tirar a marca de perdida" : "Indicar perdido — a oportunidade fica onde está, só ganha a marca")" @onclick="() => AskPerdida(o)" @onclick:stopPropagation="true">@Icons.Svg("x")</button>
                         <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
                         <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
@@ -183,57 +183,36 @@
     </div>
 }
 
-@* ---- Indicar venda: confirmar/editar os dados que vão para o Controle ---- *@
-@if (_sell is not null && _sellReg is not null)
+@* ---- Considerar dados do CRM: desfaz o que foi alterado no sistema ---- *@
+@if (_crm is not null)
 {
-    <div class="drawer-backdrop" @onclick="() => _sell = null"></div>
-    <div class="confirm-box" style="width:min(640px,calc(100vw - 32px))">
-        <div class="confirm-head">@Icons.Svg("dollar")<span>Indicar venda</span></div>
-        <p class="confirm-text">Confira e, se precisar, <strong>edite</strong> os dados. Ao confirmar, a oferta <strong>sai das Oportunidades</strong> e vai para o <strong>Controle · Ofertas e pedidos</strong>.</p>
-        <div class="form-grid">
-            <label class="fld">Oferta (proposta)<input class="field" @bind="_sellReg.Oferta" /></label>
-            <label class="fld">Pedido (PV)<input class="field" @bind="_sellReg.Pedido" /></label>
-            <label class="fld full">Cliente<input class="field" @bind="_sellReg.Cliente" /></label>
-            <label class="fld">Mercado<input class="field" @bind="_sellReg.Mercado" /></label>
-            <label class="fld">Vendedor (KAM)<input class="field" @bind="_sellReg.Kam" /></label>
-            <label class="fld">Tipo
-                <select class="field" @bind="_sellReg.Tipo">
-                    <option value="">—</option>
-                    @foreach (var t in ControleRegistro.Tipos){<option value="@t">@t</option>}
-                </select>
-            </label>
-            <label class="fld">Status<input class="field" list="dl-status-oferta" @bind="_sellReg.Status" placeholder="situação da oferta" /></label>
-            <label class="fld">Valor Líquido (R$)<input class="field num" @bind="_sellReg.ValorLiquido" /></label>
-            <label class="fld">Classificação do valor <span class="hint">define a cor na tabela do Controle</span>
-                <select class="field" @bind="_sellReg.Classificacao">
-                    <option value="">—</option>
-                    @foreach (var c in ControleRegistro.Classificacoes){<option value="@c">@c</option>}
-                </select>
-            </label>
-            <label class="fld">POC
-                <select class="field" @bind="_sellReg.Poc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
-            </label>
-            <label class="fld">Moeda de origem<input class="field" @bind="_sellReg.Moeda" /></label>
-            <label class="fld">Valor na moeda de origem<input class="field num" @bind="_sellReg.ValorOriginal" /></label>
-            <label class="fld">Semana<input class="field num" @bind="_sellReg.Semana" /></label>
-            <label class="fld">Mês
-                @* Número, não nome: é o que o Controle usa para achar o câmbio
-                   de fechamento do mês da oferta. *@
-                <select class="field" @bind="_sellReg.Mes"><option value="">—</option>@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
-            </label>
-            <label class="fld full">Observação<textarea class="field" rows="2" @bind="_sellReg.Observacao"></textarea></label>
-            <label class="fld full">Nota de atenção <span class="hint">se preenchida, a oferta fica destacada para o Controle</span>
-                <textarea class="field" rows="2" @bind="_sellReg.Atencao" placeholder="Ex.: pendência documental, aguardando aprovação…"></textarea>
-            </label>
-        </div>
-        <datalist id="dl-status-oferta">@foreach (var v in Lists.Items("status_oferta")){<option value="@v" />}</datalist>
-        @if (!string.IsNullOrEmpty(_sellErr)) { <div class="confirm-err">@_sellErr</div> }
-        <div class="modal-actions">
-            <button class="btn-ghost" disabled="@_sellBusy" @onclick="() => _sell = null">Cancelar</button>
-            <button class="btn-primary" disabled="@_sellBusy" @onclick="ConfirmSell">
-                @if (_sellBusy) { <span class="spinner-sm"></span><text>Movendo…</text> } else { @Icons.Svg("check") <text>OK, indicar venda</text> }
-            </button>
-        </div>
+    var difs = AlteracoesCrm.Alterados(_crm).Where(c => !AlteracoesCrm.SemInfo(c.ValorCrm)).ToList();
+    <div class="drawer-backdrop" @onclick="() => _crm = null"></div>
+    <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
+        <div class="confirm-head">@Icons.Svg("history")<span>Considerar dados do CRM</span></div>
+        @if (difs.Count == 0)
+        {
+            <p class="confirm-text">Nada a desfazer em <strong>@_crm.Name</strong> (@_crm.ProposalNumber): os campos já estão iguais ao que o CRM trouxe — ou o CRM não trouxe valor para os campos que foram alterados.</p>
+            <div class="modal-actions"><button class="btn-ghost" @onclick="() => _crm = null">Fechar</button></div>
+        }
+        else
+        {
+            <p class="confirm-text">Em <strong>@_crm.Name</strong> (@_crm.ProposalNumber), os campos abaixo voltam ao valor do CRM. O que foi preenchido no sistema nesses campos deixa de valer.</p>
+            <table class="alt-lista">
+                <thead><tr><th>Campo</th><th class="num">No sistema</th><th class="num">Volta para (CRM)</th></tr></thead>
+                <tbody>
+                    @foreach (var c in difs)
+                    {
+                        <tr><td>@c.Rotulo</td><td class="num crm">@AlteracoesCrm.Mostrar(c.Nome, c.ValorSistema)</td><td class="num sis">@AlteracoesCrm.Mostrar(c.Nome, c.ValorCrm)</td></tr>
+                    }
+                </tbody>
+            </table>
+            <p class="confirm-text" style="font-size:12px;color:var(--muted);margin-top:10px">Campos que o CRM trouxe vazios ficam como estão.</p>
+            <div class="modal-actions">
+                <button class="btn-ghost" @onclick="() => _crm = null">Cancelar</button>
+                <button class="btn-primary" @onclick="ConfirmCrm">@Icons.Svg("history")Considerar dados do CRM</button>
+            </div>
+        }
     </div>
 }
 
@@ -683,57 +662,36 @@
         await OnChanged.InvokeAsync();
     }
 
-    // ---- Indicar venda: move a oportunidade para o Controle (Ofertas e pedidos) ----
-    private Opportunity? _sell;
-    private ControleRegistro? _sellReg;
-    private string _sellErr = "";
-    private bool _sellBusy;
+    // ---- Considerar dados do CRM: desfaz o que foi alterado no sistema ----
+    // Volta cada campo protegido ao valor que o CRM trouxe por último. Só mexe
+    // onde o CRM tem valor: campo que o CRM trouxe vazio fica como está — não há
+    // "dado do CRM" para considerar ali.
+    private Opportunity? _crm;
+    private void AskCrm(Opportunity o) => _crm = o;
 
-    // Monta um rascunho editável do registro (Ofertas e pedidos) a partir da proposta.
-    private void OpenSell(Opportunity o)
+    private async Task ConfirmCrm()
     {
-        _sell = o; _sellErr = ""; _sellBusy = false;
-        var d = o.ExpectedDateValue;
-        _sellReg = new ControleRegistro
+        if (_crm is null) return;
+        var full = Repo.GetFresh(_crm.Id) ?? Repo.Get(_crm.Id) ?? _crm;
+        var valores = AlteracoesCrm.Ler(full.CrmSnapshot);
+        var mudou = false;
+        foreach (var campo in AlteracoesCrm.Protegidos)
         {
-            Oferta = string.IsNullOrWhiteSpace(o.ProposalNumber) ? o.Name : o.ProposalNumber,
-            Pedido = o.PvNumber,
-            Cliente = Cat.CustomerName(o.CustomerId),
-            Mercado = Cat.MarketName(o.MarketId),
-            Kam = OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId)),
-            ValorLiquido = o.AmountBrl.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-            Semana = d is { } dd ? System.Globalization.ISOWeek.GetWeekOfYear(dd).ToString() : "",
-            Mes = d is { } dm ? dm.Month.ToString() : "",
-            Poc = "",
-            Moeda = string.IsNullOrWhiteSpace(o.CurrencyCode) ? "BRL" : o.CurrencyCode,
-            ValorOriginal = o.AmountOriginalValue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-            Observacao = o.Notes ?? "",
-            OppId = o.Id,           // permite devolver a oferta às Oportunidades
-        };
-    }
-
-    private async Task ConfirmSell()
-    {
-        if (_sell is null || _sellReg is null || _sellBusy) return;
-        _sellBusy = true; _sellErr = "";
-        var o = _sell;
-        var reg = _sellReg;
-        try
-        {
-            await Task.Run(() =>
-            {
-                Controle.SaveRegistro(reg, _user);   // usa os valores (possivelmente editados)
-
-                var full = Repo.GetFresh(o.Id) ?? Repo.Get(o.Id) ?? o;
-                full.MovidaControle = "Sim";
-                full.UpdatedAt = _today.ToString("yyyy-MM-dd");
-                full.UpdatedBy = _user;
-                Repo.Save(full);
-            });
-            _sell = null; _sellReg = null;
-            await OnChanged.InvokeAsync();
+            if (!valores.TryGetValue(campo, out var doCrm) || AlteracoesCrm.SemInfo(doCrm)) continue;
+            if (!AlteracoesCrm.Diferente(campo, doCrm, AlteracoesCrm.Valor(full, campo))) continue;
+            typeof(Opportunity).GetProperty(campo)?.SetValue(full, doCrm);
+            // Sem carimbo de edição à mão: o campo volta a ser "do CRM".
+            if (campo == nameof(Opportunity.ExpectedDate)) full.DateChangedAt = "";
+            if (campo == nameof(Opportunity.AmountOriginal)) full.ValueChangedAt = "";
+            mudou = true;
         }
-        catch (Exception ex) { _sellErr = "Falha ao indicar a venda: " + ex.Message; }
-        finally { _sellBusy = false; }
+        if (mudou)
+        {
+            full.UpdatedAt = _today.ToString("yyyy-MM-dd");
+            full.UpdatedBy = _user;
+            Repo.Save(full);
+        }
+        _crm = null;
+        await OnChanged.InvokeAsync();
     }
 }
