@@ -76,6 +76,7 @@
         }
         <div class="modal-actions">
             <button class="btn-ghost" @onclick="() => _altOpen = false">Fechar</button>
+            <button class="btn-ghost" title="Planilha com TODAS as oportunidades do recorte: cada campo protegido, o valor que o CRM trouxe, o valor no sistema e se são diferentes — para auditar o que a base guarda" @onclick="ExportarAuditoria">@Icons.Svg("download")Auditoria completa (.xlsx)</button>
             <button class="btn-primary" disabled="@(linhas.Count == 0)" @onclick="ExportarAlteracoes">@Icons.Svg("download")Exportar Excel</button>
         </div>
     </div>
@@ -634,6 +635,54 @@
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         await JS.InvokeVoidAsync("appDownload", $"alteradas_no_sistema_{_today:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
+    }
+
+    // Auditoria: TODAS as oportunidades do recorte, campo a campo, com o valor
+    // que o CRM trouxe, o valor no sistema e se diferem — inclusive as que não
+    // têm memória. É a prova concreta do que a base guarda, para quando "eu sei
+    // que foi alterado" e o filtro discordam.
+    private async Task ExportarAuditoria()
+    {
+        var rows = Rows;
+        using var wb = new ClosedXML.Excel.XLWorkbook();
+        var ws = wb.Worksheets.Add("Memória do CRM");
+        var cab = new[] { "Proposta", "Oportunidade", "Cliente", "Vendedor", "Tem memória do CRM", "Campo",
+                          "Valor no CRM", "Valor no sistema", "Diferente", "Última alteração por", "Última alteração em" };
+        for (var c = 0; c < cab.Length; c++)
+        {
+            ws.Cell(1, c + 1).Value = cab[c];
+            ws.Cell(1, c + 1).Style.Font.Bold = true;
+        }
+        var r = 2;
+        foreach (var o in rows)
+        {
+            var temMemoria = !string.IsNullOrEmpty(o.CrmSnapshot);
+            var crm = AlteracoesCrm.Ler(o.CrmSnapshot);
+            foreach (var campo in AlteracoesCrm.Protegidos)
+            {
+                var noCrm = crm.TryGetValue(campo, out var v) ? v : null;
+                var aqui = AlteracoesCrm.Valor(o, campo);
+                ws.Cell(r, 1).Value = o.ProposalNumber;
+                ws.Cell(r, 2).Value = o.Name;
+                ws.Cell(r, 3).Value = Cat.CustomerName(o.CustomerId);
+                ws.Cell(r, 4).Value = KamName(o);
+                ws.Cell(r, 5).Value = temMemoria ? "Sim" : "Não";
+                ws.Cell(r, 6).Value = AlteracoesCrm.Rotulo(campo);
+                ws.Cell(r, 7).Value = noCrm is null ? "(sem memória)" : AlteracoesCrm.Mostrar(campo, noCrm);
+                ws.Cell(r, 8).Value = AlteracoesCrm.Mostrar(campo, aqui);
+                ws.Cell(r, 9).Value = noCrm is not null && AlteracoesCrm.Diferente(campo, noCrm, aqui) ? "Sim" : "Não";
+                ws.Cell(r, 10).Value = AlteracoesCrm.Quem(o);
+                ws.Cell(r, 11).Value = Fmt.Date(AlteracoesCrm.Quando(o, campo));
+                r++;
+            }
+        }
+        ws.SheetView.FreezeRows(1);
+        ws.RangeUsed()?.SetAutoFilter();
+        ws.Columns().AdjustToContents();
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        await JS.InvokeVoidAsync("appDownload", $"auditoria_memoria_crm_{_today:yyyy-MM-dd}.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
     }
 
