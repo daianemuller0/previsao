@@ -266,6 +266,7 @@ public sealed class DataSyncService
         nameof(Opportunity.Indicada),         // indicada na previsão
         nameof(Opportunity.MovidaControle),   // venda indicada → Controle
         nameof(Opportunity.Kyc),
+        nameof(Opportunity.Perdida),          // indicada como perdida pelo vendedor
         nameof(Opportunity.Top10),
         nameof(Opportunity.PlantId),
         nameof(Opportunity.ForecastCategory), // escolha do usuário na tela
@@ -307,40 +308,16 @@ public sealed class DataSyncService
     // última importação. Se a planilha repetir aquele mesmo valor, ela não tem
     // novidade e o preenchimento do sistema fica. Se ela vier com outro valor, o
     // CRM realmente mexeu e passa a mandar de novo.
+    // A lista, os separadores e a leitura vivem em AlteracoesCrm: é a mesma
+    // memória que a tela usa para mostrar o que foi alterado no sistema.
     private static readonly System.Reflection.PropertyInfo[] CamposProtegidos =
-        new[]
-        {
-            nameof(Opportunity.ExpectedDate),              // data prevista
-            nameof(Opportunity.AmountOriginal),            // Net Value
-            nameof(Opportunity.WinProbability),            // % de ganho
-            nameof(Opportunity.CloseInPeriodProbability),  // % de sair no mês
-            nameof(Opportunity.GmPercent),                 // PM %
-            nameof(Opportunity.Ramp),
-            nameof(Opportunity.Otp),
-            nameof(Opportunity.Notes),                     // observação
-        }
-        .Select(n => typeof(Opportunity).GetProperty(n)!)
-        .ToArray();
-
-    // Separadores fora do teclado: observação e nomes de cliente podem conter
-    // ";" e "=", que quebrariam um formato mais óbvio.
-    private const char SepCampo = '\u001F', SepValor = '\u001E';
+        AlteracoesCrm.Protegidos.Select(n => typeof(Opportunity).GetProperty(n)!).ToArray();
 
     private static string SerializarCrm(Opportunity o) =>
-        string.Join(SepCampo, CamposProtegidos
-            .Select(p => p.Name + SepValor + ((string?)p.GetValue(o) ?? "")));
+        string.Join(AlteracoesCrm.SepCampo, CamposProtegidos
+            .Select(p => p.Name + AlteracoesCrm.SepValor + ((string?)p.GetValue(o) ?? "")));
 
-    private static Dictionary<string, string> LerCrm(string s)
-    {
-        var d = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (string.IsNullOrEmpty(s)) return d;
-        foreach (var item in s.Split(SepCampo))
-        {
-            var i = item.IndexOf(SepValor);
-            if (i > 0) d[item[..i]] = item[(i + 1)..];
-        }
-        return d;
-    }
+    private static Dictionary<string, string> LerCrm(string s) => AlteracoesCrm.Ler(s);
 
     /// <summary>Primeira vez que a linha entra: a planilha é a referência, e o que
     /// ela trouxe vira a memória contra a qual as próximas leituras são comparadas.</summary>

@@ -22,7 +22,7 @@ public class OpportunityRepository
         "value_changed_at, date_changed_at, servico_previsto, market_onestream, ramp, coluna1, otp, top10, " +
         "stage, commercial_segment, process, brand, end_user_site, chance, customer_ref, is_inter_company, " +
         "description, status_description, amount_raw, indicada, setor, movida_controle, kyc, " +
-        "crm_snapshot";
+        "crm_snapshot, perdida";
 
     private readonly ParquetStore _store;
     private readonly object _lock = new();
@@ -100,6 +100,7 @@ public class OpportunityRepository
             MovidaControle = S(r, 55),
             Kyc = S(r, 56),
             CrmSnapshot = S(r, 57),
+            Perdida = S(r, 58),
         };
 
     /// <summary>Relê UMA oportunidade direto dos Parquet, ignorando o cache.
@@ -154,6 +155,7 @@ public class OpportunityRepository
         [nameof(Opportunity.Notes)] = "Observação", [nameof(Opportunity.NextAction)] = "Próxima ação",
         [nameof(Opportunity.Risks)] = "Riscos", [nameof(Opportunity.Stage)] = "Etapa do funil",
         [nameof(Opportunity.Setor)] = "Setor", [nameof(Opportunity.MovidaControle)] = "Movida para o Controle",
+        [nameof(Opportunity.Perdida)] = "Perdida",
     };
 
     // Garante o cache carregado (dentro do lock).
@@ -271,6 +273,7 @@ public class OpportunityRepository
             new("movida_controle", o.MovidaControle),
             new("kyc", o.Kyc),
             new("crm_snapshot", o.CrmSnapshot),
+            new("perdida", o.Perdida),
         };
 
     public void Delete(string id)
@@ -321,5 +324,6 @@ public class OpportunityRepository
         IsInterCompany = o.IsInterCompany, Description = o.Description, StatusDescription = o.StatusDescription,
         AmountRaw = o.AmountRaw, Indicada = o.Indicada, Setor = o.Setor,
         MovidaControle = o.MovidaControle, Kyc = o.Kyc, CrmSnapshot = o.CrmSnapshot,
+        Perdida = o.Perdida,
     };
 }

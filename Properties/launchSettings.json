@@ -3,7 +3,6 @@
     "HowdenSalesForecast": {
       "commandName": "Project",
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:5080",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
