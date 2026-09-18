@@ -13,6 +13,13 @@ namespace HowdenSalesForecast.Data;
 // cabeçalho que ela traz; cada linha do AFM entra nessas colunas pelo De-Para
 // de letras combinado com a área (coluna do AFM → coluna do NB).
 //
+// As planilhas seguem o formato da exportação do CRM, o mesmo da importação
+// de oportunidades: linhas de título antes do cabeçalho de verdade, coluna A
+// em branco e uma linha de totais no fim. A regra aqui é a mesma de lá: o
+// cabeçalho é a primeira linha "cheia", o que vem antes é descartado, a
+// coluna em branco é ignorada (a primeira preenchida passa a contar como "A")
+// e a leitura para na linha de totais.
+//
 // Três colunas pedem tratamento: o vendedor (K do AFM → M do NB) e o aplicador
 // (AB → AD) têm nomes escritos de forma diferente nos dois CRMs e são casados
 // por uma tabela de equivalência; o valor do AFM (N) vem em dólar e é
@@ -129,24 +136,22 @@ public sealed class AplicacaoService
             ?? Opportunity.BrlPerUsd;
         if (d.TaxaUsd <= 0) d.Avisos.Add("Sem taxa USD cadastrada no Controle: os valores do AFM ficaram zerados.");
 
-        var gradeNb = nb is null ? null : Ler(nb, d.Avisos, "NB");
-        var gradeAfm = afm is null ? null : Ler(afm, d.Avisos, "AFM");
+        var planNb = nb is null ? null : Ler(nb, d.Avisos, "NB");
+        var planAfm = afm is null ? null : Ler(afm, d.Avisos, "AFM");
         if (nb is null) d.Avisos.Add($"Planilha do NB não encontrada em: {NbPath}");
         if (afm is null) d.Avisos.Add($"Planilha do AFM não encontrada em: {AfmPath}");
 
         // Colunas da tabela = colunas do NB que participam do De-Para, na ordem
         // da planilha, com o cabeçalho do NB (ou, se o NB não veio, o do AFM).
         var letrasNb = DePara.Select(p => p.Nb).Distinct().OrderBy(Idx).ToList();
-        var cabNb = gradeNb is { Count: > 0 } ? Cabecalho(gradeNb) : null;
-        var cabAfm = gradeAfm is { Count: > 0 } ? Cabecalho(gradeAfm) : null;
         for (var i = 0; i < letrasNb.Count; i++)
         {
             var letra = letrasNb[i];
-            var rotulo = cabNb is not null ? Texto(cabNb, Idx(letra)) : "";
-            if (rotulo == "" && cabAfm is not null)
+            var rotulo = planNb is not null ? planNb.Texto(planNb.Cab, letra) : "";
+            if (rotulo == "" && planAfm is not null)
             {
                 var deAfm = DePara.FirstOrDefault(p => p.Nb == letra).Afm;
-                if (deAfm is not null) rotulo = Texto(cabAfm, Idx(deAfm));
+                if (deAfm is not null) rotulo = planAfm.Texto(planAfm.Cab, deAfm);
             }
             d.Colunas.Add(new Coluna(letra, rotulo == "" ? letra : rotulo, i));
         }
@@ -156,15 +161,14 @@ public sealed class AplicacaoService
         var iApl = pos.TryGetValue(ColAplicadorNb, out var b) ? b : -1;
 
         // ---- linhas do NB: cada letra na sua coluna, valor já em real ----------
-        if (gradeNb is not null)
+        if (planNb is not null)
         {
-            var (_, dados) = Separar(gradeNb);
-            foreach (var row in dados)
+            foreach (var row in planNb.Dados)
             {
                 var v = new string[d.Colunas.Count];
-                foreach (var c in d.Colunas) v[c.Indice] = Texto(row, Idx(c.Letra));
+                foreach (var c in d.Colunas) v[c.Indice] = planNb.Texto(row, c.Letra);
                 if (v.All(string.IsNullOrWhiteSpace)) continue;
-                var valor = Numero(row, Idx(ColValorNb));
+                var valor = planNb.Numero(row, ColValorNb);
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = valor.ToString("0.##", Inv);
                 d.Linhas.Add(new Linha("NB", v, valor,
                     iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""));
@@ -173,20 +177,19 @@ public sealed class AplicacaoService
         }
 
         // ---- linhas do AFM: passam pelo De-Para, nomes e câmbio ----------------
-        if (gradeAfm is not null)
+        if (planAfm is not null)
         {
-            var (_, dados) = Separar(gradeAfm);
-            foreach (var row in dados)
+            foreach (var row in planAfm.Dados)
             {
                 var v = new string[d.Colunas.Count];
                 foreach (var (colAfm, colNb) in DePara)
-                    if (pos.TryGetValue(colNb, out var i)) v[i] = Texto(row, Idx(colAfm));
+                    if (pos.TryGetValue(colNb, out var i)) v[i] = planAfm.Texto(row, colAfm);
                 if (v.All(string.IsNullOrWhiteSpace)) continue;
 
                 if (iVend >= 0) v[iVend] = Equivalente(v[iVend], VendedorNb);
                 if (iApl >= 0) v[iApl] = Equivalente(v[iApl], AplicadorNb);
 
-                var usd = Numero(row, Idx(ColValorAfm));
+                var usd = planAfm.Numero(row, ColValorAfm);
                 var brl = d.TaxaUsd > 0 ? usd * d.TaxaUsd : 0;
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = brl.ToString("0.##", Inv);
                 d.Linhas.Add(new Linha("AFM", v, brl,
@@ -194,6 +197,85 @@ public sealed class AplicacaoService
                 d.LinhasAfm++;
             }
         }
+    }
+
+    // ---- planilha já preparada -------------------------------------------------
+    // Cab = linha de cabeçalho; Dados = só as linhas de dados (sem título em cima,
+    // sem totais embaixo, sem linhas vazias); Desloc = quantas colunas em branco
+    // há à esquerda — a primeira coluna preenchida é a "A" das letras do De-Para.
+    private sealed class Planilha
+    {
+        public OpportunityImporter.Cel[] Cab { get; init; } = Array.Empty<OpportunityImporter.Cel>();
+        public List<OpportunityImporter.Cel[]> Dados { get; init; } = new();
+        public int Desloc { get; init; }
+
+        public string Texto(OpportunityImporter.Cel[] row, string letra)
+        {
+            var i = Idx(letra) + Desloc;
+            return i >= 0 && i < row.Length ? (row[i].Text ?? "").Trim() : "";
+        }
+
+        public double Numero(OpportunityImporter.Cel[] row, string letra)
+        {
+            var i = Idx(letra) + Desloc;
+            if (i < 0 || i >= row.Length) return 0;
+            if (row[i].Num is { } n) return n;
+            var t = (row[i].Text ?? "").Trim().Replace("R$", "").Replace("US$", "").Replace("$", "").Trim();
+            if (t == "") return 0;
+            // "1.234,56" (pt-BR) ou "1,234.56" (en): decide pelo último separador.
+            var ultVirg = t.LastIndexOf(','); var ultPonto = t.LastIndexOf('.');
+            t = ultVirg > ultPonto ? t.Replace(".", "").Replace(',', '.') : t.Replace(",", "");
+            return double.TryParse(t, NumberStyles.Any, Inv, out var v) ? v : 0;
+        }
+    }
+
+    private static Planilha Preparar(List<OpportunityImporter.Cel[]> grade)
+    {
+        static int Cheias(OpportunityImporter.Cel[] r) => r.Count(c => !string.IsNullOrWhiteSpace(c.Text));
+
+        // Cabeçalho: a primeira linha "cheia" — pelo menos três células e ao menos
+        // metade da linha mais cheia da planilha. Título e data em cima têm uma
+        // ou duas células e ficam de fora.
+        var max = grade.Count == 0 ? 0 : grade.Max(Cheias);
+        var h = 0;
+        for (var i = 0; i < grade.Count; i++)
+            if (Cheias(grade[i]) >= 3 && Cheias(grade[i]) * 2 >= max) { h = i; break; }
+
+        var dados = new List<OpportunityImporter.Cel[]>();
+        foreach (var row in grade.Skip(h + 1))
+        {
+            if (Cheias(row) == 0) continue;
+            if (EhTotal(row)) break;          // rodapé da exportação: daqui para baixo nada é dado
+            dados.Add(row);
+        }
+
+        // Colunas em branco à esquerda (a coluna A da exportação do CRM): vazias
+        // no cabeçalho e em todas as linhas de dados.
+        var desloc = 0;
+        while (Vazia(grade.Count > h ? grade[h] : Array.Empty<OpportunityImporter.Cel>(), desloc)
+               && dados.All(r => Vazia(r, desloc))
+               && desloc < 5)
+            desloc++;
+
+        return new Planilha { Cab = grade.Count > h ? grade[h] : Array.Empty<OpportunityImporter.Cel>(), Dados = dados, Desloc = desloc };
+    }
+
+    private static bool Vazia(OpportunityImporter.Cel[] row, int i) =>
+        i >= row.Length || string.IsNullOrWhiteSpace(row[i].Text);
+
+    // Linha de totais / rodapé da exportação (mesmos sinais da importação).
+    private static bool EhTotal(OpportunityImporter.Cel[] row)
+    {
+        foreach (var c in row)
+        {
+            var n = OpportunityImporter.Normalizar(c.Text ?? "");
+            if (n == "") continue;
+            if (n is "total" or "sum" or "count" or "grand total" or "subtotal" or "totais") return true;
+            if (n.Contains("confidential information") || n.Contains("do not distribute")
+                || n.Contains("salesforce.com") || n.Contains("copyright")) return true;
+            return false;                    // a primeira célula preenchida decide
+        }
+        return false;
     }
 
     // ---- utilitários -----------------------------------------------------------
@@ -205,7 +287,7 @@ public sealed class AplicacaoService
         return tabela.TryGetValue(OpportunityImporter.Normalizar(n), out var nb) ? nb : n;
     }
 
-    private static List<OpportunityImporter.Cel[]>? Ler(string file, List<string> avisos, string rotulo)
+    private static Planilha? Ler(string file, List<string> avisos, string rotulo)
     {
         try
         {
@@ -215,46 +297,20 @@ public sealed class AplicacaoService
             fs.CopyTo(ms);
             ms.Position = 0;
             var grade = OpportunityImporter.LerGrade(Path.GetFileName(file), ms);
-            if (grade.Count == 0) avisos.Add($"Planilha do {rotulo} está vazia: {Path.GetFileName(file)}");
-            return grade;
+            if (grade.Count == 0)
+            {
+                avisos.Add($"Planilha do {rotulo} está vazia: {Path.GetFileName(file)}");
+                return null;
+            }
+            var plan = Preparar(grade);
+            if (plan.Dados.Count == 0) avisos.Add($"Planilha do {rotulo} sem linhas de dados abaixo do cabeçalho: {Path.GetFileName(file)}");
+            return plan;
         }
         catch (Exception ex)
         {
             avisos.Add($"Não foi possível ler a planilha do {rotulo} ({Path.GetFileName(file)}): {ex.Message}");
             return null;
         }
-    }
-
-    // Cabeçalho = primeira linha com pelo menos três células preenchidas; o que
-    // vem antes é título/metadado, o que vem depois é dado.
-    private static int LinhaCabecalho(List<OpportunityImporter.Cel[]> grade)
-    {
-        for (var i = 0; i < grade.Count; i++)
-            if (grade[i].Count(c => !string.IsNullOrWhiteSpace(c.Text)) >= 3) return i;
-        return 0;
-    }
-
-    private static OpportunityImporter.Cel[] Cabecalho(List<OpportunityImporter.Cel[]> grade) => grade[LinhaCabecalho(grade)];
-
-    private static (OpportunityImporter.Cel[] Cab, IEnumerable<OpportunityImporter.Cel[]> Dados) Separar(List<OpportunityImporter.Cel[]> grade)
-    {
-        var h = LinhaCabecalho(grade);
-        return (grade[h], grade.Skip(h + 1));
-    }
-
-    private static string Texto(OpportunityImporter.Cel[] row, int i) =>
-        i >= 0 && i < row.Length ? (row[i].Text ?? "").Trim() : "";
-
-    private static double Numero(OpportunityImporter.Cel[] row, int i)
-    {
-        if (i < 0 || i >= row.Length) return 0;
-        if (row[i].Num is { } n) return n;
-        var t = (row[i].Text ?? "").Trim().Replace("R$", "").Replace("US$", "").Replace("$", "").Trim();
-        if (t == "") return 0;
-        // "1.234,56" (pt-BR) ou "1,234.56" (en): decide pelo último separador.
-        var ultVirg = t.LastIndexOf(','); var ultPonto = t.LastIndexOf('.');
-        t = ultVirg > ultPonto ? t.Replace(".", "").Replace(',', '.') : t.Replace(",", "");
-        return double.TryParse(t, NumberStyles.Any, Inv, out var v) ? v : 0;
     }
 
     /// <summary>Letra de coluna do Excel → índice (A=0 … Z=25, AA=26, AD=29).</summary>
