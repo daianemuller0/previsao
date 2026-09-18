@@ -13,10 +13,9 @@ namespace HowdenSalesForecast.Data;
 // cabeçalho que ela traz; cada linha do AFM entra nessas colunas pelo De-Para
 // de letras combinado com a área (coluna do AFM → coluna do NB).
 //
-// As planilhas seguem o formato da exportação do CRM: linhas de título antes
-// do cabeçalho de verdade (no NB, o cabeçalho é a linha 14 — configurável) e
-// uma linha de totais no fim. O que vem antes do cabeçalho é descartado e a
-// leitura para na linha de totais. As LETRAS são as do Excel, sem deslocar —
+// A linha do cabeçalho é configurável por planilha (no NB é a primeira; no
+// AFM é descoberta: a primeira linha cheia). O que vem antes é descartado e a
+// leitura para na linha de totais/rodapé, se houver. As LETRAS são as do Excel, sem deslocar —
 // a coluna A do NB, que ninguém usa, simplesmente não entra na tabela.
 //
 // Três colunas pedem tratamento: o vendedor (K do AFM → M do NB) e o aplicador
@@ -108,7 +107,7 @@ public sealed class AplicacaoService
     public string AfmPath => _cfg["Aplicadores:AfmPath"] ?? "";
     public string NbPath => _cfg["Aplicadores:NbPath"] ?? "";
     /// <summary>Linha (1 = primeira) em que está o cabeçalho; 0 = descobrir sozinho.</summary>
-    public int NbHeaderRow => _cfg.GetValue("Aplicadores:NbHeaderRow", 14);
+    public int NbHeaderRow => _cfg.GetValue("Aplicadores:NbHeaderRow", 1);
     public int AfmHeaderRow => _cfg.GetValue("Aplicadores:AfmHeaderRow", 0);
 
     /// <summary>Tabela unificada. Relê os arquivos só quando mudaram na rede
