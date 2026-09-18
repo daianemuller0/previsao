@@ -219,6 +219,41 @@ else if (_dados is { } d)
     }
 }
 
+@* ---- Guia da proposta: todos os campos da linha, aberta com dois cliques ---- *@
+@if (_detalhe is { } p && _dados is { } dd)
+{
+    var hojeD = DateTime.Today;
+    <div class="drawer-backdrop" @onclick="() => _detalhe = null"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">@Traco(p.Chave)</h2>
+                <p class="subtitle"><span class="setor-tag setor-@p.Origem.ToLower()">@p.Origem</span> · @Traco(p.Aplicador) · @Traco(p.Vendedor)</p>
+            </div>
+            <button class="icon-btn" @onclick="() => _detalhe = null">@Icons.Svg("x")</button>
+        </div>
+
+        <div class="exec-grid cols-2" style="margin-bottom:14px">
+            <div class="fact"><div class="fact-label">Valor TOTAL</div><div class="fact-value">@Fmt.Brl(p.ValorBrl)</div></div>
+            <div class="fact"><div class="fact-label">Situação</div><div class="fact-value">
+                @if (p.Actual is { } env) { <text>Enviada em @env.ToString("dd/MM/yyyy")</text> }
+                else if (Atrasada(p)) { <span style="color:var(--neg)">Atrasada · @((hojeD - p.Due!.Value).Days) dia(s)</span> }
+                else { <text>Pendente de envio</text> }
+            </div></div>
+            <div class="fact"><div class="fact-label">Prazo do cliente (Due)</div><div class="fact-value">@(p.Due is { } due ? due.ToString("dd/MM/yyyy") : "—")</div></div>
+            <div class="fact"><div class="fact-label">GM</div><div class="fact-value">@(p.Gm is { } gm ? Fmt.Pct(gm, 1) : "—")</div></div>
+        </div>
+
+        @* Todas as colunas da tabela, na ordem, com o título do AFM. *@
+        <dl>
+            @foreach (var c in dd.Colunas)
+            {
+                <div class="dl"><dt title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</dt><dd>@(c.Indice == dd.IndiceValor ? Fmt.Brl(p.ValorBrl) : Traco(p.Valores[c.Indice]))</dd></div>
+            }
+        </dl>
+    </div>
+}
+
 @code {
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
     private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -238,6 +273,7 @@ else if (_dados is { } d)
     private HashSet<string> _vendedores = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
     private bool _soAtrasadas;   // sem Actual e com o Due já vencido
+    private AplicacaoService.Linha? _detalhe;   // proposta aberta com dois cliques
     private string _dataCampo = "actual";   // janela de tempo por Actual (envio) ou Due (prazo)
     private DateTime? _de, _ate;
 
@@ -363,7 +399,7 @@ else if (_dados is { } d)
                 <tbody>
                     @foreach (var l in rows)
                     {
-                        <tr class="@classeLinha">
+                        <tr class="clickable @classeLinha" title="Dois cliques abrem a proposta" @ondblclick="() => _detalhe = l">
                             <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
                             @if (extra is not null) { <td class="right num col-strong">@extra(l)</td> }
                             @foreach (var c in d.Colunas)
