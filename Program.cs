@@ -105,6 +105,8 @@ builder.Services.AddHostedService<CompactionService>();
 builder.Services.AddHostedService<AtualizacaoAgendada>();
 // Sincronização das bases (planilhas do CRM na rede): New Business + Aftermarket.
 builder.Services.AddSingleton<DataSyncService>();
+// Guia Aplicação: planilhas de aplicadores (AFM + NB) unificadas numa tabela.
+builder.Services.AddSingleton<AplicacaoService>();
 // Recorte das telas durante a sessão: abrir uma proposta e voltar não refaz os
 // filtros. Scoped = por circuito, ou seja, por pessoa e por aba do navegador.
 builder.Services.AddScoped<FiltroMemoria>();

@@ -1,0 +1,749 @@
+@page "/aplicacao"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AplicacaoService Aplic
+@inject ChartPrefsRepository ChartPrefs
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Aplicação</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Aplicação</h1>
+        <p class="subtitle">Planilhas de aplicadores do Aftermarket e do New Business numa tabela só · desempenho por aplicador</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-ghost" title="Reler as planilhas da rede agora" disabled="@_lendo" @onclick="() => Carregar(true)">@Icons.Svg("import")Atualizar</button>
+        @if (_aba == "dados")
+        {
+            <button class="btn-ghost" title="Exportar a tabela (com os filtros da tela) para Excel" disabled="@(_dados is null || Linhas.Count == 0)" @onclick="Exportar">@Icons.Svg("download")Exportar Excel</button>
+        }
+        else
+        {
+            @* Montar a página: arrastar os painéis e escolher a largura (duplo clique). *@
+            <button class="btn-ghost @(_organizando ? "active" : "")" title="Arrastar os painéis para montar a página do seu jeito · duplo clique num painel alterna a largura" @onclick="AlternarOrganizar">@Icons.Svg("layers")@(_organizando ? "Concluir" : "Organizar")</button>
+            @if (_organizando)
+            {
+                <button class="btn-ghost" title="Voltar à disposição original dos painéis" @onclick="RestaurarLayout">@Icons.Svg("history")Restaurar padrão</button>
+            }
+        }
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab @(_aba == "dados" ? "active" : "")" @onclick='() => TrocarAba("dados")'>Tabela de dados @if (_dados is not null) { <span class="tab-badge">@_dados.Linhas.Count</span> }</button>
+    <button class="tab @(_aba == "desempenho" ? "active" : "")" @onclick='() => TrocarAba("desempenho")'>Desempenho</button>
+</div>
+
+@if (_lendo && _dados is null)
+{
+    <div class="info-banner">Lendo as planilhas da rede…</div>
+}
+else if (_dados is { } d)
+{
+    @* Origem dos dados e avisos de leitura: quem olha a tabela precisa saber de
+       qual arquivo ela veio e com qual câmbio. *@
+    <div class="cfg-kv" style="margin-bottom:6px">
+        <span class="cfg-k">AFM</span><code class="cfg-path">@(d.ArquivoAfm == "" ? "— não encontrada" : d.ArquivoAfm)</code>
+        <span class="muted" style="margin-left:8px">@d.LinhasAfm linha(s) · valores em US$ convertidos a @d.TaxaUsd.ToString("0.0000", _pt) R$/US$</span>
+    </div>
+    <div class="cfg-kv" style="margin-bottom:12px">
+        <span class="cfg-k">NB</span><code class="cfg-path">@(d.ArquivoNb == "" ? "— não encontrada" : d.ArquivoNb)</code>
+        <span class="muted" style="margin-left:8px">@d.LinhasNb linha(s) · valores já em R$</span>
+        @if (d.LidoEm is { } lido) { <span class="muted" style="margin-left:8px">· lido às @lido.ToString("HH:mm")</span> }
+    </div>
+    @foreach (var aviso in d.Avisos)
+    {
+        <div class="confirm-err" style="margin-bottom:8px">@aviso</div>
+    }
+    @if (_aba == "desempenho" && d.ColunasFaltando.Count > 0)
+    {
+        <div class="confirm-err" style="margin-bottom:8px">Colunas que os gráficos usam e não foram achadas no cabeçalho do AFM: <strong>@string.Join(", ", d.ColunasFaltando)</strong>. Os gráficos que dependem delas ficam vazios — confira o título dessas colunas na planilha.</div>
+    }
+
+    <div class="filterbar filterbar-sticky">
+        <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="qualquer coluna…" @bind="_busca" @bind:event="oninput" /></div>
+        <div class="flt"><span class="flt-label">Origem</span>
+            <select @bind="_origem"><option value="">Ambas</option><option value="AFM">AFM</option><option value="NB">NB</option></select>
+        </div>
+        <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
+        <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco) e com o prazo do cliente (Due) já passado"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
+        <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco)"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
+        @* Janela de tempo: pela data de envio (Actual) ou pelo prazo do cliente (Due). *@
+        <div class="flt"><span class="flt-label">Período por</span>
+            <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option></select>
+        </div>
+        <div class="flt" title="Ano da data escolhida em 'Período por'"><span class="flt-label">Ano</span>
+            <select @bind="_ano">
+                <option value="">Todos</option>
+                @foreach (var a in Anos) { <option value="@a">@a</option> }
+            </select>
+        </div>
+        <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_de" /></div>
+        <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_ate" /></div>
+        <div class="filterbar-spacer"></div>
+        <div class="fb-summary">
+            <div class="fb-sum"><span class="fb-sum-k">Propostas</span><span class="fb-sum-v">@Linhas.Count</span></div>
+            @if (d.IndiceValor >= 0)
+            {
+                <div class="fb-sum"><span class="fb-sum-k">Valor TOTAL</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
+            }
+        </div>
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _soPendentes || _ano != "" || _de is not null || _ate is not null)
+        {
+            <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
+        }
+    </div>
+
+    @if (_aba == "dados")
+    {
+        @Tabela(d, Linhas, "70vh")
+    }
+    else
+    {
+        var rows = Linhas;
+        var hoje = DateTime.Today;
+        var atrasadas = rows.Where(Atrasada)
+                            .Select(l => (L: l, Dias: (hoje - l.Due!.Value).Days))
+                            .OrderByDescending(x => x.Dias).ToList();
+        var pendentes = rows.Where(Pendente)
+                            .OrderBy(l => Traco(l.Aplicador), StringComparer.CurrentCultureIgnoreCase)
+                            .ThenBy(l => l.Due ?? DateTime.MaxValue).ToList();
+
+        @* Painéis arrastáveis (Organizar): a ordem e a largura ficam guardadas por usuário. *@
+        <div class="g12 exec-board" id="exec-board">
+
+            <div class="c12" data-pnl="mensal">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador por mês <span class="hint">data de envio = Actual · aplicador = ProposalEngineer</span></div><TelaCheia /></div>
+                    @RenderMensal(rows)
+                </div>
+            </div>
+
+            <div class="c12" data-pnl="atrasadas">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div class="panel-title">Propostas atrasadas <span class="hint">sem data de envio (Actual) e com o prazo do cliente (Due) já passado · @atrasadas.Count</span></div>
+                        <button class="btn-ghost sm" title="Exportar as atrasadas para Excel" disabled="@(atrasadas.Count == 0)" @onclick='() => ExportarLista(atrasadas.Select(x => x.L).ToList(), "propostas_atrasadas", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString())'>@Icons.Svg("download")Exportar Excel</button>
+                        <TelaCheia />
+                    </div>
+                    @if (atrasadas.Count == 0)
+                    {
+                        <div class="empty">Nenhuma proposta atrasada no recorte.</div>
+                    }
+                    else
+                    {
+                        @* As mesmas colunas da Tabela de dados, com os dias de atraso na frente. *@
+                        @Tabela(d, atrasadas.Select(x => x.L).ToList(), "480px", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString(), "row-perdida")
+                    }
+                </div>
+            </div>
+
+            <div class="c12" data-pnl="pendentes">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco) · @pendentes.Count</span></div>
+                        <button class="btn-ghost sm" title="Exportar as pendentes para Excel" disabled="@(pendentes.Count == 0)" @onclick='() => ExportarLista(pendentes, "propostas_pendentes", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "")'>@Icons.Svg("download")Exportar Excel</button>
+                        <TelaCheia />
+                    </div>
+                    @if (pendentes.Count == 0)
+                    {
+                        <div class="empty">Nenhuma proposta pendente no recorte.</div>
+                    }
+                    else
+                    {
+                        @* Mesmas colunas da Tabela de dados; "Dias p/ o prazo" negativo = já passou. *@
+                        @Tabela(d, pendentes, "480px", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "—")
+                    }
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="valor-aplicador">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Valor enviado por aplicador <span class="hint">Valor TOTAL em R$</span></div><TelaCheia /></div>
+                    @RenderBarras(Agrupar(rows, l => l.Aplicador, l => l.ValorBrl), Dinheiro)
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="segmento">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Valor enviado por segmento <span class="hint">Industry · R$</span></div><TelaCheia /></div>
+                    @RenderBarras(Agrupar(rows, l => l.Industry, l => l.ValorBrl), Dinheiro)
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="bu">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Por unidade de negócio <span class="hint">BU · quantidade de propostas</span></div><TelaCheia /></div>
+                    @RenderPizza(Contar(rows, l => l.Bu))
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="gm">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">GM médio por aplicador <span class="hint">margem média das propostas com GM informado</span></div><TelaCheia /></div>
+                    @RenderBarras(Media(rows.Where(l => l.Gm is not null), l => l.Aplicador, l => l.Gm!.Value), v => Fmt.Pct(v, 1))
+                </div>
+            </div>
+
+            <div class="c12" data-pnl="mapa">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div class="panel-title">Por país <span class="hint">aplicador × país · roda p/ zoom · arraste p/ mover</span></div>
+                        <div class="seg-radio" style="margin:0 12px 0 auto">
+                            <label><input type="radio" name="mapa-metrica" checked="@(_mapaMetrica == "qtd")" @onchange='() => _mapaMetrica = "qtd"' /> Quantidade</label>
+                            <label><input type="radio" name="mapa-metrica" checked="@(_mapaMetrica == "valor")" @onchange='() => _mapaMetrica = "valor"' /> Valor TOTAL</label>
+                        </div>
+                        <div class="map-zoom">
+                            <button class="icon-btn" title="Diminuir" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1/1.3)'>@Icons.Svg("down")</button>
+                            <button class="icon-btn" title="Aumentar" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1.3)'>@Icons.Svg("up")</button>
+                            <button class="icon-btn" title="Redefinir" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapId)'>@Icons.Svg("target")</button>
+                        </div>
+                        <TelaCheia />
+                    </div>
+                    @RenderMapa(rows)
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="salesperson">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas por vendedor <span class="hint">Salesperson · quantidade</span></div><TelaCheia /></div>
+                    @RenderBarras(Agrupar(rows, l => l.Vendedor, _ => 1), Inteiro)
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="category">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Por categoria <span class="hint">Category · quantidade de propostas</span></div><TelaCheia /></div>
+                    @RenderPizza(Contar(rows, l => l.Category))
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="origem">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Por origem <span class="hint">NB × AFM · quantidade de propostas</span></div><TelaCheia /></div>
+                    @RenderPizza(Contar(rows, l => l.Origem))
+                </div>
+            </div>
+
+            <div class="c6" data-pnl="prazo">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Tempo médio de envio por aplicador <span class="hint">Due − Actual, em dias · positivo = enviou antes do prazo</span></div><TelaCheia /></div>
+                    @RenderBarras(Media(rows.Where(l => l.Due is not null && l.Actual is not null), l => l.Aplicador, l => (l.Due!.Value - l.Actual!.Value).TotalDays), v => v.ToString("0.0", _pt) + " d", negativos: true)
+                </div>
+            </div>
+
+            <div class="c12" data-pnl="lista">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas do recorte <span class="hint">a mesma lista da aba Tabela de dados · @rows.Count proposta(s)</span></div><TelaCheia /></div>
+                    @Tabela(d, rows, "520px")
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@* ---- Guia da proposta: todos os campos da linha, aberta com dois cliques ---- *@
+@if (_detalhe is { } p && _dados is { } dd)
+{
+    var hojeD = DateTime.Today;
+    <div class="drawer-backdrop" @onclick="() => _detalhe = null"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">@Traco(p.Chave)</h2>
+                <p class="subtitle"><span class="setor-tag setor-@p.Origem.ToLower()">@p.Origem</span> · @Traco(p.Aplicador) · @Traco(p.Vendedor)</p>
+            </div>
+            <button class="icon-btn" @onclick="() => _detalhe = null">@Icons.Svg("x")</button>
+        </div>
+
+        <div class="exec-grid cols-2" style="margin-bottom:14px">
+            <div class="fact"><div class="fact-label">Valor TOTAL</div><div class="fact-value">@Fmt.Brl(p.ValorBrl)</div></div>
+            <div class="fact"><div class="fact-label">Situação</div><div class="fact-value">
+                @if (p.Actual is { } env) { <text>Enviada em @env.ToString("dd/MM/yyyy")</text> }
+                else if (Atrasada(p)) { <span style="color:var(--neg)">Atrasada · @((hojeD - p.Due!.Value).Days) dia(s)</span> }
+                else { <text>Pendente de envio</text> }
+            </div></div>
+            <div class="fact"><div class="fact-label">Prazo do cliente (Due)</div><div class="fact-value">@(p.Due is { } due ? due.ToString("dd/MM/yyyy") : "—")</div></div>
+            <div class="fact"><div class="fact-label">GM</div><div class="fact-value">@(p.Gm is { } gm ? Fmt.Pct(gm, 1) : "—")</div></div>
+        </div>
+
+        @* Todas as colunas da tabela, na ordem, com o título do AFM. *@
+        <dl>
+            @foreach (var c in dd.Colunas)
+            {
+                <div class="dl"><dt title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</dt><dd>@(c.Indice == dd.IndiceValor ? Fmt.Brl(p.ValorBrl) : Traco(p.Valores[c.Indice]))</dd></div>
+            }
+        </dl>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private const string MapId = "worldmap-aplicacao";
+    private const string ChaveLayout = "layout-aplicacao";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _aba = "dados";
+    private AplicacaoService.Dados? _dados;
+    private bool _lendo;
+    private string _login = "";
+    private string _mapaMetrica = "qtd";
+
+    private string _busca = "";
+    private string _origem = "";
+    private HashSet<string> _vendedores = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
+    private bool _soAtrasadas;   // sem Actual e com o Due já vencido
+    private bool _soPendentes;   // sem Actual (ainda não enviada)
+    private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null;
+    private AplicacaoService.Linha? _detalhe;   // proposta aberta com dois cliques
+    private string _dataCampo = "actual";   // janela de tempo por Actual (envio) ou Due (prazo)
+    private string _ano = "";               // ano da data escolhida ("" = todos)
+    private DateTime? _de, _ate;
+
+    // Regra única de "atrasada", usada pelo filtro e pelo painel: ainda não foi
+    // enviada (Actual em branco) e hoje já passou do prazo do cliente (Due).
+    private static bool Atrasada(AplicacaoService.Linha l) =>
+        l.Actual is null && l.Due is { } due && DateTime.Today > due;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var user = (await AuthState).User;
+            _login = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? user.Identity?.Name ?? "";
+        }
+        await Carregar(false);
+    }
+
+    // A leitura vai à rede (duas planilhas): fora da thread da tela, para a
+    // página aparecer na hora com "lendo…" em vez de travar até terminar.
+    private async Task Carregar(bool force)
+    {
+        if (_lendo) return;
+        _lendo = true;
+        try { _dados = await Task.Run(() => Aplic.Carregar(force)); }
+        finally { _lendo = false; }
+    }
+
+    private void TrocarAba(string aba) { _aba = aba; }
+
+    // ---- painel montável (mesmo mecanismo da Visão Executiva) ---------------
+    private DotNetObjectReference<Aplicacao>? _ref;
+    private bool _organizando;
+    private string LayoutSalvo => ChartPrefs.Get(_login, ChaveLayout).Ordem;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ref ??= DotNetObjectReference.Create(this);
+        if (_aba != "desempenho") return;
+        try { await JS.InvokeVoidAsync("appLayout.ligar", _ref, LayoutSalvo); } catch { }
+        try { await JS.InvokeVoidAsync("worldMap.init", MapId, _ref); } catch { }
+    }
+
+    [JSInvokable]
+    public Task SaveLayout(string layout) => InvokeAsync(() =>
+        ChartPrefs.Save(_login, ChaveLayout, layout ?? "", ChartPrefsRepository.BarraPadrao));
+
+    // O mapa chama estes ao clicar num país; aqui não há filtro cruzado.
+    [JSInvokable] public Task ApplyCrossFilter(string dim, string val) => Task.CompletedTask;
+    [JSInvokable] public Task ClearAllFilters() => Task.CompletedTask;
+
+    private async Task AlternarOrganizar()
+    {
+        _organizando = !_organizando;
+        try { await JS.InvokeVoidAsync("appLayout.organizar", _organizando, _ref); } catch { }
+    }
+
+    private async Task RestaurarLayout()
+    {
+        ChartPrefs.Reset(_login, ChaveLayout);
+        try { await JS.InvokeVoidAsync("appLayout.aplicar", ""); } catch { }
+    }
+
+    public void Dispose() => _ref?.Dispose();
+
+    // ---- filtros --------------------------------------------------------------
+    private IEnumerable<string> Vendedores => Nomes(l => l.Vendedor);
+    private IEnumerable<string> Aplicadores => Nomes(l => l.Aplicador);
+    private IEnumerable<string> Nomes(Func<AplicacaoService.Linha, string> pega) =>
+        (_dados?.Linhas ?? new()).Select(pega).Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
+
+    // Anos que aparecem na data escolhida em "Período por" (mais recente primeiro).
+    private IEnumerable<int> Anos =>
+        (_dados?.Linhas ?? new()).Select(DataEscolhida).Where(x => x is not null)
+            .Select(x => x!.Value.Year).Distinct().OrderByDescending(a => a);
+
+    private DateTime? DataEscolhida(AplicacaoService.Linha l) => _dataCampo == "due" ? l.Due : l.Actual;
+
+    private List<AplicacaoService.Linha> Linhas
+    {
+        get
+        {
+            if (_dados is null) return new();
+            IEnumerable<AplicacaoService.Linha> q = _dados.Linhas;
+            if (_origem != "") q = q.Where(l => l.Origem == _origem);
+            if (_vendedores.Count > 0) q = q.Where(l => _vendedores.Contains(l.Vendedor));
+            if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
+            if (_soAtrasadas) q = q.Where(Atrasada);
+            if (_soPendentes) q = q.Where(Pendente);
+            // Ano e janela De/Até usam a data escolhida em "Período por".
+            // Sem essa data, a proposta fica fora do recorte.
+            if (_ano != "" && int.TryParse(_ano, out var ano))
+                q = q.Where(l => DataEscolhida(l) is { } x && x.Year == ano);
+            if (_de is { } de) q = q.Where(l => DataEscolhida(l) is { } x && x >= de.Date);
+            if (_ate is { } ate) q = q.Where(l => DataEscolhida(l) is { } x && x <= ate.Date);
+            if (!string.IsNullOrWhiteSpace(_busca))
+            {
+                var b = _busca.Trim();
+                q = q.Where(l => l.Valores.Any(v => v is not null && v.Contains(b, StringComparison.CurrentCultureIgnoreCase)));
+            }
+            return q.ToList();
+        }
+    }
+
+    private void Limpar()
+    {
+        _busca = ""; _origem = ""; _soAtrasadas = false; _soPendentes = false;
+        _de = _ate = null; _dataCampo = "actual"; _ano = "";
+        _vendedores.Clear(); _aplicadores.Clear();
+    }
+
+    // ---- tabela de propostas (mesma nas duas abas) ------------------------------
+    // colunaExtra/extra: uma coluna a mais no fim (ex.: "Dias de atraso");
+    // classeLinha: destaque das linhas (ex.: vermelho das atrasadas).
+    private RenderFragment Tabela(AplicacaoService.Dados d, List<AplicacaoService.Linha> rows, string altura,
+                                  string? colunaExtra = null, Func<AplicacaoService.Linha, string>? extra = null, string classeLinha = "") =>
+        @<div class="table-wrap tbl-compact" style="max-height:@altura;overflow:auto">
+            <table class="grid-tbl">
+                <thead>
+                    <tr>
+                        <th class="center">Origem</th>
+                        @if (colunaExtra is not null) { <th class="right">@colunaExtra</th> }
+                        @foreach (var c in d.Colunas)
+                        {
+                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in rows)
+                    {
+                        <tr class="clickable @classeLinha" title="Dois cliques abrem a proposta" @ondblclick="() => _detalhe = l">
+                            <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
+                            @if (extra is not null) { <td class="right num col-strong">@extra(l)</td> }
+                            @foreach (var c in d.Colunas)
+                            {
+                                if (c.Indice == d.IndiceValor)
+                                {
+                                    <td class="right num">@Fmt.Brl(l.ValorBrl)</td>
+                                }
+                                else
+                                {
+                                    <td>@(string.IsNullOrWhiteSpace(l.Valores[c.Indice]) ? "—" : l.Valores[c.Indice])</td>
+                                }
+                            }
+                        </tr>
+                    }
+                    @if (rows.Count == 0)
+                    {
+                        <tr><td colspan="@(d.Colunas.Count + (colunaExtra is not null ? 2 : 1))" class="empty">Nenhuma linha no recorte.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>;
+
+    // ---- agrupamentos ---------------------------------------------------------
+    private sealed record Fatia(string Rotulo, double Valor, string Extra = "");
+
+    private static string Traco(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s;
+    private static string Dinheiro(double v) => "R$ " + Fmt.Compact(v);
+    private static string Inteiro(double v) => v.ToString("0", _pt);
+    private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+    private static string F(double v) => v.ToString("0.##", Inv);
+
+    private static List<Fatia> Agrupar(IEnumerable<AplicacaoService.Linha> rows, Func<AplicacaoService.Linha, string> chave, Func<AplicacaoService.Linha, double> medida) =>
+        rows.GroupBy(l => Traco(chave(l)), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new Fatia(g.Key, g.Sum(medida)))
+            .Where(f => f.Valor != 0)
+            .OrderByDescending(f => f.Valor).ToList();
+
+    private static List<Fatia> Media(IEnumerable<AplicacaoService.Linha> rows, Func<AplicacaoService.Linha, string> chave, Func<AplicacaoService.Linha, double> medida) =>
+        rows.GroupBy(l => Traco(chave(l)), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new Fatia(g.Key, g.Average(medida), $"{g.Count()} proposta(s)"))
+            .OrderByDescending(f => f.Valor).ToList();
+
+    private static List<Fatia> Contar(IEnumerable<AplicacaoService.Linha> rows, Func<AplicacaoService.Linha, string> chave) =>
+        rows.GroupBy(l => Traco(chave(l)), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new Fatia(g.Key, g.Count(), "R$ " + Fmt.Compact(g.Sum(l => l.ValorBrl))))
+            .OrderByDescending(f => f.Valor).ToList();
+
+    private static readonly string[] Cores =
+        { "#1b5fa9", "#14a8a0", "#f2a63c", "#e2664e", "#6c5ce0", "#2fae6b", "#d15fa6", "#3f9bd6", "#a0705a", "#7a8794", "#0f766e", "#b7791f" };
+
+    // ---- gráficos -------------------------------------------------------------
+
+    // Ranking em barras, no mesmo desenho da Visão Executiva: número, nome e
+    // valor numa linha, a barra embaixo ocupando a largura toda. Com
+    // "negativos", a barra mede o módulo e fica vermelha quando é negativo.
+    private RenderFragment RenderBarras(List<Fatia> dados, Func<double, string> fmt, bool negativos = false) => builder =>
+    {
+        if (dados.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
+        var max = Math.Max(dados.Max(f => Math.Abs(f.Valor)), 0.000001);
+        var total = dados.Sum(f => Math.Abs(f.Valor));
+        // Resumo fixo em cima; a lista rola dentro de uma altura limitada, para o
+        // painel não crescer com a quantidade de aplicadores.
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<div class='apl-resumo'><span>{dados.Count} item(ns)</span>{(negativos ? "" : $"<span class='apl-total'><small>TOTAL</small>{Esc(fmt(dados.Sum(f => f.Valor)))}</span>")}</div>");
+        sb.Append("<div class='apl-scroll'><div class='rank rk-stack'>");
+        for (var i = 0; i < dados.Count; i++)
+        {
+            var f = dados[i];
+            var neg = negativos && f.Valor < 0;
+            sb.Append($"<div class='rank-row{(i == 0 ? " top1" : "")}' title='{Esc(f.Rotulo)}{(f.Extra != "" ? " · " + Esc(f.Extra) : "")}'>");
+            sb.Append("<div class='rank-line'>");
+            sb.Append($"<span class='rank-num'>{i + 1}</span>");
+            sb.Append($"<span class='rank-name'>{Esc(f.Rotulo)}</span>");
+            sb.Append($"<span class='rank-val'>{Esc(fmt(f.Valor))}</span>");
+            sb.Append(negativos
+                ? $"<span class='rank-share'>{(f.Extra != "" ? Esc(f.Extra) : "")}</span>"
+                : $"<span class='rank-share'>{Esc(Fmt.Pct(Math.Abs(f.Valor) / Math.Max(total, 0.000001) * 100))}</span>");
+            sb.Append("</div>");
+            sb.Append($"<div class='rank-track'><div class='rank-fill{(neg ? " neg" : "")}' style='width:{F(Math.Abs(f.Valor) / max * 100)}%'></div></div>");
+            sb.Append("</div>");
+        }
+        sb.Append("</div></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Rosca + legenda (quantidade e, quando houver, o extra — o valor em R$).
+    private RenderFragment RenderPizza(List<Fatia> dados) => builder =>
+    {
+        if (dados.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
+        double total = Math.Max(dados.Sum(d => d.Valor), 0.000001);
+        double r = 51, C = 2 * Math.PI * r, acumulado = 0;
+        var sb = new System.Text.StringBuilder("<div class='donut-wrap'>");
+        sb.Append("<svg viewBox='0 0 128 128' class='donut-svg' role='img' aria-label='Distribuição'>");
+        sb.Append($"<circle cx='64' cy='64' r='{F(r)}' fill='none' stroke='#eef2f7' stroke-width='15'/>");
+        for (var i = 0; i < dados.Count; i++)
+        {
+            var frac = dados[i].Valor / total;
+            var len = frac * C;
+            sb.Append($"<circle cx='64' cy='64' r='{F(r)}' fill='none' stroke='{Cores[i % Cores.Length]}' stroke-width='15' stroke-dasharray='{F(len)} {F(C - len)}' stroke-dashoffset='{F(C / 4 - acumulado)}'><title>{Esc(dados[i].Rotulo)}: {F(dados[i].Valor)} ({Esc(Fmt.Pct(frac * 100))})</title></circle>");
+            acumulado += len;
+        }
+        sb.Append($"<text x='64' y='60' text-anchor='middle' font-size='18' font-weight='800' fill='#16233a'>{F(total)}</text>");
+        sb.Append("<text x='64' y='76' text-anchor='middle' font-size='9' fill='#6b7a90'>propostas</text>");
+        sb.Append("</svg><ul class='donut-legend apl-scroll-legenda'>");
+        for (var i = 0; i < dados.Count; i++)
+        {
+            var d = dados[i];
+            sb.Append($"<li title='{Esc(d.Rotulo)}'><span class='dl-dot' style='background:{Cores[i % Cores.Length]}'></span><span class='dl-name'>{Esc(d.Rotulo)}</span><span class='dl-val'>{F(d.Valor)}</span><span class='dl-pct'>{Esc(Fmt.Pct(d.Valor / total * 100))}{(d.Extra != "" ? " · " + Esc(d.Extra) : "")}</span></li>");
+        }
+        sb.Append("</ul></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Linhas: um traço por aplicador, um ponto por mês (quantidade enviada).
+    private RenderFragment RenderMensal(List<AplicacaoService.Linha> rows) => builder =>
+    {
+        var enviadas = rows.Where(l => l.Actual is not null).ToList();
+        if (enviadas.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Nenhuma proposta com data de envio (Actual) no recorte.</div>"); return; }
+
+        var meses = enviadas.Select(l => new DateTime(l.Actual!.Value.Year, l.Actual.Value.Month, 1)).Distinct().OrderBy(m => m).ToList();
+        var primeiro = meses.First(); var ultimo = meses.Last();
+        meses = new List<DateTime>();
+        for (var m = primeiro; m <= ultimo; m = m.AddMonths(1)) meses.Add(m);
+
+        var series = enviadas
+            .GroupBy(l => Traco(l.Aplicador), StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Nome: g.Key, Total: g.Count(),
+                          PorMes: g.GroupBy(l => new DateTime(l.Actual!.Value.Year, l.Actual.Value.Month, 1)).ToDictionary(x => x.Key, x => x.Count())))
+            .OrderByDescending(s => s.Total).ToList();
+        var maxY = Math.Max(series.SelectMany(s => s.PorMes.Values).DefaultIfEmpty(1).Max(), 1);
+
+        const double W = 1000, H = 320, L = 42, R = 16, T = 18, B = 44;
+        double X(int i) => L + (meses.Count > 1 ? i * (W - L - R) / (meses.Count - 1) : (W - L - R) / 2);
+        double Y(double v) => T + (H - T - B) * (1 - v / maxY);
+
+        var sb = new System.Text.StringBuilder("<div class='chart-body'>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='Propostas enviadas por mês'>");
+        // grade horizontal com rótulos
+        var passos = Math.Min(maxY, 5);
+        for (var k = 0; k <= passos; k++)
+        {
+            double v = (double)maxY * k / passos;
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - R)}' y2='{F(Y(v))}' stroke='#e3e9f2' stroke-width='1'/>");
+            sb.Append($"<text x='{F(L - 6)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10' fill='#6b7a90'>{F(Math.Round(v))}</text>");
+        }
+        // rótulos dos meses (pula alguns quando são muitos)
+        var salto = meses.Count > 18 ? 2 : 1;
+        for (var i = 0; i < meses.Count; i += salto)
+            sb.Append($"<text x='{F(X(i))}' y='{F(H - B + 18)}' text-anchor='middle' font-size='10' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+        // séries
+        for (var s = 0; s < series.Count; s++)
+        {
+            var cor = Cores[s % Cores.Length];
+            var pontos = string.Join(" ", meses.Select((m, i) => $"{F(X(i))},{F(Y(series[s].PorMes.GetValueOrDefault(m)))}"));
+            sb.Append($"<polyline points='{pontos}' fill='none' stroke='{cor}' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/>");
+            for (var i = 0; i < meses.Count; i++)
+            {
+                var v = series[s].PorMes.GetValueOrDefault(meses[i]);
+                if (v == 0) continue;
+                sb.Append($"<circle cx='{F(X(i))}' cy='{F(Y(v))}' r='3.5' fill='{cor}' stroke='#fff' stroke-width='1.2'><title>{Esc(series[s].Nome)} · {Esc(meses[i].ToString("MMMM/yyyy", _pt))}: {v}</title></circle>");
+            }
+        }
+        sb.Append("</svg></div>");
+        // legenda
+        sb.Append("<div class='map-legend cols apl-scroll-legenda' style='margin-top:10px'>");
+        for (var s = 0; s < series.Count; s++)
+            sb.Append($"<div class='ml-row'><span class='ml-dot' style='background:{Cores[s % Cores.Length]}'></span><span class='ml-name'>{Esc(series[s].Nome)}</span><span class='ml-val'>{series[s].Total}</span><span class='ml-pct'>{Esc(Fmt.Pct(series[s].Total * 100.0 / enviadas.Count))}</span></div>");
+        sb.Append("</div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- mapa (mesmo desenho da Visão Executiva) --------------------------------
+    private static readonly Dictionary<string, string> CountryToMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["brasil"] = "Brazil", ["chile"] = "Chile", ["peru"] = "Peru", ["perú"] = "Peru",
+        ["argentina"] = "Argentina", ["colombia"] = "Colombia", ["colômbia"] = "Colombia",
+        ["bolivia"] = "Bolivia", ["bolívia"] = "Bolivia", ["venezuela"] = "Venezuela",
+        ["equador"] = "Ecuador", ["paraguai"] = "Paraguay", ["uruguai"] = "Uruguay",
+        ["guiana"] = "Guyana", ["méxico"] = "Mexico", ["mexico"] = "Mexico",
+        ["estados unidos"] = "United States of America", ["eua"] = "United States of America", ["usa"] = "United States of America",
+        ["espanha"] = "Spain", ["alemanha"] = "Germany", ["frança"] = "France", ["itália"] = "Italy",
+        ["reino unido"] = "United Kingdom", ["china"] = "China", ["índia"] = "India", ["japão"] = "Japan",
+        ["áfrica do sul"] = "South Africa", ["austrália"] = "Australia", ["canadá"] = "Canada",
+    };
+
+    private static string? MapKey(string label)
+    {
+        var l = (label ?? "").Trim();
+        if (l == "") return null;
+        if (CountryToMap.TryGetValue(l, out var en) && WorldMap.Paths.ContainsKey(en)) return en;
+        return WorldMap.Paths.ContainsKey(l) ? l : null;
+    }
+
+    private static string Shade(double t)
+    {
+        t = Math.Clamp(t, 0, 1);
+        int r = (int)(238 + (0 - 238) * t), g = (int)(244 + (122 - 244) * t), b = (int)(248 + (158 - 248) * t);
+        return $"rgb({r},{g},{b})";
+    }
+
+    private RenderFragment RenderMapa(List<AplicacaoService.Linha> rows) => builder =>
+    {
+        var porValor = _mapaMetrica == "valor";
+        double Medida(IEnumerable<AplicacaoService.Linha> ls) => porValor ? ls.Sum(l => l.ValorBrl) : ls.Count();
+        string Fmtd(double v) => porValor ? "R$ " + Fmt.Compact(v) : v.ToString("0", _pt);
+        var metrica = porValor ? "Valor TOTAL" : "propostas";
+
+        var comPais = rows.Where(l => MapKey(l.Country) is not null).ToList();
+        if (comPais.Count == 0)
+        {
+            var semPais = rows.Count(l => !string.IsNullOrWhiteSpace(l.Country));
+            builder.AddMarkupContent(0, semPais > 0
+                ? "<div class='empty'>Nenhum país do recorte foi reconhecido no mapa (confira a grafia na coluna Country).</div>"
+                : "<div class='empty'>Sem país informado no recorte.</div>");
+            return;
+        }
+
+        var porPais = comPais.GroupBy(l => MapKey(l.Country)!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+        var valores = porPais.ToDictionary(kv => kv.Key, kv => Medida(kv.Value), StringComparer.OrdinalIgnoreCase);
+        var maxV = Math.Max(valores.Values.Max(), 0.000001);
+        var totalV = Math.Max(valores.Values.Sum(), 0.000001);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<div class='worldmap' id='{MapId}'><div class='worldmap-inner'>");
+        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Distribuição por país'>");
+        sb.Append($"<rect x='0' y='0' width='{F(WorldMap.ViewW)}' height='{F(WorldMap.ViewH)}' fill='#f7fafc'/>");
+        foreach (var (name, d) in WorldMap.Paths)
+        {
+            var has = valores.TryGetValue(name, out var v);
+            var fill = has ? Shade(v / maxV) : "#e7edf3";
+            var data = has ? $" data-value='{Esc(Fmtd(v))}' data-pct='{Esc(Fmt.Pct(v / totalV * 100))}' data-metric='{Esc(metrica)}'" : "";
+            sb.Append($"<path d='{d}' fill='{fill}' stroke='#cdd8e4' stroke-width='0.4' data-country='{Esc(name)}'{data} class='wm-path'/>");
+        }
+        foreach (var kv in valores)
+        {
+            if (!WorldMap.Centroids.TryGetValue(kv.Key, out var pos)) continue;
+            var escuro = kv.Value / maxV > 0.5;
+            sb.Append($"<text x='{F(pos.X)}' y='{F(pos.Y + 3)}' text-anchor='middle' font-size='9' font-weight='700' fill='{(escuro ? "#fff" : "#1e2836")}'>{Esc(porValor ? Fmt.Compact(kv.Value) : kv.Value.ToString("0", _pt))}</text>");
+        }
+        sb.Append("</svg></div></div>");
+
+        // Aplicador × país: cada país com a quebra por aplicador (quantidade e valor).
+        sb.Append("<div class='table-wrap tbl-compact' style='margin-top:12px;max-height:360px;overflow:auto'><table class='grid-tbl'><thead><tr><th>País</th><th>Aplicador</th><th class='right'>Propostas</th><th class='right'>Valor TOTAL</th></tr></thead><tbody>");
+        foreach (var pais in porPais.OrderByDescending(kv => Medida(kv.Value)))
+        {
+            var grupos = pais.Value.GroupBy(l => Traco(l.Aplicador), StringComparer.OrdinalIgnoreCase).OrderByDescending(g => Medida(g)).ToList();
+            var primeiro = true;
+            foreach (var g in grupos)
+            {
+                sb.Append("<tr>");
+                sb.Append(primeiro ? $"<td class='col-strong' rowspan='{grupos.Count}'>{Esc(pais.Key)}</td>" : "");
+                sb.Append($"<td>{Esc(g.Key)}</td><td class='right num'>{g.Count()}</td><td class='right num'>{Esc(Fmt.Brl(g.Sum(l => l.ValorBrl)))}</td></tr>");
+                primeiro = false;
+            }
+        }
+        sb.Append("</tbody></table></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- exportação -----------------------------------------------------------
+    // Mesma planilha para a Tabela de dados e para as listas de atrasadas e
+    // pendentes: Origem, a coluna extra (dias) quando houver, e todas as colunas.
+    private Task Exportar() => ExportarLista(Linhas, "aplicacao");
+
+    private async Task ExportarLista(List<AplicacaoService.Linha> linhas, string nome,
+                                     string? colunaExtra = null, Func<AplicacaoService.Linha, string>? extra = null)
+    {
+        if (_dados is not { } d || linhas.Count == 0) return;
+        using var wb = new ClosedXML.Excel.XLWorkbook();
+        var ws = wb.Worksheets.Add("Aplicação");
+        var col = 1;
+        ws.Cell(1, col++).Value = "Origem";
+        if (colunaExtra is not null) ws.Cell(1, col++).Value = colunaExtra;
+        var primeira = col;                        // coluna da planilha onde começam as da tabela
+        foreach (var c in d.Colunas) ws.Cell(1, primeira + c.Indice).Value = c.Rotulo;
+        ws.Row(1).Style.Font.Bold = true;
+
+        var r = 2;
+        foreach (var l in linhas)
+        {
+            col = 1;
+            ws.Cell(r, col++).Value = l.Origem;
+            if (extra is not null)
+            {
+                var v = extra(l);
+                if (int.TryParse(v, out var n)) ws.Cell(r, col).Value = n; else ws.Cell(r, col).Value = v;
+                col++;
+            }
+            foreach (var c in d.Colunas)
+            {
+                var cel = ws.Cell(r, primeira + c.Indice);
+                if (c.Indice == d.IndiceValor)
+                {
+                    cel.Value = l.ValorBrl;
+                    cel.Style.NumberFormat.Format = "#,##0.00";
+                }
+                else cel.Value = l.Valores[c.Indice] ?? "";
+            }
+            r++;
+        }
+        ws.SheetView.FreezeRows(1);
+        ws.RangeUsed()?.SetAutoFilter();
+        ws.Columns().AdjustToContents();
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        await JS.InvokeVoidAsync("appDownload", $"{nome}_{DateTime.Today:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
+    }
+}

@@ -92,9 +92,30 @@ public sealed class OpportunityImporter
     // Célula já normalizada: o TEXTO (para casar cabeçalho e ler campos) e o
     // NÚMERO cru quando a célula é numérica — assim o separador decimal da
     // planilha nunca entra na conta.
-    private readonly record struct Cel(string Text, double? Num);
+    public readonly record struct Cel(string Text, double? Num);
 
     private static readonly Cel Vazia = new("", null);
+
+    /// <summary>Grade crua de uma planilha (.xlsx/.xlsm/.xls/.csv): a mesma
+    /// leitura que a importação usa, para quem precisa das células pela posição
+    /// (guia Aplicação). Só a primeira aba do arquivo.</summary>
+    public static List<Cel[]> LerGrade(string fileName, Stream stream)
+    {
+        if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var lines = reader.ReadToEnd().Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Where(l => l.Length > 0).ToList();
+            if (lines.Count == 0) return new();
+            var delim = lines[0].Count(c => c == ';') >= lines[0].Count(c => c == ',') ? ';' : ',';
+            return lines.Select(l => SplitCsv(l, delim).Select(t => new Cel(t.Trim(), null)).ToArray()).ToList();
+        }
+        if (fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase)) return GradeXls(stream);
+        return GradeXlsx(stream);
+    }
+
+    /// <summary>Normalização de nomes para casamento (minúsculas, sem acento,
+    /// espaços colapsados) — a mesma da importação.</summary>
+    public static string Normalizar(string s) => Norm(s);
 
     private Result ParseGrid(List<Cel[]> rows, Source source,
         Func<string, double?>? rate, Action<string>? onCurrency)
@@ -160,8 +181,11 @@ public sealed class OpportunityImporter
             for (var c = 1; c <= last; c++)
             {
                 var cell = row.Cell(c);
-                linha[c - 1] = new Cel(cell.GetString(),
-                    cell.Value.IsNumber ? cell.Value.GetNumber() : null);
+                // Data sai em ISO, não no formato de exibição da célula: assim quem
+                // lê não depende de como a planilha foi formatada.
+                linha[c - 1] = cell.Value.IsDateTime
+                    ? new Cel(cell.Value.GetDateTime().ToString("yyyy-MM-dd"), null)
+                    : new Cel(cell.GetString(), cell.Value.IsNumber ? cell.Value.GetNumber() : null);
             }
             grade.Add(linha);
         }
