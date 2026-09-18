@@ -410,7 +410,11 @@ else if (_dados is { } d)
         if (dados.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
         var max = Math.Max(dados.Max(f => Math.Abs(f.Valor)), 0.000001);
         var total = dados.Sum(f => Math.Abs(f.Valor));
-        var sb = new System.Text.StringBuilder("<div class='rank rk-stack'>");
+        // Resumo fixo em cima; a lista rola dentro de uma altura limitada, para o
+        // painel não crescer com a quantidade de aplicadores.
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<div class='apl-resumo'><span>{dados.Count} item(ns)</span>{(negativos ? "" : $"<span class='apl-total'><small>TOTAL</small>{Esc(fmt(dados.Sum(f => f.Valor)))}</span>")}</div>");
+        sb.Append("<div class='apl-scroll'><div class='rank rk-stack'>");
         for (var i = 0; i < dados.Count; i++)
         {
             var f = dados[i];
@@ -427,7 +431,7 @@ else if (_dados is { } d)
             sb.Append($"<div class='rank-track'><div class='rank-fill{(neg ? " neg" : "")}' style='width:{F(Math.Abs(f.Valor) / max * 100)}%'></div></div>");
             sb.Append("</div>");
         }
-        sb.Append("</div>");
+        sb.Append("</div></div>");
         builder.AddMarkupContent(0, sb.ToString());
     };
 
@@ -449,7 +453,7 @@ else if (_dados is { } d)
         }
         sb.Append($"<text x='64' y='60' text-anchor='middle' font-size='18' font-weight='800' fill='#16233a'>{F(total)}</text>");
         sb.Append("<text x='64' y='76' text-anchor='middle' font-size='9' fill='#6b7a90'>propostas</text>");
-        sb.Append("</svg><ul class='donut-legend'>");
+        sb.Append("</svg><ul class='donut-legend apl-scroll-legenda'>");
         for (var i = 0; i < dados.Count; i++)
         {
             var d = dados[i];
@@ -510,7 +514,7 @@ else if (_dados is { } d)
         }
         sb.Append("</svg></div>");
         // legenda
-        sb.Append("<div class='map-legend cols' style='margin-top:10px'>");
+        sb.Append("<div class='map-legend cols apl-scroll-legenda' style='margin-top:10px'>");
         for (var s = 0; s < series.Count; s++)
             sb.Append($"<div class='ml-row'><span class='ml-dot' style='background:{Cores[s % Cores.Length]}'></span><span class='ml-name'>{Esc(series[s].Nome)}</span><span class='ml-val'>{series[s].Total}</span><span class='ml-pct'>{Esc(Fmt.Pct(series[s].Total * 100.0 / enviadas.Count))}</span></div>");
         sb.Append("</div>");

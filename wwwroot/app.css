@@ -1990,3 +1990,9 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .rk-stack .rank-line { display: grid; grid-template-columns: 26px 1fr auto auto; align-items: center; gap: 12px; min-width: 0; }
 .rk-stack .rank-track { height: 12px; }
 .rk-stack .rank-fill.neg { background: linear-gradient(90deg, #b23a2e 0%, #e2664e 100%); }
+/* Altura limitada com rolagem própria: muitos aplicadores não esticam o painel. */
+.apl-scroll { max-height: 380px; overflow-y: auto; padding-right: 6px; }
+.apl-scroll-legenda { max-height: 200px; overflow-y: auto; padding-right: 6px; }
+.apl-resumo { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 6px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.apl-resumo .apl-total { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.apl-resumo .apl-total small { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
