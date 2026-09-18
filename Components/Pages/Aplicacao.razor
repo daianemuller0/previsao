@@ -482,7 +482,7 @@ else if (_dados is { } d)
         var passos = Math.Min(maxY, 5);
         for (var k = 0; k <= passos; k++)
         {
-            var v = maxY * k / passos;
+            double v = (double)maxY * k / passos;
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - R)}' y2='{F(Y(v))}' stroke='#e3e9f2' stroke-width='1'/>");
             sb.Append($"<text x='{F(L - 6)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10' fill='#6b7a90'>{F(Math.Round(v))}</text>");
         }
