@@ -57,9 +57,9 @@ public static class AccessRoles
     // Abas (chaves iguais às do NavMenu) permitidas por papel.
     public static readonly Dictionary<string, string[]> Tabs = new()
     {
-        [Vendedor] = new[] { "executivo", "oportunidades", "followup", "aplicacao" },
-        [Diretor]  = new[] { "executivo", "oportunidades", "followup", "aplicacao" },
-        [Controle] = new[] { "executivo", "oportunidades", "controle", "aplicacao" },
+        [Vendedor] = new[] { "executivo", "oportunidades", "followup" },
+        [Diretor]  = new[] { "executivo", "oportunidades", "followup" },
+        [Controle] = new[] { "executivo", "oportunidades", "controle" },
         [Admin]    = new[] { "executivo", "oportunidades", "followup", "controle", "aplicacao", "listas", "configuracoes", "identidade", "administracao" },
     };
 
