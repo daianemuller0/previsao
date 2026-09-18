@@ -13,12 +13,12 @@ namespace HowdenSalesForecast.Data;
 // cabeçalho que ela traz; cada linha do AFM entra nessas colunas pelo De-Para
 // de letras combinado com a área (coluna do AFM → coluna do NB).
 //
-// As planilhas seguem o formato da exportação do CRM, o mesmo da importação
-// de oportunidades: linhas de título antes do cabeçalho de verdade, coluna A
-// em branco e uma linha de totais no fim. A regra aqui é a mesma de lá: o
-// cabeçalho é a primeira linha "cheia", o que vem antes é descartado, a
-// coluna em branco é ignorada (a primeira preenchida passa a contar como "A")
-// e a leitura para na linha de totais.
+// As planilhas seguem o formato da exportação do CRM: linhas de título antes
+// do cabeçalho de verdade (no NB, o cabeçalho é a linha 14 — configurável) e
+// uma linha de totais no fim. O que vem antes do cabeçalho é descartado e a
+// leitura para na linha de totais. As LETRAS são as do Excel, sem deslocar:
+// a coluna A do NB fica vazia nas linhas do NB e é preenchida pela B do AFM,
+// exatamente como o De-Para diz.
 //
 // Três colunas pedem tratamento: o vendedor (K do AFM → M do NB) e o aplicador
 // (AB → AD) têm nomes escritos de forma diferente nos dois CRMs e são casados
@@ -107,6 +107,9 @@ public sealed class AplicacaoService
 
     public string AfmPath => _cfg["Aplicadores:AfmPath"] ?? "";
     public string NbPath => _cfg["Aplicadores:NbPath"] ?? "";
+    /// <summary>Linha (1 = primeira) em que está o cabeçalho; 0 = descobrir sozinho.</summary>
+    public int NbHeaderRow => _cfg.GetValue("Aplicadores:NbHeaderRow", 14);
+    public int AfmHeaderRow => _cfg.GetValue("Aplicadores:AfmHeaderRow", 0);
 
     /// <summary>Tabela unificada. Relê os arquivos só quando mudaram na rede
     /// (ou quando <paramref name="force"/>); fora isso devolve o que está em memória.</summary>
@@ -136,8 +139,8 @@ public sealed class AplicacaoService
             ?? Opportunity.BrlPerUsd;
         if (d.TaxaUsd <= 0) d.Avisos.Add("Sem taxa USD cadastrada no Controle: os valores do AFM ficaram zerados.");
 
-        var planNb = nb is null ? null : Ler(nb, d.Avisos, "NB");
-        var planAfm = afm is null ? null : Ler(afm, d.Avisos, "AFM");
+        var planNb = nb is null ? null : Ler(nb, d.Avisos, "NB", NbHeaderRow);
+        var planAfm = afm is null ? null : Ler(afm, d.Avisos, "AFM", AfmHeaderRow);
         if (nb is null) d.Avisos.Add($"Planilha do NB não encontrada em: {NbPath}");
         if (afm is null) d.Avisos.Add($"Planilha do AFM não encontrada em: {AfmPath}");
 
@@ -201,23 +204,21 @@ public sealed class AplicacaoService
 
     // ---- planilha já preparada -------------------------------------------------
     // Cab = linha de cabeçalho; Dados = só as linhas de dados (sem título em cima,
-    // sem totais embaixo, sem linhas vazias); Desloc = quantas colunas em branco
-    // há à esquerda — a primeira coluna preenchida é a "A" das letras do De-Para.
+    // sem totais embaixo, sem linhas vazias). As letras são as do Excel.
     private sealed class Planilha
     {
         public OpportunityImporter.Cel[] Cab { get; init; } = Array.Empty<OpportunityImporter.Cel>();
         public List<OpportunityImporter.Cel[]> Dados { get; init; } = new();
-        public int Desloc { get; init; }
 
         public string Texto(OpportunityImporter.Cel[] row, string letra)
         {
-            var i = Idx(letra) + Desloc;
+            var i = Idx(letra);
             return i >= 0 && i < row.Length ? (row[i].Text ?? "").Trim() : "";
         }
 
         public double Numero(OpportunityImporter.Cel[] row, string letra)
         {
-            var i = Idx(letra) + Desloc;
+            var i = Idx(letra);
             if (i < 0 || i >= row.Length) return 0;
             if (row[i].Num is { } n) return n;
             var t = (row[i].Text ?? "").Trim().Replace("R$", "").Replace("US$", "").Replace("$", "").Trim();
@@ -229,17 +230,26 @@ public sealed class AplicacaoService
         }
     }
 
-    private static Planilha Preparar(List<OpportunityImporter.Cel[]> grade)
+    private static Planilha Preparar(List<OpportunityImporter.Cel[]> grade, int linhaCabecalho)
     {
         static int Cheias(OpportunityImporter.Cel[] r) => r.Count(c => !string.IsNullOrWhiteSpace(c.Text));
 
-        // Cabeçalho: a primeira linha "cheia" — pelo menos três células e ao menos
-        // metade da linha mais cheia da planilha. Título e data em cima têm uma
-        // ou duas células e ficam de fora.
-        var max = grade.Count == 0 ? 0 : grade.Max(Cheias);
-        var h = 0;
-        for (var i = 0; i < grade.Count; i++)
-            if (Cheias(grade[i]) >= 3 && Cheias(grade[i]) * 2 >= max) { h = i; break; }
+        int h;
+        if (linhaCabecalho > 0)
+        {
+            // Linha informada pela área (1 = primeira linha da planilha).
+            h = Math.Min(linhaCabecalho - 1, Math.Max(grade.Count - 1, 0));
+        }
+        else
+        {
+            // Sem linha informada: a primeira linha "cheia" — pelo menos três
+            // células e ao menos metade da linha mais cheia da planilha. Título e
+            // data em cima têm uma ou duas células e ficam de fora.
+            var max = grade.Count == 0 ? 0 : grade.Max(Cheias);
+            h = 0;
+            for (var i = 0; i < grade.Count; i++)
+                if (Cheias(grade[i]) >= 3 && Cheias(grade[i]) * 2 >= max) { h = i; break; }
+        }
 
         var dados = new List<OpportunityImporter.Cel[]>();
         foreach (var row in grade.Skip(h + 1))
@@ -249,19 +259,8 @@ public sealed class AplicacaoService
             dados.Add(row);
         }
 
-        // Colunas em branco à esquerda (a coluna A da exportação do CRM): vazias
-        // no cabeçalho e em todas as linhas de dados.
-        var desloc = 0;
-        while (Vazia(grade.Count > h ? grade[h] : Array.Empty<OpportunityImporter.Cel>(), desloc)
-               && dados.All(r => Vazia(r, desloc))
-               && desloc < 5)
-            desloc++;
-
-        return new Planilha { Cab = grade.Count > h ? grade[h] : Array.Empty<OpportunityImporter.Cel>(), Dados = dados, Desloc = desloc };
+        return new Planilha { Cab = grade.Count > h ? grade[h] : Array.Empty<OpportunityImporter.Cel>(), Dados = dados };
     }
-
-    private static bool Vazia(OpportunityImporter.Cel[] row, int i) =>
-        i >= row.Length || string.IsNullOrWhiteSpace(row[i].Text);
 
     // Linha de totais / rodapé da exportação (mesmos sinais da importação).
     private static bool EhTotal(OpportunityImporter.Cel[] row)
@@ -287,7 +286,7 @@ public sealed class AplicacaoService
         return tabela.TryGetValue(OpportunityImporter.Normalizar(n), out var nb) ? nb : n;
     }
 
-    private static Planilha? Ler(string file, List<string> avisos, string rotulo)
+    private static Planilha? Ler(string file, List<string> avisos, string rotulo, int linhaCabecalho)
     {
         try
         {
@@ -302,7 +301,7 @@ public sealed class AplicacaoService
                 avisos.Add($"Planilha do {rotulo} está vazia: {Path.GetFileName(file)}");
                 return null;
             }
-            var plan = Preparar(grade);
+            var plan = Preparar(grade, linhaCabecalho);
             if (plan.Dados.Count == 0) avisos.Add($"Planilha do {rotulo} sem linhas de dados abaixo do cabeçalho: {Path.GetFileName(file)}");
             return plan;
         }
