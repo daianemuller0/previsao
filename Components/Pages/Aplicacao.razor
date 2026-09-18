@@ -69,6 +69,7 @@ else if (_dados is { } d)
         </div>
         <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
+        <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco) e com o prazo do cliente (Due) já passado"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
         <div class="filterbar-spacer"></div>
         <div class="fb-summary">
             <div class="fb-sum"><span class="fb-sum-k">Propostas</span><span class="fb-sum-v">@Linhas.Count</span></div>
@@ -77,7 +78,7 @@ else if (_dados is { } d)
                 <div class="fb-sum"><span class="fb-sum-k">Valor TOTAL</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
             }
         </div>
-        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0)
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas)
         {
             <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
         }
@@ -126,7 +127,7 @@ else if (_dados is { } d)
     {
         var rows = Linhas;
         var hoje = DateTime.Today;
-        var atrasadas = rows.Where(l => l.Actual is null && l.Due is { } due && due < hoje)
+        var atrasadas = rows.Where(Atrasada)
                             .Select(l => (L: l, Dias: (hoje - l.Due!.Value).Days))
                             .OrderByDescending(x => x.Dias).ToList();
 
@@ -275,6 +276,12 @@ else if (_dados is { } d)
     private string _origem = "";
     private HashSet<string> _vendedores = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
+    private bool _soAtrasadas;   // sem Actual e com o Due já vencido
+
+    // Regra única de "atrasada", usada pelo filtro e pelo painel: ainda não foi
+    // enviada (Actual em branco) e hoje já passou do prazo do cliente (Due).
+    private static bool Atrasada(AplicacaoService.Linha l) =>
+        l.Actual is null && l.Due is { } due && DateTime.Today > due;
 
     protected override async Task OnInitializedAsync()
     {
@@ -349,6 +356,7 @@ else if (_dados is { } d)
             if (_origem != "") q = q.Where(l => l.Origem == _origem);
             if (_vendedores.Count > 0) q = q.Where(l => _vendedores.Contains(l.Vendedor));
             if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
+            if (_soAtrasadas) q = q.Where(Atrasada);
             if (!string.IsNullOrWhiteSpace(_busca))
             {
                 var b = _busca.Trim();
@@ -360,7 +368,7 @@ else if (_dados is { } d)
 
     private void Limpar()
     {
-        _busca = ""; _origem = "";
+        _busca = ""; _origem = ""; _soAtrasadas = false;
         _vendedores.Clear(); _aplicadores.Clear();
     }
 
