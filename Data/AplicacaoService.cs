@@ -13,9 +13,14 @@ namespace HowdenSalesForecast.Data;
 // cabeçalho que ela traz; cada linha do AFM entra nessas colunas pelo De-Para
 // de letras combinado com a área (coluna do AFM → coluna do NB).
 //
-// A linha do cabeçalho é configurável por planilha (no NB é a primeira; no
-// AFM é descoberta: a primeira linha cheia). O que vem antes é descartado e a
-// leitura para na linha de totais/rodapé, se houver. As LETRAS são as do Excel, sem deslocar —
+// A planilha do AFM é limpa: cabeçalho na primeira linha, dados em seguida. A
+// do NB é exportação do CRM: 13 linhas de metadados e o cabeçalho na linha 14
+// (configurável). O que vem antes do cabeçalho é descartado e a leitura para
+// na linha de totais/rodapé, se houver.
+//
+// Os TÍTULOS das colunas da tabela vêm do cabeçalho do AFM, pela equivalência:
+// a coluna B do NB se chama como a coluna A do AFM, e assim por diante. Colunas
+// sem equivalência não entram. As LETRAS são as do Excel, sem deslocar —
 // a coluna A do NB, que ninguém usa, simplesmente não entra na tabela.
 //
 // Três colunas pedem tratamento: o vendedor (K do AFM → M do NB) e o aplicador
@@ -29,7 +34,8 @@ namespace HowdenSalesForecast.Data;
 // ---------------------------------------------------------------------------
 public sealed class AplicacaoService
 {
-    public sealed record Coluna(string Letra, string Rotulo, int Indice);
+    /// <summary>Letra = coluna no NB; LetraAfm = coluna equivalente no AFM (de onde vem o título).</summary>
+    public sealed record Coluna(string Letra, string LetraAfm, string Rotulo, int Indice);
 
     public sealed record Linha(string Origem, string[] Valores, double ValorBrl, string Vendedor, string Aplicador);
 
@@ -107,8 +113,8 @@ public sealed class AplicacaoService
     public string AfmPath => _cfg["Aplicadores:AfmPath"] ?? "";
     public string NbPath => _cfg["Aplicadores:NbPath"] ?? "";
     /// <summary>Linha (1 = primeira) em que está o cabeçalho; 0 = descobrir sozinho.</summary>
-    public int NbHeaderRow => _cfg.GetValue("Aplicadores:NbHeaderRow", 1);
-    public int AfmHeaderRow => _cfg.GetValue("Aplicadores:AfmHeaderRow", 0);
+    public int NbHeaderRow => _cfg.GetValue("Aplicadores:NbHeaderRow", 14);
+    public int AfmHeaderRow => _cfg.GetValue("Aplicadores:AfmHeaderRow", 1);
 
     /// <summary>Tabela unificada. Relê os arquivos só quando mudaram na rede
     /// (ou quando <paramref name="force"/>); fora isso devolve o que está em memória.</summary>
@@ -144,18 +150,16 @@ public sealed class AplicacaoService
         if (afm is null) d.Avisos.Add($"Planilha do AFM não encontrada em: {AfmPath}");
 
         // Colunas da tabela = colunas do NB que participam do De-Para, na ordem
-        // da planilha, com o cabeçalho do NB (ou, se o NB não veio, o do AFM).
+        // da planilha. O título vem do cabeçalho do AFM (coluna equivalente); se
+        // o AFM não veio, do NB; em último caso, a própria letra.
         var letrasNb = DePara.Select(p => p.Nb).Distinct().OrderBy(Idx).ToList();
         for (var i = 0; i < letrasNb.Count; i++)
         {
             var letra = letrasNb[i];
-            var rotulo = planNb is not null ? planNb.Texto(planNb.Cab, letra) : "";
-            if (rotulo == "" && planAfm is not null)
-            {
-                var deAfm = DePara.FirstOrDefault(p => p.Nb == letra).Afm;
-                if (deAfm is not null) rotulo = planAfm.Texto(planAfm.Cab, deAfm);
-            }
-            d.Colunas.Add(new Coluna(letra, rotulo == "" ? letra : rotulo, i));
+            var deAfm = DePara.First(p => p.Nb == letra).Afm;
+            var rotulo = planAfm is not null ? planAfm.Texto(planAfm.Cab, deAfm) : "";
+            if (rotulo == "" && planNb is not null) rotulo = planNb.Texto(planNb.Cab, letra);
+            d.Colunas.Add(new Coluna(letra, deAfm, rotulo == "" ? letra : rotulo, i));
         }
         var pos = d.Colunas.ToDictionary(c => c.Letra, c => c.Indice, StringComparer.Ordinal);
         d.IndiceValor = pos.TryGetValue(ColValorNb, out var iv) ? iv : -1;

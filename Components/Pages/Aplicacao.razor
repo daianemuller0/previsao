@@ -76,7 +76,7 @@ else if (_dados is { } d)
                     <th class="center">Origem</th>
                     @foreach (var c in d.Colunas)
                     {
-                        <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="Coluna @c.Letra da planilha do NB">@c.Rotulo</th>
+                        <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</th>
                     }
                 </tr>
             </thead>
