@@ -12,7 +12,6 @@
 <div class="page-head">
     <div>
         <h1>Aplicação</h1>
-        <p class="subtitle">Planilhas de aplicadores do Aftermarket e do New Business numa tabela só · desempenho por aplicador</p>
     </div>
     <div class="page-actions">
         <button class="btn-ghost" title="Reler as planilhas da rede agora" disabled="@_lendo" @onclick="() => Carregar(true)">@Icons.Svg("import")Atualizar</button>
@@ -76,11 +75,11 @@ else if (_dados is { } d)
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
         <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco) e com o prazo do cliente (Due) já passado"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
         <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco)"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
-        @* Janela de tempo: pela data de envio (Actual) ou pelo prazo do cliente (Due). *@
-        <div class="flt"><span class="flt-label">Período por</span>
-            <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option></select>
+        @* Janela de tempo: pela data de envio (Actual), pelo prazo do cliente (Due) ou por ambas. *@
+        <div class="flt" title="Ambas: a proposta entra se o envio OU o prazo cair no período"><span class="flt-label">Período por</span>
+            <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option><option value="ambas">Ambas</option></select>
         </div>
-        <div class="flt" title="Ano da data escolhida em 'Período por'"><span class="flt-label">Ano</span>
+        <div class="flt" title="Ano da(s) data(s) escolhida(s) em 'Período por'"><span class="flt-label">Ano</span>
             <select @bind="_ano">
                 <option value="">Todos</option>
                 @foreach (var a in Anos) { <option value="@a">@a</option> }
@@ -307,7 +306,7 @@ else if (_dados is { } d)
     private bool _soPendentes;   // sem Actual (ainda não enviada)
     private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null;
     private AplicacaoService.Linha? _detalhe;   // proposta aberta com dois cliques
-    private string _dataCampo = "actual";   // janela de tempo por Actual (envio) ou Due (prazo)
+    private string _dataCampo = "actual";   // janela de tempo por Actual (envio), Due (prazo) ou ambas
     private string _ano = "";               // ano da data escolhida ("" = todos)
     private DateTime? _de, _ate;
 
@@ -382,12 +381,16 @@ else if (_dados is { } d)
         (_dados?.Linhas ?? new()).Select(pega).Where(s => !string.IsNullOrWhiteSpace(s))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
 
-    // Anos que aparecem na data escolhida em "Período por" (mais recente primeiro).
+    // Anos que aparecem na(s) data(s) escolhida(s) em "Período por" (mais recente primeiro).
     private IEnumerable<int> Anos =>
-        (_dados?.Linhas ?? new()).Select(DataEscolhida).Where(x => x is not null)
-            .Select(x => x!.Value.Year).Distinct().OrderByDescending(a => a);
+        (_dados?.Linhas ?? new()).SelectMany(Datas).Select(x => x.Year).Distinct().OrderByDescending(a => a);
 
-    private DateTime? DataEscolhida(AplicacaoService.Linha l) => _dataCampo == "due" ? l.Due : l.Actual;
+    // Datas da proposta que contam no período: Actual, Due ou as duas ("ambas").
+    private IEnumerable<DateTime> Datas(AplicacaoService.Linha l)
+    {
+        if (_dataCampo != "due" && l.Actual is { } a) yield return a;
+        if (_dataCampo != "actual" && l.Due is { } d) yield return d;
+    }
 
     private List<AplicacaoService.Linha> Linhas
     {
@@ -400,12 +403,14 @@ else if (_dados is { } d)
             if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
             if (_soAtrasadas) q = q.Where(Atrasada);
             if (_soPendentes) q = q.Where(Pendente);
-            // Ano e janela De/Até usam a data escolhida em "Período por".
-            // Sem essa data, a proposta fica fora do recorte.
-            if (_ano != "" && int.TryParse(_ano, out var ano))
-                q = q.Where(l => DataEscolhida(l) is { } x && x.Year == ano);
-            if (_de is { } de) q = q.Where(l => DataEscolhida(l) is { } x && x >= de.Date);
-            if (_ate is { } ate) q = q.Where(l => DataEscolhida(l) is { } x && x <= ate.Date);
+            // Ano e janela De/Até usam a(s) data(s) escolhida(s) em "Período por".
+            // Com "ambas", basta uma das datas cair no recorte; sem data, fica fora.
+            int? ano = _ano != "" && int.TryParse(_ano, out var a) ? a : null;
+            if (ano is not null || _de is not null || _ate is not null)
+            {
+                var de = _de?.Date; var ate = _ate?.Date;
+                q = q.Where(l => Datas(l).Any(x => (ano is null || x.Year == ano) && (de is null || x >= de) && (ate is null || x <= ate)));
+            }
             if (!string.IsNullOrWhiteSpace(_busca))
             {
                 var b = _busca.Trim();
