@@ -70,6 +70,12 @@ else if (_dados is { } d)
         <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
         <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco) e com o prazo do cliente (Due) já passado"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
+        @* Janela de tempo: pela data de envio (Actual) ou pelo prazo do cliente (Due). *@
+        <div class="flt"><span class="flt-label">Período por</span>
+            <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option></select>
+        </div>
+        <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_de" /></div>
+        <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_ate" /></div>
         <div class="filterbar-spacer"></div>
         <div class="fb-summary">
             <div class="fb-sum"><span class="fb-sum-k">Propostas</span><span class="fb-sum-v">@Linhas.Count</span></div>
@@ -78,7 +84,7 @@ else if (_dados is { } d)
                 <div class="fb-sum"><span class="fb-sum-k">Valor TOTAL</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
             }
         </div>
-        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas)
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _de is not null || _ate is not null)
         {
             <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
         }
@@ -86,42 +92,7 @@ else if (_dados is { } d)
 
     @if (_aba == "dados")
     {
-        <div class="table-wrap tbl-compact" style="max-height:70vh;overflow:auto">
-            <table class="grid-tbl">
-                <thead>
-                    <tr>
-                        <th class="center">Origem</th>
-                        @foreach (var c in d.Colunas)
-                        {
-                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var l in Linhas)
-                    {
-                        <tr>
-                            <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
-                            @foreach (var c in d.Colunas)
-                            {
-                                if (c.Indice == d.IndiceValor)
-                                {
-                                    <td class="right num">@Fmt.Brl(l.ValorBrl)</td>
-                                }
-                                else
-                                {
-                                    <td>@(string.IsNullOrWhiteSpace(l.Valores[c.Indice]) ? "—" : l.Valores[c.Indice])</td>
-                                }
-                            }
-                        </tr>
-                    }
-                    @if (Linhas.Count == 0)
-                    {
-                        <tr><td colspan="@(d.Colunas.Count + 1)" class="empty">Nenhuma linha no recorte.</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        @Tabela(d, Linhas, "70vh")
     }
     else
     {
@@ -254,6 +225,13 @@ else if (_dados is { } d)
                     @RenderBarras(Agrupar(rows.Where(l => l.Actual is null), l => l.Aplicador, _ => 1), Inteiro)
                 </div>
             </div>
+
+            <div class="c12" data-pnl="lista">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas do recorte <span class="hint">a mesma lista da aba Tabela de dados · @rows.Count proposta(s)</span></div><TelaCheia /></div>
+                    @Tabela(d, rows, "520px")
+                </div>
+            </div>
         </div>
     }
 }
@@ -277,6 +255,8 @@ else if (_dados is { } d)
     private HashSet<string> _vendedores = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
     private bool _soAtrasadas;   // sem Actual e com o Due já vencido
+    private string _dataCampo = "actual";   // janela de tempo por Actual (envio) ou Due (prazo)
+    private DateTime? _de, _ate;
 
     // Regra única de "atrasada", usada pelo filtro e pelo painel: ainda não foi
     // enviada (Actual em branco) e hoje já passou do prazo do cliente (Due).
@@ -357,6 +337,13 @@ else if (_dados is { } d)
             if (_vendedores.Count > 0) q = q.Where(l => _vendedores.Contains(l.Vendedor));
             if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
             if (_soAtrasadas) q = q.Where(Atrasada);
+            if (_de is not null || _ate is not null)
+            {
+                // Sem a data escolhida, a proposta fica fora da janela.
+                Func<AplicacaoService.Linha, DateTime?> data = _dataCampo == "due" ? l => l.Due : l => l.Actual;
+                if (_de is { } de) q = q.Where(l => data(l) is { } x && x >= de.Date);
+                if (_ate is { } ate) q = q.Where(l => data(l) is { } x && x <= ate.Date);
+            }
             if (!string.IsNullOrWhiteSpace(_busca))
             {
                 var b = _busca.Trim();
@@ -369,8 +356,48 @@ else if (_dados is { } d)
     private void Limpar()
     {
         _busca = ""; _origem = ""; _soAtrasadas = false;
+        _de = _ate = null; _dataCampo = "actual";
         _vendedores.Clear(); _aplicadores.Clear();
     }
+
+    // ---- tabela de propostas (mesma nas duas abas) ------------------------------
+    private RenderFragment Tabela(AplicacaoService.Dados d, List<AplicacaoService.Linha> rows, string altura) =>
+        @<div class="table-wrap tbl-compact" style="max-height:@altura;overflow:auto">
+            <table class="grid-tbl">
+                <thead>
+                    <tr>
+                        <th class="center">Origem</th>
+                        @foreach (var c in d.Colunas)
+                        {
+                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in rows)
+                    {
+                        <tr>
+                            <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
+                            @foreach (var c in d.Colunas)
+                            {
+                                if (c.Indice == d.IndiceValor)
+                                {
+                                    <td class="right num">@Fmt.Brl(l.ValorBrl)</td>
+                                }
+                                else
+                                {
+                                    <td>@(string.IsNullOrWhiteSpace(l.Valores[c.Indice]) ? "—" : l.Valores[c.Indice])</td>
+                                }
+                            }
+                        </tr>
+                    }
+                    @if (rows.Count == 0)
+                    {
+                        <tr><td colspan="@(d.Colunas.Count + 1)" class="empty">Nenhuma linha no recorte.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>;
 
     // ---- agrupamentos ---------------------------------------------------------
     private sealed record Fatia(string Rotulo, double Valor, string Extra = "");
