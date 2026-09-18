@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject AplicacaoService Aplic
 @inject ChartPrefsRepository ChartPrefs
+@inject ColumnPrefsRepository ColPrefs
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -15,6 +16,10 @@
     </div>
     <div class="page-actions">
         <button class="btn-ghost" title="Reler as planilhas da rede agora" disabled="@_lendo" @onclick="() => Carregar(true)">@Icons.Svg("import")Atualizar</button>
+        @if (OrdemColunas.Length > 0)
+        {
+            <button class="btn-ghost" title="Voltar as colunas das tabelas para a ordem original da planilha" @onclick="RestaurarColunas">@Icons.Svg("history")Ordem original das colunas</button>
+        }
         @if (_aba == "dados")
         {
             <button class="btn-ghost" title="Exportar a tabela (com os filtros da tela) para Excel" disabled="@(_dados is null || Linhas.Count == 0)" @onclick="Exportar">@Icons.Svg("download")Exportar Excel</button>
@@ -99,7 +104,7 @@ else if (_dados is { } d)
 
     @if (_aba == "dados")
     {
-        @Tabela(d, Linhas, "70vh")
+        @Tabela("dados", d, Linhas, "70vh")
     }
     else
     {
@@ -136,7 +141,7 @@ else if (_dados is { } d)
                     else
                     {
                         @* As mesmas colunas da Tabela de dados, com os dias de atraso na frente. *@
-                        @Tabela(d, atrasadas.Select(x => x.L).ToList(), "480px", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString(), "row-perdida")
+                        @Tabela("atrasadas", d, atrasadas.Select(x => x.L).ToList(), "480px", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString(), "row-perdida")
                     }
                 </div>
             </div>
@@ -155,7 +160,7 @@ else if (_dados is { } d)
                     else
                     {
                         @* Mesmas colunas da Tabela de dados; "Dias p/ o prazo" negativo = já passou. *@
-                        @Tabela(d, pendentes, "480px", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "—")
+                        @Tabela("pendentes", d, pendentes, "480px", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "—")
                     }
                 </div>
             </div>
@@ -238,7 +243,7 @@ else if (_dados is { } d)
             <div class="c12" data-pnl="lista">
                 <div class="panel">
                     <div class="panel-head"><div class="panel-title">Propostas do recorte <span class="hint">a mesma lista da aba Tabela de dados · @rows.Count proposta(s)</span></div><TelaCheia /></div>
-                    @Tabela(d, rows, "520px")
+                    @Tabela("lista", d, rows, "520px")
                 </div>
             </div>
         </div>
@@ -270,9 +275,9 @@ else if (_dados is { } d)
             <div class="fact"><div class="fact-label">GM</div><div class="fact-value">@(p.Gm is { } gm ? Fmt.Pct(gm, 1) : "—")</div></div>
         </div>
 
-        @* Todas as colunas da tabela, na ordem, com o título do AFM. *@
+        @* Todas as colunas da tabela, na ordem escolhida pelo usuário, com o título do AFM. *@
         <dl>
-            @foreach (var c in dd.Colunas)
+            @foreach (var c in Colunas(dd))
             {
                 <div class="dl"><dt title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</dt><dd>@(c.Indice == dd.IndiceValor ? Fmt.Brl(p.ValorBrl) : Traco(p.Valores[c.Indice]))</dd></div>
             }
@@ -341,6 +346,8 @@ else if (_dados is { } d)
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender) _ref ??= DotNetObjectReference.Create(this);
+        foreach (var t in TabelasIds)
+            try { await JS.InvokeVoidAsync("colOrder.init", "apl-th-" + t, _ref, ChaveColunas); } catch { }
         if (_aba != "desempenho") return;
         try { await JS.InvokeVoidAsync("appLayout.ligar", _ref, LayoutSalvo); } catch { }
         try { await JS.InvokeVoidAsync("worldMap.init", MapId, _ref); } catch { }
@@ -415,20 +422,65 @@ else if (_dados is { } d)
         _vendedores.Clear(); _aplicadores.Clear();
     }
 
+    // ---- ordem das colunas (arrastar o cabeçalho) ------------------------------
+    // Uma ordem só, por usuário, para a Tabela de dados e as listas de atrasadas,
+    // pendentes e propostas do recorte; guardada por letra da coluna (NB).
+    private const string ChaveColunas = "aplicacao";
+    private static readonly string[] TabelasIds = { "dados", "atrasadas", "pendentes", "lista" };
+    private string[] _ordemColunas = Array.Empty<string>();
+    private int _ordemVersao = -1;
+
+    private string[] OrdemColunas
+    {
+        get
+        {
+            if (_ordemVersao != ColPrefs.Version)
+            {
+                _ordemColunas = ColPrefs.Get(_login, ChaveColunas).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                _ordemVersao = ColPrefs.Version;
+            }
+            return _ordemColunas;
+        }
+    }
+
+    // Colunas na ordem do usuário; as que não estão na ordem gravada (coluna nova
+    // na planilha) ficam no fim, na ordem original.
+    private List<AplicacaoService.Coluna> Colunas(AplicacaoService.Dados d)
+    {
+        var ordem = OrdemColunas;
+        if (ordem.Length == 0) return d.Colunas;
+        var pos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < ordem.Length; i++) pos.TryAdd(ordem[i], i);
+        return d.Colunas.Select((c, i) => (c, k: pos.TryGetValue(c.Letra, out var p) ? p : ordem.Length + i))
+                        .OrderBy(x => x.k).Select(x => x.c).ToList();
+    }
+
+    /// <summary>Nova ordem depois de arrastar um cabeçalho (chamado pelo JS).</summary>
+    [JSInvokable]
+    public Task SaveColumnOrder(string tabela, string[] ordem) => InvokeAsync(() =>
+    {
+        ColPrefs.Save(_login, ChaveColunas, string.Join(",", ordem ?? Array.Empty<string>()));
+        StateHasChanged();
+    });
+
+    private void RestaurarColunas() => ColPrefs.Reset(_login, ChaveColunas);
+
     // ---- tabela de propostas (mesma nas duas abas) ------------------------------
     // colunaExtra/extra: uma coluna a mais no fim (ex.: "Dias de atraso");
     // classeLinha: destaque das linhas (ex.: vermelho das atrasadas).
-    private RenderFragment Tabela(AplicacaoService.Dados d, List<AplicacaoService.Linha> rows, string altura,
+    // id: nome da tabela (dados/atrasadas/pendentes/lista) — cada cabeçalho é
+    // arrastável e todas compartilham a mesma ordem de colunas do usuário.
+    private RenderFragment Tabela(string id, AplicacaoService.Dados d, List<AplicacaoService.Linha> rows, string altura,
                                   string? colunaExtra = null, Func<AplicacaoService.Linha, string>? extra = null, string classeLinha = "") =>
         @<div class="table-wrap tbl-compact" style="max-height:@altura;overflow:auto">
             <table class="grid-tbl">
                 <thead>
-                    <tr>
+                    <tr id="apl-th-@id" class="th-drag">
                         <th class="center">Origem</th>
                         @if (colunaExtra is not null) { <th class="right">@colunaExtra</th> }
-                        @foreach (var c in d.Colunas)
+                        @foreach (var c in Colunas(d))
                         {
-                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</th>
+                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" draggable="true" data-key="@c.Letra" title="@c.Rotulo (AFM @c.LetraAfm → NB @c.Letra) — arraste para mover a coluna">@c.Rotulo</th>
                         }
                     </tr>
                 </thead>
@@ -438,7 +490,7 @@ else if (_dados is { } d)
                         <tr class="clickable @classeLinha" title="Dois cliques abrem a proposta" @ondblclick="() => _detalhe = l">
                             <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
                             @if (extra is not null) { <td class="right num col-strong">@extra(l)</td> }
-                            @foreach (var c in d.Colunas)
+                            @foreach (var c in Colunas(d))
                             {
                                 if (c.Indice == d.IndiceValor)
                                 {
@@ -711,8 +763,8 @@ else if (_dados is { } d)
         var col = 1;
         ws.Cell(1, col++).Value = "Origem";
         if (colunaExtra is not null) ws.Cell(1, col++).Value = colunaExtra;
-        var primeira = col;                        // coluna da planilha onde começam as da tabela
-        foreach (var c in d.Colunas) ws.Cell(1, primeira + c.Indice).Value = c.Rotulo;
+        var colunas = Colunas(d);                  // mesma ordem da tela
+        foreach (var c in colunas) ws.Cell(1, col++).Value = c.Rotulo;
         ws.Row(1).Style.Font.Bold = true;
 
         var r = 2;
@@ -726,9 +778,9 @@ else if (_dados is { } d)
                 if (int.TryParse(v, out var n)) ws.Cell(r, col).Value = n; else ws.Cell(r, col).Value = v;
                 col++;
             }
-            foreach (var c in d.Colunas)
+            foreach (var c in colunas)
             {
-                var cel = ws.Cell(r, primeira + c.Indice);
+                var cel = ws.Cell(r, col++);
                 if (c.Indice == d.IndiceValor)
                 {
                     cel.Value = l.ValorBrl;
