@@ -1983,3 +1983,10 @@ html.apresentando .page-head {
 }
 html.apresentando .page-head > div:first-child { display: none; }
 html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
+
+/* ---- Ranking empilhado (guia Aplicação): número + nome + valor numa linha e a
+   barra embaixo, na largura toda — o desenho dos rankings da Visão Executiva. */
+.rk-stack .rank-row { display: flex; flex-direction: column; gap: 8px; cursor: default; padding: 12px 6px; }
+.rk-stack .rank-line { display: grid; grid-template-columns: 26px 1fr auto auto; align-items: center; gap: 12px; min-width: 0; }
+.rk-stack .rank-track { height: 12px; }
+.rk-stack .rank-fill.neg { background: linear-gradient(90deg, #b23a2e 0%, #e2664e 100%); }

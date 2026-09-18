@@ -402,25 +402,30 @@ else if (_dados is { } d)
 
     // ---- gráficos -------------------------------------------------------------
 
-    // Barras horizontais: rótulo, barra proporcional, valor. Com "negativos", a
-    // barra mede o módulo e fica vermelha quando o valor é negativo.
+    // Ranking em barras, no mesmo desenho da Visão Executiva: número, nome e
+    // valor numa linha, a barra embaixo ocupando a largura toda. Com
+    // "negativos", a barra mede o módulo e fica vermelha quando é negativo.
     private RenderFragment RenderBarras(List<Fatia> dados, Func<double, string> fmt, bool negativos = false) => builder =>
     {
         if (dados.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
         var max = Math.Max(dados.Max(f => Math.Abs(f.Valor)), 0.000001);
         var total = dados.Sum(f => Math.Abs(f.Valor));
-        var sb = new System.Text.StringBuilder("<div class='chart-body flow'>");
+        var sb = new System.Text.StringBuilder("<div class='rank rk-stack'>");
         for (var i = 0; i < dados.Count; i++)
         {
             var f = dados[i];
-            var cor = negativos && f.Valor < 0 ? "var(--neg)" : Cores[i % Cores.Length];
-            sb.Append($"<div class='bar-row' title='{Esc(f.Rotulo)}{(f.Extra != "" ? " · " + Esc(f.Extra) : "")}'>");
-            sb.Append($"<span class='bar-label'>{Esc(f.Rotulo)}</span>");
-            sb.Append($"<span class='bar-track'><span class='bar-fill' style='width:{F(Math.Abs(f.Valor) / max * 100)}%;background:{cor}'></span></span>");
-            sb.Append($"<span class='bar-value'>{Esc(fmt(f.Valor))}");
-            if (!negativos && total > 0) sb.Append($" <span class='muted' style='font-weight:400'>· {Esc(Fmt.Pct(Math.Abs(f.Valor) / total * 100))}</span>");
-            if (f.Extra != "" && negativos) sb.Append($" <span class='muted' style='font-weight:400'>· {Esc(f.Extra)}</span>");
-            sb.Append("</span></div>");
+            var neg = negativos && f.Valor < 0;
+            sb.Append($"<div class='rank-row{(i == 0 ? " top1" : "")}' title='{Esc(f.Rotulo)}{(f.Extra != "" ? " · " + Esc(f.Extra) : "")}'>");
+            sb.Append("<div class='rank-line'>");
+            sb.Append($"<span class='rank-num'>{i + 1}</span>");
+            sb.Append($"<span class='rank-name'>{Esc(f.Rotulo)}</span>");
+            sb.Append($"<span class='rank-val'>{Esc(fmt(f.Valor))}</span>");
+            sb.Append(negativos
+                ? $"<span class='rank-share'>{(f.Extra != "" ? Esc(f.Extra) : "")}</span>"
+                : $"<span class='rank-share'>{Esc(Fmt.Pct(Math.Abs(f.Valor) / Math.Max(total, 0.000001) * 100))}</span>");
+            sb.Append("</div>");
+            sb.Append($"<div class='rank-track'><div class='rank-fill{(neg ? " neg" : "")}' style='width:{F(Math.Abs(f.Valor) / max * 100)}%'></div></div>");
+            sb.Append("</div>");
         }
         sb.Append("</div>");
         builder.AddMarkupContent(0, sb.ToString());
