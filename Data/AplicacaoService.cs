@@ -16,9 +16,8 @@ namespace HowdenSalesForecast.Data;
 // As planilhas seguem o formato da exportação do CRM: linhas de título antes
 // do cabeçalho de verdade (no NB, o cabeçalho é a linha 14 — configurável) e
 // uma linha de totais no fim. O que vem antes do cabeçalho é descartado e a
-// leitura para na linha de totais. As LETRAS são as do Excel, sem deslocar:
-// a coluna A do NB fica vazia nas linhas do NB e é preenchida pela B do AFM,
-// exatamente como o De-Para diz.
+// leitura para na linha de totais. As LETRAS são as do Excel, sem deslocar —
+// a coluna A do NB, que ninguém usa, simplesmente não entra na tabela.
 //
 // Três colunas pedem tratamento: o vendedor (K do AFM → M do NB) e o aplicador
 // (AB → AD) têm nomes escritos de forma diferente nos dois CRMs e são casados
@@ -51,10 +50,11 @@ public sealed class AplicacaoService
     }
 
     // ---- De-Para de colunas: letra do AFM → letra do NB ---------------------
-    // A coluna B do AFM alimenta duas do NB (A e C), conforme passado pela área.
+    // Letras do Excel, como a área passou. A coluna A do NB não entra: ninguém
+    // a usa e nenhuma coluna do AFM aponta para ela.
     private static readonly (string Afm, string Nb)[] DePara =
     {
-        ("B", "A"), ("B", "C"), ("C", "E"), ("D", "F"), ("F", "H"), ("H", "J"),
+        ("A", "B"), ("B", "D"), ("C", "E"), ("D", "F"), ("F", "H"), ("H", "J"),
         ("I", "K"), ("J", "L"), ("K", "M"), ("L", "N"), ("M", "O"), ("N", "P"),
         ("O", "Q"), ("Q", "R"), ("S", "T"), ("T", "X"), ("V", "Z"), ("AB", "AD"),
         ("Y", "AB"), ("AA", "AC"), ("W", "AA"),
