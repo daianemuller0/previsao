@@ -121,25 +121,8 @@ else if (_dados is { } d)
                     }
                     else
                     {
-                        <div class="table-wrap tbl-compact" style="max-height:420px;overflow:auto">
-                            <table class="grid-tbl">
-                                <thead><tr><th>Proposta</th><th class="center">Origem</th><th>Aplicador</th><th>Vendedor</th><th>Prazo (Due)</th><th class="right">Dias de atraso</th><th class="right">Valor TOTAL</th></tr></thead>
-                                <tbody>
-                                    @foreach (var (l, dias) in atrasadas)
-                                    {
-                                        <tr class="row-perdida">
-                                            <td class="col-strong">@Traco(l.Chave)</td>
-                                            <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
-                                            <td>@Traco(l.Aplicador)</td>
-                                            <td>@Traco(l.Vendedor)</td>
-                                            <td class="nowrap">@l.Due!.Value.ToString("dd/MM/yyyy")</td>
-                                            <td class="right num">@dias</td>
-                                            <td class="right num">@Fmt.Brl(l.ValorBrl)</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        @* As mesmas colunas da Tabela de dados, com os dias de atraso na frente. *@
+                        @Tabela(d, atrasadas.Select(x => x.L).ToList(), "480px", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString(), "row-perdida")
                     }
                 </div>
             </div>
@@ -361,12 +344,16 @@ else if (_dados is { } d)
     }
 
     // ---- tabela de propostas (mesma nas duas abas) ------------------------------
-    private RenderFragment Tabela(AplicacaoService.Dados d, List<AplicacaoService.Linha> rows, string altura) =>
+    // colunaExtra/extra: uma coluna a mais no fim (ex.: "Dias de atraso");
+    // classeLinha: destaque das linhas (ex.: vermelho das atrasadas).
+    private RenderFragment Tabela(AplicacaoService.Dados d, List<AplicacaoService.Linha> rows, string altura,
+                                  string? colunaExtra = null, Func<AplicacaoService.Linha, string>? extra = null, string classeLinha = "") =>
         @<div class="table-wrap tbl-compact" style="max-height:@altura;overflow:auto">
             <table class="grid-tbl">
                 <thead>
                     <tr>
                         <th class="center">Origem</th>
+                        @if (colunaExtra is not null) { <th class="right">@colunaExtra</th> }
                         @foreach (var c in d.Colunas)
                         {
                             <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</th>
@@ -376,8 +363,9 @@ else if (_dados is { } d)
                 <tbody>
                     @foreach (var l in rows)
                     {
-                        <tr>
+                        <tr class="@classeLinha">
                             <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
+                            @if (extra is not null) { <td class="right num col-strong">@extra(l)</td> }
                             @foreach (var c in d.Colunas)
                             {
                                 if (c.Indice == d.IndiceValor)
@@ -393,7 +381,7 @@ else if (_dados is { } d)
                     }
                     @if (rows.Count == 0)
                     {
-                        <tr><td colspan="@(d.Colunas.Count + 1)" class="empty">Nenhuma linha no recorte.</td></tr>
+                        <tr><td colspan="@(d.Colunas.Count + (colunaExtra is not null ? 2 : 1))" class="empty">Nenhuma linha no recorte.</td></tr>
                     }
                 </tbody>
             </table>
