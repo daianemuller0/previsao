@@ -70,6 +70,7 @@ else if (_dados is { } d)
         <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
         <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco) e com o prazo do cliente (Due) já passado"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
+        <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco)"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
         @* Janela de tempo: pela data de envio (Actual) ou pelo prazo do cliente (Due). *@
         <div class="flt"><span class="flt-label">Período por</span>
             <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option></select>
@@ -84,7 +85,7 @@ else if (_dados is { } d)
                 <div class="fb-sum"><span class="fb-sum-k">Valor TOTAL</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
             }
         </div>
-        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _de is not null || _ate is not null)
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _soPendentes || _de is not null || _ate is not null)
         {
             <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
         }
@@ -101,6 +102,9 @@ else if (_dados is { } d)
         var atrasadas = rows.Where(Atrasada)
                             .Select(l => (L: l, Dias: (hoje - l.Due!.Value).Days))
                             .OrderByDescending(x => x.Dias).ToList();
+        var pendentes = rows.Where(Pendente)
+                            .OrderBy(l => Traco(l.Aplicador), StringComparer.CurrentCultureIgnoreCase)
+                            .ThenBy(l => l.Due ?? DateTime.MaxValue).ToList();
 
         @* Painéis arrastáveis (Organizar): a ordem e a largura ficam guardadas por usuário. *@
         <div class="g12 exec-board" id="exec-board">
@@ -123,6 +127,21 @@ else if (_dados is { } d)
                     {
                         @* As mesmas colunas da Tabela de dados, com os dias de atraso na frente. *@
                         @Tabela(d, atrasadas.Select(x => x.L).ToList(), "480px", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString(), "row-perdida")
+                    }
+                </div>
+            </div>
+
+            <div class="c12" data-pnl="pendentes">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco) · @pendentes.Count</span></div><TelaCheia /></div>
+                    @if (pendentes.Count == 0)
+                    {
+                        <div class="empty">Nenhuma proposta pendente no recorte.</div>
+                    }
+                    else
+                    {
+                        @* Mesmas colunas da Tabela de dados; "Dias p/ o prazo" negativo = já passou. *@
+                        @Tabela(d, pendentes, "480px", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "—")
                     }
                 </div>
             </div>
@@ -202,13 +221,6 @@ else if (_dados is { } d)
                 </div>
             </div>
 
-            <div class="c6" data-pnl="pendentes">
-                <div class="panel">
-                    <div class="panel-head"><div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco)</span></div><TelaCheia /></div>
-                    @RenderBarras(Agrupar(rows.Where(l => l.Actual is null), l => l.Aplicador, _ => 1), Inteiro)
-                </div>
-            </div>
-
             <div class="c12" data-pnl="lista">
                 <div class="panel">
                     <div class="panel-head"><div class="panel-title">Propostas do recorte <span class="hint">a mesma lista da aba Tabela de dados · @rows.Count proposta(s)</span></div><TelaCheia /></div>
@@ -273,6 +285,8 @@ else if (_dados is { } d)
     private HashSet<string> _vendedores = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
     private bool _soAtrasadas;   // sem Actual e com o Due já vencido
+    private bool _soPendentes;   // sem Actual (ainda não enviada)
+    private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null;
     private AplicacaoService.Linha? _detalhe;   // proposta aberta com dois cliques
     private string _dataCampo = "actual";   // janela de tempo por Actual (envio) ou Due (prazo)
     private DateTime? _de, _ate;
@@ -356,6 +370,7 @@ else if (_dados is { } d)
             if (_vendedores.Count > 0) q = q.Where(l => _vendedores.Contains(l.Vendedor));
             if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
             if (_soAtrasadas) q = q.Where(Atrasada);
+            if (_soPendentes) q = q.Where(Pendente);
             if (_de is not null || _ate is not null)
             {
                 // Sem a data escolhida, a proposta fica fora da janela.
@@ -374,7 +389,7 @@ else if (_dados is { } d)
 
     private void Limpar()
     {
-        _busca = ""; _origem = ""; _soAtrasadas = false;
+        _busca = ""; _origem = ""; _soAtrasadas = false; _soPendentes = false;
         _de = _ate = null; _dataCampo = "actual";
         _vendedores.Clear(); _aplicadores.Clear();
     }
