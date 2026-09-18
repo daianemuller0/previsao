@@ -1,0 +1,200 @@
+@page "/aplicacao"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AplicacaoService Aplic
+@inject IJSRuntime JS
+
+<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Aplicação</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Aplicação</h1>
+        <p class="subtitle">Planilhas de aplicadores do Aftermarket e do New Business numa tabela só</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-ghost" title="Reler as planilhas da rede agora" disabled="@_lendo" @onclick="() => Carregar(true)">@Icons.Svg("import")Atualizar</button>
+        <button class="btn-ghost" title="Exportar a tabela (com os filtros da tela) para Excel" disabled="@(_dados is null || Linhas.Count == 0)" @onclick="Exportar">@Icons.Svg("download")Exportar Excel</button>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab @(_aba == "dados" ? "active" : "")" @onclick='() => _aba = "dados"'>Tabela de dados @if (_dados is not null) { <span class="tab-badge">@_dados.Linhas.Count</span> }</button>
+    <button class="tab @(_aba == "segunda" ? "active" : "")" @onclick='() => _aba = "segunda"'>Aba 2</button>
+</div>
+
+@if (_aba == "segunda")
+{
+    <div class="panel"><div class="empty" style="padding:40px 12px">Esta aba ainda vai ser definida.</div></div>
+}
+else if (_lendo && _dados is null)
+{
+    <div class="info-banner">Lendo as planilhas da rede…</div>
+}
+else if (_dados is { } d)
+{
+    @* Origem dos dados e avisos de leitura: quem olha a tabela precisa saber de
+       qual arquivo ela veio e com qual câmbio. *@
+    <div class="cfg-kv" style="margin-bottom:6px">
+        <span class="cfg-k">AFM</span><code class="cfg-path">@(d.ArquivoAfm == "" ? "— não encontrada" : d.ArquivoAfm)</code>
+        <span class="muted" style="margin-left:8px">@d.LinhasAfm linha(s) · valores em US$ convertidos a @d.TaxaUsd.ToString("0.0000", _pt) R$/US$</span>
+    </div>
+    <div class="cfg-kv" style="margin-bottom:12px">
+        <span class="cfg-k">NB</span><code class="cfg-path">@(d.ArquivoNb == "" ? "— não encontrada" : d.ArquivoNb)</code>
+        <span class="muted" style="margin-left:8px">@d.LinhasNb linha(s) · valores já em R$</span>
+        @if (d.LidoEm is { } lido) { <span class="muted" style="margin-left:8px">· lido às @lido.ToString("HH:mm")</span> }
+    </div>
+    @foreach (var aviso in d.Avisos)
+    {
+        <div class="confirm-err" style="margin-bottom:8px">@aviso</div>
+    }
+
+    <div class="filterbar filterbar-sticky">
+        <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="qualquer coluna…" @bind="_busca" @bind:event="oninput" /></div>
+        <div class="flt"><span class="flt-label">Origem</span>
+            <select @bind="_origem"><option value="">Ambas</option><option value="AFM">AFM</option><option value="NB">NB</option></select>
+        </div>
+        <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
+        <div class="filterbar-spacer"></div>
+        <div class="fb-summary">
+            <div class="fb-sum"><span class="fb-sum-k">Linhas</span><span class="fb-sum-v">@Linhas.Count</span></div>
+            @if (d.IndiceValor >= 0)
+            {
+                <div class="fb-sum"><span class="fb-sum-k">Valor (R$)</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
+            }
+        </div>
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0)
+        {
+            <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
+        }
+    </div>
+
+    <div class="table-wrap tbl-compact" style="max-height:70vh;overflow:auto">
+        <table class="grid-tbl">
+            <thead>
+                <tr>
+                    <th class="center">Origem</th>
+                    @foreach (var c in d.Colunas)
+                    {
+                        <th class="@(c.Indice == d.IndiceValor ? "right" : "")" title="Coluna @c.Letra da planilha do NB">@c.Rotulo</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Linhas)
+                {
+                    <tr>
+                        <td class="center"><span class="setor-tag setor-@l.Origem.ToLower()">@l.Origem</span></td>
+                        @foreach (var c in d.Colunas)
+                        {
+                            if (c.Indice == d.IndiceValor)
+                            {
+                                <td class="right num">@Fmt.Brl(l.ValorBrl)</td>
+                            }
+                            else
+                            {
+                                <td>@(string.IsNullOrWhiteSpace(l.Valores[c.Indice]) ? "—" : l.Valores[c.Indice])</td>
+                            }
+                        }
+                    </tr>
+                }
+                @if (Linhas.Count == 0)
+                {
+                    <tr><td colspan="@(d.Colunas.Count + 1)" class="empty">Nenhuma linha no recorte.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    private string _aba = "dados";
+    private AplicacaoService.Dados? _dados;
+    private bool _lendo;
+
+    private string _busca = "";
+    private string _origem = "";
+    private HashSet<string> _vendedores = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync() => await Carregar(false);
+
+    // A leitura vai à rede (duas planilhas): fora da thread da tela, para a
+    // página aparecer na hora com "lendo…" em vez de travar até terminar.
+    private async Task Carregar(bool force)
+    {
+        if (_lendo) return;
+        _lendo = true;
+        try { _dados = await Task.Run(() => Aplic.Carregar(force)); }
+        finally { _lendo = false; }
+    }
+
+    private IEnumerable<string> Vendedores => Nomes(l => l.Vendedor);
+    private IEnumerable<string> Aplicadores => Nomes(l => l.Aplicador);
+    private IEnumerable<string> Nomes(Func<AplicacaoService.Linha, string> pega) =>
+        (_dados?.Linhas ?? new()).Select(pega).Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
+
+    private List<AplicacaoService.Linha> Linhas
+    {
+        get
+        {
+            if (_dados is null) return new();
+            IEnumerable<AplicacaoService.Linha> q = _dados.Linhas;
+            if (_origem != "") q = q.Where(l => l.Origem == _origem);
+            if (_vendedores.Count > 0) q = q.Where(l => _vendedores.Contains(l.Vendedor));
+            if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
+            if (!string.IsNullOrWhiteSpace(_busca))
+            {
+                var b = _busca.Trim();
+                q = q.Where(l => l.Valores.Any(v => v is not null && v.Contains(b, StringComparison.CurrentCultureIgnoreCase)));
+            }
+            return q.ToList();
+        }
+    }
+
+    private void Limpar()
+    {
+        _busca = ""; _origem = "";
+        _vendedores.Clear(); _aplicadores.Clear();
+    }
+
+    private async Task Exportar()
+    {
+        if (_dados is not { } d) return;
+        var linhas = Linhas;
+        using var wb = new ClosedXML.Excel.XLWorkbook();
+        var ws = wb.Worksheets.Add("Aplicação");
+        ws.Cell(1, 1).Value = "Origem";
+        ws.Cell(1, 1).Style.Font.Bold = true;
+        foreach (var c in d.Colunas)
+        {
+            ws.Cell(1, c.Indice + 2).Value = c.Rotulo;
+            ws.Cell(1, c.Indice + 2).Style.Font.Bold = true;
+        }
+        var r = 2;
+        foreach (var l in linhas)
+        {
+            ws.Cell(r, 1).Value = l.Origem;
+            foreach (var c in d.Colunas)
+            {
+                if (c.Indice == d.IndiceValor)
+                {
+                    ws.Cell(r, c.Indice + 2).Value = l.ValorBrl;
+                    ws.Cell(r, c.Indice + 2).Style.NumberFormat.Format = "#,##0.00";
+                }
+                else ws.Cell(r, c.Indice + 2).Value = l.Valores[c.Indice] ?? "";
+            }
+            r++;
+        }
+        ws.SheetView.FreezeRows(1);
+        ws.RangeUsed()?.SetAutoFilter();
+        ws.Columns().AdjustToContents();
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        await JS.InvokeVoidAsync("appDownload", $"aplicacao_{DateTime.Today:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
+    }
+}
