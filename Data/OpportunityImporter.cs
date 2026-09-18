@@ -181,8 +181,11 @@ public sealed class OpportunityImporter
             for (var c = 1; c <= last; c++)
             {
                 var cell = row.Cell(c);
-                linha[c - 1] = new Cel(cell.GetString(),
-                    cell.Value.IsNumber ? cell.Value.GetNumber() : null);
+                // Data sai em ISO, não no formato de exibição da célula: assim quem
+                // lê não depende de como a planilha foi formatada.
+                linha[c - 1] = cell.Value.IsDateTime
+                    ? new Cel(cell.Value.GetDateTime().ToString("yyyy-MM-dd"), null)
+                    : new Cel(cell.GetString(), cell.Value.IsNumber ? cell.Value.GetNumber() : null);
             }
             grade.Add(linha);
         }

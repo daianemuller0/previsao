@@ -37,7 +37,19 @@ public sealed class AplicacaoService
     /// <summary>Letra = coluna no NB; LetraAfm = coluna equivalente no AFM (de onde vem o título).</summary>
     public sealed record Coluna(string Letra, string LetraAfm, string Rotulo, int Indice);
 
-    public sealed record Linha(string Origem, string[] Valores, double ValorBrl, string Vendedor, string Aplicador);
+    /// <summary>Uma linha da tabela. Valores = células nas colunas da tabela; os
+    /// demais campos são as colunas que os gráficos usam, já interpretadas.</summary>
+    public sealed record Linha(string Origem, string[] Valores, double ValorBrl, string Vendedor, string Aplicador)
+    {
+        public DateTime? Actual { get; init; }     // data em que a proposta foi enviada
+        public DateTime? Due { get; init; }        // data em que o cliente esperava receber
+        public string Industry { get; init; } = "";
+        public string Bu { get; init; } = "";
+        public double? Gm { get; init; }           // em %, já multiplicado por 100 quando vem decimal
+        public string Country { get; init; } = "";
+        public string Category { get; init; } = "";
+        public string Chave { get; init; } = "";   // primeira coluna preenchida: identifica a proposta nas listas
+    }
 
     public sealed class Dados
     {
@@ -52,6 +64,39 @@ public sealed class AplicacaoService
         public DateTime? LidoEm { get; set; }
         /// <summary>Posição da coluna de valor (P do NB) em Valores; -1 se não veio.</summary>
         public int IndiceValor { get; set; } = -1;
+        /// <summary>Colunas que os gráficos usam e não foram achadas pelo título.</summary>
+        public List<string> ColunasFaltando { get; } = new();
+    }
+
+    // ---- colunas que os gráficos usam, achadas pelo TÍTULO (cabeçalho do AFM) ----
+    // Cada entrada: nome amigável + títulos aceitos (normalizados, por prefixo).
+    private static readonly (string Nome, string[] Titulos)[] ColunasGrafico =
+    {
+        ("Actual",           new[] { "actual" }),
+        ("Due",              new[] { "due" }),
+        ("ProposalEngineer", new[] { "proposalengineer", "proposal engineer", "aplicador" }),
+        ("Salesperson",      new[] { "salesperson", "sales person", "vendedor" }),
+        ("Industry",         new[] { "industry", "segmento" }),
+        ("BU",               new[] { "bu", "business unit", "unidade" }),
+        ("GM",               new[] { "gm", "margem" }),
+        ("Country",          new[] { "country", "pais", "país" }),
+        ("Category",         new[] { "category", "categoria" }),
+    };
+
+    private static int AcharColuna(List<Coluna> colunas, string nome)
+    {
+        var titulos = ColunasGrafico.First(c => c.Nome == nome).Titulos;
+        foreach (var c in colunas)
+        {
+            var r = OpportunityImporter.Normalizar(c.Rotulo);
+            if (titulos.Any(t => r == t)) return c.Indice;
+        }
+        foreach (var c in colunas)
+        {
+            var r = OpportunityImporter.Normalizar(c.Rotulo);
+            if (titulos.Any(t => r.StartsWith(t + " ", StringComparison.Ordinal) || r.StartsWith(t, StringComparison.Ordinal) && t.Length >= 4)) return c.Indice;
+        }
+        return -1;
     }
 
     // ---- De-Para de colunas: letra do AFM → letra do NB ---------------------
@@ -163,8 +208,43 @@ public sealed class AplicacaoService
         }
         var pos = d.Colunas.ToDictionary(c => c.Letra, c => c.Indice, StringComparer.Ordinal);
         d.IndiceValor = pos.TryGetValue(ColValorNb, out var iv) ? iv : -1;
+        // A coluna de valor ganha o nome pedido pela área.
+        if (d.IndiceValor >= 0) d.Colunas[d.IndiceValor] = d.Colunas[d.IndiceValor] with { Rotulo = "Valor TOTAL" };
         var iVend = pos.TryGetValue(ColVendedorNb, out var a) ? a : -1;
         var iApl = pos.TryGetValue(ColAplicadorNb, out var b) ? b : -1;
+
+        // Colunas dos gráficos, pelo título. As de vendedor e aplicador têm a
+        // letra combinada como reserva, se o título não casar.
+        var iActual = AcharColuna(d.Colunas, "Actual");
+        var iDue = AcharColuna(d.Colunas, "Due");
+        var iEng = AcharColuna(d.Colunas, "ProposalEngineer"); if (iEng < 0) iEng = iApl;
+        var iSales = AcharColuna(d.Colunas, "Salesperson"); if (iSales < 0) iSales = iVend;
+        var iInd = AcharColuna(d.Colunas, "Industry");
+        var iBu = AcharColuna(d.Colunas, "BU");
+        var iGm = AcharColuna(d.Colunas, "GM");
+        var iPais = AcharColuna(d.Colunas, "Country");
+        var iCat = AcharColuna(d.Colunas, "Category");
+        foreach (var (nome, i) in new[] { ("Actual", iActual), ("Due", iDue), ("ProposalEngineer", iEng), ("Salesperson", iSales),
+                                          ("Industry", iInd), ("BU", iBu), ("GM", iGm), ("Country", iPais), ("Category", iCat) })
+            if (i < 0) d.ColunasFaltando.Add(nome);
+
+        string Cel(string[] v, int i) => i >= 0 && i < v.Length ? (v[i] ?? "").Trim() : "";
+        Linha Completar(Linha l, bool nb)
+        {
+            var v = l.Valores;
+            var gm = Percentual(Cel(v, iGm));
+            if (gm is { } g && nb) gm = g * 100;     // o NB traz decimal (0,25 = 25%)
+            return l with
+            {
+                Actual = Data(Cel(v, iActual)),
+                Due = Data(Cel(v, iDue)),
+                Industry = Cel(v, iInd), Bu = Cel(v, iBu), Gm = gm,
+                Country = Cel(v, iPais), Category = Cel(v, iCat),
+                Chave = v.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
+                Aplicador = iEng >= 0 ? Cel(v, iEng) : l.Aplicador,
+                Vendedor = iSales >= 0 ? Cel(v, iSales) : l.Vendedor,
+            };
+        }
 
         // ---- linhas do NB: cada letra na sua coluna, valor já em real ----------
         if (planNb is not null)
@@ -176,8 +256,8 @@ public sealed class AplicacaoService
                 if (v.All(string.IsNullOrWhiteSpace)) continue;
                 var valor = planNb.Numero(row, ColValorNb);
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = valor.ToString("0.##", Inv);
-                d.Linhas.Add(new Linha("NB", v, valor,
-                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""));
+                d.Linhas.Add(Completar(new Linha("NB", v, valor,
+                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), nb: true));
                 d.LinhasNb++;
             }
         }
@@ -198,8 +278,8 @@ public sealed class AplicacaoService
                 var usd = planAfm.Numero(row, ColValorAfm);
                 var brl = d.TaxaUsd > 0 ? usd * d.TaxaUsd : 0;
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = brl.ToString("0.##", Inv);
-                d.Linhas.Add(new Linha("AFM", v, brl,
-                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""));
+                d.Linhas.Add(Completar(new Linha("AFM", v, brl,
+                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), nb: false));
                 d.LinhasAfm++;
             }
         }
@@ -281,6 +361,30 @@ public sealed class AplicacaoService
     }
 
     // ---- utilitários -----------------------------------------------------------
+
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    /// <summary>Data em qualquer formato que as planilhas trazem: ISO, dd/MM/aaaa,
+    /// MM/dd/aaaa (texto do CRM) ou número de série do Excel.</summary>
+    public static DateTime? Data(string s)
+    {
+        s = (s ?? "").Trim();
+        if (s == "") return null;
+        if (DateTime.TryParseExact(s, new[] { "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss" }, Inv, DateTimeStyles.None, out var d)) return d.Date;
+        if (DateTime.TryParse(s, Br, DateTimeStyles.None, out d)) return d.Date;
+        if (DateTime.TryParse(s, Inv, DateTimeStyles.None, out d)) return d.Date;
+        if (double.TryParse(s, NumberStyles.Any, Inv, out var serial) && serial is > 20000 and < 80000) return DateTime.FromOADate(serial).Date;
+        return null;
+    }
+
+    private static double? Percentual(string s)
+    {
+        s = (s ?? "").Trim().Replace("%", "").Trim();
+        if (s == "") return null;
+        var ultVirg = s.LastIndexOf(','); var ultPonto = s.LastIndexOf('.');
+        s = ultVirg > ultPonto ? s.Replace(".", "").Replace(',', '.') : s.Replace(",", "");
+        return double.TryParse(s, NumberStyles.Any, Inv, out var v) ? v : null;
+    }
 
     private static string Equivalente(string nome, Dictionary<string, string> tabela)
     {
