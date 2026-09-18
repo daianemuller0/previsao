@@ -118,7 +118,11 @@ else if (_dados is { } d)
 
             <div class="c12" data-pnl="atrasadas">
                 <div class="panel">
-                    <div class="panel-head"><div class="panel-title">Propostas atrasadas <span class="hint">sem data de envio (Actual) e com o prazo do cliente (Due) já passado · @atrasadas.Count</span></div><TelaCheia /></div>
+                    <div class="panel-head">
+                        <div class="panel-title">Propostas atrasadas <span class="hint">sem data de envio (Actual) e com o prazo do cliente (Due) já passado · @atrasadas.Count</span></div>
+                        <button class="btn-ghost sm" title="Exportar as atrasadas para Excel" disabled="@(atrasadas.Count == 0)" @onclick='() => ExportarLista(atrasadas.Select(x => x.L).ToList(), "propostas_atrasadas", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString())'>@Icons.Svg("download")Exportar Excel</button>
+                        <TelaCheia />
+                    </div>
                     @if (atrasadas.Count == 0)
                     {
                         <div class="empty">Nenhuma proposta atrasada no recorte.</div>
@@ -133,7 +137,11 @@ else if (_dados is { } d)
 
             <div class="c12" data-pnl="pendentes">
                 <div class="panel">
-                    <div class="panel-head"><div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco) · @pendentes.Count</span></div><TelaCheia /></div>
+                    <div class="panel-head">
+                        <div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco) · @pendentes.Count</span></div>
+                        <button class="btn-ghost sm" title="Exportar as pendentes para Excel" disabled="@(pendentes.Count == 0)" @onclick='() => ExportarLista(pendentes, "propostas_pendentes", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "")'>@Icons.Svg("download")Exportar Excel</button>
+                        <TelaCheia />
+                    </div>
                     @if (pendentes.Count == 0)
                     {
                         <div class="empty">Nenhuma proposta pendente no recorte.</div>
@@ -677,31 +685,43 @@ else if (_dados is { } d)
     };
 
     // ---- exportação -----------------------------------------------------------
-    private async Task Exportar()
+    // Mesma planilha para a Tabela de dados e para as listas de atrasadas e
+    // pendentes: Origem, a coluna extra (dias) quando houver, e todas as colunas.
+    private Task Exportar() => ExportarLista(Linhas, "aplicacao");
+
+    private async Task ExportarLista(List<AplicacaoService.Linha> linhas, string nome,
+                                     string? colunaExtra = null, Func<AplicacaoService.Linha, string>? extra = null)
     {
-        if (_dados is not { } d) return;
-        var linhas = Linhas;
+        if (_dados is not { } d || linhas.Count == 0) return;
         using var wb = new ClosedXML.Excel.XLWorkbook();
         var ws = wb.Worksheets.Add("Aplicação");
-        ws.Cell(1, 1).Value = "Origem";
-        ws.Cell(1, 1).Style.Font.Bold = true;
-        foreach (var c in d.Colunas)
-        {
-            ws.Cell(1, c.Indice + 2).Value = c.Rotulo;
-            ws.Cell(1, c.Indice + 2).Style.Font.Bold = true;
-        }
+        var col = 1;
+        ws.Cell(1, col++).Value = "Origem";
+        if (colunaExtra is not null) ws.Cell(1, col++).Value = colunaExtra;
+        var primeira = col;                        // coluna da planilha onde começam as da tabela
+        foreach (var c in d.Colunas) ws.Cell(1, primeira + c.Indice).Value = c.Rotulo;
+        ws.Row(1).Style.Font.Bold = true;
+
         var r = 2;
         foreach (var l in linhas)
         {
-            ws.Cell(r, 1).Value = l.Origem;
+            col = 1;
+            ws.Cell(r, col++).Value = l.Origem;
+            if (extra is not null)
+            {
+                var v = extra(l);
+                if (int.TryParse(v, out var n)) ws.Cell(r, col).Value = n; else ws.Cell(r, col).Value = v;
+                col++;
+            }
             foreach (var c in d.Colunas)
             {
+                var cel = ws.Cell(r, primeira + c.Indice);
                 if (c.Indice == d.IndiceValor)
                 {
-                    ws.Cell(r, c.Indice + 2).Value = l.ValorBrl;
-                    ws.Cell(r, c.Indice + 2).Style.NumberFormat.Format = "#,##0.00";
+                    cel.Value = l.ValorBrl;
+                    cel.Style.NumberFormat.Format = "#,##0.00";
                 }
-                else ws.Cell(r, c.Indice + 2).Value = l.Valores[c.Indice] ?? "";
+                else cel.Value = l.Valores[c.Indice] ?? "";
             }
             r++;
         }
@@ -710,7 +730,7 @@ else if (_dados is { } d)
         ws.Columns().AdjustToContents();
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
-        await JS.InvokeVoidAsync("appDownload", $"aplicacao_{DateTime.Today:yyyy-MM-dd}.xlsx",
+        await JS.InvokeVoidAsync("appDownload", $"{nome}_{DateTime.Today:yyyy-MM-dd}.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
     }
 }
