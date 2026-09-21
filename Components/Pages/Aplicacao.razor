@@ -73,8 +73,8 @@ else if (_dados is { } d)
         </div>
         <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
-        <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco) e com o prazo do cliente (Due) já passado"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
-        <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco)"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
+        <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco), prazo do cliente (Due) já passado e não fechadas no CRM"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
+        <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco) e não fechadas no CRM"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
         @* Janela de tempo: pela data de envio (Actual), pelo prazo do cliente (Due) ou por ambas. *@
         <div class="flt" title="Ambas: a proposta entra se o envio OU o prazo cair no período"><span class="flt-label">Período por</span>
             <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option><option value="ambas">Ambas</option></select>
@@ -129,7 +129,7 @@ else if (_dados is { } d)
             <div class="c12" data-pnl="atrasadas">
                 <div class="panel">
                     <div class="panel-head">
-                        <div class="panel-title">Propostas atrasadas <span class="hint">sem data de envio (Actual) e com o prazo do cliente (Due) já passado · @atrasadas.Count</span></div>
+                        <div class="panel-title">Propostas atrasadas <span class="hint">sem data de envio (Actual), prazo do cliente (Due) já passado e não fechadas no CRM · @atrasadas.Count</span></div>
                         <button class="btn-ghost sm" title="Exportar as atrasadas para Excel" disabled="@(atrasadas.Count == 0)" @onclick='() => ExportarLista(atrasadas.Select(x => x.L).ToList(), "propostas_atrasadas", "Dias de atraso", l => (hoje - l.Due!.Value).Days.ToString())'>@Icons.Svg("download")Exportar Excel</button>
                         <TelaCheia />
                     </div>
@@ -148,7 +148,7 @@ else if (_dados is { } d)
             <div class="c12" data-pnl="pendentes">
                 <div class="panel">
                     <div class="panel-head">
-                        <div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco) · @pendentes.Count</span></div>
+                        <div class="panel-title">Propostas pendentes por aplicador <span class="hint">sem data de envio (Actual em branco) e não fechadas no CRM · @pendentes.Count</span></div>
                         <button class="btn-ghost sm" title="Exportar as pendentes para Excel" disabled="@(pendentes.Count == 0)" @onclick='() => ExportarLista(pendentes, "propostas_pendentes", "Dias p/ o prazo", l => l.Due is { } due ? (due - hoje).Days.ToString() : "")'>@Icons.Svg("download")Exportar Excel</button>
                         <TelaCheia />
                     </div>
@@ -266,7 +266,8 @@ else if (_dados is { } d)
         <div class="exec-grid cols-2" style="margin-bottom:14px">
             <div class="fact"><div class="fact-label">Valor TOTAL</div><div class="fact-value">@Fmt.Brl(p.ValorBrl)</div></div>
             <div class="fact"><div class="fact-label">Situação</div><div class="fact-value">
-                @if (p.Actual is { } env) { <text>Enviada em @env.ToString("dd/MM/yyyy")</text> }
+                @if (p.Fechada) { <text>Fechada no CRM · @p.Estagio</text> }
+                else if (p.Actual is { } env) { <text>Enviada em @env.ToString("dd/MM/yyyy")</text> }
                 else if (Atrasada(p)) { <span style="color:var(--neg)">Atrasada · @((hojeD - p.Due!.Value).Days) dia(s)</span> }
                 else { <text>Pendente de envio</text> }
             </div></div>
@@ -304,7 +305,9 @@ else if (_dados is { } d)
     private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
     private bool _soAtrasadas;   // sem Actual e com o Due já vencido
     private bool _soPendentes;   // sem Actual (ainda não enviada)
-    private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null;
+    // Pendente: ainda não enviada (Actual em branco) e não fechada no CRM
+    // (FunnelStage/Stage começando com "Closed" fica fora).
+    private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null && !l.Fechada;
     private AplicacaoService.Linha? _detalhe;   // proposta aberta com dois cliques
     private string _dataCampo = "actual";   // janela de tempo por Actual (envio), Due (prazo) ou ambas
     private string _ano = "";               // ano da data escolhida ("" = todos)
@@ -313,7 +316,7 @@ else if (_dados is { } d)
     // Regra única de "atrasada", usada pelo filtro e pelo painel: ainda não foi
     // enviada (Actual em branco) e hoje já passou do prazo do cliente (Due).
     private static bool Atrasada(AplicacaoService.Linha l) =>
-        l.Actual is null && l.Due is { } due && DateTime.Today > due;
+        Pendente(l) && l.Due is { } due && DateTime.Today > due;
 
     protected override async Task OnInitializedAsync()
     {

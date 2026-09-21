@@ -49,6 +49,11 @@ public sealed class AplicacaoService
         public string Country { get; init; } = "";
         public string Category { get; init; } = "";
         public string Chave { get; init; } = "";   // primeira coluna preenchida: identifica a proposta nas listas
+        /// <summary>Estágio no CRM: FunnelStage (AFM) ou Stage (NB), como veio.</summary>
+        public string Estagio { get; init; } = "";
+        /// <summary>Proposta fechada no CRM (Closed, Closed Won, Closed Lost, Closed
+        /// Abandoned…): fica fora de atrasadas e pendentes.</summary>
+        public bool Fechada => OpportunityImporter.Normalizar(Estagio).StartsWith("closed", StringComparison.Ordinal);
     }
 
     public sealed class Dados
@@ -228,6 +233,13 @@ public sealed class AplicacaoService
                                           ("Industry", iInd), ("BU", iBu), ("GM", iGm), ("Country", iPais), ("Category", iCat) })
             if (i < 0) d.ColunasFaltando.Add(nome);
 
+        // Estágio do CRM: vem direto de cada planilha, pelo título da coluna
+        // (FunnelStage no AFM, Stage no NB), sem passar pelo De-Para.
+        var iEstNb = planNb?.ColunaPorTitulo("stage") ?? -1;
+        var iEstAfm = planAfm?.ColunaPorTitulo("funnelstage", "funnel stage") ?? -1;
+        if (planNb is not null && iEstNb < 0) d.Avisos.Add("Coluna 'Stage' não encontrada no cabeçalho do NB: as propostas fechadas não puderam ser separadas das pendentes e atrasadas.");
+        if (planAfm is not null && iEstAfm < 0) d.Avisos.Add("Coluna 'FunnelStage' não encontrada no cabeçalho do AFM: as propostas fechadas não puderam ser separadas das pendentes e atrasadas.");
+
         string Cel(string[] v, int i) => i >= 0 && i < v.Length ? (v[i] ?? "").Trim() : "";
         Linha Completar(Linha l, bool nb)
         {
@@ -257,7 +269,7 @@ public sealed class AplicacaoService
                 var valor = planNb.Numero(row, ColValorNb);
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = valor.ToString("0.##", Inv);
                 d.Linhas.Add(Completar(new Linha("NB", v, valor,
-                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), nb: true));
+                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : "") { Estagio = planNb.Texto(row, iEstNb) }, nb: true));
                 d.LinhasNb++;
             }
         }
@@ -279,7 +291,7 @@ public sealed class AplicacaoService
                 var brl = d.TaxaUsd > 0 ? usd * d.TaxaUsd : 0;
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = brl.ToString("0.##", Inv);
                 d.Linhas.Add(Completar(new Linha("AFM", v, brl,
-                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), nb: false));
+                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : "") { Estagio = planAfm.Texto(row, iEstAfm) }, nb: false));
                 d.LinhasAfm++;
             }
         }
@@ -293,10 +305,17 @@ public sealed class AplicacaoService
         public OpportunityImporter.Cel[] Cab { get; init; } = Array.Empty<OpportunityImporter.Cel>();
         public List<OpportunityImporter.Cel[]> Dados { get; init; } = new();
 
-        public string Texto(OpportunityImporter.Cel[] row, string letra)
+        public string Texto(OpportunityImporter.Cel[] row, string letra) => Texto(row, Idx(letra));
+
+        public string Texto(OpportunityImporter.Cel[] row, int i) =>
+            i >= 0 && i < row.Length ? (row[i].Text ?? "").Trim() : "";
+
+        /// <summary>Posição da coluna cujo título (normalizado) é um dos pedidos; -1 se não há.</summary>
+        public int ColunaPorTitulo(params string[] titulos)
         {
-            var i = Idx(letra);
-            return i >= 0 && i < row.Length ? (row[i].Text ?? "").Trim() : "";
+            for (var i = 0; i < Cab.Length; i++)
+                if (titulos.Contains(OpportunityImporter.Normalizar(Cab[i].Text ?? ""))) return i;
+            return -1;
         }
 
         public double Numero(OpportunityImporter.Cel[] row, string letra)
