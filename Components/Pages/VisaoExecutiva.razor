@@ -1272,60 +1272,12 @@
     private Task ExportarIndicadas() =>
         ExportarXlsx(_indicadas, $"oportunidades_indicadas_{_today:yyyy-MM-dd}.xlsx", "Indicadas");
 
-    // Gera o .xlsx de uma lista de oportunidades e entrega o download.
+    // Gera o .xlsx de uma lista de oportunidades (planilha completa, a mesma da
+    // guia Oportunidades: todas as colunas da tabela e os demais campos) e entrega o download.
     private async Task ExportarXlsx(List<Opportunity> lista, string nome, string aba)
     {
         if (lista.Count == 0) return;
-        var bytes = await Task.Run(() =>
-        {
-            using var wb = new ClosedXML.Excel.XLWorkbook();
-            var ws = wb.Worksheets.Add(aba);
-            string[] head =
-            {
-                "Setor", "Quarter", "Data", "País", "Market Variável", "Market", "Product",
-                "Tipo de Equipamento", "Key Account", "Customer", "Proposta", "Net Value (R$)",
-                "PM %", "% de Ganho", "% de Sair no Mês", "Chance Conversão (R$)", "NB/AFM",
-                "Unidade de Venda", "PV", "Valor USD", "OTP", "TOP 10", "KYC",
-            };
-            for (var i = 0; i < head.Length; i++) ws.Cell(1, i + 1).Value = head[i];
-            ws.Row(1).Style.Font.Bold = true;
-
-            var r = 2;
-            foreach (var o in lista)
-            {
-                var d = o.ExpectedDateValue;
-                var c = 1;
-                ws.Cell(r, c++).Value = o.Setor;
-                ws.Cell(r, c++).Value = d is { } dq ? $"Q{Fmt.QuarterOf(dq.Month)} {dq.Year}" : "";
-                ws.Cell(r, c++).Value = d is { } dd ? dd.ToString("dd/MM/yyyy") : "";
-                ws.Cell(r, c++).Value = Cat.CountryName(o.CountryId);
-                ws.Cell(r, c++).Value = Cat.SubMarketName(o.SubMarketId);
-                ws.Cell(r, c++).Value = Cat.MarketName(o.MarketId);
-                ws.Cell(r, c++).Value = Cat.ProductName(o.ProductId);
-                ws.Cell(r, c++).Value = Cat.EquipmentName(o.EquipmentTypeId);
-                ws.Cell(r, c++).Value = Cat.KamName(o.KamId);
-                ws.Cell(r, c++).Value = Cat.CustomerName(o.CustomerId);
-                ws.Cell(r, c++).Value = o.ProposalNumber;
-                ws.Cell(r, c++).Value = o.AmountBrl;
-                ws.Cell(r, c++).Value = o.GmPercentValue;
-                ws.Cell(r, c++).Value = o.WinProbabilityValue;
-                ws.Cell(r, c++).Value = o.CloseProbabilityValue;
-                ws.Cell(r, c++).Value = ForecastCalc.ConversionBrl(o);
-                ws.Cell(r, c++).Value = o.CommercialCategory;
-                ws.Cell(r, c++).Value = Cat.BuCode(o.PvBusinessUnitId);
-                ws.Cell(r, c++).Value = o.PvNumber;
-                ws.Cell(r, c++).Value = o.AmountUsd;
-                ws.Cell(r, c++).Value = o.Otp;
-                ws.Cell(r, c++).Value = o.Top10;
-                ws.Cell(r, c++).Value = o.Kyc;
-                r++;
-            }
-            ws.Columns().AdjustToContents();
-            using var ms = new MemoryStream();
-            wb.SaveAs(ms);
-            return ms.ToArray();
-        });
-
+        var bytes = await Task.Run(() => OpportunityExcel.Gerar(lista, Cat, aba, _today));
         try
         {
             await JS.InvokeVoidAsync("appDownload", nome,

@@ -23,6 +23,7 @@
             <button class="btn-ghost" @onclick="OpenUnindicate">@Icons.Svg("x")Desindicar todas</button>
             <button class="btn-ghost" @onclick="OpenImport">@Icons.Svg("import")Importar base</button>
         }
+        <button class="btn-ghost" title="Planilha Excel completa das oportunidades do recorte atual: todas as colunas da tabela e os demais campos. Sem filtros, sai a carteira inteira." disabled="@(Rows.Count == 0)" @onclick="ExportarTudo">@Icons.Svg("download")Exportar Excel</button>
         <button class="btn-ghost" title="Lista e Excel das oportunidades com valores alterados no sistema em relação ao CRM (no recorte atual)" @onclick="() => _altOpen = true">@Icons.Svg("history")<span>Alteradas no sistema</span>@if (AlteradasNoRecorte.Count > 0) { <span class="tag" style="margin-left:6px">@AlteradasNoRecorte.Count</span> }</button>
         <button class="btn-primary" @onclick="NewOpp">@Icons.Svg("edit")Nova oportunidade</button>
     </div>
@@ -93,6 +94,7 @@
     <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
     <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_dateFrom" /></div>
     <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_dateTo" /></div>
+    <MultiFilter Label="Setor" AllText="Ambos" Options="SetorOptions" Selected="_setores" OnChanged="StateHasChanged" />
     <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
     <MultiFilter Label="KAM" AllText="Todos" EmptyText="Nenhum vendedor nos dados." Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
     <MultiFilter Label="Categoria" AllText="Todas" Options="CategoriaOptions" Selected="_cats" OnChanged="StateHasChanged" />
@@ -315,7 +317,8 @@
     // Filtros multi-seleção (vazio = todos). Guardam os RÓTULOS exibidos.
     private static HashSet<string> NewSet() => new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _cats = NewSet(), _kams = NewSet(), _markets = NewSet(),
-                            _risks = NewSet(), _years = NewSet(), _months = NewSet();
+                            _risks = NewSet(), _years = NewSet(), _months = NewSet(),
+                            _setores = NewSet();   // "NB" · "AFM" (coluna Setor)
     private bool _onlyIndicated;
     private bool _onlyLost;                // só as indicadas como perdidas
     private bool _onlyAltered;             // só as com valor alterado no sistema (≠ CRM)
@@ -341,10 +344,11 @@
     private IEnumerable<string> KamOptions => _all.Select(KamName)
         .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
     private static IEnumerable<string> CategoriaOptions => Enum.GetValues<ForecastCategory>().Select(ForecastCategories.Label);
+    private static readonly string[] SetorOptions = Opportunity.SetoresManuais;   // NB · AFM
     private static IEnumerable<string> RiscoOptions => Enum.GetValues<RiskLevel>().Select(RiskLevels.Label);
     private string KamName(Opportunity o) => OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId));
 
-    private IEnumerable<HashSet<string>> AllSets => new[] { _cats, _kams, _markets, _risks, _years, _months };
+    private IEnumerable<HashSet<string>> AllSets => new[] { _cats, _kams, _markets, _risks, _years, _months, _setores };
     private int _activeFilters => (_search != "" ? 1 : 0)
         + AllSets.Count(s => s.Count > 0)
         + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
@@ -359,10 +363,10 @@
 
     private sealed record Recorte(string Search, HashSet<string> Cats, HashSet<string> Kams,
         HashSet<string> Markets, HashSet<string> Risks, HashSet<string> Years, HashSet<string> Months,
-        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost, bool OnlyAltered);
+        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost, bool OnlyAltered, HashSet<string>? Setores = null);
 
     private void GuardarFiltros() => Filtros.Guardar(Tela,
-        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost, _onlyAltered));
+        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost, _onlyAltered, _setores));
 
     private void RestaurarFiltros()
     {
@@ -370,6 +374,7 @@
         _search = r.Search;
         _cats = r.Cats; _kams = r.Kams; _markets = r.Markets;
         _risks = r.Risks; _years = r.Years; _months = r.Months;
+        _setores = r.Setores ?? NewSet();
         _onlyIndicated = r.OnlyIndicated;
         _onlyLost = r.OnlyLost;
         _onlyAltered = r.OnlyAltered;
@@ -686,6 +691,17 @@
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
     }
 
+    // Planilha completa do recorte atual (sem filtros = carteira inteira):
+    // a mesma da Visão Executiva, com todas as colunas e os demais campos.
+    private async Task ExportarTudo()
+    {
+        var rows = Rows;
+        if (rows.Count == 0) return;
+        var bytes = await Task.Run(() => OpportunityExcel.Gerar(rows, Cat, "Oportunidades", _today));
+        await JS.InvokeVoidAsync("appDownload", $"oportunidades_{_today:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
+    }
+
     private async Task DownloadNotFound()
     {
         if (_bulkNotFound is not { Count: > 0 }) return;
@@ -711,6 +727,7 @@
             if (_onlyLost) q = q.Where(o => o.PerdidaValue);
             if (_onlyAltered) q = q.Where(AlteracoesCrm.Alterada);
             if (_cats.Count > 0) q = q.Where(o => _cats.Contains(ForecastCategories.Label(o.Category)));
+            if (_setores.Count > 0) q = q.Where(o => _setores.Contains(o.SetorEfetivo));
             if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KamName(o)));
             if (_markets.Count > 0) q = q.Where(o => _markets.Contains(Cat.MarketName(o.MarketId)));
             if (_risks.Count > 0) q = q.Where(o => _risks.Contains(RiskLevels.Label(ForecastCalc.Level(o, _today))));
