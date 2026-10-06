@@ -35,7 +35,12 @@ namespace HowdenSalesForecast.Data;
 public sealed class AplicacaoService
 {
     /// <summary>Letra = coluna no NB; LetraAfm = coluna equivalente no AFM (de onde vem o título).</summary>
-    public sealed record Coluna(string Letra, string LetraAfm, string Rotulo, int Indice);
+    public sealed record Coluna(string Letra, string LetraAfm, string Rotulo, int Indice)
+    {
+        /// <summary>Coluna só do AFM (fora do De-Para): a chave começa com "AFM:".</summary>
+        public bool SoAfm => Letra.StartsWith("AFM:", StringComparison.Ordinal);
+        public string Origem => SoAfm ? $"só AFM {LetraAfm}" : $"AFM {LetraAfm} → NB {Letra}";
+    }
 
     /// <summary>Uma linha da tabela. Valores = células nas colunas da tabela; os
     /// demais campos são as colunas que os gráficos usam, já interpretadas.</summary>
@@ -51,6 +56,8 @@ public sealed class AplicacaoService
         public string Chave { get; init; } = "";   // primeira coluna preenchida: identifica a proposta nas listas
         /// <summary>Estágio no CRM: FunnelStage (AFM) ou Stage (NB), como veio.</summary>
         public string Estagio { get; init; } = "";
+        /// <summary>BU de origem intercompany (AFM: BU_IC_FR, senão BU_RFQ_IC). Vazia = sem origem IC.</summary>
+        public string BuOrigem { get; init; } = "";
         /// <summary>Proposta fechada no CRM (Closed, Closed Won, Closed Lost, Closed
         /// Abandoned…): fica fora de atrasadas e pendentes.</summary>
         public bool Fechada => OpportunityImporter.Normalizar(Estagio).StartsWith("closed", StringComparison.Ordinal);
@@ -163,6 +170,27 @@ public sealed class AplicacaoService
         ("Y", "AB"), ("AA", "AC"), ("W", "AA"),
     };
 
+    // ---- colunas só do AFM (fora do De-Para), no fim da tabela ----------------
+    // Lidas pelo título do cabeçalho do AFM, com a letra de reserva. A BU de
+    // origem tem duas fontes: BU_IC_FR (AC) e, se vazia, BU_RFQ_IC (AB).
+    private static readonly (string Rotulo, string[] Titulos, string Letra)[] ExtrasAfm =
+    {
+        ("BU de origem",    new[] { "bu_ic_fr", "bu ic fr" },            "AC"),
+        ("CRM de origem",   new[] { "no_ic_fr", "no ic fr" },            "AD"),
+        ("Moeda de origem", new[] { "@" },                               "AE"),   // "Moeda" repete o título da coluna de valor: só pela letra
+        ("Valor de origem", new[] { "potential value quote" },           "AF"),
+        ("Refname",         new[] { "refname" },                         "AH"),
+        ("Refno",           new[] { "refno" },                           "AI"),
+        ("Productcompany",  new[] { "productcompany", "product company" }, "AJ"),
+        ("Articleno",       new[] { "articleno", "article no" },         "AK"),
+        ("Contractno",      new[] { "contractno", "contract no" },       "AL"),
+        ("Serialno",        new[] { "serialno", "serial no" },           "AM"),
+        ("Applicationtype", new[] { "applicationtype", "application type" }, "AN"),
+        ("Designation",     new[] { "designation" },                     "AO"),
+        ("Clientrefno",     new[] { "clientrefno", "client ref no", "clientref" }, "AP"),
+    };
+    private static readonly (string[] Titulos, string Letra) BuRfqAfm = (new[] { "bu_rfq_ic", "bu rfq ic" }, "AB");
+
     private const string ColVendedorNb = "M", ColAplicadorNb = "AD", ColValorNb = "P";
     private const string ColVendedorAfm = "K", ColAplicadorAfm = "AB", ColValorAfm = "N";   // valor em dólar
 
@@ -259,6 +287,26 @@ public sealed class AplicacaoService
             if (rotulo == "" && planNb is not null) rotulo = planNb.Texto(planNb.Cab, letra);
             d.Colunas.Add(new Coluna(letra, deAfm, rotulo == "" ? letra : rotulo, i));
         }
+        // Colunas só do AFM, no fim: posição na planilha pelo título, senão pela letra.
+        var extras = new List<(int Indice, int Col)>();          // (coluna da tabela, coluna na planilha do AFM)
+        var iBuRfq = -1;
+        if (planAfm is not null)
+        {
+            int Onde(string[] titulos, string letra)
+            {
+                var i = titulos[0] == "@" ? -1 : AcharCampo(planAfm, titulos, null);
+                return i >= 0 ? i : Idx(letra);
+            }
+            foreach (var e in ExtrasAfm)
+            {
+                var idx = d.Colunas.Count;
+                d.Colunas.Add(new Coluna("AFM:" + e.Letra, e.Letra, e.Rotulo, idx));
+                extras.Add((idx, Onde(e.Titulos, e.Letra)));
+            }
+            iBuRfq = Onde(BuRfqAfm.Titulos, BuRfqAfm.Letra);
+        }
+        var iBuOrigem = d.Colunas.FindIndex(c => c.Rotulo == "BU de origem");
+
         var pos = d.Colunas.ToDictionary(c => c.Letra, c => c.Indice, StringComparer.Ordinal);
         d.IndiceValor = pos.TryGetValue(ColValorNb, out var iv) ? iv : -1;
         // A coluna de valor ganha o nome pedido pela área.
@@ -291,6 +339,7 @@ public sealed class AplicacaoService
                 Industry = p.Texto(row, c.Ind), Bu = p.Texto(row, c.Bu), Gm = gm,
                 Country = p.Texto(row, c.Pais), Category = p.Texto(row, c.Cat),
                 Estagio = p.Texto(row, c.Est),
+                BuOrigem = iBuOrigem >= 0 ? (l.Valores[iBuOrigem] ?? "").Trim() : "",
                 Chave = iChave >= 0 && !string.IsNullOrWhiteSpace(l.Valores[iChave]) ? l.Valores[iChave].Trim()
                         : l.Valores.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
                 Aplicador = apl != "" ? apl : l.Aplicador,
@@ -323,6 +372,9 @@ public sealed class AplicacaoService
                 foreach (var (colAfm, colNb) in DePara)
                     if (pos.TryGetValue(colNb, out var i)) v[i] = planAfm.Texto(row, colAfm);
                 if (v.All(string.IsNullOrWhiteSpace)) continue;
+                // Colunas só do AFM; a BU de origem cai para BU_RFQ_IC quando BU_IC_FR está vazia.
+                foreach (var (idx, col) in extras) v[idx] = planAfm.Texto(row, col);
+                if (iBuOrigem >= 0 && string.IsNullOrWhiteSpace(v[iBuOrigem])) v[iBuOrigem] = planAfm.Texto(row, iBuRfq);
 
                 if (iVend >= 0) v[iVend] = Equivalente(v[iVend], VendedorNb);
                 if (iApl >= 0) v[iApl] = Equivalente(v[iApl], AplicadorNb);
