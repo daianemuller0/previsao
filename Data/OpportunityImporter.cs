@@ -99,18 +99,22 @@ public sealed class OpportunityImporter
     /// <summary>Grade crua de uma planilha (.xlsx/.xlsm/.xls/.csv): a mesma
     /// leitura que a importação usa, para quem precisa das células pela posição
     /// (guia Aplicação). Só a primeira aba do arquivo.</summary>
-    public static List<Cel[]> LerGrade(string fileName, Stream stream)
+    /// <param name="manterLinhasVazias">true = a posição de cada linha da grade é a
+    /// linha da planilha (linha vazia vira array vazio). Necessário quando o
+    /// cabeçalho é informado pelo NÚMERO da linha, como na guia Aplicação.</param>
+    public static List<Cel[]> LerGrade(string fileName, Stream stream, bool manterLinhasVazias = false)
     {
         if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
         {
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            var lines = reader.ReadToEnd().Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Where(l => l.Length > 0).ToList();
+            var lines = reader.ReadToEnd().Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Where(l => manterLinhasVazias || l.Length > 0).ToList();
             if (lines.Count == 0) return new();
-            var delim = lines[0].Count(c => c == ';') >= lines[0].Count(c => c == ',') ? ';' : ',';
+            var primeira = lines.FirstOrDefault(l => l.Length > 0) ?? "";
+            var delim = primeira.Count(c => c == ';') >= primeira.Count(c => c == ',') ? ';' : ',';
             return lines.Select(l => SplitCsv(l, delim).Select(t => new Cel(t.Trim(), null)).ToArray()).ToList();
         }
         if (fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase)) return GradeXls(stream);
-        return GradeXlsx(stream);
+        return GradeXlsx(stream, manterLinhasVazias);
     }
 
     /// <summary>Normalização de nomes para casamento (minúsculas, sem acento,
@@ -167,14 +171,20 @@ public sealed class OpportunityImporter
     }
 
     // ---- Excel moderno (.xlsx / .xlsm) via ClosedXML -----------------------
-    private static List<Cel[]> GradeXlsx(Stream stream)
+    private static List<Cel[]> GradeXlsx(Stream stream, bool manterLinhasVazias = false)
     {
         using var wb = new XLWorkbook(stream);
         var ws = wb.Worksheets.FirstOrDefault();
         var grade = new List<Cel[]>();
         if (ws is null) return grade;
 
-        foreach (var row in ws.RowsUsed())
+        // RowsUsed() pula as linhas vazias — bom para a importação (que acha o
+        // cabeçalho pelo conteúdo), ruim quando a linha do cabeçalho é informada
+        // pelo número: aí cada linha da planilha precisa manter a sua posição.
+        IEnumerable<IXLRow> linhas = manterLinhasVazias
+            ? Enumerable.Range(1, ws.LastRowUsed()?.RowNumber() ?? 0).Select(ws.Row)
+            : ws.RowsUsed();
+        foreach (var row in linhas)
         {
             var last = row.LastCellUsed()?.Address.ColumnNumber ?? 0;
             var linha = new Cel[last];

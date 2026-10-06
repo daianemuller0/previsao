@@ -20,8 +20,10 @@ public class AppUser
     public bool IsActive => !string.Equals(Ativo, "Nao", StringComparison.OrdinalIgnoreCase)
                           && !string.Equals(Ativo, "Não", StringComparison.OrdinalIgnoreCase);
 
-    // Diretor/Controle/Admin enxergam TODOS os vendedores.
+    // Diretor/Controle/Admin/Gestor enxergam TODOS os vendedores.
     public bool ScopeAll => AccessRoles.SeesAll(Role);
+    /// <summary>Setor a que o papel está preso ("AFM" para o Gestor Aftermarket; vazio = todos).</summary>
+    public string SetorFixo => AccessRoles.SetorFixo(Role);
 
     public List<string> VendedorList =>
         Vendedores.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -33,6 +35,7 @@ public static class AccessRoles
     public const string Vendedor = "vendedor";
     public const string Controle = "controle";
     public const string Diretor = "diretor";
+    public const string GestorAfm = "gestor_afm";   // Gestor Aftermarket: tudo de todos, mas só o setor AFM
     public const string Admin = "admin";
 
     public static readonly (string Role, string Label)[] All =
@@ -40,6 +43,7 @@ public static class AccessRoles
         (Vendedor, "Vendedor"),
         (Controle, "Controle"),
         (Diretor, "Diretor"),
+        (GestorAfm, "Gestor Aftermarket"),
         (Admin, "Administrador"),
     };
 
@@ -52,7 +56,11 @@ public static class AccessRoles
     }
 
     // Roles que enxergam a base inteira (sem recorte por vendedor).
-    public static bool SeesAll(string role) => role is Controle or Diretor or Admin;
+    public static bool SeesAll(string role) => role is Controle or Diretor or Admin or GestorAfm;
+
+    // Recorte por SETOR: o Gestor Aftermarket só vê o que é AFM (coluna Setor);
+    // nada de NB. Vazio = sem recorte de setor.
+    public static string SetorFixo(string role) => Normalize(role) == GestorAfm ? "AFM" : "";
 
     // Abas (chaves iguais às do NavMenu) permitidas por papel.
     public static readonly Dictionary<string, string[]> Tabs = new()
@@ -60,6 +68,7 @@ public static class AccessRoles
         [Vendedor] = new[] { "executivo", "oportunidades", "followup" },
         [Diretor]  = new[] { "executivo", "oportunidades", "followup" },
         [Controle] = new[] { "executivo", "oportunidades", "controle" },
+        [GestorAfm] = new[] { "executivo", "oportunidades", "controle", "aplicacao" },
         [Admin]    = new[] { "executivo", "oportunidades", "followup", "controle", "aplicacao", "listas", "configuracoes", "identidade", "administracao" },
     };
 

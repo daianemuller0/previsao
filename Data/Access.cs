@@ -17,6 +17,7 @@ public sealed class AccessScope
     public string Nome { get; init; } = "";
     public string Role { get; init; } = AccessRoles.Vendedor;
     public bool All { get; init; }                       // vê a base inteira
+    public string Setor { get; init; } = "";             // "AFM" = só Aftermarket; vazio = todos os setores
     private readonly HashSet<string> _names = new();     // vendedores permitidos (normalizados)
 
     public AccessScope() { }
@@ -40,6 +41,14 @@ public sealed class AccessScope
 
     public bool CanTab(string tabKey) => AccessRoles.CanTab(Role, tabKey);
 
+    // Vê este setor? (coluna Setor da oportunidade / origem da planilha)
+    public bool CanSeeSetor(string? setor) =>
+        Setor == "" || string.Equals((setor ?? "").Trim(), Setor, StringComparison.OrdinalIgnoreCase);
+
+    // Oportunidade dentro do recorte: carteira do vendedor E setor.
+    public bool CanSee(Opportunity o, string canonicalVendedor) =>
+        CanSeeVendedor(canonicalVendedor) && CanSeeSetor(o.SetorEfetivo);
+
     public IReadOnlyCollection<string> Names => _names;
 
     // Resolve o recorte a partir do principal (claims do cookie).
@@ -57,6 +66,7 @@ public sealed class AccessScope
             Nome = user.Identity?.Name ?? "",
             Role = role,
             All = AccessRoles.SeesAll(role),
+            Setor = AccessRoles.SetorFixo(role),
         };
     }
 

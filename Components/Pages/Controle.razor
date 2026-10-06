@@ -1,5 +1,5 @@
 @page "/controle"
-@attribute [Authorize(Roles = "controle,admin")]
+@attribute [Authorize(Roles = "controle,admin,gestor_afm")]
 @rendermode InteractiveServer
 @inject ControleRepository Repo
 @inject Catalog Cat
@@ -19,7 +19,7 @@
 <div class="page-head">
     <div>
         <h1>Controle</h1>
-        <p class="subtitle">REPORT HSA · realizado × budget por mês · valores em @Sym</p>
+        <p class="subtitle">@(SoAfm ? "Aftermarket · realizado por mês e ofertas do setor AFM" : "REPORT HSA · realizado × budget por mês") · valores em @Sym</p>
     </div>
     <div class="page-actions">
         <div class="flt" style="border:1px solid var(--border);border-radius:999px;padding:5px 12px"><span class="flt-label">Ano</span><select @bind="_year" @bind:after="Reload">@foreach (var y in Years){<option value="@y">@y</option>}</select></div>
@@ -27,7 +27,9 @@
             <button class="@(_cur == "BRL" ? "active" : "")" @onclick='() => _cur = "BRL"'>BRL</button>
             <button class="@(_cur == "USD" ? "active" : "")" @onclick='() => _cur = "USD"'>USD</button>
         </div>
-        @if (_edit)
+        @* O budget e o realizado são da empresa inteira: o Gestor Aftermarket só consulta. *@
+        @if (SoAfm) { }
+        else if (_edit)
         {
             <button class="btn-ghost" @onclick="Cancel">Cancelar</button>
             <button class="btn-primary" @onclick="Save">@Icons.Svg("check")Salvar@(_pending.Count > 0 ? $" ({_pending.Count})" : "")</button>
@@ -51,7 +53,10 @@ else
         <div class="edit-banner">@Icons.Svg("edit")<span><strong>Modo de edição.</strong> Altere os valores de orçamento, realizado e intercompany diretamente nas células destacadas. As linhas de total e atingimento são calculadas automaticamente.</span></div>
     }
 
-    @* ---- Cartões por semestre ---- *@
+    @* ---- Cartões por semestre e REPORT HSA: números da empresa inteira (NB+AFM),
+       fora do recorte do Gestor Aftermarket. ---- *@
+    @if (!SoAfm)
+    {
     <div class="exec-grid cols-4" style="margin-bottom:18px">
         <div class="stat accent-left"><div class="stat-label">1º semestre · Meta</div><div class="stat-value sm">@Brl(Sum(_budget, 0, 6))</div><div class="stat-context">Reportado @Brl(Sum(_real, 0, 6))</div><div class="stat-context">Realizado @Brl(Sum(_realizada, 0, 6))</div><div class="stat-context">Meta Vendas HSA @Brl(Sum(_metaHsa, 0, 6))</div></div>
         <div class="stat accent-left"><div class="stat-label">1º semestre · Atingimento</div><div class="stat-value sm" style="color:@AtCol(Attain(0, 6))">@Pct(Attain(0, 6))</div><div class="stat-context">Realizado ÷ Budget (Jan–Jun)</div></div>
@@ -109,15 +114,16 @@ else
             </table>
         </div>
     </div>
+    }
 
     @* ---- Composição mensal ---- *@
     <div class="panel" style="margin-top:16px">
-        <div class="panel-head"><div class="panel-title">Composição mensal <span class="hint">NB · AFM · SV · LTSA · em @Sym</span></div></div>
+        <div class="panel-head"><div class="panel-title">@(SoAfm ? "Realizado Aftermarket" : "Composição mensal") <span class="hint">@(SoAfm ? "AFM" : "NB · AFM · SV · LTSA") · em @Sym</span></div></div>
         <div class="table-wrap rep-wrap">
             <table class="grid-tbl rep-tbl">
                 <thead><tr><th>Categoria</th>@for (var m = 1; m <= 12; m++){<th class="right @(m == _month ? "cur" : "")">@Fmt.MonthName(m)</th>}<th class="right">Acum.</th></tr></thead>
                 <tbody>
-                    @foreach (var c in CompCats)
+                    @foreach (var c in CompCats.Where(c => !SoAfm || c.Key == "AFM"))
                     {
                         var ck = c.Key;
                         <tr>
@@ -126,11 +132,14 @@ else
                             <td class="right strong">@Num(Enumerable.Range(1, 12).Sum(x => Real(ck, x)))</td>
                         </tr>
                     }
+                    @if (!SoAfm)
+                    {
                     <tr class="rep-total">
                         <td class="rname">Total realizado</td>
                         @for (var m = 1; m <= 12; m++){<td class="right @(m == _month ? "cur" : "")">@Num(ConsReal(m))</td>}
                         <td class="right">@Num(Enumerable.Range(1, 12).Sum(ConsReal))</td>
                     </tr>
+                    }
                 </tbody>
             </table>
         </div>
@@ -266,6 +275,7 @@ else
                                     case "cliente":  <td>@Dash(g.Cliente)</td> break;
                                     case "mercado":  <td>@Dash(g.Mercado)</td> break;
                                     case "kam":      <td>@Dash(g.Kam)</td> break;
+                                    case "setor":    <td class="center">@if (g.Setor != "") { <span class="setor-tag setor-@g.Setor.ToLower()">@g.Setor</span> } else { <text>—</text> }</td> break;
                                     case "tipo":     <td class="center">@Dash(g.Tipo)</td> break;
                                     // A cor do valor diz como ele deve ser lido (ClasseValor).
                                     case "liquido":  <td class="right num @g.ClasseValor" title="@ClassTitulo(g)">@(ValorBrl(g) != 0 ? Brl(ValorBrl(g)) : "—")</td> break;
@@ -300,6 +310,12 @@ else
             <label class="fld full">Cliente<input class="field" @bind="_regEdit.Cliente" /></label>
             <label class="fld">Mercado<input class="field" list="dl-market" @bind="_regEdit.Mercado" /></label>
             <label class="fld">KAM<input class="field" list="dl-key_account" @bind="_regEdit.Kam" /></label>
+            <label class="fld">Setor (NB/AFM) <span class="hint">recorte do Gestor Aftermarket</span>
+                <select class="field" @bind="_regEdit.Setor" disabled="@SoAfm">
+                    <option value="">—</option>
+                    @foreach (var st in Opportunity.SetoresManuais){<option value="@st">@st</option>}
+                </select>
+            </label>
             <label class="fld">Tipo
                 <select class="field" @bind="_regEdit.Tipo">
                     <option value="">—</option>
@@ -378,7 +394,7 @@ else
     <div class="drawer-backdrop" @onclick="() => _showRegImport = false"></div>
     <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
         <div class="confirm-head" style="color:var(--primary)">@Icons.Svg("import")<span>Importar ofertas em massa</span></div>
-        <p class="confirm-text">Arquivo <strong>.csv</strong> com as colunas <code>oferta;pedido;cliente;mercado;kam;valor_liquido;semana;mes;poc</code>. A primeira linha pode ser o cabeçalho.</p>
+        <p class="confirm-text">Arquivo <strong>.csv</strong> com as colunas <code>oferta;pedido;cliente;mercado;kam;valor_liquido;semana;mes;poc;setor</code> (setor = NB ou AFM, opcional). A primeira linha pode ser o cabeçalho.</p>
         <label class="fld">Arquivo (.csv)<InputFile class="field" OnChange="OnRegImport" accept=".csv" /></label>
         @if (_regImp is not null)
         {
@@ -398,6 +414,9 @@ else
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
     private static readonly string[] Cats = { "NB", "AFM", "SV", "LTSA" };
+    private AccessScope _scope = new();
+    // Gestor Aftermarket: só a categoria AFM e só as ofertas marcadas como AFM.
+    private bool SoAfm => _scope.Setor == "AFM";
 
     private int _year = DateTime.Today.Year, _month = DateTime.Today.Month;
     private string _cur = "BRL";
@@ -446,6 +465,7 @@ else
         if (AuthState is not null)
         {
             var st = await AuthState;
+            _scope = AccessScope.Resolve(st.User);
             _user = st.User.Identity?.Name ?? "—";
             _login = st.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                      ?? st.User.Identity?.Name ?? "";
@@ -464,6 +484,7 @@ else
         new("cliente", "Cliente"),
         new("mercado", "Mercado"),
         new("kam",     "KAM"),
+        new("setor",   "Setor",         "center"),
         new("tipo",    "Tipo",          "center"),
         new("liquido", "Valor Líquido", "right"),
         new("moeda",   "Moeda",         "center"),
@@ -525,6 +546,7 @@ else
         for (var m = 1; m <= 12; m++) { _real[m] = VendasReal(m); _realizada[m] = Real(RealizadaCat, m); _budget[m] = Budget(m); _metaHsa[m] = BudgetOf("MHSA", m); }
 
         var q = _registros.AsEnumerable();
+        if (SoAfm) q = q.Where(g => _scope.CanSeeSetor(g.Setor));
         if (!string.IsNullOrWhiteSpace(_regSearch))
         {
             var s = _regSearch.Trim().ToLowerInvariant();
@@ -537,6 +559,7 @@ else
 
         // Vendas por semana: soma o valor líquido das ofertas de cada semana.
         _semanas = _registros
+            .Where(g => !SoAfm || _scope.CanSeeSetor(g.Setor))
             .Where(g => g.SemanaV > 0)
             .Where(g => _regMes == 0 || MesNum(g.Mes) == _regMes)
             .GroupBy(g => g.SemanaV)
@@ -557,19 +580,24 @@ else
         return 0;
     }
 
-    private void NewReg() { _regEdit = new ControleRegistro(); _regIsNew = true; }
+    private void NewReg() { _regEdit = new ControleRegistro { Setor = _scope.Setor }; _regIsNew = true; }
     private void EditReg(ControleRegistro g)
     {
         _regIsNew = false;
+        // Cópia COMPLETA: editar não pode apagar o que não está no formulário.
         _regEdit = new ControleRegistro
         {
             Id = g.Id, Oferta = g.Oferta, Pedido = g.Pedido, Cliente = g.Cliente, Mercado = g.Mercado,
             Kam = g.Kam, ValorLiquido = g.ValorLiquido, Semana = g.Semana, Mes = g.Mes, Poc = g.Poc,
+            Tipo = g.Tipo, Classificacao = g.Classificacao, Status = g.Status, Moeda = g.Moeda,
+            ValorOriginal = g.ValorOriginal, Observacao = g.Observacao, Atencao = g.Atencao,
+            OppId = g.OppId, Setor = g.Setor,
         };
     }
     private void SaveReg()
     {
         if (_regEdit is null) return;
+        if (SoAfm) _regEdit.Setor = "AFM";    // o Gestor Aftermarket só grava AFM
         // normaliza o valor digitado (pt-BR) para invariante
         if (ParseVal(_regEdit.ValorLiquido) is { } v) _regEdit.ValorLiquido = v.ToString("0.##", CultureInfo.InvariantCulture);
         Repo.SaveRegistro(_regEdit, _user ?? "—");
@@ -640,6 +668,7 @@ else
                 {
                     Oferta = Col(0), Pedido = Col(1), Cliente = Col(2), Mercado = Col(3), Kam = Col(4),
                     ValorLiquido = vNorm, Semana = Col(6), Mes = Col(7), Poc = Col(8),
+                    Setor = SoAfm ? "AFM" : Col(9).ToUpperInvariant(),
                 });
             }
         }

@@ -214,7 +214,7 @@ public class ControleRepository
     private const string EntReg = "controle_registros";
     private const string RegCols = "id, oferta, pedido, cliente, mercado, kam, valor_liquido, semana, mes, poc, " +
         "moeda, valor_original, observacao, atencao, opp_id, updated_by, updated_at, " +
-        "tipo, classificacao, status";
+        "tipo, classificacao, status, setor";
 
     public List<ControleRegistro> Registros() =>
         _store.ReadLatest(EntReg, RegCols, r => new ControleRegistro
@@ -224,7 +224,7 @@ public class ControleRepository
             Moeda = string.IsNullOrWhiteSpace(S(r, 10)) ? "BRL" : S(r, 10),
             ValorOriginal = S(r, 11), Observacao = S(r, 12), Atencao = S(r, 13), OppId = S(r, 14),
             UpdatedBy = S(r, 15), UpdatedAt = S(r, 16),
-            Tipo = S(r, 17), Classificacao = S(r, 18), Status = S(r, 19),
+            Tipo = S(r, 17), Classificacao = S(r, 18), Status = S(r, 19), Setor = S(r, 20),
         });
 
     private static KeyValuePair<string, object?>[] RowReg(ControleRegistro g) => new KeyValuePair<string, object?>[]
@@ -236,6 +236,7 @@ public class ControleRepository
         new("observacao", g.Observacao), new("atencao", g.Atencao), new("opp_id", g.OppId),
         new("updated_by", g.UpdatedBy), new("updated_at", g.UpdatedAt),
         new("tipo", g.Tipo), new("classificacao", g.Classificacao), new("status", g.Status),
+        new("setor", g.Setor),
     };
 
     public void SaveRegistro(ControleRegistro g, string user)

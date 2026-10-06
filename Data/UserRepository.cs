@@ -180,5 +180,6 @@ public class UserRepository
         ("Thais Trevine",        AccessRoles.Controle, Array.Empty<string>()),
         ("Rogerio Silva",        AccessRoles.Controle, Array.Empty<string>()),
         ("Edson Luis Geraldini", AccessRoles.Diretor,  Array.Empty<string>()),
+        ("Gestor Aftermarket",   AccessRoles.GestorAfm, Array.Empty<string>()),   // login gestor.aftermarket
     };
 }

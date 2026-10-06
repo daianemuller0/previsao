@@ -33,7 +33,7 @@
                         <td><code>@u.Login</code></td>
                         <td><span class="badge @RoleCss(u.Role)">@AccessRoles.Label(u.Role)</span></td>
                         <td class="muted" style="font-size:11.5px">@string.Join(" · ", AbasDe(u.Role))</td>
-                        <td>@(u.ScopeAll ? "Todos os vendedores" : (u.VendedorList.Count == 0 ? "—" : string.Join(", ", u.VendedorList)))</td>
+                        <td>@(u.ScopeAll ? (u.SetorFixo != "" ? $"Todos os vendedores · só {u.SetorFixo}" : "Todos os vendedores") : (u.VendedorList.Count == 0 ? "—" : string.Join(", ", u.VendedorList)))</td>
                         <td class="center">@(u.IsActive ? Mark("Sim") : Mark("Não"))</td>
                         <td class="center actions-col">
                             <button class="row-act" title="Editar" @onclick="() => OpenEdit(u)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
@@ -45,7 +45,7 @@
             </tbody>
         </table>
     </div>
-    <p class="muted" style="font-size:11.5px;margin-top:10px">O recorte é aplicado nos dados: cada login só enxerga as oportunidades da carteira permitida (Oportunidades, Visão Executiva e Follow-up). Diretor e Controle veem todos os vendedores.</p>
+    <p class="muted" style="font-size:11.5px;margin-top:10px">O recorte é aplicado nos dados: cada login só enxerga as oportunidades da carteira permitida (Oportunidades, Visão Executiva e Follow-up). Diretor e Controle veem todos os vendedores. O Gestor Aftermarket vê todos os vendedores, mas só as oportunidades, ofertas e propostas do setor AFM.</p>
 </div>
 
 @* ---- Papéis de acesso (referência) ---- *@
@@ -58,6 +58,7 @@
                 <tr><td class="col-strong">Vendedor</td><td>Oportunidades · Visão Executiva · Follow-up</td><td>Sua carteira (a dele + as autorizadas)</td></tr>
                 <tr><td class="col-strong">Diretor</td><td>Oportunidades · Visão Executiva · Follow-up</td><td>Todos os vendedores</td></tr>
                 <tr><td class="col-strong">Controle</td><td>Oportunidades · Visão Executiva · Controle</td><td>Todos os vendedores</td></tr>
+                <tr><td class="col-strong">Gestor Aftermarket</td><td>Visão Executiva · Oportunidades · Controle · Aplicação</td><td>Todos os vendedores, só o setor AFM (nada de NB)</td></tr>
                 <tr><td class="col-strong">Administrador</td><td>Todas as abas + configurações</td><td>Todos os vendedores</td></tr>
             </tbody>
         </table>
@@ -246,7 +247,7 @@
     private static string RoleCss(string role) => role switch
     {
         AccessRoles.Admin => "fc-commit", AccessRoles.Diretor => "fc-best",
-        AccessRoles.Controle => "fc-upside", _ => "fc-pipe",
+        AccessRoles.Controle => "fc-upside", AccessRoles.GestorAfm => "fc-best", _ => "fc-pipe",
     };
 
     private static MarkupString Mark(string s) =>

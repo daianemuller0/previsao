@@ -69,39 +69,87 @@ public sealed class AplicacaoService
         public DateTime? LidoEm { get; set; }
         /// <summary>Posição da coluna de valor (P do NB) em Valores; -1 se não veio.</summary>
         public int IndiceValor { get; set; } = -1;
-        /// <summary>Colunas que os gráficos usam e não foram achadas pelo título.</summary>
+        /// <summary>Colunas que os gráficos usam e não foram achadas pelo título (ex.: "Actual no AFM").</summary>
         public List<string> ColunasFaltando { get; } = new();
+        /// <summary>Cabeçalho de cada planilha, "letra: título", para a pessoa conferir o que o arquivo traz.</summary>
+        public List<string> CabecalhoAfm { get; } = new();
+        public List<string> CabecalhoNb { get; } = new();
     }
 
-    // ---- colunas que os gráficos usam, achadas pelo TÍTULO (cabeçalho do AFM) ----
-    // Cada entrada: nome amigável + títulos aceitos (normalizados, por prefixo).
-    private static readonly (string Nome, string[] Titulos)[] ColunasGrafico =
+    // ---- colunas que os gráficos usam -------------------------------------------
+    // Lidas DIRETO de cada planilha (AFM e NB), pelo título do cabeçalho — não
+    // dependem do De-Para, porque nem toda coluna dos gráficos entra na tabela.
+    // Cada entrada: nome + títulos aceitos no AFM + títulos aceitos no NB
+    // (normalizados). A busca aceita o título exato, o título como palavra dentro
+    // de um maior ("Actual" acha "Actual Date") e, por fim, o início do título.
+    // Em appsettings (Aplicadores:Colunas:<Nome>:Afm / :Nb) dá para informar a
+    // letra ou o título exato da coluna, que vale acima de tudo.
+    private static readonly (string Nome, string[] Afm, string[] Nb)[] Campos =
     {
-        ("Actual",           new[] { "actual" }),
-        ("Due",              new[] { "due" }),
-        ("ProposalEngineer", new[] { "proposalengineer", "proposal engineer", "aplicador" }),
-        ("Salesperson",      new[] { "salesperson", "sales person", "vendedor" }),
-        ("Industry",         new[] { "industry", "segmento" }),
-        ("BU",               new[] { "bu", "business unit", "unidade" }),
-        ("GM",               new[] { "gm", "margem" }),
-        ("Country",          new[] { "country", "pais", "país" }),
-        ("Category",         new[] { "category", "categoria" }),
+        ("Actual",           new[] { "actual", "actual date", "date actual", "sent date", "data de envio" }, new[] { "actual", "actual date", "date actual", "sent date", "data de envio" }),
+        ("Due",              new[] { "due", "due date", "date due", "prazo" },                              new[] { "due", "due date", "date due", "prazo" }),
+        ("ProposalEngineer", new[] { "proposalengineer", "proposal engineer", "aplicador", "engineer" },   new[] { "proposalengineer", "proposal engineer", "aplicador", "engineer" }),
+        ("Salesperson",      new[] { "salesperson", "sales person", "vendedor", "sales rep" },             new[] { "salesperson", "sales person", "vendedor", "sales rep" }),
+        ("Industry",         new[] { "industry", "segmento" },                                            new[] { "industry", "segmento" }),
+        ("BU",               new[] { "bu", "business unit", "unidade" },                                  new[] { "bu", "business unit", "unidade" }),
+        ("GM",               new[] { "gm", "margem", "gross margin" },                                    new[] { "gm", "margem", "gross margin" }),
+        ("Country",          new[] { "country", "pais", "país" },                                         new[] { "country", "pais", "país" }),
+        ("Category",         new[] { "category", "categoria" },                                           new[] { "category", "categoria" }),
+        ("Stage",            new[] { "funnelstage", "funnel stage", "stage", "estagio" },                 new[] { "stage", "funnelstage", "funnel stage", "estagio" }),
     };
 
-    private static int AcharColuna(List<Coluna> colunas, string nome)
+    /// <summary>Posição (0 = A) da coluna de um campo numa planilha: pela configuração
+    /// (letra ou título), senão pelos títulos aceitos; -1 se não há.</summary>
+    private static int AcharCampo(Planilha p, string[] titulos, string? cfg)
     {
-        var titulos = ColunasGrafico.First(c => c.Nome == nome).Titulos;
-        foreach (var c in colunas)
+        var cab = p.Cab.Select(c => OpportunityImporter.Normalizar(c.Text ?? "")).ToArray();
+        if (!string.IsNullOrWhiteSpace(cfg))
         {
-            var r = OpportunityImporter.Normalizar(c.Rotulo);
-            if (titulos.Any(t => r == t)) return c.Indice;
+            var t = OpportunityImporter.Normalizar(cfg);
+            var i = Array.IndexOf(cab, t);
+            if (i >= 0) return i;
+            if (System.Text.RegularExpressions.Regex.IsMatch(cfg.Trim(), "^[A-Za-z]{1,3}$")) return Idx(cfg.Trim().ToUpperInvariant());
+            return -1;
         }
-        foreach (var c in colunas)
-        {
-            var r = OpportunityImporter.Normalizar(c.Rotulo);
-            if (titulos.Any(t => r.StartsWith(t + " ", StringComparison.Ordinal) || r.StartsWith(t, StringComparison.Ordinal) && t.Length >= 4)) return c.Indice;
-        }
+        // 1) título exato
+        foreach (var t in titulos) { var i = Array.IndexOf(cab, t); if (i >= 0) return i; }
+        // 2) título como palavra(s) inteira(s) dentro do cabeçalho ("Actual" em "Actual Date")
+        foreach (var t in titulos)
+            for (var i = 0; i < cab.Length; i++)
+                if (cab[i] != "" && (" " + cab[i] + " ").Contains(" " + t + " ", StringComparison.Ordinal)) return i;
+        // 3) início do título, só para nomes com 4+ letras (evita "bu"/"gm" casarem qualquer coisa)
+        foreach (var t in titulos.Where(t => t.Length >= 4))
+            for (var i = 0; i < cab.Length; i++)
+                if (cab[i].StartsWith(t, StringComparison.Ordinal)) return i;
         return -1;
+    }
+
+    /// <summary>Posições dos campos dos gráficos numa planilha.</summary>
+    private sealed class Posicoes
+    {
+        public int Actual = -1, Due = -1, Eng = -1, Sales = -1, Ind = -1, Bu = -1, Gm = -1, Pais = -1, Cat = -1, Est = -1;
+    }
+
+    private Posicoes Resolver(Planilha p, string origem, Dados d)
+    {
+        var nb = origem == "NB";
+        int Pos(string nome)
+        {
+            var c = Campos.First(x => x.Nome == nome);
+            var cfg = _cfg[$"Aplicadores:Colunas:{nome}:{(nb ? "Nb" : "Afm")}"];
+            var i = AcharCampo(p, nb ? c.Nb : c.Afm, cfg);
+            if (i < 0) d.ColunasFaltando.Add($"{nome} no {origem}");
+            return i;
+        }
+        var r = new Posicoes
+        {
+            Actual = Pos("Actual"), Due = Pos("Due"), Eng = Pos("ProposalEngineer"), Sales = Pos("Salesperson"),
+            Ind = Pos("Industry"), Bu = Pos("BU"), Gm = Pos("GM"), Pais = Pos("Country"), Cat = Pos("Category"), Est = Pos("Stage"),
+        };
+        // Vendedor e aplicador têm a letra combinada como reserva, se o título não casar.
+        if (r.Eng < 0) r.Eng = Idx(nb ? ColAplicadorNb : ColAplicadorAfm);
+        if (r.Sales < 0) r.Sales = Idx(nb ? ColVendedorNb : ColVendedorAfm);
+        return r;
     }
 
     // ---- De-Para de colunas: letra do AFM → letra do NB ---------------------
@@ -116,7 +164,7 @@ public sealed class AplicacaoService
     };
 
     private const string ColVendedorNb = "M", ColAplicadorNb = "AD", ColValorNb = "P";
-    private const string ColValorAfm = "N";   // em dólar
+    private const string ColVendedorAfm = "K", ColAplicadorAfm = "AB", ColValorAfm = "N";   // valor em dólar
 
     // ---- equivalência de nomes (AFM → NB); quem não está aqui passa igual ----
     private static readonly (string Afm, string Nb)[] Vendedores =
@@ -218,43 +266,30 @@ public sealed class AplicacaoService
         var iVend = pos.TryGetValue(ColVendedorNb, out var a) ? a : -1;
         var iApl = pos.TryGetValue(ColAplicadorNb, out var b) ? b : -1;
 
-        // Colunas dos gráficos, pelo título. As de vendedor e aplicador têm a
-        // letra combinada como reserva, se o título não casar.
-        var iActual = AcharColuna(d.Colunas, "Actual");
-        var iDue = AcharColuna(d.Colunas, "Due");
-        var iEng = AcharColuna(d.Colunas, "ProposalEngineer"); if (iEng < 0) iEng = iApl;
-        var iSales = AcharColuna(d.Colunas, "Salesperson"); if (iSales < 0) iSales = iVend;
-        var iInd = AcharColuna(d.Colunas, "Industry");
-        var iBu = AcharColuna(d.Colunas, "BU");
-        var iGm = AcharColuna(d.Colunas, "GM");
-        var iPais = AcharColuna(d.Colunas, "Country");
-        var iCat = AcharColuna(d.Colunas, "Category");
-        foreach (var (nome, i) in new[] { ("Actual", iActual), ("Due", iDue), ("ProposalEngineer", iEng), ("Salesperson", iSales),
-                                          ("Industry", iInd), ("BU", iBu), ("GM", iGm), ("Country", iPais), ("Category", iCat) })
-            if (i < 0) d.ColunasFaltando.Add(nome);
+        // Campos dos gráficos: posição em cada planilha, direto pelo cabeçalho dela.
+        var posNb = planNb is null ? null : Resolver(planNb, "NB", d);
+        var posAfm = planAfm is null ? null : Resolver(planAfm, "AFM", d);
+        if (planAfm is not null) d.CabecalhoAfm.AddRange(planAfm.Cab.Select((c, i) => $"{Letra(i)}: {(c.Text ?? "").Trim()}").Where(x => !x.EndsWith(": ")));
+        if (planNb is not null) d.CabecalhoNb.AddRange(planNb.Cab.Select((c, i) => $"{Letra(i)}: {(c.Text ?? "").Trim()}").Where(x => !x.EndsWith(": ")));
 
-        // Estágio do CRM: vem direto de cada planilha, pelo título da coluna
-        // (FunnelStage no AFM, Stage no NB), sem passar pelo De-Para.
-        var iEstNb = planNb?.ColunaPorTitulo("stage") ?? -1;
-        var iEstAfm = planAfm?.ColunaPorTitulo("funnelstage", "funnel stage") ?? -1;
-        if (planNb is not null && iEstNb < 0) d.Avisos.Add("Coluna 'Stage' não encontrada no cabeçalho do NB: as propostas fechadas não puderam ser separadas das pendentes e atrasadas.");
-        if (planAfm is not null && iEstAfm < 0) d.Avisos.Add("Coluna 'FunnelStage' não encontrada no cabeçalho do AFM: as propostas fechadas não puderam ser separadas das pendentes e atrasadas.");
-
-        string Cel(string[] v, int i) => i >= 0 && i < v.Length ? (v[i] ?? "").Trim() : "";
-        Linha Completar(Linha l, bool nb)
+        // Preenche os campos tipados lendo a linha ORIGINAL da planilha.
+        Linha Completar(Linha l, Planilha p, OpportunityImporter.Cel[] row, Posicoes c, bool nb)
         {
-            var v = l.Valores;
-            var gm = Percentual(Cel(v, iGm));
+            var gm = Percentual(p.Texto(row, c.Gm));
             if (gm is { } g && nb) gm = g * 100;     // o NB traz decimal (0,25 = 25%)
+            var apl = p.Texto(row, c.Eng);
+            var vend = p.Texto(row, c.Sales);
+            if (!nb) { apl = Equivalente(apl, AplicadorNb); vend = Equivalente(vend, VendedorNb); }
             return l with
             {
-                Actual = Data(Cel(v, iActual)),
-                Due = Data(Cel(v, iDue)),
-                Industry = Cel(v, iInd), Bu = Cel(v, iBu), Gm = gm,
-                Country = Cel(v, iPais), Category = Cel(v, iCat),
-                Chave = v.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
-                Aplicador = iEng >= 0 ? Cel(v, iEng) : l.Aplicador,
-                Vendedor = iSales >= 0 ? Cel(v, iSales) : l.Vendedor,
+                Actual = Data(p.Texto(row, c.Actual)),
+                Due = Data(p.Texto(row, c.Due)),
+                Industry = p.Texto(row, c.Ind), Bu = p.Texto(row, c.Bu), Gm = gm,
+                Country = p.Texto(row, c.Pais), Category = p.Texto(row, c.Cat),
+                Estagio = p.Texto(row, c.Est),
+                Chave = l.Valores.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
+                Aplicador = apl != "" ? apl : l.Aplicador,
+                Vendedor = vend != "" ? vend : l.Vendedor,
             };
         }
 
@@ -269,7 +304,7 @@ public sealed class AplicacaoService
                 var valor = planNb.Numero(row, ColValorNb);
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = valor.ToString("0.##", Inv);
                 d.Linhas.Add(Completar(new Linha("NB", v, valor,
-                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : "") { Estagio = planNb.Texto(row, iEstNb) }, nb: true));
+                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), planNb, row, posNb!, nb: true));
                 d.LinhasNb++;
             }
         }
@@ -291,7 +326,7 @@ public sealed class AplicacaoService
                 var brl = d.TaxaUsd > 0 ? usd * d.TaxaUsd : 0;
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = brl.ToString("0.##", Inv);
                 d.Linhas.Add(Completar(new Linha("AFM", v, brl,
-                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : "") { Estagio = planAfm.Texto(row, iEstAfm) }, nb: false));
+                    iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), planAfm, row, posAfm!, nb: false));
                 d.LinhasAfm++;
             }
         }
@@ -310,13 +345,6 @@ public sealed class AplicacaoService
         public string Texto(OpportunityImporter.Cel[] row, int i) =>
             i >= 0 && i < row.Length ? (row[i].Text ?? "").Trim() : "";
 
-        /// <summary>Posição da coluna cujo título (normalizado) é um dos pedidos; -1 se não há.</summary>
-        public int ColunaPorTitulo(params string[] titulos)
-        {
-            for (var i = 0; i < Cab.Length; i++)
-                if (titulos.Contains(OpportunityImporter.Normalizar(Cab[i].Text ?? ""))) return i;
-            return -1;
-        }
 
         public double Numero(OpportunityImporter.Cel[] row, string letra)
         {
@@ -421,7 +449,8 @@ public sealed class AplicacaoService
             using var ms = new MemoryStream();
             fs.CopyTo(ms);
             ms.Position = 0;
-            var grade = OpportunityImporter.LerGrade(Path.GetFileName(file), ms);
+            // Linhas vazias mantidas: o cabeçalho é informado pelo número da linha.
+            var grade = OpportunityImporter.LerGrade(Path.GetFileName(file), ms, manterLinhasVazias: true);
             if (grade.Count == 0)
             {
                 avisos.Add($"Planilha do {rotulo} está vazia: {Path.GetFileName(file)}");
@@ -448,6 +477,14 @@ public sealed class AplicacaoService
             n = n * 26 + (ch - 'A' + 1);
         }
         return n - 1;
+    }
+
+    /// <summary>Índice → letra de coluna do Excel (0=A … 25=Z, 26=AA).</summary>
+    public static string Letra(int i)
+    {
+        var s = "";
+        for (i++; i > 0; i = (i - 1) / 26) s = (char)('A' + (i - 1) % 26) + s;
+        return s;
     }
 
     private static string? ResolveFile(string path)
