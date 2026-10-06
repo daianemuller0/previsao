@@ -272,6 +272,10 @@ public sealed class AplicacaoService
         if (planAfm is not null) d.CabecalhoAfm.AddRange(planAfm.Cab.Select((c, i) => $"{Letra(i)}: {(c.Text ?? "").Trim()}").Where(x => !x.EndsWith(": ")));
         if (planNb is not null) d.CabecalhoNb.AddRange(planNb.Cab.Select((c, i) => $"{Letra(i)}: {(c.Text ?? "").Trim()}").Where(x => !x.EndsWith(": ")));
 
+        // Identificador da proposta nas listas e na gaveta: o número da cotação,
+        // se houver coluna com esse título; senão a primeira coluna preenchida.
+        var iChave = d.Colunas.FindIndex(c => OpportunityImporter.Normalizar(c.Rotulo) is "quotenumber" or "quote number" or "proposta" or "proposal" or "opportunity number");
+
         // Preenche os campos tipados lendo a linha ORIGINAL da planilha.
         Linha Completar(Linha l, Planilha p, OpportunityImporter.Cel[] row, Posicoes c, bool nb)
         {
@@ -287,7 +291,8 @@ public sealed class AplicacaoService
                 Industry = p.Texto(row, c.Ind), Bu = p.Texto(row, c.Bu), Gm = gm,
                 Country = p.Texto(row, c.Pais), Category = p.Texto(row, c.Cat),
                 Estagio = p.Texto(row, c.Est),
-                Chave = l.Valores.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
+                Chave = iChave >= 0 && !string.IsNullOrWhiteSpace(l.Valores[iChave]) ? l.Valores[iChave].Trim()
+                        : l.Valores.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
                 Aplicador = apl != "" ? apl : l.Aplicador,
                 Vendedor = vend != "" ? vend : l.Vendedor,
             };
@@ -329,6 +334,17 @@ public sealed class AplicacaoService
                     iVend >= 0 ? v[iVend] : "", iApl >= 0 ? v[iApl] : ""), planAfm, row, posAfm!, nb: false));
                 d.LinhasAfm++;
             }
+        }
+
+        // A área pediu: no lugar da coluna "PO Esperado" (título do AFM) entra a
+        // data de envio (Actual) em todas as tabelas. Título configurável em
+        // Aplicadores:ColunaTrocadaPorActual; vazio desliga a troca.
+        var trocar = OpportunityImporter.Normalizar(_cfg["Aplicadores:ColunaTrocadaPorActual"] ?? "PO Esperado");
+        var iTroca = trocar == "" ? -1 : d.Colunas.FindIndex(c => OpportunityImporter.Normalizar(c.Rotulo) == trocar);
+        if (iTroca >= 0)
+        {
+            d.Colunas[iTroca] = d.Colunas[iTroca] with { Rotulo = "Actual" };
+            foreach (var l in d.Linhas) l.Valores[iTroca] = l.Actual?.ToString("yyyy-MM-dd") ?? "";
         }
     }
 
