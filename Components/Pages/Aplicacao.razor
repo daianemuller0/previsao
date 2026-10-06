@@ -63,7 +63,19 @@ else if (_dados is { } d)
     }
     @if (_aba == "desempenho" && d.ColunasFaltando.Count > 0)
     {
-        <div class="confirm-err" style="margin-bottom:8px">Colunas que os gráficos usam e não foram achadas no cabeçalho do AFM: <strong>@string.Join(", ", d.ColunasFaltando)</strong>. Os gráficos que dependem delas ficam vazios — confira o título dessas colunas na planilha.</div>
+        <div class="confirm-err" style="margin-bottom:8px">
+            Colunas que os gráficos usam e não foram achadas no cabeçalho: <strong>@string.Join(", ", d.ColunasFaltando)</strong>.
+            Os painéis que dependem delas ficam vazios. Confira abaixo os títulos que cada planilha traz e, se o nome for outro,
+            informe a letra ou o título em <code>appsettings.json</code> → <code>Aplicadores:Colunas</code> (ex.: <code>"Actual": { "Afm": "X", "Nb": "Sent Date" }</code>).
+            <details style="margin-top:6px">
+                <summary style="cursor:pointer">Cabeçalho do AFM (@d.CabecalhoAfm.Count colunas)</summary>
+                <div class="muted" style="font-size:11.5px;margin-top:4px">@string.Join(" · ", d.CabecalhoAfm)</div>
+            </details>
+            <details style="margin-top:4px">
+                <summary style="cursor:pointer">Cabeçalho do NB (@d.CabecalhoNb.Count colunas)</summary>
+                <div class="muted" style="font-size:11.5px;margin-top:4px">@string.Join(" · ", d.CabecalhoNb)</div>
+            </details>
+        </div>
     }
 
     <div class="filterbar filterbar-sticky">
