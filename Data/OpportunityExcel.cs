@@ -54,6 +54,10 @@ public static class OpportunityExcel
             ("OTP",                   o => o.Otp),
             ("TOP 10",                o => o.Top10),
             ("KYC",                   o => o.Kyc),
+            ("BU de origem",          o => o.BuOrigem),
+            ("CRM de origem",         o => o.CrmOrigem),
+            ("Moeda de origem",       o => o.MoedaOrigem),
+            ("Valor de origem",       o => string.IsNullOrWhiteSpace(o.ValorOrigem) ? (XLCellValue)Blank.Value : o.ValorOrigemValue),
             // ---- o restante da oportunidade ----
             ("Oportunidade",          o => o.Name),
             ("Indicada na previsão",  o => o.IndicadaValue ? "Sim" : "Não"),

@@ -145,20 +145,28 @@ public sealed class OpportunityImporter
             if (key != "" && !map.ContainsKey(key)) map[key] = i;
         }
 
+        // Nome de coluna: pelo título do cabeçalho ou, começando com "@", pela
+        // LETRA do Excel ("@AH") — para colunas cujo título se repete na planilha.
+        int IdxDe(string n) => n.StartsWith('@') ? ColIdx(n[1..]) : (map.TryGetValue(Norm(n), out var i) ? i : -1);
+
         foreach (var row in rows.Skip(hi + 1))
         {
             string Get(params string[] names)
             {
                 foreach (var n in names)
-                    if (map.TryGetValue(Norm(n), out var i))
-                        return i < row.Length ? row[i].Text.Trim() : "";
+                {
+                    var i = IdxDe(n);
+                    if (i >= 0) return i < row.Length ? row[i].Text.Trim() : "";
+                }
                 return "";
             }
             double? GetN(params string[] names)
             {
                 foreach (var n in names)
-                    if (map.TryGetValue(Norm(n), out var i))
-                        return i < row.Length ? row[i].Num : null;
+                {
+                    var i = IdxDe(n);
+                    if (i >= 0) return i < row.Length ? row[i].Num : null;
+                }
                 return null;
             }
             // Região de TOTAIS/rodapé no fim da planilha (posição varia): dessa
@@ -498,6 +506,13 @@ public sealed class OpportunityImporter
         var id = seq == 1 ? baseId : baseId + "-" + seq.ToString(Inv);
 
         var descr = get(new[] { "Description" });
+
+        // Origem intercompany (colunas AE..AI da planilha). BU de origem: BU_IC_FR
+        // (AF) se preenchida, senão BU_RFQ_IC (AE). "Moeda" repete o título da
+        // coluna M, por isso a AH é lida pela letra.
+        var buIc = get(new[] { "BU_IC_FR", "@AF" });
+        var buRfq = get(new[] { "BU_RFQ_IC", "@AE" });
+        var valorOrigem = Num("Potential Value Quote", "@AI");
         var o = new Opportunity
         {
             Id = id,
@@ -534,6 +549,10 @@ public sealed class OpportunityImporter
             StatusDescription = status,
             AmountRaw = cur + " " + value.ToString(Inv),
             Setor = "AFM",                // origem: planilha de Aftermarket
+            BuOrigem = buIc != "" ? buIc : buRfq,
+            CrmOrigem = get(new[] { "No_IC_FR", "@AG" }),
+            MoedaOrigem = get(new[] { "@AH" }).Trim().ToUpperInvariant(),
+            ValorOrigem = valorOrigem is { } vo ? vo.ToString(Inv) : "",
         };
 
         if (dateIso == "") r.Warnings.Add($"Oportunidade {Show(quote)}: data (PO Esperado) inválida ou ausente.");
@@ -684,6 +703,18 @@ public sealed class OpportunityImporter
     }
 
     private static string Show(string s) => string.IsNullOrWhiteSpace(s) ? "(sem número)" : s;
+
+    /// <summary>Letra de coluna do Excel → índice (A=0 … Z=25, AA=26); -1 se inválida.</summary>
+    public static int ColIdx(string letra)
+    {
+        var n = 0;
+        foreach (var ch in (letra ?? "").Trim().ToUpperInvariant())
+        {
+            if (ch < 'A' || ch > 'Z') return -1;
+            n = n * 26 + (ch - 'A' + 1);
+        }
+        return n - 1;
+    }
 
     // NB/RT/AFM/SV — normaliza para o código conhecido, senão preserva o texto.
     private string MatchBu(string val)

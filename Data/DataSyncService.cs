@@ -64,7 +64,7 @@ public sealed class DataSyncService
     // v8: carteira do Elmer repartida por market (Oil → Bruno). Subir a versão
     // força a reimportação na próxima abertura, para a regra pegar o que já
     // está na base sem esperar planilha nova.
-    private const string ImportVersion = "v8";
+    private const string ImportVersion = "v9";   // v9: colunas de origem intercompany do AFM (AE..AI)
 
     private string? MarcaGravada(string prefix)
     {
