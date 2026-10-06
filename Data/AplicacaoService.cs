@@ -449,7 +449,8 @@ public sealed class AplicacaoService
             using var ms = new MemoryStream();
             fs.CopyTo(ms);
             ms.Position = 0;
-            var grade = OpportunityImporter.LerGrade(Path.GetFileName(file), ms);
+            // Linhas vazias mantidas: o cabeçalho é informado pelo número da linha.
+            var grade = OpportunityImporter.LerGrade(Path.GetFileName(file), ms, manterLinhasVazias: true);
             if (grade.Count == 0)
             {
                 avisos.Add($"Planilha do {rotulo} está vazia: {Path.GetFileName(file)}");
