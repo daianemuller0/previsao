@@ -322,7 +322,7 @@ app.MapGet("/controle/export", (ControleRepository repo, HttpRequest req) =>
     var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
     return Results.File(bytes, "text/csv; charset=utf-8", $"controle_{year}.csv");
     // Mesma restrição da aba Controle: só Controle e Administrador.
-}).RequireAuthorization(p => p.RequireRole(AccessRoles.Controle, AccessRoles.Admin));
+}).RequireAuthorization(p => p.RequireRole(AccessRoles.Controle, AccessRoles.Admin, AccessRoles.GestorAfm));
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

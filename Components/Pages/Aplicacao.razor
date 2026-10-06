@@ -1,5 +1,5 @@
 @page "/aplicacao"
-@attribute [Authorize(Roles = "admin")]
+@attribute [Authorize(Roles = "admin,gestor_afm")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject AplicacaoService Aplic
 @inject ChartPrefsRepository ChartPrefs
@@ -80,9 +80,12 @@ else if (_dados is { } d)
 
     <div class="filterbar filterbar-sticky">
         <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="qualquer coluna…" @bind="_busca" @bind:event="oninput" /></div>
-        <div class="flt"><span class="flt-label">Origem</span>
-            <select @bind="_origem"><option value="">Ambas</option><option value="AFM">AFM</option><option value="NB">NB</option></select>
-        </div>
+        @if (_setorFixo == "")
+        {
+            <div class="flt"><span class="flt-label">Origem</span>
+                <select @bind="_origem"><option value="">Ambas</option><option value="AFM">AFM</option><option value="NB">NB</option></select>
+            </div>
+        }
         <MultiFilter Label="Aplicador" AllText="Todos" Options="Aplicadores" Selected="_aplicadores" OnChanged="StateHasChanged" />
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
         <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco), prazo do cliente (Due) já passado e não fechadas no CRM"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
@@ -309,6 +312,7 @@ else if (_dados is { } d)
     private AplicacaoService.Dados? _dados;
     private bool _lendo;
     private string _login = "";
+    private string _setorFixo = "";   // "AFM" para o Gestor Aftermarket: só as linhas do AFM
     private string _mapaMetrica = "qtd";
 
     private string _busca = "";
@@ -336,6 +340,7 @@ else if (_dados is { } d)
         {
             var user = (await AuthState).User;
             _login = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? user.Identity?.Name ?? "";
+            _setorFixo = AccessScope.Resolve(user).Setor;
         }
         await Carregar(false);
     }
@@ -413,6 +418,7 @@ else if (_dados is { } d)
         {
             if (_dados is null) return new();
             IEnumerable<AplicacaoService.Linha> q = _dados.Linhas;
+            if (_setorFixo != "") q = q.Where(l => l.Origem == _setorFixo);
             if (_origem != "") q = q.Where(l => l.Origem == _origem);
             if (_vendedores.Count > 0) q = q.Where(l => _vendedores.Contains(l.Vendedor));
             if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
