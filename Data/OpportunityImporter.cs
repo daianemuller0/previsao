@@ -553,6 +553,16 @@ public sealed class OpportunityImporter
             CrmOrigem = get(new[] { "No_IC_FR", "@AG" }),
             MoedaOrigem = get(new[] { "@AH" }).Trim().ToUpperInvariant(),
             ValorOrigem = valorOrigem is { } vo ? vo.ToString(Inv) : "",
+            // Referência do equipamento (AK..AS): pelo título, com a letra de reserva.
+            Refname = get(new[] { "Refname", "@AK" }),
+            Refno = get(new[] { "Refno", "@AL" }),
+            Productcompany = get(new[] { "Productcompany", "@AM" }),
+            Articleno = get(new[] { "Articleno", "@AN" }),
+            Contractno = get(new[] { "Contractno", "@AO" }),
+            Serialno = get(new[] { "Serialno", "@AP" }),
+            Applicationtype = get(new[] { "Applicationtype", "@AQ" }),
+            Designation = get(new[] { "Designation", "@AR" }),
+            Clientrefno = get(new[] { "Clientrefno", "@AS" }),
         };
 
         if (dateIso == "") r.Warnings.Add($"Oportunidade {Show(quote)}: data (PO Esperado) inválida ou ausente.");

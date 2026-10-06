@@ -60,6 +60,16 @@ public class Opportunity
     public string CrmOrigem { get; set; } = "";             // CRM de origem: No_IC_FR (AG)
     public string MoedaOrigem { get; set; } = "";           // Moeda (AH)
     public string ValorOrigem { get; set; } = "";           // Valor (AI, Potential Value Quote), na moeda de origem
+    // ---- Referência do equipamento (planilha do Aftermarket, colunas AK..AS) ----
+    public string Refname { get; set; } = "";                   // Refname (AK)
+    public string Refno { get; set; } = "";                     // Refno (AL)
+    public string Productcompany { get; set; } = "";            // Productcompany (AM)
+    public string Articleno { get; set; } = "";                 // Articleno (AN)
+    public string Contractno { get; set; } = "";                // Contractno (AO)
+    public string Serialno { get; set; } = "";                  // Serialno (AP)
+    public string Applicationtype { get; set; } = "";           // Applicationtype (AQ)
+    public string Designation { get; set; } = "";               // Designation (AR)
+    public string Clientrefno { get; set; } = "";               // Clientrefno (AS)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";

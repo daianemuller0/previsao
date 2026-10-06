@@ -100,6 +100,15 @@
                             case "crmorigem": <td class="nowrap">@Dash(o.CrmOrigem)</td> break;
                             case "moedaorigem": <td class="center">@Dash(o.MoedaOrigem)</td> break;
                             case "valororigem": <td class="right num">@(string.IsNullOrWhiteSpace(o.ValorOrigem) ? "—" : o.ValorOrigemValue.ToString("#,##0.00", _pt))</td> break;
+                            case "refname":       <td>@Dash(o.Refname)</td> break;
+                            case "refno":         <td>@Dash(o.Refno)</td> break;
+                            case "productcompany":<td>@Dash(o.Productcompany)</td> break;
+                            case "articleno":     <td>@Dash(o.Articleno)</td> break;
+                            case "contractno":    <td>@Dash(o.Contractno)</td> break;
+                            case "serialno":      <td>@Dash(o.Serialno)</td> break;
+                            case "applicationtype":<td>@Dash(o.Applicationtype)</td> break;
+                            case "designation":   <td>@Dash(o.Designation)</td> break;
+                            case "clientrefno":   <td>@Dash(o.Clientrefno)</td> break;
                         }
                     }
                 </tr>
