@@ -143,7 +143,7 @@ else if (_dados is { } d)
 
             <div class="c12" data-pnl="mensal">
                 <div class="panel">
-                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador por mês <span class="hint">data de envio = Actual · aplicador = ProposalEngineer</span></div><TelaCheia /></div>
+                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador por mês <span class="hint">data de envio = Actual · aplicador = ProposalEngineer · a partir de jan/2026</span></div><TelaCheia /></div>
                     @RenderMensal(rows)
                 </div>
             </div>
@@ -640,10 +640,15 @@ else if (_dados is { } d)
     };
 
     // Linhas: um traço por aplicador, um ponto por mês (quantidade enviada).
+    private static readonly DateTime InicioMensal = new(2026, 1, 1);   // primeiro mês do gráfico mensal
+
     private RenderFragment RenderMensal(List<AplicacaoService.Linha> rows) => builder =>
     {
-        var enviadas = rows.Where(l => l.Actual is not null).ToList();
-        if (enviadas.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Nenhuma proposta com data de envio (Actual) no recorte.</div>"); return; }
+        // O gráfico começa em janeiro de 2026: datas de envio antigas (ou
+        // digitadas errado no CRM) esticavam o eixo por anos e esmagavam o que
+        // interessa. As propostas anteriores continuam nas listas e nos totais.
+        var enviadas = rows.Where(l => l.Actual is { } a && a >= InicioMensal).ToList();
+        if (enviadas.Count == 0) { builder.AddMarkupContent(0, $"<div class='empty'>Nenhuma proposta com data de envio (Actual) a partir de {InicioMensal:MM/yyyy} no recorte.</div>"); return; }
 
         var meses = enviadas.Select(l => new DateTime(l.Actual!.Value.Year, l.Actual.Value.Month, 1)).Distinct().OrderBy(m => m).ToList();
         var primeiro = meses.First(); var ultimo = meses.Last();
