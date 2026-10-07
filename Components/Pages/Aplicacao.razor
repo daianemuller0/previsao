@@ -92,7 +92,7 @@ else if (_dados is { } d)
         <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco) e não fechadas no CRM"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
         <label class="flt-toggle @(_soIc ? "on" : "")" title="Só as propostas com origem intercompany: BU de origem preenchida (AFM, BU_IC_FR ou BU_RFQ_IC)"><input type="checkbox" @bind="_soIc" />@Icons.Svg("layers")<span>Origem IC</span></label>
         @* Janela de tempo: sempre pela data de envio (Actual). *@
-        <div class="flt" title="Ano da data de envio (Actual)"><span class="flt-label">Ano</span>
+        <div class="flt" title="Ano da data de envio (Actual); para proposta ainda não enviada, do prazo do cliente (Due)"><span class="flt-label">Ano</span>
             <select @bind="_ano">
                 <option value="">Todos</option>
                 @foreach (var a in Anos) { <option value="@a">@a</option> }
@@ -409,9 +409,14 @@ else if (_dados is { } d)
         (_dados?.Linhas ?? new()).Select(pega).Where(s => !string.IsNullOrWhiteSpace(s))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
 
-    // Anos que aparecem na data de envio (Actual), mais recente primeiro.
+    // Data que conta no período: a de envio (Actual). Proposta ainda não enviada
+    // não tem Actual — nela vale o prazo do cliente (Due), senão as pendentes e
+    // atrasadas sumiriam de qualquer recorte de ano/mês.
+    private static DateTime? DataPeriodo(AplicacaoService.Linha l) => l.Actual ?? l.Due;
+
+    // Anos que aparecem na data do período, mais recente primeiro.
     private IEnumerable<int> Anos =>
-        (_dados?.Linhas ?? new()).Where(l => l.Actual is not null).Select(l => l.Actual!.Value.Year).Distinct().OrderByDescending(a => a);
+        (_dados?.Linhas ?? new()).Select(DataPeriodo).Where(x => x is not null).Select(x => x!.Value.Year).Distinct().OrderByDescending(a => a);
 
     private List<AplicacaoService.Linha> Linhas
     {
@@ -426,13 +431,13 @@ else if (_dados is { } d)
             if (_soAtrasadas) q = q.Where(Atrasada);
             if (_soPendentes) q = q.Where(Pendente);
             if (_soIc) q = q.Where(l => l.BuOrigem != "");
-            // Ano, meses e janela De/Até: sempre pela data de envio (Actual).
-            // Sem Actual, a proposta fica fora do recorte de período.
+            // Ano, meses e janela De/Até pela data de envio (Actual); sem ela, pelo
+            // prazo (Due). Sem nenhuma das duas, a proposta fica fora do recorte.
             int? ano = _ano != "" && int.TryParse(_ano, out var a) ? a : null;
             if (ano is not null || _meses.Count > 0 || _de is not null || _ate is not null)
             {
                 var de = _de?.Date; var ate = _ate?.Date;
-                q = q.Where(l => l.Actual is { } x && (ano is null || x.Year == ano) && (_meses.Count == 0 || _meses.Contains(Fmt.MonthLong(x.Month)))
+                q = q.Where(l => DataPeriodo(l) is { } x && (ano is null || x.Year == ano) && (_meses.Count == 0 || _meses.Contains(Fmt.MonthLong(x.Month)))
                                  && (de is null || x >= de) && (ate is null || x <= ate));
             }
             if (!string.IsNullOrWhiteSpace(_busca))
