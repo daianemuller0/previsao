@@ -140,6 +140,13 @@ else if (_dados is { } d)
                 </div>
             </div>
 
+            <div class="c12" data-pnl="enviadas-aplicador">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador <span class="hint">total com data de envio (Actual) · ordem decrescente · @rows.Count(l => l.Actual is not null)</span></div><TelaCheia /></div>
+                    @RenderPodio(Contar(rows.Where(l => l.Actual is not null), l => l.Aplicador))
+                </div>
+            </div>
+
             <div class="c12" data-pnl="atrasadas">
                 <div class="panel">
                     <div class="panel-head">
@@ -593,6 +600,64 @@ else if (_dados is { } d)
             sb.Append("</div>");
         }
         sb.Append("</div></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // Iniciais do nome para o avatar (duas letras).
+    private static string Iniciais(string nome)
+    {
+        var partes = (nome ?? "").Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+        if (partes.Length == 0) return "?";
+        var s = partes[0][..1] + (partes.Length > 1 ? partes[^1][..1] : "");
+        return s.ToUpperInvariant();
+    }
+
+    // Pódio + ranking: os três primeiros em destaque, depois a lista completa
+    // com barra proporcional, quantidade e participação. Valor em Fatia.Valor é
+    // a quantidade; Fatia.Extra traz o valor em R$ para o tooltip e os cartões.
+    private RenderFragment RenderPodio(List<Fatia> dados) => builder =>
+    {
+        if (dados.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Nenhuma proposta com data de envio (Actual) no recorte.</div>"); return; }
+        var max = Math.Max(dados.Max(f => f.Valor), 1);
+        var total = Math.Max(dados.Sum(f => f.Valor), 1);
+        string Cor(int i) => Cores[i % Cores.Length];
+        string Pct(double v) => Esc(Fmt.Pct(v / total * 100));
+
+        var sb = new System.Text.StringBuilder("<div class='pod'>");
+        // ---- pódio: 2º · 1º · 3º ----
+        var top = dados.Take(3).ToList();
+        if (top.Count >= 2)
+        {
+            sb.Append("<div class='pod-top'>");
+            foreach (var pos in new[] { 1, 0, 2 })
+            {
+                if (pos >= top.Count) { sb.Append("<div></div>"); continue; }
+                var f = top[pos];
+                sb.Append($"<div class='pod-card p{pos + 1}' title='{Esc(f.Rotulo)} · {Esc(f.Extra)}'>");
+                sb.Append($"<span class='pod-medal'>{pos + 1}º</span>");
+                sb.Append($"<span class='pod-av' style='background:{Cor(pos)}'>{Esc(Iniciais(f.Rotulo))}</span>");
+                sb.Append($"<span class='pod-nm'>{Esc(f.Rotulo)}</span>");
+                sb.Append($"<span class='pod-ct'>{F(f.Valor)}</span>");
+                sb.Append($"<span class='pod-sh'>{Pct(f.Valor)} das enviadas · {Esc(f.Extra)}</span>");
+                sb.Append("</div>");
+            }
+            sb.Append("</div>");
+        }
+        // ---- ranking completo ----
+        sb.Append($"<div class='apl-resumo'><span>{dados.Count} aplicador(es)</span><span class='apl-total'><small>ENVIADAS</small>{F(total)}</span></div>");
+        sb.Append("<div class='apl-scroll'><div class='pod-list'>");
+        for (var i = 0; i < dados.Count; i++)
+        {
+            var f = dados[i];
+            sb.Append($"<div class='pod-row{(i < 3 ? " top" + (i + 1) : "")}' title='{Esc(f.Rotulo)} · {F(f.Valor)} proposta(s) · {Esc(f.Extra)}'>");
+            sb.Append($"<span class='pod-rank'>{i + 1}</span>");
+            sb.Append($"<span class='pod-av sm' style='background:{Cor(i)}'>{Esc(Iniciais(f.Rotulo))}</span>");
+            sb.Append($"<span class='pod-name'>{Esc(f.Rotulo)}</span>");
+            sb.Append($"<span class='pod-bar'><span class='pod-fill' style='width:{F(f.Valor / max * 100)}%;background:linear-gradient(90deg,{Cor(i)}cc,{Cor(i)})'></span><span class='pod-num'>{F(f.Valor)}</span></span>");
+            sb.Append($"<span class='pod-share'>{Pct(f.Valor)}</span>");
+            sb.Append("</div>");
+        }
+        sb.Append("</div></div></div>");
         builder.AddMarkupContent(0, sb.ToString());
     };
 
