@@ -90,16 +90,15 @@ else if (_dados is { } d)
         <MultiFilter Label="Vendedor" AllText="Todos" Options="Vendedores" Selected="_vendedores" OnChanged="StateHasChanged" />
         <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco), prazo do cliente (Due) já passado e não fechadas no CRM"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
         <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco) e não fechadas no CRM"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
-        @* Janela de tempo: pela data de envio (Actual), pelo prazo do cliente (Due) ou por ambas. *@
-        <div class="flt" title="Ambas: a proposta entra se o envio OU o prazo cair no período"><span class="flt-label">Período por</span>
-            <select @bind="_dataCampo"><option value="actual">Envio (Actual)</option><option value="due">Prazo (Due)</option><option value="ambas">Ambas</option></select>
-        </div>
-        <div class="flt" title="Ano da(s) data(s) escolhida(s) em 'Período por'"><span class="flt-label">Ano</span>
+        <label class="flt-toggle @(_soIc ? "on" : "")" title="Só as propostas com origem intercompany: BU de origem preenchida (AFM, BU_IC_FR ou BU_RFQ_IC)"><input type="checkbox" @bind="_soIc" />@Icons.Svg("layers")<span>Origem IC</span></label>
+        @* Janela de tempo: sempre pela data de envio (Actual). *@
+        <div class="flt" title="Ano da data de envio (Actual); para proposta ainda não enviada, do prazo do cliente (Due)"><span class="flt-label">Ano</span>
             <select @bind="_ano">
                 <option value="">Todos</option>
                 @foreach (var a in Anos) { <option value="@a">@a</option> }
             </select>
         </div>
+        <MultiFilter Label="Mês" AllText="Todos" Options="MesOptions" Selected="_meses" OnChanged="StateHasChanged" />
         <div class="flt"><span class="flt-label">De</span><input class="flt-date" type="date" @bind="_de" /></div>
         <div class="flt"><span class="flt-label">Até</span><input class="flt-date" type="date" @bind="_ate" /></div>
         <div class="filterbar-spacer"></div>
@@ -110,7 +109,7 @@ else if (_dados is { } d)
                 <div class="fb-sum"><span class="fb-sum-k">Valor TOTAL</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
             }
         </div>
-        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _soPendentes || _ano != "" || _de is not null || _ate is not null)
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _soPendentes || _soIc || _ano != "" || _meses.Count > 0 || _de is not null || _ate is not null)
         {
             <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
         }
@@ -136,8 +135,15 @@ else if (_dados is { } d)
 
             <div class="c12" data-pnl="mensal">
                 <div class="panel">
-                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador por mês <span class="hint">data de envio = Actual · aplicador = ProposalEngineer</span></div><TelaCheia /></div>
+                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador por mês <span class="hint">data de envio = Actual · aplicador = ProposalEngineer · a partir de jan/2026</span></div><TelaCheia /></div>
                     @RenderMensal(rows)
+                </div>
+            </div>
+
+            <div class="c12" data-pnl="enviadas-aplicador">
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Propostas enviadas por aplicador <span class="hint">total com data de envio (Actual) · ordem decrescente · @rows.Count(l => l.Actual is not null)</span></div><TelaCheia /></div>
+                    @RenderPodio(Contar(rows.Where(l => l.Actual is not null), l => l.Aplicador))
                 </div>
             </div>
 
@@ -294,7 +300,7 @@ else if (_dados is { } d)
         <dl>
             @foreach (var c in Colunas(dd))
             {
-                <div class="dl"><dt title="AFM @c.LetraAfm → NB @c.Letra">@c.Rotulo</dt><dd>@(c.Indice == dd.IndiceValor ? Fmt.Brl(p.ValorBrl) : Traco(p.Valores[c.Indice]))</dd></div>
+                <div class="dl"><dt title="@c.Origem">@c.Rotulo</dt><dd>@(c.Indice == dd.IndiceValor ? Fmt.Brl(p.ValorBrl) : Traco(p.Valores[c.Indice]))</dd></div>
             }
         </dl>
     </div>
@@ -321,12 +327,14 @@ else if (_dados is { } d)
     private HashSet<string> _aplicadores = new(StringComparer.OrdinalIgnoreCase);
     private bool _soAtrasadas;   // sem Actual e com o Due já vencido
     private bool _soPendentes;   // sem Actual (ainda não enviada)
+    private bool _soIc;          // só com BU de origem intercompany
     // Pendente: ainda não enviada (Actual em branco) e não fechada no CRM
     // (FunnelStage/Stage começando com "Closed" fica fora).
     private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null && !l.Fechada;
     private AplicacaoService.Linha? _detalhe;   // proposta aberta com dois cliques
-    private string _dataCampo = "actual";   // janela de tempo por Actual (envio), Due (prazo) ou ambas
     private string _ano = "";               // ano da data escolhida ("" = todos)
+    private HashSet<string> _meses = new(StringComparer.OrdinalIgnoreCase);   // meses (nome) da data de envio; vazio = todos
+    private static IEnumerable<string> MesOptions => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private DateTime? _de, _ate;
 
     // Regra única de "atrasada", usada pelo filtro e pelo painel: ainda não foi
@@ -401,16 +409,14 @@ else if (_dados is { } d)
         (_dados?.Linhas ?? new()).Select(pega).Where(s => !string.IsNullOrWhiteSpace(s))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
 
-    // Anos que aparecem na(s) data(s) escolhida(s) em "Período por" (mais recente primeiro).
-    private IEnumerable<int> Anos =>
-        (_dados?.Linhas ?? new()).SelectMany(Datas).Select(x => x.Year).Distinct().OrderByDescending(a => a);
+    // Data que conta no período: a de envio (Actual). Proposta ainda não enviada
+    // não tem Actual — nela vale o prazo do cliente (Due), senão as pendentes e
+    // atrasadas sumiriam de qualquer recorte de ano/mês.
+    private static DateTime? DataPeriodo(AplicacaoService.Linha l) => l.Actual ?? l.Due;
 
-    // Datas da proposta que contam no período: Actual, Due ou as duas ("ambas").
-    private IEnumerable<DateTime> Datas(AplicacaoService.Linha l)
-    {
-        if (_dataCampo != "due" && l.Actual is { } a) yield return a;
-        if (_dataCampo != "actual" && l.Due is { } d) yield return d;
-    }
+    // Anos que aparecem na data do período, mais recente primeiro.
+    private IEnumerable<int> Anos =>
+        (_dados?.Linhas ?? new()).Select(DataPeriodo).Where(x => x is not null).Select(x => x!.Value.Year).Distinct().OrderByDescending(a => a);
 
     private List<AplicacaoService.Linha> Linhas
     {
@@ -424,13 +430,15 @@ else if (_dados is { } d)
             if (_aplicadores.Count > 0) q = q.Where(l => _aplicadores.Contains(l.Aplicador));
             if (_soAtrasadas) q = q.Where(Atrasada);
             if (_soPendentes) q = q.Where(Pendente);
-            // Ano e janela De/Até usam a(s) data(s) escolhida(s) em "Período por".
-            // Com "ambas", basta uma das datas cair no recorte; sem data, fica fora.
+            if (_soIc) q = q.Where(l => l.BuOrigem != "");
+            // Ano, meses e janela De/Até pela data de envio (Actual); sem ela, pelo
+            // prazo (Due). Sem nenhuma das duas, a proposta fica fora do recorte.
             int? ano = _ano != "" && int.TryParse(_ano, out var a) ? a : null;
-            if (ano is not null || _de is not null || _ate is not null)
+            if (ano is not null || _meses.Count > 0 || _de is not null || _ate is not null)
             {
                 var de = _de?.Date; var ate = _ate?.Date;
-                q = q.Where(l => Datas(l).Any(x => (ano is null || x.Year == ano) && (de is null || x >= de) && (ate is null || x <= ate)));
+                q = q.Where(l => DataPeriodo(l) is { } x && (ano is null || x.Year == ano) && (_meses.Count == 0 || _meses.Contains(Fmt.MonthLong(x.Month)))
+                                 && (de is null || x >= de) && (ate is null || x <= ate));
             }
             if (!string.IsNullOrWhiteSpace(_busca))
             {
@@ -443,8 +451,8 @@ else if (_dados is { } d)
 
     private void Limpar()
     {
-        _busca = ""; _origem = ""; _soAtrasadas = false; _soPendentes = false;
-        _de = _ate = null; _dataCampo = "actual"; _ano = "";
+        _busca = ""; _origem = ""; _soAtrasadas = false; _soPendentes = false; _soIc = false;
+        _de = _ate = null; _ano = ""; _meses.Clear();
         _vendedores.Clear(); _aplicadores.Clear();
     }
 
@@ -506,7 +514,7 @@ else if (_dados is { } d)
                         @if (colunaExtra is not null) { <th class="right">@colunaExtra</th> }
                         @foreach (var c in Colunas(d))
                         {
-                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" draggable="true" data-key="@c.Letra" title="@c.Rotulo (AFM @c.LetraAfm → NB @c.Letra) — arraste para mover a coluna">@c.Rotulo</th>
+                            <th class="@(c.Indice == d.IndiceValor ? "right" : "")" draggable="true" data-key="@c.Letra" title="@c.Rotulo (@c.Origem) — arraste para mover a coluna">@c.Rotulo</th>
                         }
                     </tr>
                 </thead>
@@ -600,6 +608,64 @@ else if (_dados is { } d)
         builder.AddMarkupContent(0, sb.ToString());
     };
 
+    // Iniciais do nome para o avatar (duas letras).
+    private static string Iniciais(string nome)
+    {
+        var partes = (nome ?? "").Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+        if (partes.Length == 0) return "?";
+        var s = partes[0][..1] + (partes.Length > 1 ? partes[^1][..1] : "");
+        return s.ToUpperInvariant();
+    }
+
+    // Pódio + ranking: os três primeiros em destaque, depois a lista completa
+    // com barra proporcional, quantidade e participação. Valor em Fatia.Valor é
+    // a quantidade; Fatia.Extra traz o valor em R$ para o tooltip e os cartões.
+    private RenderFragment RenderPodio(List<Fatia> dados) => builder =>
+    {
+        if (dados.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Nenhuma proposta com data de envio (Actual) no recorte.</div>"); return; }
+        var max = Math.Max(dados.Max(f => f.Valor), 1);
+        var total = Math.Max(dados.Sum(f => f.Valor), 1);
+        string Cor(int i) => Cores[i % Cores.Length];
+        string Pct(double v) => Esc(Fmt.Pct(v / total * 100));
+
+        var sb = new System.Text.StringBuilder("<div class='pod'>");
+        // ---- pódio: 2º · 1º · 3º ----
+        var top = dados.Take(3).ToList();
+        if (top.Count >= 2)
+        {
+            sb.Append("<div class='pod-top'>");
+            foreach (var pos in new[] { 1, 0, 2 })
+            {
+                if (pos >= top.Count) { sb.Append("<div></div>"); continue; }
+                var f = top[pos];
+                sb.Append($"<div class='pod-card p{pos + 1}' title='{Esc(f.Rotulo)} · {Esc(f.Extra)}'>");
+                sb.Append($"<span class='pod-medal'>{pos + 1}º</span>");
+                sb.Append($"<span class='pod-av' style='background:{Cor(pos)}'>{Esc(Iniciais(f.Rotulo))}</span>");
+                sb.Append($"<span class='pod-nm'>{Esc(f.Rotulo)}</span>");
+                sb.Append($"<span class='pod-ct'>{F(f.Valor)}</span>");
+                sb.Append($"<span class='pod-sh'>{Pct(f.Valor)} das enviadas · {Esc(f.Extra)}</span>");
+                sb.Append("</div>");
+            }
+            sb.Append("</div>");
+        }
+        // ---- ranking completo ----
+        sb.Append($"<div class='apl-resumo'><span>{dados.Count} aplicador(es)</span><span class='apl-total'><small>ENVIADAS</small>{F(total)}</span></div>");
+        sb.Append("<div class='apl-scroll'><div class='pod-list'>");
+        for (var i = 0; i < dados.Count; i++)
+        {
+            var f = dados[i];
+            sb.Append($"<div class='pod-row{(i < 3 ? " top" + (i + 1) : "")}' title='{Esc(f.Rotulo)} · {F(f.Valor)} proposta(s) · {Esc(f.Extra)}'>");
+            sb.Append($"<span class='pod-rank'>{i + 1}</span>");
+            sb.Append($"<span class='pod-av sm' style='background:{Cor(i)}'>{Esc(Iniciais(f.Rotulo))}</span>");
+            sb.Append($"<span class='pod-name'>{Esc(f.Rotulo)}</span>");
+            sb.Append($"<span class='pod-bar'><span class='pod-fill' style='width:{F(f.Valor / max * 100)}%;background:linear-gradient(90deg,{Cor(i)}cc,{Cor(i)})'></span><span class='pod-num'>{F(f.Valor)}</span></span>");
+            sb.Append($"<span class='pod-share'>{Pct(f.Valor)}</span>");
+            sb.Append("</div>");
+        }
+        sb.Append("</div></div></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
     // Rosca + legenda (quantidade e, quando houver, o extra — o valor em R$).
     private RenderFragment RenderPizza(List<Fatia> dados) => builder =>
     {
@@ -629,10 +695,15 @@ else if (_dados is { } d)
     };
 
     // Linhas: um traço por aplicador, um ponto por mês (quantidade enviada).
+    private static readonly DateTime InicioMensal = new(2026, 1, 1);   // primeiro mês do gráfico mensal
+
     private RenderFragment RenderMensal(List<AplicacaoService.Linha> rows) => builder =>
     {
-        var enviadas = rows.Where(l => l.Actual is not null).ToList();
-        if (enviadas.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Nenhuma proposta com data de envio (Actual) no recorte.</div>"); return; }
+        // O gráfico começa em janeiro de 2026: datas de envio antigas (ou
+        // digitadas errado no CRM) esticavam o eixo por anos e esmagavam o que
+        // interessa. As propostas anteriores continuam nas listas e nos totais.
+        var enviadas = rows.Where(l => l.Actual is { } a && a >= InicioMensal).ToList();
+        if (enviadas.Count == 0) { builder.AddMarkupContent(0, $"<div class='empty'>Nenhuma proposta com data de envio (Actual) a partir de {InicioMensal:MM/yyyy} no recorte.</div>"); return; }
 
         var meses = enviadas.Select(l => new DateTime(l.Actual!.Value.Year, l.Actual.Value.Month, 1)).Distinct().OrderBy(m => m).ToList();
         var primeiro = meses.First(); var ultimo = meses.Last();

@@ -105,6 +105,7 @@
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     <label class="flt-toggle @(_onlyLost ? "on" : "")" title="Mostrar somente as oportunidades indicadas como perdidas"><input type="checkbox" @bind="_onlyLost" />@Icons.Svg("x")<span>Perdidas</span></label>
     <label class="flt-toggle @(_onlyAltered ? "on" : "")" title="Mostrar somente as oportunidades com algum valor alterado no sistema (diferente do que o CRM trouxe)"><input type="checkbox" @bind="_onlyAltered" />@Icons.Svg("edit")<span>Alteradas no sistema</span></label>
+    <label class="flt-toggle @(_onlyIc ? "on" : "")" title="Somente as ofertas com origem intercompany: as que têm BU de origem preenchida (planilha do Aftermarket, colunas BU_IC_FR / BU_RFQ_IC)"><input type="checkbox" @bind="_onlyIc" />@Icons.Svg("layers")<span>Origem IC</span></label>
     <div class="filterbar-spacer"></div>
     @if (_activeFilters > 0) { <span class="tag">@_activeFilters ativo(s)</span> }
     <button class="btn-link" @onclick="ClearFilters">@Icons.Svg("x")Limpar filtros</button>
@@ -325,6 +326,7 @@
     private bool _onlyIndicated;
     private bool _onlyLost;                // só as indicadas como perdidas
     private bool _onlyAltered;             // só as com valor alterado no sistema (≠ CRM)
+    private bool _onlyIc;                  // só as ofertas com origem intercompany (BU de origem preenchida)
     private DateTime? _dateFrom, _dateTo;
     private int _openCount;
     private bool _isAdmin;                            // manutenção da base só p/ admin
@@ -357,7 +359,8 @@
         + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
         + (_onlyIndicated ? 1 : 0)
         + (_onlyLost ? 1 : 0)
-        + (_onlyAltered ? 1 : 0);
+        + (_onlyAltered ? 1 : 0)
+        + (_onlyIc ? 1 : 0);
 
     // ---- recorte guardado durante a sessão ---------------------------------
     // Abrir uma proposta recria esta tela do zero na volta. Sem guardar, o filtro
@@ -366,10 +369,10 @@
 
     private sealed record Recorte(string Search, HashSet<string> Cats, HashSet<string> Kams,
         HashSet<string> Markets, HashSet<string> Risks, HashSet<string> Years, HashSet<string> Months,
-        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost, bool OnlyAltered, HashSet<string>? Setores = null);
+        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost, bool OnlyAltered, HashSet<string>? Setores = null, bool OnlyIc = false);
 
     private void GuardarFiltros() => Filtros.Guardar(Tela,
-        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost, _onlyAltered, _setores));
+        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost, _onlyAltered, _setores, _onlyIc));
 
     private void RestaurarFiltros()
     {
@@ -381,6 +384,7 @@
         _onlyIndicated = r.OnlyIndicated;
         _onlyLost = r.OnlyLost;
         _onlyAltered = r.OnlyAltered;
+        _onlyIc = r.OnlyIc;
         _dateFrom = r.De; _dateTo = r.Ate;
     }
 
@@ -392,6 +396,7 @@
         _onlyIndicated = false;
         _onlyLost = false;
         _onlyAltered = false;
+        _onlyIc = false;
         GuardarFiltros();     // limpou de propósito: a memória acompanha
     }
     private Opportunity? _new;
@@ -729,6 +734,7 @@
             if (_onlyIndicated) q = q.Where(o => o.IndicadaValue);
             if (_onlyLost) q = q.Where(o => o.PerdidaValue);
             if (_onlyAltered) q = q.Where(AlteracoesCrm.Alterada);
+            if (_onlyIc) q = q.Where(o => !string.IsNullOrWhiteSpace(o.BuOrigem));
             if (_cats.Count > 0) q = q.Where(o => _cats.Contains(ForecastCategories.Label(o.Category)));
             if (_setores.Count > 0) q = q.Where(o => _setores.Contains(o.SetorEfetivo));
             if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KamName(o)));

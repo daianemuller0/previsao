@@ -22,7 +22,8 @@ public class OpportunityRepository
         "value_changed_at, date_changed_at, servico_previsto, market_onestream, ramp, coluna1, otp, top10, " +
         "stage, commercial_segment, process, brand, end_user_site, chance, customer_ref, is_inter_company, " +
         "description, status_description, amount_raw, indicada, setor, movida_controle, kyc, " +
-        "crm_snapshot, perdida";
+        "crm_snapshot, perdida, bu_origem, crm_origem, moeda_origem, valor_origem, " +
+        "refname, refno, productcompany, articleno, contractno, serialno, applicationtype, designation, clientrefno";
 
     private readonly ParquetStore _store;
     private readonly object _lock = new();
@@ -101,6 +102,8 @@ public class OpportunityRepository
             Kyc = S(r, 56),
             CrmSnapshot = S(r, 57),
             Perdida = S(r, 58),
+            BuOrigem = S(r, 59), CrmOrigem = S(r, 60), MoedaOrigem = S(r, 61), ValorOrigem = S(r, 62),
+            Refname = S(r, 63), Refno = S(r, 64), Productcompany = S(r, 65), Articleno = S(r, 66), Contractno = S(r, 67), Serialno = S(r, 68), Applicationtype = S(r, 69), Designation = S(r, 70), Clientrefno = S(r, 71),
         };
 
     /// <summary>Relê UMA oportunidade direto dos Parquet, ignorando o cache.
@@ -156,6 +159,8 @@ public class OpportunityRepository
         [nameof(Opportunity.Risks)] = "Riscos", [nameof(Opportunity.Stage)] = "Etapa do funil",
         [nameof(Opportunity.Setor)] = "Setor", [nameof(Opportunity.MovidaControle)] = "Movida para o Controle",
         [nameof(Opportunity.Perdida)] = "Perdida",
+        [nameof(Opportunity.BuOrigem)] = "BU de origem", [nameof(Opportunity.CrmOrigem)] = "CRM de origem",
+        [nameof(Opportunity.MoedaOrigem)] = "Moeda de origem", [nameof(Opportunity.ValorOrigem)] = "Valor de origem",
     };
 
     // Garante o cache carregado (dentro do lock).
@@ -274,6 +279,9 @@ public class OpportunityRepository
             new("kyc", o.Kyc),
             new("crm_snapshot", o.CrmSnapshot),
             new("perdida", o.Perdida),
+            new("bu_origem", o.BuOrigem), new("crm_origem", o.CrmOrigem),
+            new("moeda_origem", o.MoedaOrigem), new("valor_origem", o.ValorOrigem),
+            new("refname", o.Refname), new("refno", o.Refno), new("productcompany", o.Productcompany), new("articleno", o.Articleno), new("contractno", o.Contractno), new("serialno", o.Serialno), new("applicationtype", o.Applicationtype), new("designation", o.Designation), new("clientrefno", o.Clientrefno),
         };
 
     public void Delete(string id)
@@ -325,5 +333,7 @@ public class OpportunityRepository
         AmountRaw = o.AmountRaw, Indicada = o.Indicada, Setor = o.Setor,
         MovidaControle = o.MovidaControle, Kyc = o.Kyc, CrmSnapshot = o.CrmSnapshot,
         Perdida = o.Perdida,
+        BuOrigem = o.BuOrigem, CrmOrigem = o.CrmOrigem, MoedaOrigem = o.MoedaOrigem, ValorOrigem = o.ValorOrigem,
+        Refname = o.Refname, Refno = o.Refno, Productcompany = o.Productcompany, Articleno = o.Articleno, Contractno = o.Contractno, Serialno = o.Serialno, Applicationtype = o.Applicationtype, Designation = o.Designation, Clientrefno = o.Clientrefno,
     };
 }

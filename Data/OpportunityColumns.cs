@@ -44,6 +44,21 @@ public static class OpportunityColumns
         new TableColumns.ColDef("otp",         "OTP",                "center"),
         new TableColumns.ColDef("top10",       "TOP 10",             "center"),
         new TableColumns.ColDef("kyc",         "KYC",                "center"),
+        // Origem intercompany (planilha do Aftermarket, colunas AE..AI)
+        new TableColumns.ColDef("buorigem",    "BU de origem"),
+        new TableColumns.ColDef("crmorigem",   "CRM de origem"),
+        new TableColumns.ColDef("moedaorigem", "Moeda de origem",    "center"),
+        new TableColumns.ColDef("valororigem", "Valor de origem",    "right"),
+        // Referência do equipamento (planilha do Aftermarket, colunas AK..AS)
+        new TableColumns.ColDef("refname",     "Refname"),
+        new TableColumns.ColDef("refno",       "Refno"),
+        new TableColumns.ColDef("productcompany","Productcompany"),
+        new TableColumns.ColDef("articleno",   "Articleno"),
+        new TableColumns.ColDef("contractno",  "Contractno"),
+        new TableColumns.ColDef("serialno",    "Serialno"),
+        new TableColumns.ColDef("applicationtype","Applicationtype"),
+        new TableColumns.ColDef("designation", "Designation"),
+        new TableColumns.ColDef("clientrefno", "Clientrefno"),
     };
 
     // Colunas ocultas por padrão (o usuário pode reexibir pelo painel "Colunas").

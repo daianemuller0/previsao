@@ -55,6 +55,21 @@ public class Opportunity
     public string MovidaControle { get; set; } = "";        // "Sim" = venda indicada → movida p/ Controle (some das Oportunidades)
     public string Kyc { get; set; } = "";                   // KYC (Know Your Customer): "Sim"/"Não"
     public string Perdida { get; set; } = "";               // "Sim" = o vendedor indicou como perdida (fica onde está, só ganha a marca)
+    // ---- Origem intercompany (planilha do Aftermarket, colunas AE..AI) ----
+    public string BuOrigem { get; set; } = "";              // BU de origem: BU_IC_FR (AF); se vazia, BU_RFQ_IC (AE)
+    public string CrmOrigem { get; set; } = "";             // CRM de origem: No_IC_FR (AG)
+    public string MoedaOrigem { get; set; } = "";           // Moeda (AH)
+    public string ValorOrigem { get; set; } = "";           // Valor (AI, Potential Value Quote), na moeda de origem
+    // ---- Referência do equipamento (planilha do Aftermarket, colunas AK..AS) ----
+    public string Refname { get; set; } = "";                   // Refname (AK)
+    public string Refno { get; set; } = "";                     // Refno (AL)
+    public string Productcompany { get; set; } = "";            // Productcompany (AM)
+    public string Articleno { get; set; } = "";                 // Articleno (AN)
+    public string Contractno { get; set; } = "";                // Contractno (AO)
+    public string Serialno { get; set; } = "";                  // Serialno (AP)
+    public string Applicationtype { get; set; } = "";           // Applicationtype (AQ)
+    public string Designation { get; set; } = "";               // Designation (AR)
+    public string Clientrefno { get; set; } = "";               // Clientrefno (AS)
 
     // Valores financeiros
     public string CurrencyCode { get; set; } = "BRL";
@@ -99,6 +114,7 @@ public class Opportunity
 
     public double AmountOriginalValue => Num(AmountOriginal);
     public double ExchangeRateValue => Num(ExchangeRate);
+    public double ValorOrigemValue => Num(ValorOrigem);
     public double GmPercentValue => Num(GmPercent);
     public double WinProbabilityValue => Num(WinProbability);
     public double CloseProbabilityValue => Num(CloseInPeriodProbability);
