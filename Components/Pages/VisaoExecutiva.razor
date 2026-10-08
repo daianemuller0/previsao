@@ -67,6 +67,7 @@
         <MultiFilter Label="País" AllText="Todos" Options="CountryOptions" Selected="_countries" OnChanged="StateHasChanged" />
         <MultiFilter Label="Produto" AllText="Todos" Options="ProductOptions" Selected="_products" OnChanged="StateHasChanged" />
         <MultiFilter Label="Cliente" AllText="Todos" Options="CustomerOptions" Selected="_customers" OnChanged="StateHasChanged" />
+        <MultiFilter Label="BU IC" AllText="Todas" EmptyText="Nenhuma oferta com BU de origem no recorte." Options="BuIcOptions" Selected="_buIcs" OnChanged="StateHasChanged" />
         <MultiFilter Label="Unidade de negócio" AllText="Todas" Options="BuOptions" Selected="_bus" OnChanged="StateHasChanged" />
         <div class="flt"><span class="flt-label">Filtrar por</span><select @bind="_valMetric"><option value="total">Valor total</option><option value="conv">Chance de conversão</option></select></div>
         <div class="flt"><span class="flt-label">Mínimo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="0" @bind="_valMin" /></div>
@@ -750,10 +751,11 @@
     private HashSet<string> _products = NewSet();
     private HashSet<string> _customers = NewSet();
     private HashSet<string> _bus = NewSet();
+    private HashSet<string> _buIcs = NewSet();       // BU IC de origem (BU de origem da planilha do AFM)
     private HashSet<string> _years = NewSet();       // anos como texto ("2026")
     private HashSet<string> _months = NewSet();      // meses por nome ("Janeiro")
     private IEnumerable<HashSet<string>> AllSets =>
-        new[] { _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months };
+        new[] { _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months, _buIcs };
 
     // ---- recorte guardado durante a sessão ---------------------------------
     // Abrir uma proposta recria esta tela do zero na volta. Sem guardar, o recorte
@@ -765,12 +767,13 @@
         HashSet<string> Products, HashSet<string> Customers, HashSet<string> Bus,
         HashSet<string> Years, HashSet<string> Months,
         string Search, bool OnlyIndicated, bool SemOtp, bool ShowMore,
-        string Currency, string ValMetric, double? ValMin, double? ValMax, bool OnlyLost, bool OnlyAltered);
+        string Currency, string ValMetric, double? ValMin, double? ValMax, bool OnlyLost, bool OnlyAltered,
+        HashSet<string>? BuIcs = null);
 
     private void GuardarFiltros() => Filtros.Guardar(Tela,
         new Recorte(_commercial, _stage, _segment, _submarket,
             _kams, _markets, _setores, _countries, _products, _customers, _bus, _years, _months,
-            _search, _onlyIndicated, _semOtp, _showMore, _currency, _valMetric, _valMin, _valMax, _onlyLost, _onlyAltered));
+            _search, _onlyIndicated, _semOtp, _showMore, _currency, _valMetric, _valMin, _valMax, _onlyLost, _onlyAltered, _buIcs));
 
     private void RestaurarFiltros()
     {
@@ -778,6 +781,7 @@
         _commercial = r.Commercial; _stage = r.Stage; _segment = r.Segment; _submarket = r.Submarket;
         _kams = r.Kams; _markets = r.Markets; _setores = r.Setores; _countries = r.Countries;
         _products = r.Products; _customers = r.Customers; _bus = r.Bus;
+        _buIcs = r.BuIcs ?? NewSet();
         _years = r.Years; _months = r.Months;
         _search = r.Search; _onlyIndicated = r.OnlyIndicated; _semOtp = r.SemOtp; _showMore = r.ShowMore;
         _onlyLost = r.OnlyLost; _onlyAltered = r.OnlyAltered;
@@ -1303,6 +1307,7 @@
     private IEnumerable<string> CountryOptions => NameOptions(KeyCountry);
     private IEnumerable<string> ProductOptions => NameOptions(KeyProduct);
     private IEnumerable<string> CustomerOptions => NameOptions(KeyCustomer);
+    private IEnumerable<string> BuIcOptions => NameOptions(o => o.BuOrigem);
     private IEnumerable<string> BuOptions => NameOptions(KeyBu);
     private IEnumerable<string> SegmentOptions => NameOptions(KeySegment);
     private IEnumerable<string> SubMarketOptions => NameOptions(KeySubMarket);
@@ -1321,6 +1326,7 @@
         if (_countries.Count > 0) q = q.Where(o => _countries.Contains(KeyCountry(o)));
         if (_products.Count > 0) q = q.Where(o => _products.Contains(KeyProduct(o)));
         if (_customers.Count > 0) q = q.Where(o => _customers.Contains(KeyCustomer(o)));
+        if (_buIcs.Count > 0) q = q.Where(o => _buIcs.Contains(o.BuOrigem));
         if (_bus.Count > 0) q = q.Where(o => _bus.Contains(KeyBu(o)));
         if (_commercial != "") q = q.Where(o => Eq(KeyCommercial(o), _commercial));
         if (_stage != "") q = q.Where(o => Eq(KeyStage(o), _stage));

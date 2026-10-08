@@ -101,6 +101,7 @@
     <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
     <MultiFilter Label="KAM" AllText="Todos" EmptyText="Nenhum vendedor nos dados." Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
     <MultiFilter Label="Categoria" AllText="Todas" Options="CategoriaOptions" Selected="_cats" OnChanged="StateHasChanged" />
+    <MultiFilter Label="BU IC" AllText="Todas" EmptyText="Nenhuma oferta com BU de origem na carteira." Options="BuIcOptions" Selected="_buIcs" OnChanged="StateHasChanged" />
     <MultiFilter Label="Risco" AllText="Todos" Options="RiscoOptions" Selected="_risks" OnChanged="StateHasChanged" />
     <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
     <label class="flt-toggle @(_onlyLost ? "on" : "")" title="Mostrar somente as oportunidades indicadas como perdidas"><input type="checkbox" @bind="_onlyLost" />@Icons.Svg("x")<span>Perdidas</span></label>
@@ -322,7 +323,8 @@
     private static HashSet<string> NewSet() => new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _cats = NewSet(), _kams = NewSet(), _markets = NewSet(),
                             _risks = NewSet(), _years = NewSet(), _months = NewSet(),
-                            _setores = NewSet();   // "NB" · "AFM" (coluna Setor)
+                            _setores = NewSet(),   // "NB" · "AFM" (coluna Setor)
+                            _buIcs = NewSet();     // BU IC de origem (BU de origem da planilha do AFM)
     private bool _onlyIndicated;
     private bool _onlyLost;                // só as indicadas como perdidas
     private bool _onlyAltered;             // só as com valor alterado no sistema (≠ CRM)
@@ -350,10 +352,12 @@
         .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
     private static IEnumerable<string> CategoriaOptions => Enum.GetValues<ForecastCategory>().Select(ForecastCategories.Label);
     private static readonly string[] SetorOptions = Opportunity.SetoresManuais;   // NB · AFM
+    private IEnumerable<string> BuIcOptions => _all.Select(o => o.BuOrigem)
+        .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase);
     private static IEnumerable<string> RiscoOptions => Enum.GetValues<RiskLevel>().Select(RiskLevels.Label);
     private string KamName(Opportunity o) => OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId));
 
-    private IEnumerable<HashSet<string>> AllSets => new[] { _cats, _kams, _markets, _risks, _years, _months, _setores };
+    private IEnumerable<HashSet<string>> AllSets => new[] { _cats, _kams, _markets, _risks, _years, _months, _setores, _buIcs };
     private int _activeFilters => (_search != "" ? 1 : 0)
         + AllSets.Count(s => s.Count > 0)
         + (_dateFrom is not null ? 1 : 0) + (_dateTo is not null ? 1 : 0)
@@ -369,10 +373,11 @@
 
     private sealed record Recorte(string Search, HashSet<string> Cats, HashSet<string> Kams,
         HashSet<string> Markets, HashSet<string> Risks, HashSet<string> Years, HashSet<string> Months,
-        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost, bool OnlyAltered, HashSet<string>? Setores = null, bool OnlyIc = false);
+        bool OnlyIndicated, DateTime? De, DateTime? Ate, bool OnlyLost, bool OnlyAltered, HashSet<string>? Setores = null, bool OnlyIc = false,
+        HashSet<string>? BuIcs = null);
 
     private void GuardarFiltros() => Filtros.Guardar(Tela,
-        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost, _onlyAltered, _setores, _onlyIc));
+        new Recorte(_search, _cats, _kams, _markets, _risks, _years, _months, _onlyIndicated, _dateFrom, _dateTo, _onlyLost, _onlyAltered, _setores, _onlyIc, _buIcs));
 
     private void RestaurarFiltros()
     {
@@ -381,6 +386,7 @@
         _cats = r.Cats; _kams = r.Kams; _markets = r.Markets;
         _risks = r.Risks; _years = r.Years; _months = r.Months;
         _setores = r.Setores ?? NewSet();
+        _buIcs = r.BuIcs ?? NewSet();
         _onlyIndicated = r.OnlyIndicated;
         _onlyLost = r.OnlyLost;
         _onlyAltered = r.OnlyAltered;
@@ -737,6 +743,7 @@
             if (_onlyIc) q = q.Where(o => !string.IsNullOrWhiteSpace(o.BuOrigem));
             if (_cats.Count > 0) q = q.Where(o => _cats.Contains(ForecastCategories.Label(o.Category)));
             if (_setores.Count > 0) q = q.Where(o => _setores.Contains(o.SetorEfetivo));
+            if (_buIcs.Count > 0) q = q.Where(o => _buIcs.Contains(o.BuOrigem));
             if (_kams.Count > 0) q = q.Where(o => _kams.Contains(KamName(o)));
             if (_markets.Count > 0) q = q.Where(o => _markets.Contains(Cat.MarketName(o.MarketId)));
             if (_risks.Count > 0) q = q.Where(o => _risks.Contains(RiskLevels.Label(ForecastCalc.Level(o, _today))));
