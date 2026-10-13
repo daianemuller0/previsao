@@ -202,30 +202,26 @@ public sealed class DataSyncService
                     // presença numa. Essa é a garantia de que o trabalho feito do
                     // zero no sistema não é apagado por sincronização.
                     //
-                    // A única trava que sobra é contra arquivo quebrado: se a
-                    // planilha veio com bem menos linhas do que a base tem
-                    // (truncada, exportação pela metade, mudança de layout), NÃO
-                    // apaga nada nesta rodada — linha a mais é ruído, linha a
-                    // menos é perda.
+                    // Não há trava por tamanho da planilha. Já houve uma ("veio com
+                    // menos de 75% das linhas da base, não apaga nada"), e ela
+                    // virou armadilha: a exportação do CRM é filtrada por período,
+                    // então quando o recorte encolheu de vez, toda leitura passou
+                    // a ser "curta" e as oportunidades fechadas nunca mais saíam.
+                    // A regra agora é a que a área pediu: não está na planilha,
+                    // sai do sistema. A única exceção é a planilha vir VAZIA
+                    // (nenhuma linha reconhecida), tratada antes deste bloco.
                     //
                     // Nada some de verdade: a baixa grava uma marca e os arquivos
                     // anteriores ficam 30 dias no histórico da pasta de dados.
                     var sumiram = existing.Where(kv => !newIds.Contains(kv.Key)).Select(kv => kv.Value).ToList();
-                    var leituraCurta = existing.Count > 0 && result.Rows.Count < existing.Count * 0.75;
-
-                    if (leituraCurta)
+                    foreach (var o in sumiram)
                     {
-                        st.Kept = sumiram.Count;
-                        st.ShortRead = true;
+                        _repo.Delete(o.Id);
+                        st.Removed++;
                     }
-                    else
-                    {
-                        foreach (var o in sumiram)
-                        {
-                            _repo.Delete(o.Id);
-                            st.Removed++;
-                        }
-                    }
+                    if (sumiram.Count > 0)
+                        st.Baixadas = sumiram.Select(o => string.IsNullOrWhiteSpace(o.ProposalNumber) ? o.Name : o.ProposalNumber)
+                                             .Where(x => !string.IsNullOrWhiteSpace(x)).Take(30).ToList();
                     _repo.Refresh();
                     st.Carteira = AplicarCarteiras();
                 }
@@ -238,10 +234,7 @@ public sealed class DataSyncService
                 st.Ok = true;
                 st.Message = result.Rows.Count > 0
                     ? $"{result.Rows.Count} oportunidade(s) de {p.Label} sincronizada(s)."
-                      + (st.Removed > 0 ? $" {st.Removed} saíram da planilha e foram baixadas." : "")
-                      + (st.Kept > 0 && st.ShortRead
-                          ? $" ATENÇÃO: a planilha veio com bem menos linhas que a base — {st.Kept} oportunidade(s) foram MANTIDAS por segurança. Confira a exportação do CRM."
-                          : "")
+                      + (st.Removed > 0 ? $" {st.Removed} saíram da planilha e foram baixadas{(st.Baixadas.Count > 0 ? ": " + string.Join(", ", st.Baixadas) + (st.Removed > st.Baixadas.Count ? "…" : "") : "")}." : "")
                       + (st.Carteira > 0 ? $" {st.Carteira} passaram para o vendedor dono do market." : "")
                     : "Planilha lida, mas nenhuma oportunidade reconhecida — confira o cabeçalho das colunas.";
                 return Finish(st);
@@ -419,11 +412,8 @@ public sealed class DataSyncStatus
     public int Warnings { get; set; }
     /// <summary>Linhas que sumiram da planilha e foram baixadas.</summary>
     public int Removed { get; set; }
-    /// <summary>Linhas que sumiram da planilha mas foram MANTIDAS porque a
-    /// leitura veio curta demais (única trava que sobrou).</summary>
-    public int Kept { get; set; }
-    /// <summary>A planilha veio com bem menos linhas que a base — nada foi apagado.</summary>
-    public bool ShortRead { get; set; }
+    /// <summary>Propostas baixadas nesta rodada (até 30), para conferência em Configurações.</summary>
+    public List<string> Baixadas { get; set; } = new();
     /// <summary>Linhas que passaram para o vendedor dono do market (carteira por market).</summary>
     public int Carteira { get; set; }
     public List<string> Currencies { get; set; } = new();
