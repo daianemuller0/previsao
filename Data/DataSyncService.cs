@@ -141,14 +141,10 @@ public sealed class DataSyncService
                     return Finish(st);
                 }
 
-                // Copia para memória permitindo leitura mesmo com o CRM gravando.
-                byte[] bytes;
-                using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var buf = new MemoryStream())
-                {
-                    fs.CopyTo(buf);
-                    bytes = buf.ToArray();
-                }
+                // Copia para memória sem atrapalhar a macro que exporta: só leitura,
+                // compartilhando até a exclusão, e cede a vez se o arquivo estiver
+                // sendo gravado naquele instante (ver LeituraSegura).
+                var bytes = LeituraSegura.Bytes(file);
 
                 // Conversão de moeda só no Aftermarket (snapshot das taxas: 1 leitura).
                 var currencies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

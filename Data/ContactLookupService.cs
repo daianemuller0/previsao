@@ -152,7 +152,8 @@ public class ContactLookupService
     {
         try
         {
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            // Cópia em memória: o arquivo de proposta fica livre para quem o edita.
+            using var fs = new MemoryStream(LeituraSegura.Bytes(path));
             using var wb = new XLWorkbook(fs);
             var (n, e) = reader(wb);
             n = (n ?? "").Trim();
