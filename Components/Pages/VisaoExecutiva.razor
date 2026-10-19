@@ -21,8 +21,6 @@
         <p class="subtitle">
             @Fmt.MonthLong(_month) de @_year · @(_quarter)º trimestre · Howden Brasil · @_currency<br />
             Última consolidação @_updated.ToString("dd/MM/yyyy 'às' HH:mm")
-            &nbsp;·&nbsp; <span class="badge @DqCss">Qualidade dos dados @_dq%</span>
-            &nbsp; <span class="badge @ConfCss">Confiança da previsão @_confidence%</span>
         </p>
     </div>
     <div class="page-actions">
@@ -873,8 +871,6 @@
     private double Rate => Cat.RateToUsd("USD");
     private double Cv(double usd) => _currency == "BRL" ? usd * Rate : usd;
     private string Money(double usd) => _sym + " " + Fmt.Compact(Cv(usd));
-    private string DqCss => _dq >= 85 ? "st-pos" : _dq >= 70 ? "st-warn" : "st-neg";
-    private string ConfCss => _confidence >= 85 ? "st-pos" : _confidence >= 70 ? "st-warn" : "st-neg";
     private static string Clamp(double v) => Math.Clamp(v, 3, 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
     private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
 

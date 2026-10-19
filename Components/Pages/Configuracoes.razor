@@ -5,6 +5,7 @@
 @inject DataSyncService Sync
 @inject ControleRepository Controle
 @inject IConfiguration Cfg
+@inject OpportunityRepository Opps
 
 @* ===========================================================================
    Configurações de importação — De-Para das colunas das duas origens de dados
@@ -23,6 +24,19 @@
             O valor final usado em todo o sistema é o <strong>Amount (converted)</strong>, sempre em R$.
         </p>
     </div>
+</div>
+
+@* ---- Saúde da previsão: saiu do cabeçalho da Visão Executiva ---- *@
+<div class="section-head"><span class="st-title">Qualidade dos dados e confiança da previsão</span><span class="st-sub">sobre as @_saude.Abertas oportunidades abertas</span><span class="st-line"></span></div>
+<div class="panel" style="margin-bottom:12px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span class="badge @SaudeDaPrevisao.Css(_saude.Qualidade)">Qualidade dos dados @_saude.Qualidade%</span>
+        <span class="badge @SaudeDaPrevisao.Css(_saude.Confianca)">Confiança da previsão @_saude.Confianca%</span>
+    </div>
+    <p class="cfg-foot" style="margin-top:10px">
+        <strong>Qualidade dos dados</strong>: média, nas oportunidades abertas, de oito itens de cadastro (cliente, produto, data, valor, % de ganho, próxima ação, atualização nos últimos 21 dias e etapa).
+        <strong>Confiança da previsão</strong>: média entre a precisão (@_saude.Precisao%, diferença entre o % do vendedor e o do gestor) e a disciplina de atualização (@_saude.Disciplina%, oportunidades atualizadas nos últimos 21 dias).
+    </p>
 </div>
 
 @* ---- As duas origens ---- *@
@@ -234,12 +248,14 @@
     private DataSyncStatus _nb = new();
     private DataSyncStatus _afm = new();
     private List<CurrencyRate> _rates = new();
+    private SaudeDaPrevisao.Resultado _saude = new(0, 0, 0, 0, 0);
 
     protected override void OnInitialized()
     {
         _nb = Sync.LastNb;
         _afm = Sync.LastAfm;
         _rates = Controle.CurrencyRates();
+        _saude = SaudeDaPrevisao.Calcular(Opps.All().Where(o => !o.MovidaControleValue), DateTime.Today);
     }
 
     private Task SincronizarNb() => Sincronizar(() => Sync.SyncNb());

@@ -64,7 +64,7 @@ public sealed class DataSyncService
     // v8: carteira do Elmer repartida por market (Oil → Bruno). Subir a versão
     // força a reimportação na próxima abertura, para a regra pegar o que já
     // está na base sem esperar planilha nova.
-    private const string ImportVersion = "v10";  // v10: colunas de origem IC (AE..AI) e referência do equipamento (AK..AS) do AFM
+    private const string ImportVersion = "v11";  // v11: Edson Geraldini → Edson Luis Geraldini
 
     private string? MarcaGravada(string prefix)
     {
@@ -141,14 +141,10 @@ public sealed class DataSyncService
                     return Finish(st);
                 }
 
-                // Copia para memória permitindo leitura mesmo com o CRM gravando.
-                byte[] bytes;
-                using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var buf = new MemoryStream())
-                {
-                    fs.CopyTo(buf);
-                    bytes = buf.ToArray();
-                }
+                // Copia para memória sem atrapalhar a macro que exporta: só leitura,
+                // compartilhando até a exclusão, e cede a vez se o arquivo estiver
+                // sendo gravado naquele instante (ver LeituraSegura).
+                var bytes = LeituraSegura.Bytes(file);
 
                 // Conversão de moeda só no Aftermarket (snapshot das taxas: 1 leitura).
                 var currencies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

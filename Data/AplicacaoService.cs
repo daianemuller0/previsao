@@ -200,6 +200,7 @@ public sealed class AplicacaoService
         ("Andre Luis de Carvalho",  "Andre Carvalho"),
         ("Bruno Castro",            "Bruno Castro"),
         ("Elmer Calle Chumacero",   "Elmer Calle Chumacero"),
+        ("Edson Geraldini",         "Edson Luis Geraldini"),
         ("Emerson Barbosa",         "Emerson Barbosa"),
         ("José Ovidio de Moura",    "Jose Moura"),
         ("Leonardo Macachero",      "Leonardo Macachero"),
@@ -512,11 +513,8 @@ public sealed class AplicacaoService
     {
         try
         {
-            // Cópia em memória: a planilha pode estar aberta no Excel de alguém.
-            using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            using var ms = new MemoryStream();
-            fs.CopyTo(ms);
-            ms.Position = 0;
+            // Cópia em memória, sem atrapalhar quem grava (ver LeituraSegura).
+            using var ms = new MemoryStream(LeituraSegura.Bytes(file));
             // Linhas vazias mantidas: o cabeçalho é informado pelo número da linha.
             var grade = OpportunityImporter.LerGrade(Path.GetFileName(file), ms, manterLinhasVazias: true);
             if (grade.Count == 0)
