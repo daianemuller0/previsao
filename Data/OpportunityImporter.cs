@@ -616,6 +616,7 @@ public sealed class OpportunityImporter
         ("Andre Luis de Carvalho", "Andre Carvalho"),
         ("Jose Ovidio de Moura",   "Jose Moura"),
         ("Leonardo Machachero",    "Leonardo Macachero"),
+        ("Edson Geraldini",        "Edson Luis Geraldini"),   // preferência dele
         ("Paulo Sergio Agostinho", "Paulo Agostinho"),
         ("Rafael Ribeiro Toledo",  "Rafael Toledo"),
         ("Thiago Cesar Veiga",     "Thiago Veiga"),

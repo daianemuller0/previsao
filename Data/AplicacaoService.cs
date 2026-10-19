@@ -200,6 +200,7 @@ public sealed class AplicacaoService
         ("Andre Luis de Carvalho",  "Andre Carvalho"),
         ("Bruno Castro",            "Bruno Castro"),
         ("Elmer Calle Chumacero",   "Elmer Calle Chumacero"),
+        ("Edson Geraldini",         "Edson Luis Geraldini"),
         ("Emerson Barbosa",         "Emerson Barbosa"),
         ("José Ovidio de Moura",    "Jose Moura"),
         ("Leonardo Macachero",      "Leonardo Macachero"),
