@@ -17,11 +17,12 @@ public sealed class AtualizacaoAgendada : BackgroundService
 
     private readonly DataSyncService _sync;
     private readonly OpportunityRepository _repo;
+    private readonly ConversaoService _conversao;
     private readonly ILogger<AtualizacaoAgendada> _log;
 
-    public AtualizacaoAgendada(DataSyncService sync, OpportunityRepository repo, ILogger<AtualizacaoAgendada> log)
+    public AtualizacaoAgendada(DataSyncService sync, OpportunityRepository repo, ConversaoService conversao, ILogger<AtualizacaoAgendada> log)
     {
-        _sync = sync; _repo = repo; _log = log;
+        _sync = sync; _repo = repo; _conversao = conversao; _log = log;
     }
 
     /// <summary>Próximo 08:00 ou 13:00 depois de "agora" (amanhã, se já passaram).</summary>
@@ -47,6 +48,7 @@ public sealed class AtualizacaoAgendada : BackgroundService
             {
                 _sync.SyncAll();
                 _repo.Refresh();
+                _conversao.Carregar(false);      // planilha de Conversão: só relê se o arquivo mudou
                 _log.LogInformation("Atualização automática das {Hora:HH:mm}: {Nb} · {Afm}",
                     alvo, _sync.LastNb.Message, _sync.LastAfm.Message);
             }

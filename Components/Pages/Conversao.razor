@@ -1,0 +1,913 @@
+@page "/conversao"
+@attribute [Authorize(Roles = "admin,diretor")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject ConversaoService Conv
+@inject CambioAnualRepository Cambio
+@inject ColumnPrefsRepository ColPrefs
+@inject IJSRuntime JS
+@using System.Text
+
+@* ===========================================================================
+   Conversão de propostas · dashboard executivo + base de propostas.
+   UMA fonte de números: Recalcular() monta _itens (planilha + câmbio do ano) e
+   _f (itens depois dos filtros globais). Cards, gráficos, rankings e a tabela
+   da Base leem _f e Somar() — nenhuma aba tem conta própria.
+   =========================================================================== *@
+
+@{ Recalcular(); }
+
+<div class="breadcrumbs"><span>Executivo</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Conversão</span></div>
+
+<div class="page-head">
+    <div>
+        <h1>Conversão de Propostas</h1>
+        <p class="subtitle">
+            Ganhas, perdidas e abertas · mês e ano pela data de envio da proposta · valores em R$ pela taxa de câmbio do ano da proposta<br />
+            @if (Conv.AtualizadoEm is { } quando)
+            {
+                <span>Atualizado em @quando.ToString("dd/MM/yyyy 'às' HH:mm") · @Conv.Atual.Propostas.Count.ToString("N0", _pt) registros</span>
+                @if (!Conv.Ok) { <span style="color:var(--neg)"> · @Conv.Mensagem</span> }
+            }
+            else { <span>@Conv.Mensagem</span> }
+        </p>
+    </div>
+    <div class="page-actions">
+        @if (_isAdmin)
+        {
+            <button class="btn-ghost" title="Taxa USD/BRL de cada ano" @onclick="AbrirTaxas">@Icons.Svg("layers")Taxas de câmbio</button>
+        }
+        <button class="btn-ghost" title="Reler a planilha agora" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab @(_aba == "dash" ? "active" : "")" @onclick='() => _aba = "dash"'>Dashboard de Conversão</button>
+    <button class="tab @(_aba == "base" ? "active" : "")" @onclick='() => _aba = "base"'>Base de Propostas @if (_temDados) { <span class="tab-badge">@_f.Count.ToString("N0", _pt)</span> }</button>
+</div>
+
+@if (_carregando && !_temDados)
+{
+    <div class="info-banner">Lendo a planilha de propostas…</div>
+}
+else if (!_temDados)
+{
+    <div class="panel"><div class="empty" style="padding:28px 12px">@Conv.Mensagem</div></div>
+}
+else
+{
+    @* ---- filtros globais (valem para as duas abas) ---- *@
+    <div class="filterbar filterbar-sticky">
+        <MultiFilter Label="Ano" AllText="Todos" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Mês" AllText="Todos" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
+        <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
+        <MultiFilter Label="BU" AllText="Todas" Options="OpBus" Selected="_bus" OnChanged="StateHasChanged" />
+        <MultiFilter Label="BU Intercompany" AllText="Todas" Options="OpBuIcs" Selected="_buIcs" OnChanged="StateHasChanged" />
+        <div class="filterbar-spacer"></div>
+        @if (Ativos > 0)
+        {
+            <span class="tag">@Ativos filtro(s) ativo(s)</span>
+            <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
+        }
+    </div>
+    @if (Ativos > 0)
+    {
+        <div class="cv-chips">
+            @foreach (var (rot, set) in ConjuntosAtivos())
+            {
+                <span class="cv-chip"><b>@rot</b> @string.Join(", ", set.Take(4))@(set.Count > 4 ? $" +{set.Count - 4}" : "")</span>
+            }
+        </div>
+    }
+
+    @* ---- avisos que afetam números ---- *@
+    @if (_r.SemTaxa > 0)
+    {
+        <div class="cv-alert">
+            <strong>@_r.SemTaxa.ToString("N0", _pt) proposta(s) (@Fmt.Usd(_r.UsdSemTaxa)) sem taxa de câmbio</strong> para @string.Join(", ", AnosSemTaxa()).
+            Esses valores <strong>não entram</strong> nos totais em R$ — as quantidades continuam completas.
+            @if (_isAdmin) { <span> Cadastre em <a href="javascript:void(0)" @onclick="AbrirTaxas">Taxas de câmbio</a>.</span> }
+            else { <span> Peça ao administrador para cadastrar a taxa.</span> }
+        </div>
+    }
+    @if (_r.NC > 0)
+    {
+        <div class="cv-alert warn">
+            <strong>@_r.NC.ToString("N0", _pt) proposta(s) com status não classificado</strong> — ficam fora de ganhas, perdidas e abertas e das taxas de ganho. Veja o detalhe no fim do dashboard.
+        </div>
+    }
+
+    @if (_aba == "dash") { @Dashboard() } else { @Base() }
+}
+
+@* ---- taxas de câmbio (administrador) ---- *@
+@if (_taxasAberto)
+{
+    <div class="drawer-backdrop" @onclick="() => _taxasAberto = false"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">Taxas de câmbio</h2>
+                <p class="subtitle">USD/BRL de cada ano · usada nas propostas enviadas naquele ano</p>
+            </div>
+            <button class="icon-btn" @onclick="() => _taxasAberto = false">@Icons.Svg("x")</button>
+        </div>
+        <p class="muted" style="font-size:12px">Valor em R$ = valor em US$ × taxa do ano da data de envio. Sem taxa cadastrada, a proposta <strong>não é convertida</strong> (e a tela avisa). As taxas ficam guardadas e não precisam ser digitadas de novo.</p>
+        <table class="grid-tbl tbl-compact">
+            <thead><tr><th>Ano</th><th class="right">Taxa USD/BRL</th><th>Situação</th></tr></thead>
+            <tbody>
+                @foreach (var ano in _taxasAnos)
+                {
+                    var a = ano;
+                    <tr>
+                        <td class="col-strong">@a</td>
+                        <td class="right"><input class="field num" style="max-width:120px;text-align:right" placeholder="ex.: 5,2000" value="@_taxasTxt.GetValueOrDefault(a, "")" @onchange="e => SetTaxa(a, e)" /></td>
+                        <td class="muted" style="font-size:12px">@(Cambio.Taxa(a) is { } t ? $"salva: {t.ToString("0.0000", _pt)}" : "sem taxa")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+            <input class="field num" style="max-width:110px" placeholder="novo ano" @bind="_novoAno" />
+            <button class="btn-ghost sm" @onclick="AdicionarAno">Adicionar ano</button>
+        </div>
+        @if (_taxasErro != "") { <div class="confirm-err">@_taxasErro</div> }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _taxasAberto = false">Cancelar</button>
+            <button class="btn-primary" @onclick="SalvarTaxas">@Icons.Svg("check")Salvar taxas</button>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private const string CorG = "#1f9254", CorP = "#c0392b", CorA = "#1b5fa9", CorN = "#94a3b8";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private bool _isAdmin, _carregando;
+    private string _login = "", _user = "—";
+    private string _aba = "dash";
+    private bool _temDados => Conv.Atual.Propostas.Count > 0;
+
+    // ---- filtros globais ----
+    private static HashSet<string> Novo() => new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _anos = Novo(), _meses = Novo(), _vend = Novo(), _bus = Novo(), _buIcs = Novo();
+    private int Ativos => new[] { _anos, _meses, _vend, _bus, _buIcs }.Count(s => s.Count > 0);
+    private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
+        new[] { ("Ano", _anos), ("Mês", _meses), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs) }.Where(x => x.Item2.Count > 0);
+    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _pag = 0; }
+
+    // ---- modelo calculado: UMA vez por renderização ----
+    private sealed record Item(PropostaConv P, int? Ano, int? Mes, double? Taxa, double? Brl);
+
+    private sealed class Resumo
+    {
+        public int Total, G, P, A, NC, SemTaxa, SemValor;
+        public double VG, VP, VA, VNC, UsdSemTaxa;
+        public int Decididas => G + P;
+        public double VTotal => VG + VP + VA + VNC;
+        public double? TaxaQtd => Decididas > 0 ? (double)G / Decididas * 100 : null;
+        public double? TaxaValor => (VG + VP) > 0 ? VG / (VG + VP) * 100 : null;
+    }
+
+    private List<Item> _itens = new();
+    private List<Item> _f = new();
+    private Resumo _r = new();
+    private Resumo? _prev;
+    private (int, int) _chave = (-1, -1);
+
+    private void Recalcular()
+    {
+        var chave = (Conv.Version, Cambio.Version);
+        if (chave != _chave) { Reconstruir(); _chave = chave; }
+        _f = Aplicar().ToList();
+        _r = Somar(_f);
+        _prev = null;
+        // Comparação com o período anterior: só quando há UM ano escolhido — mesmos meses e filtros, ano anterior.
+        if (_anos.Count == 1 && int.TryParse(_anos.First(), out var a))
+            _prev = Somar(Aplicar("ano").Where(i => i.Ano == a - 1));
+    }
+
+    private void Reconstruir()
+    {
+        var taxas = Cambio.Todas();
+        _itens = Conv.Atual.Propostas.Select(p =>
+        {
+            int? ano = p.Data?.Year, mes = p.Data?.Month;
+            double? tx = ano is { } y && taxas.TryGetValue(y, out var t) ? t : null;
+            double? brl = p.ValorUsd is { } v && tx is { } t2 ? v * t2 : null;
+            return new Item(p, ano, mes, tx, brl);
+        }).ToList();
+    }
+
+    private static string AnoTxt(Item i) => i.Ano?.ToString() ?? "Sem data";
+
+    private IEnumerable<Item> Aplicar(string? exceto = null)
+    {
+        IEnumerable<Item> q = _itens;
+        if (exceto != "ano" && _anos.Count > 0) q = q.Where(i => _anos.Contains(AnoTxt(i)));
+        if (exceto != "mes" && _meses.Count > 0) q = q.Where(i => i.Mes is { } m && _meses.Contains(Fmt.MonthLong(m)));
+        if (exceto != "vend" && _vend.Count > 0) q = q.Where(i => _vend.Contains(i.P.Vendedor));
+        if (exceto != "bu" && _bus.Count > 0) q = q.Where(i => _bus.Contains(i.P.Bu));
+        if (exceto != "buic" && _buIcs.Count > 0) q = q.Where(i => _buIcs.Contains(i.P.BuIc));
+        return q;
+    }
+
+    private static Resumo Somar(IEnumerable<Item> itens)
+    {
+        var r = new Resumo();
+        foreach (var i in itens)
+        {
+            r.Total++;
+            var tem = i.Brl is not null; var b = i.Brl ?? 0;
+            switch (i.P.Classe)
+            {
+                case ClasseProposta.Ganha: r.G++; if (tem) r.VG += b; break;
+                case ClasseProposta.Perdida: r.P++; if (tem) r.VP += b; break;
+                case ClasseProposta.Aberta: r.A++; if (tem) r.VA += b; break;
+                default: r.NC++; if (tem) r.VNC += b; break;
+            }
+            if (i.P.ValorUsd is null) r.SemValor++;
+            else if (i.Brl is null) { r.SemTaxa++; r.UsdSemTaxa += i.P.ValorUsd.Value; }
+        }
+        return r;
+    }
+
+    private List<(string Nome, Resumo R)> Grupos(Func<Item, string> chave) =>
+        _f.GroupBy(chave, StringComparer.OrdinalIgnoreCase)
+          .Select(g => (Nome: g.Key, R: Somar(g)))
+          .OrderByDescending(x => x.R.VTotal).ThenByDescending(x => x.R.Total).ToList();
+
+    // opções em cascata: cada filtro mostra só o que existe com os OUTROS filtros aplicados
+    private IEnumerable<string> OpAnos => Aplicar("ano").Select(AnoTxt).Distinct().OrderByDescending(x => x == "Sem data" ? "0" : x);
+    private IEnumerable<string> OpMeses => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
+    private IEnumerable<string> OpVendedores => Aplicar("vend").Select(i => i.P.Vendedor).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> OpBus => Aplicar("bu").Select(i => i.P.Bu).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> OpBuIcs => Aplicar("buic").Select(i => i.P.BuIc).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+
+    private IEnumerable<string> AnosSemTaxa() =>
+        _f.Where(i => i.P.ValorUsd is not null && i.Brl is null).Select(AnoTxt).Distinct().OrderBy(x => x);
+
+    // ---- ciclo de vida ----
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var u = (await AuthState).User;
+            _isAdmin = u.IsInRole("admin");
+            _user = u.Identity?.Name ?? "—";
+            _login = u.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? _user;
+        }
+        _carregando = true;
+        try { await Task.Run(() => Conv.Carregar(false)); } finally { _carregando = false; }
+        if (_temDados) CarregarOcultas();
+    }
+
+    private async Task Atualizar()
+    {
+        if (_carregando) return;
+        _carregando = true;
+        try { await Task.Run(() => Conv.Carregar(true)); } finally { _carregando = false; }
+    }
+
+    private static string R(double v) => "R$ " + Fmt.Compact(v);
+    private static string P1(double v) => Fmt.Pct(v, 1);
+    private static string PctDe(double parte, double todo) => todo > 0 ? Fmt.Pct(parte / todo * 100, 1) : "—";
+    private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+    private static string F(double v) => v.ToString("0.##", Inv);
+    private static double? Delta(double atual, double? anterior) => anterior is > 0 ? (atual - anterior.Value) / anterior.Value * 100 : null;
+
+    // ======================================================================
+    //  ABA 1 · DASHBOARD
+    // ======================================================================
+    private RenderFragment Dashboard() => @<div>
+        @if (_f.Count == 0)
+        {
+            <div class="panel"><div class="empty" style="padding:30px 12px">Nenhuma proposta com os filtros atuais. <button class="btn-link" @onclick="Limpar">Limpar filtros</button></div></div>
+        }
+        else
+        {
+            @* ---- KPIs ---- *@
+            <div class="exec-grid cols-3 cv-kpis">
+                <StatCard Label="Total de propostas" Value="@_r.Total.ToString("N0", _pt)" AccentLeft="true" Context="@(Descricao())"
+                          Delta="@Delta(_r.Total, _prev?.Total)" Info="@InfoTotal()" />
+                <StatCard Label="Propostas ganhas" Value="@_r.G.ToString("N0", _pt)" AccentLeft="true" Context="@($"{PctDe(_r.G, _r.Total)} do total")"
+                          Delta="@Delta(_r.G, _prev?.G)">
+                    <div class="cv-mini"><i style="width:@F(Largura(_r.G, _r.Total))%;background:@CorG"></i></div>
+                </StatCard>
+                <StatCard Label="Propostas perdidas" Value="@_r.P.ToString("N0", _pt)" AccentLeft="true" Context="@($"{PctDe(_r.P, _r.Total)} do total")"
+                          Delta="@Delta(_r.P, _prev?.P)">
+                    <div class="cv-mini"><i style="width:@F(Largura(_r.P, _r.Total))%;background:@CorP"></i></div>
+                </StatCard>
+                <StatCard Label="Propostas abertas" Value="@_r.A.ToString("N0", _pt)" AccentLeft="true" Context="@($"{PctDe(_r.A, _r.Total)} do total")"
+                          Delta="@Delta(_r.A, _prev?.A)">
+                    <div class="cv-mini"><i style="width:@F(Largura(_r.A, _r.Total))%;background:@CorA"></i></div>
+                </StatCard>
+                <StatCard Label="Valor total em propostas" Value="@R(_r.VTotal)" AccentLeft="true"
+                          Context="@(_r.NC > 0 && _r.VNC > 0 ? $"inclui {R(_r.VNC)} não classificados" : "soma em R$ das propostas convertidas")"
+                          Info="@($"{Fmt.Brl(_r.VTotal)}")" Delta="@Delta(_r.VTotal, _prev?.VTotal)" />
+                <StatCard Label="Valor convertido em vendas" Value="@R(_r.VG)" AccentLeft="true"
+                          Context="@(_r.TaxaValor is { } tv ? $"{P1(tv)} de taxa de ganho por valor" : "sem propostas decididas")"
+                          Info="@($"{Fmt.Brl(_r.VG)}")" Delta="@Delta(_r.VG, _prev?.VG)" />
+            </div>
+
+            @* ---- quantidade × valor ---- *@
+            <div class="g12">
+                <div class="c6"><div class="panel">
+                    <div class="panel-head"><div class="panel-title">Conversão por quantidade <span class="hint">ganhas · perdidas · abertas</span></div><TelaCheia /></div>
+                    @Donut()
+                </div></div>
+                <div class="c6"><div class="panel">
+                    <div class="panel-head"><div class="panel-title">Conversão por valor <span class="hint">R$ por categoria · passe o mouse para o valor completo</span></div><TelaCheia /></div>
+                    @BarrasValor()
+                </div></div>
+            </div>
+
+            @* ---- evolução ---- *@
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Evolução mensal <span class="hint">por mês de ENVIO da proposta, com o status atual — não é a data de fechamento</span></div>
+                    <div class="segmented">
+                        <button class="@(_metMes == "qtd" ? "active" : "")" @onclick='() => _metMes = "qtd"'>Quantidade</button>
+                        <button class="@(_metMes == "valor" ? "active" : "")" @onclick='() => _metMes = "valor"'>Valor (R$)</button>
+                    </div>
+                    <TelaCheia />
+                </div>
+                @Mensal()
+            </div>
+
+            @* ---- vendedores ---- *@
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Conversão por vendedor <span class="hint">taxas só sobre propostas decididas (ganhas + perdidas)</span></div>
+                    <div class="segmented">
+                        <button class="@(_ordVend == "valor" ? "active" : "")" @onclick='() => _ordVend = "valor"'>Valor ganho</button>
+                        <button class="@(_ordVend == "qtd" ? "active" : "")" @onclick='() => _ordVend = "qtd"'>Qtd. ganha</button>
+                        <button class="@(_ordVend == "taxa" ? "active" : "")" @onclick='() => _ordVend = "taxa"'>Taxa de ganho</button>
+                    </div>
+                    <TelaCheia />
+                </div>
+                @Vendedores()
+            </div>
+
+            @* ---- BU e BU intercompany ---- *@
+            <div class="panel">
+                <div class="panel-head"><div class="panel-title">Conversão por BU <span class="hint">coluna V · barra = composição do valor</span></div><TelaCheia /></div>
+                @TabelaGrupo(Grupos(i => i.P.Bu))
+            </div>
+            <div class="panel">
+                <div class="panel-head"><div class="panel-title">Conversão por BU Intercompany <span class="hint">AG; se vazia, AF · independente da BU acima</span></div><TelaCheia /></div>
+                @TabelaGrupo(Grupos(i => i.P.BuIc))
+            </div>
+
+            @* ---- perdas ---- *@
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Status das propostas perdidas <span class="hint">onde mais perdemos e o impacto financeiro</span></div>
+                    <div class="segmented">
+                        <button class="@(_metPerda == "qtd" ? "active" : "")" @onclick='() => _metPerda = "qtd"'>Quantidade</button>
+                        <button class="@(_metPerda == "valor" ? "active" : "")" @onclick='() => _metPerda = "valor"'>Valor (R$)</button>
+                    </div>
+                    <TelaCheia />
+                </div>
+                @Perdas()
+            </div>
+
+            @if (_r.NC > 0)
+            {
+                <div class="panel">
+                    <div class="panel-head"><div class="panel-title">Status não classificados <span class="hint">revisão — fora de ganhas, perdidas e abertas</span></div></div>
+                    <table class="grid-tbl tbl-compact">
+                        <thead><tr><th>Status na planilha</th><th class="right">Propostas</th><th class="right">Valor (R$)</th></tr></thead>
+                        <tbody>
+                            @foreach (var nc in StatusNaoClassificados())
+                            {
+                                <tr><td class="col-strong">@nc.Nome</td><td class="right num">@nc.Qtd.ToString("N0", _pt)</td><td class="right num" title="@Fmt.Brl(nc.Valor)">@R(nc.Valor)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @Verificacoes()
+        }
+    </div>;
+
+    private string InfoTotal() => _prev is null
+        ? "Quantidade de propostas no recorte"
+        : $"Variação sobre {int.Parse(_anos.First()) - 1}: mesmos filtros e meses";
+
+    private void SetTaxa(int ano, ChangeEventArgs e) => _taxasTxt[ano] = e.Value?.ToString() ?? "";
+    private void Buscar(ChangeEventArgs e) { _busca = e.Value?.ToString() ?? ""; _pag = 0; }
+
+    private string Descricao() => _prev is null ? "no recorte selecionado" : $"vs. {int.Parse(_anos.First()) - 1}";
+    private List<(string Nome, int Qtd, double Valor)> StatusNaoClassificados() =>
+        _f.Where(i => i.P.Classe == ClasseProposta.NaoClassificada)
+          .GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal))
+          .Select(x => (Nome: x.First().P.StatusOriginal == "" ? "(vazio)" : x.First().P.StatusOriginal, Qtd: x.Count(), Valor: x.Sum(i => i.Brl ?? 0)))
+          .OrderByDescending(x => x.Qtd).ToList();
+
+    private static double Largura(double parte, double todo) => todo > 0 ? parte / todo * 100 : 0;
+
+    // ---- gráfico 1: rosca ----
+    private RenderFragment Donut() => builder =>
+    {
+        var fatias = new List<(string Nome, int Qtd, string Cor)> { ("Ganhas", _r.G, CorG), ("Perdidas", _r.P, CorP), ("Abertas", _r.A, CorA) };
+        if (_r.NC > 0) fatias.Add(("Não classificadas", _r.NC, CorN));
+        double total = Math.Max(_r.Total, 1), raio = 51, C = 2 * Math.PI * raio, acum = 0;
+        var sb = new StringBuilder("<div class='donut-wrap cv-donut'>");
+        sb.Append("<svg viewBox='0 0 128 128' class='donut-svg' role='img' aria-label='Conversão por quantidade'>");
+        sb.Append($"<circle cx='64' cy='64' r='{F(raio)}' fill='none' stroke='#eef2f7' stroke-width='15'/>");
+        foreach (var f in fatias)
+        {
+            if (f.Qtd == 0) continue;
+            var len = f.Qtd / total * C;
+            sb.Append($"<circle class='cv-arc' cx='64' cy='64' r='{F(raio)}' fill='none' stroke='{f.Cor}' stroke-width='15' stroke-dasharray='{F(len)} {F(C - len)}' stroke-dashoffset='{F(C / 4 - acum)}'><title>{Esc(f.Nome)}: {f.Qtd.ToString("N0", _pt)} ({Esc(PctDe(f.Qtd, _r.Total))})</title></circle>");
+            acum += len;
+        }
+        sb.Append($"<text x='64' y='63' text-anchor='middle' font-size='21' font-weight='800' fill='#12304f'>{Esc(_r.Total.ToString("N0", _pt))}</text>");
+        sb.Append("<text x='64' y='78' text-anchor='middle' font-size='9' fill='#6b7a90'>propostas</text></svg>");
+        sb.Append("<ul class='donut-legend'>");
+        foreach (var f in fatias)
+            sb.Append($"<li><span class='dl-dot' style='background:{f.Cor}'></span><span class='dl-name'>{Esc(f.Nome)}</span><span class='dl-val'>{f.Qtd.ToString("N0", _pt)}</span><span class='dl-pct'>{Esc(PctDe(f.Qtd, _r.Total))} do total</span></li>");
+        sb.Append("</ul></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- gráfico 2: barras de valor + taxas de ganho ----
+    private RenderFragment BarrasValor() => builder =>
+    {
+        var linhas = new List<(string Nome, double V, string Cor)> { ("Ganhas", _r.VG, CorG), ("Perdidas", _r.VP, CorP), ("Abertas", _r.VA, CorA) };
+        if (_r.VNC > 0) linhas.Add(("Não classificadas", _r.VNC, CorN));
+        var max = Math.Max(linhas.Max(l => l.V), 1);
+        var sb = new StringBuilder("<div class='cv-vals'>");
+        foreach (var l in linhas)
+        {
+            sb.Append($"<div class='cv-val' title='{Esc(l.Nome)}: {Esc(Fmt.Brl(l.V))}'>");
+            sb.Append($"<div class='cv-val-top'><span><i class='cv-dot' style='background:{l.Cor}'></i>{Esc(l.Nome)}</span><b>{Esc(R(l.V))}</b><em>{Esc(PctDe(l.V, _r.VTotal))} do valor total</em></div>");
+            sb.Append($"<div class='cv-track'><div class='cv-fill' style='width:{F(l.V / max * 100)}%;background:{l.Cor}'></div></div></div>");
+        }
+        sb.Append("</div>");
+        sb.Append("<div class='cv-taxas'>");
+        sb.Append($"<div class='cv-taxa' title='Ganhas ÷ (ganhas + perdidas)'><span>Taxa de ganho por quantidade</span><b style='color:{CorG}'>{Esc(_r.TaxaQtd is { } tq ? P1(tq) : "—")}</b><small>{_r.G.ToString("N0", _pt)} ganhas de {_r.Decididas.ToString("N0", _pt)} decididas</small></div>");
+        sb.Append($"<div class='cv-taxa' title='Valor ganho ÷ (valor ganho + valor perdido)'><span>Taxa de ganho por valor</span><b style='color:{CorG}'>{Esc(_r.TaxaValor is { } tv ? P1(tv) : "—")}</b><small>{Esc(R(_r.VG))} de {Esc(R(_r.VG + _r.VP))} decididos</small></div>");
+        sb.Append("</div><p class='cv-nota'>As taxas de ganho ignoram as propostas abertas, que ainda não têm resultado. Não confundir com a participação no total.</p>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- gráfico 3: evolução mensal (colunas empilhadas) ----
+    private string _metMes = "qtd", _metPerda = "qtd", _ordVend = "valor";
+
+    private RenderFragment Mensal() => builder =>
+    {
+        var comData = _f.Where(i => i.Ano is not null).ToList();
+        if (comData.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Nenhuma proposta com data de envio no recorte.</div>"); return; }
+        var porMes = comData.GroupBy(i => new DateTime(i.Ano!.Value, i.Mes!.Value, 1)).ToDictionary(g => g.Key, g => Somar(g));
+        var ini = porMes.Keys.Min(); var fim = porMes.Keys.Max();
+        var meses = new List<DateTime>();
+        for (var m = ini; m <= fim; m = m.AddMonths(1)) meses.Add(m);
+
+        bool qtd = _metMes == "qtd";
+        double Val(Resumo r, int c) => qtd ? c switch { 0 => r.G, 1 => r.P, 2 => r.A, _ => r.NC } : c switch { 0 => r.VG, 1 => r.VP, 2 => r.VA, _ => r.VNC };
+        var temNc = comData.Any(i => i.P.Classe == ClasseProposta.NaoClassificada);
+        var cats = temNc ? 4 : 3;
+        var cores = new[] { CorG, CorP, CorA, CorN };
+        var nomes = new[] { "Ganhas", "Perdidas", "Abertas", "Não classificadas" };
+        double maxY = 1;
+        foreach (var m in meses) if (porMes.TryGetValue(m, out var r0)) maxY = Math.Max(maxY, Enumerable.Range(0, cats).Sum(c => Val(r0, c)));
+
+        const double W = 1000, H = 300, L = 54, Rr = 12, T = 14, B = 38;
+        var passo = (W - L - Rr) / meses.Count; var larg = Math.Min(passo * 0.62, 46);
+        double Y(double v) => T + (H - T - B) * (1 - v / maxY);
+        string Rot(double v) => qtd ? F(Math.Round(v)) : R(v);
+
+        var sb = new StringBuilder("<div class='chart-body'>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='Evolução mensal'>");
+        for (var k = 0; k <= 4; k++)
+        {
+            var v = maxY * k / 4;
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e3e9f2'/>");
+            sb.Append($"<text x='{F(L - 6)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10' fill='#6b7a90'>{Esc(Rot(v))}</text>");
+        }
+        var salto = meses.Count > 24 ? 3 : meses.Count > 12 ? 2 : 1;
+        for (var i = 0; i < meses.Count; i++)
+        {
+            var x = L + passo * i + (passo - larg) / 2;
+            porMes.TryGetValue(meses[i], out var r);
+            if (r is not null)
+            {
+                double acum = 0;
+                for (var c = 0; c < cats; c++)
+                {
+                    var v = Val(r, c); if (v <= 0) continue;
+                    sb.Append($"<rect class='cv-seg' x='{F(x)}' y='{F(Y(acum + v))}' width='{F(larg)}' height='{F(Y(acum) - Y(acum + v))}' fill='{cores[c]}' rx='2'><title>{Esc(nomes[c])} em {Esc(meses[i].ToString("MMM/yy", _pt))}: {Esc(qtd ? F(v) + " proposta(s)" : Fmt.Brl(v))}</title></rect>");
+                    acum += v;
+                }
+            }
+            if (i % salto == 0)
+                sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - B + 16)}' text-anchor='middle' font-size='10' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+        }
+        sb.Append("</svg><div class='cv-leg'>");
+        for (var c = 0; c < cats; c++) sb.Append($"<span><i class='cv-dot' style='background:{cores[c]}'></i>{nomes[c]}</span>");
+        sb.Append("</div>");
+        var semData = _f.Count - comData.Count;
+        if (semData > 0) sb.Append($"<p class='cv-nota'>{semData.ToString("N0", _pt)} proposta(s) sem data de envio válida não aparecem neste gráfico (continuam nos totais).</p>");
+        sb.Append("</div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- gráfico 4: vendedores ----
+    private RenderFragment Vendedores() => builder =>
+    {
+        var lista = Grupos(i => i.P.Vendedor);
+        IEnumerable<(string Nome, Resumo R)> ord = _ordVend switch
+        {
+            "qtd" => lista.OrderByDescending(x => x.R.G).ThenByDescending(x => x.R.VG),
+            "taxa" => lista.OrderByDescending(x => x.R.TaxaQtd ?? -1).ThenByDescending(x => x.R.Decididas),
+            _ => lista.OrderByDescending(x => x.R.VG).ThenByDescending(x => x.R.G),
+        };
+        var l2 = ord.ToList();
+        var maxTotal = Math.Max(l2.Max(x => x.R.Total), 1);
+        var sb = new StringBuilder($"<div class='apl-resumo'><span>{l2.Count} vendedor(es)</span><span class='apl-total'><small>ORDEM</small>{(_ordVend == "valor" ? "valor ganho" : _ordVend == "qtd" ? "quantidade ganha" : "taxa de ganho")}</span></div>");
+        sb.Append("<div class='apl-scroll cv-scroll'><div class='cv-list'>");
+        for (var i = 0; i < l2.Count; i++)
+        {
+            var (nome, r) = l2[i];
+            var pequena = r.Decididas < 5;
+            sb.Append($"<div class='cv-row' title='{Esc(nome)}'>");
+            sb.Append($"<span class='rank-num'>{i + 1}</span><span class='cv-name'>{Esc(nome)}</span>");
+            sb.Append($"<span class='cv-k'><small>Valor ganho</small><b title='{Esc(Fmt.Brl(r.VG))}'>{Esc(R(r.VG))}</b></span>");
+            sb.Append($"<span class='cv-k'><small>Taxa (qtd.)</small><b>{Esc(r.TaxaQtd is { } tq ? P1(tq) : "—")}</b></span>");
+            sb.Append($"<span class='cv-k'><small>Taxa (valor)</small><b>{Esc(r.TaxaValor is { } tv ? P1(tv) : "—")}</b></span>");
+            sb.Append($"<div class='cv-stack' style='width:{F(r.Total / (double)maxTotal * 100)}%'>");
+            if (r.G > 0) sb.Append($"<i style='flex:{r.G};background:{CorG}' title='Ganhas: {r.G}'></i>");
+            if (r.P > 0) sb.Append($"<i style='flex:{r.P};background:{CorP}' title='Perdidas: {r.P}'></i>");
+            if (r.A > 0) sb.Append($"<i style='flex:{r.A};background:{CorA}' title='Abertas: {r.A}'></i>");
+            if (r.NC > 0) sb.Append($"<i style='flex:{r.NC};background:{CorN}' title='Não classificadas: {r.NC}'></i>");
+            sb.Append("</div>");
+            sb.Append($"<span class='cv-sub'>{r.Total} propostas · <b style='color:{CorG}'>{r.G} ganhas</b> · <b style='color:{CorP}'>{r.P} perdidas</b> · <b style='color:{CorA}'>{r.A} abertas</b> · {r.Decididas} decididas");
+            if (pequena) sb.Append(" · <span class='cv-amostra' title='Poucas propostas decididas: a taxa varia muito com uma única venda'>amostra pequena</span>");
+            sb.Append("</span></div>");
+        }
+        sb.Append("</div></div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- gráficos 5 e 6: BU e BU Intercompany ----
+    private RenderFragment TabelaGrupo(List<(string Nome, Resumo R)> grupos) => @<div class="cv-tw">
+        <table class="grid-tbl tbl-compact cv-tbl">
+            <thead>
+                <tr><th>Unidade</th><th class="right">Propostas</th><th class="right">Ganhas</th><th class="right">Perdidas</th><th class="right">Abertas</th>
+                    <th class="right">Valor total</th><th class="right">Valor ganho</th><th class="right">Valor perdido</th><th class="right">Valor aberto</th>
+                    <th class="right">Taxa (qtd.)</th><th class="right">Taxa (valor)</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var (nome, r) in grupos)
+                {
+                    var tot = Math.Max(r.VG + r.VP + r.VA + r.VNC, 0.0000001);
+                    <tr>
+                        <td class="col-strong">
+                            @nome
+                            <div class="cv-bar" title="Composição do valor: ganho / perdido / aberto">
+                                <i style="width:@F(r.VG / tot * 100)%;background:@CorG"></i><i style="width:@F(r.VP / tot * 100)%;background:@CorP"></i><i style="width:@F(r.VA / tot * 100)%;background:@CorA"></i><i style="width:@F(r.VNC / tot * 100)%;background:@CorN"></i>
+                            </div>
+                        </td>
+                        <td class="right num">@r.Total.ToString("N0", _pt)</td>
+                        <td class="right num" style="color:@CorG">@r.G.ToString("N0", _pt)</td>
+                        <td class="right num" style="color:@CorP">@r.P.ToString("N0", _pt)</td>
+                        <td class="right num" style="color:@CorA">@r.A.ToString("N0", _pt)</td>
+                        <td class="right num" title="@Fmt.Brl(r.VTotal)">@R(r.VTotal)</td>
+                        <td class="right num" title="@Fmt.Brl(r.VG)">@R(r.VG)</td>
+                        <td class="right num" title="@Fmt.Brl(r.VP)">@R(r.VP)</td>
+                        <td class="right num" title="@Fmt.Brl(r.VA)">@R(r.VA)</td>
+                        <td class="right num col-strong">@(r.TaxaQtd is { } tq ? P1(tq) : "—")</td>
+                        <td class="right num col-strong">@(r.TaxaValor is { } tv ? P1(tv) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>;
+
+    // ---- gráfico 7: status de perda ----
+    private static readonly string[] StatusPerda = { "Cancelled", "Closed - Customer Lost", "Closed - Lost", "Closed - No Bid", "Closed - Unknown" };
+
+    private RenderFragment Perdas() => builder =>
+    {
+        bool qtd = _metPerda == "qtd";
+        var perdidas = _f.Where(i => i.P.Classe == ClasseProposta.Perdida).ToList();
+        // os cinco status esperados sempre aparecem (mesmo zerados), na grafia combinada
+        var linhas = StatusPerda.Select(s =>
+        {
+            var chave = ConversaoService.NormalizarStatus(s);
+            var itens = perdidas.Where(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal) == chave).ToList();
+            return (Nome: s, Qtd: itens.Count, Valor: itens.Sum(i => i.Brl ?? 0));
+        }).OrderByDescending(x => qtd ? x.Qtd : x.Valor).ToList();
+        var max = Math.Max(linhas.Max(x => qtd ? x.Qtd : x.Valor), 1);
+        var totQ = linhas.Sum(x => x.Qtd); var totV = linhas.Sum(x => x.Valor);
+        var sb = new StringBuilder($"<div class='apl-resumo'><span>{perdidas.Count.ToString("N0", _pt)} proposta(s) perdida(s)</span><span class='apl-total'><small>TOTAL</small>{Esc(qtd ? totQ.ToString("N0", _pt) : R(totV))}</span></div>");
+        sb.Append("<div class='cv-vals'>");
+        foreach (var l in linhas)
+        {
+            var v = qtd ? l.Qtd : l.Valor;
+            sb.Append($"<div class='cv-val' title='{Esc(l.Nome)}: {l.Qtd} proposta(s) · {Esc(Fmt.Brl(l.Valor))}'>");
+            sb.Append($"<div class='cv-val-top'><span><i class='cv-dot' style='background:{CorP}'></i>{Esc(l.Nome)}</span><b>{Esc(qtd ? l.Qtd.ToString("N0", _pt) : R(l.Valor))}</b><em>{Esc(qtd ? PctDe(l.Qtd, totQ) : PctDe(l.Valor, totV))}</em></div>");
+            sb.Append($"<div class='cv-track'><div class='cv-fill' style='width:{F(v / max * 100)}%;background:linear-gradient(90deg,#e2664e,{CorP})'></div></div></div>");
+        }
+        sb.Append("</div>");
+        builder.AddMarkupContent(0, sb.ToString());
+    };
+
+    // ---- reconciliação e qualidade ----
+    private RenderFragment Verificacoes() => @<details class="panel cv-det">
+        <summary>Verificações dos dados</summary>
+        @{
+            var total = Conv.Atual.Propostas.Count;
+            var geral = Somar(_itens);
+            var somaCat = geral.G + geral.P + geral.A + geral.NC;
+            var okQtd = total == somaCat && total == _itens.Count;
+            var okFiltro = _f.Count == _r.G + _r.P + _r.A + _r.NC;
+            var indep = _itens.Sum(i => i.Brl ?? 0);
+            var okValor = Math.Abs(indep - geral.VTotal) < 0.01 && Math.Abs(_f.Sum(i => i.Brl ?? 0) - _r.VTotal) < 0.01;
+        }
+        <ul class="cv-checks">
+            <li class="@(okQtd ? "ok" : "bad")">@(okQtd ? "✔" : "✖") Total de registros (@total.ToString("N0", _pt)) = ganhas (@geral.G) + perdidas (@geral.P) + abertas (@geral.A) + não classificadas (@geral.NC)</li>
+            <li class="@(okFiltro ? "ok" : "bad")">@(okFiltro ? "✔" : "✖") No recorte atual: @_f.Count.ToString("N0", _pt) = @_r.G + @_r.P + @_r.A + @_r.NC</li>
+            <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@Fmt.Brl(geral.VTotal) na base toda)</li>
+            <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") Propostas com valor mas sem taxa de câmbio: @geral.SemTaxa.ToString("N0", _pt)@(geral.SemTaxa > 0 ? $" (US$ {geral.UsdSemTaxa.ToString("N0", _pt)} fora dos valores em R$)" : "")</li>
+            <li class="info">ℹ Propostas sem valor em US$ na planilha: @geral.SemValor.ToString("N0", _pt) — contam nas quantidades, não nos valores</li>
+        </ul>
+        @if (Conv.Atual.Avisos.Count > 0)
+        {
+            <div class="cv-sub-h">Avisos da leitura</div>
+            <ul class="cv-checks">@foreach (var a in Conv.Atual.Avisos) { <li class="bad">⚠ @a</li> }</ul>
+        }
+        <div class="cv-sub-h">Colunas lidas da planilha</div>
+        <ul class="cv-checks">@foreach (var m in Conv.Atual.Mapeamento) { <li class="info">@m</li> }</ul>
+    </details>;
+
+    // ======================================================================
+    //  ABA 2 · BASE DE PROPOSTAS
+    // ======================================================================
+    private string _busca = "";
+    private readonly HashSet<string> _classes = Novo();
+    private string _ordCol = "data"; private bool _ordAsc = false;
+    private int _pag; private const int PorPagina = 50;
+    private HashSet<string>? _ocultas;
+    private const string TabelaPref = "conversao_base";
+
+    private sealed record Col(string Key, string Titulo, string Align, Func<Item, string> Texto, Func<Item, object?> Chave);
+
+    private static string NomeClasse(ClasseProposta c) => c switch
+    {
+        ClasseProposta.Ganha => "Ganha", ClasseProposta.Perdida => "Perdida", ClasseProposta.Aberta => "Aberta", _ => "Não classificada",
+    };
+    private static readonly string[] NomesClasse = { "Ganha", "Perdida", "Aberta", "Não classificada" };
+
+    private List<Col> Colunas()
+    {
+        var cols = new List<Col>
+        {
+            new("data", "Data de envio", "nowrap", i => i.P.Data?.ToString("dd/MM/yyyy") ?? (i.P.DataTexto == "" ? "—" : i.P.DataTexto + " (inválida)"), i => i.P.Data),
+            new("ano", "Ano", "center", i => i.Ano?.ToString() ?? "—", i => i.Ano),
+            new("mes", "Mês", "center", i => i.Mes is { } m ? Fmt.MonthLong(m) : "—", i => i.Mes),
+            new("vend", "Vendedor", "", i => i.P.Vendedor, i => i.P.Vendedor),
+            new("bu", "BU", "", i => i.P.Bu, i => i.P.Bu),
+            new("buic", "BU Intercompany", "", i => i.P.BuIc, i => i.P.BuIc),
+            new("status", "Status original", "", i => i.P.StatusOriginal == "" ? "—" : i.P.StatusOriginal, i => i.P.StatusOriginal),
+            new("classe", "Classificação", "center", i => NomeClasse(i.P.Classe), i => (int)i.P.Classe),
+            new("usd", "Valor original (US$)", "right", i => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", _pt) : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)"), i => i.P.ValorUsd),
+            new("taxa", "Taxa aplicada", "right", i => i.Taxa is { } t ? t.ToString("0.0000", _pt) : "sem taxa", i => i.Taxa),
+            new("brl", "Valor convertido (R$)", "right", i => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : "—", i => i.Brl),
+            new("linha", "Linha na planilha", "center", i => i.P.Linha.ToString(), i => i.P.Linha),
+        };
+        foreach (var c in Conv.Atual.Colunas)
+        {
+            var idx = c.Indice;
+            cols.Add(new Col("o" + idx, $"{c.Letra} · {c.Titulo}", "", i => idx < i.P.Celulas.Length && i.P.Celulas[idx] != "" ? i.P.Celulas[idx] : "—",
+                i => idx < i.P.Celulas.Length ? i.P.Celulas[idx] : ""));
+        }
+        return cols;
+    }
+
+    // colunas originais da planilha começam ocultas; o usuário escolhe e a escolha fica guardada
+    private void CarregarOcultas()
+    {
+        var pref = ColPrefs.Get(_login, TabelaPref);
+        _ocultas = pref.StartsWith("v1:", StringComparison.Ordinal)
+            ? new HashSet<string>(pref[3..].Split(',', StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal)
+            : new HashSet<string>(Conv.Atual.Colunas.Select(c => "o" + c.Indice), StringComparer.Ordinal);
+    }
+    private void AlternarColuna(string key)
+    {
+        _ocultas ??= new HashSet<string>(StringComparer.Ordinal);
+        if (!_ocultas.Remove(key)) _ocultas.Add(key);
+        ColPrefs.Save(_login, TabelaPref, "v1:" + string.Join(",", _ocultas));
+    }
+
+    private static int Cmp(object? a, object? b)
+    {
+        if (a is null && b is null) return 0;
+        if (a is null) return 1;      // vazio sempre no fim
+        if (b is null) return -1;
+        return (a, b) switch
+        {
+            (double x, double y) => x.CompareTo(y),
+            (int x, int y) => x.CompareTo(y),
+            (DateTime x, DateTime y) => x.CompareTo(y),
+            _ => string.Compare(a.ToString(), b.ToString(), StringComparison.CurrentCultureIgnoreCase),
+        };
+    }
+
+    private void Ordenar(string key)
+    {
+        if (_ordCol == key) _ordAsc = !_ordAsc; else { _ordCol = key; _ordAsc = true; }
+        _pag = 0;
+    }
+
+    private List<Item> LinhasTabela(List<Col> cols)
+    {
+        IEnumerable<Item> q = _f;                                         // o MESMO recorte do dashboard
+        if (_classes.Count > 0) q = q.Where(i => _classes.Contains(NomeClasse(i.P.Classe)));
+        if (!string.IsNullOrWhiteSpace(_busca))
+        {
+            var b = _busca.Trim();
+            q = q.Where(i => cols.Any(c => c.Texto(i).Contains(b, StringComparison.CurrentCultureIgnoreCase)));
+        }
+        var col = cols.FirstOrDefault(c => c.Key == _ordCol) ?? cols[0];
+        q = _ordAsc ? q.OrderBy(col.Chave, Comparer<object?>.Create(Cmp)) : q.OrderByDescending(col.Chave, Comparer<object?>.Create(Cmp));
+        return q.ToList();
+    }
+
+    private RenderFragment Base() => @<div>
+        @{
+            if (_ocultas is null) CarregarOcultas();
+            var todas = Colunas();
+            var visiveis = todas.Where(c => _ocultas is null || !_ocultas.Contains(c.Key)).ToList();
+            var linhas = LinhasTabela(todas);
+            var paginas = Math.Max(1, (linhas.Count + PorPagina - 1) / PorPagina);
+            if (_pag >= paginas) _pag = paginas - 1;
+            var pagina = linhas.Skip(_pag * PorPagina).Take(PorPagina).ToList();
+            var rt = Somar(linhas);
+        }
+        <div class="cv-tools">
+            <input class="flt-search" style="min-width:240px" placeholder="Pesquisar em qualquer coluna…" value="@_busca" @oninput="Buscar" />
+            <MultiFilter Label="Classificação" AllText="Todas" Options="NomesClasse" Selected="_classes" OnChanged="StateHasChanged" />
+            <details class="cv-cols">
+                <summary class="btn-ghost sm">@Icons.Svg("layers")Colunas</summary>
+                <div class="cv-cols-panel">
+                    @foreach (var c in todas)
+                    {
+                        var k = c.Key;
+                        <label class="flt-check"><input type="checkbox" checked="@(_ocultas is null || !_ocultas.Contains(k))" @onchange="() => AlternarColuna(k)" /><span>@c.Titulo</span></label>
+                    }
+                </div>
+            </details>
+            <div class="filterbar-spacer"></div>
+            <span class="muted" style="font-size:12px">@linhas.Count.ToString("N0", _pt) registro(s) · valor @Fmt.Brl(rt.VTotal)</span>
+            <button class="btn-primary sm" disabled="@(linhas.Count == 0)" @onclick="() => Exportar(linhas, todas)">@Icons.Svg("download")Exportar Excel</button>
+        </div>
+        <div class="table-wrap tbl-compact" style="max-height:68vh;overflow:auto">
+            <table class="grid-tbl">
+                <thead>
+                    <tr>
+                        @foreach (var c in visiveis)
+                        {
+                            var k = c.Key;
+                            <th class="@c.Align cv-sort" title="Ordenar" @onclick="() => Ordenar(k)">@c.Titulo@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in pagina)
+                    {
+                        <tr>
+                            @foreach (var c in visiveis)
+                            {
+                                if (c.Key == "classe")
+                                {
+                                    <td class="center"><span class="cv-badge @ClasseCss(i.P.Classe)">@NomeClasse(i.P.Classe)</span></td>
+                                }
+                                else if (c.Key is "taxa" && i.Taxa is null)
+                                {
+                                    <td class="right" style="color:var(--neg)" title="Sem taxa de câmbio para este ano">sem taxa</td>
+                                }
+                                else
+                                {
+                                    <td class="@c.Align">@c.Texto(i)</td>
+                                }
+                            }
+                        </tr>
+                    }
+                    @if (linhas.Count == 0)
+                    {
+                        <tr><td colspan="@Math.Max(visiveis.Count, 1)" class="empty">Nenhum registro com os filtros atuais.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="cv-pager">
+            <span class="muted">Mostrando @(linhas.Count == 0 ? 0 : _pag * PorPagina + 1)–@Math.Min((_pag + 1) * PorPagina, linhas.Count) de @linhas.Count.ToString("N0", _pt)</span>
+            <button class="btn-ghost sm" disabled="@(_pag == 0)" @onclick="() => _pag = 0">«</button>
+            <button class="btn-ghost sm" disabled="@(_pag == 0)" @onclick="() => _pag--">‹</button>
+            <span>página @(_pag + 1) de @paginas</span>
+            <button class="btn-ghost sm" disabled="@(_pag >= paginas - 1)" @onclick="() => _pag++">›</button>
+            <button class="btn-ghost sm" disabled="@(_pag >= paginas - 1)" @onclick="() => _pag = paginas - 1">»</button>
+        </div>
+    </div>;
+
+    private static string ClasseCss(ClasseProposta c) => c switch
+    {
+        ClasseProposta.Ganha => "g", ClasseProposta.Perdida => "p", ClasseProposta.Aberta => "a", _ => "n",
+    };
+
+    private async Task Exportar(List<Item> linhas, List<Col> todas)
+    {
+        if (linhas.Count == 0) return;
+        using var wb = new ClosedXML.Excel.XLWorkbook();
+        var ws = wb.Worksheets.Add("Base de Propostas");
+        for (var c = 0; c < todas.Count; c++) ws.Cell(1, c + 1).Value = todas[c].Titulo;
+        ws.Row(1).Style.Font.Bold = true;
+        for (var r = 0; r < linhas.Count; r++)
+        {
+            var i = linhas[r];
+            for (var c = 0; c < todas.Count; c++)
+            {
+                var cel = ws.Cell(r + 2, c + 1);
+                switch (todas[c].Key)
+                {
+                    case "usd": if (i.P.ValorUsd is { } u) { cel.Value = u; cel.Style.NumberFormat.Format = "#,##0.00"; } break;
+                    case "taxa": if (i.Taxa is { } t) { cel.Value = t; cel.Style.NumberFormat.Format = "0.0000"; } else cel.Value = "sem taxa"; break;
+                    case "brl": if (i.Brl is { } b) { cel.Value = b; cel.Style.NumberFormat.Format = "#,##0.00"; } break;
+                    case "ano": if (i.Ano is { } a) cel.Value = a; break;
+                    case "linha": cel.Value = i.P.Linha; break;
+                    case "data": if (i.P.Data is { } d) { cel.Value = d; cel.Style.DateFormat.Format = "dd/MM/yyyy"; } break;
+                    default: cel.Value = todas[c].Texto(i) == "—" ? "" : todas[c].Texto(i); break;
+                }
+            }
+        }
+        ws.SheetView.FreezeRows(1);
+        ws.RangeUsed()?.SetAutoFilter();
+        ws.Columns(1, Math.Min(todas.Count, 12)).AdjustToContents();
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        await JS.InvokeVoidAsync("appDownload", $"base_de_propostas_{DateTime.Today:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
+    }
+
+    // ======================================================================
+    //  TAXAS DE CÂMBIO (administrador)
+    // ======================================================================
+    private bool _taxasAberto;
+    private string _taxasErro = "", _novoAno = "";
+    private readonly Dictionary<int, string> _taxasTxt = new();
+    private List<int> _taxasAnos = new();
+
+    private void AbrirTaxas()
+    {
+        if (!_isAdmin) return;
+        _taxasErro = ""; _novoAno = "";
+        var salvas = Cambio.Todas();
+        var maximo = new[] { DateTime.Today.Year, salvas.Count > 0 ? salvas.Keys.Max() : 0, Conv.Atual.Propostas.Where(p => p.Data is not null).Select(p => p.Data!.Value.Year).DefaultIfEmpty(0).Max() }.Max();
+        _taxasAnos = Enumerable.Range(2024, Math.Max(maximo - 2024 + 1, 1)).Union(salvas.Keys).Distinct().OrderBy(x => x).ToList();
+        _taxasTxt.Clear();
+        foreach (var a in _taxasAnos) _taxasTxt[a] = salvas.TryGetValue(a, out var t) ? t.ToString("0.0000", _pt) : "";
+        _taxasAberto = true;
+    }
+
+    private void AdicionarAno()
+    {
+        if (int.TryParse(_novoAno.Trim(), out var a) && a is >= 2000 and <= 2100)
+        {
+            if (!_taxasAnos.Contains(a)) { _taxasAnos.Add(a); _taxasAnos.Sort(); _taxasTxt[a] = ""; }
+            _novoAno = ""; _taxasErro = "";
+        }
+        else _taxasErro = "Informe um ano válido (ex.: 2027).";
+    }
+
+    // "5,20" ou "5.20": o separador decimal é o último; nunca "5.20" lido como 520.
+    private static double? LerTaxa(string txt)
+    {
+        var t = (txt ?? "").Trim().Replace(" ", "");
+        if (t == "") return null;
+        if (t.Contains(',')) t = t.Replace(".", "").Replace(',', '.');
+        return double.TryParse(t, System.Globalization.NumberStyles.Float, Inv, out var v) ? v : double.NaN;
+    }
+
+    private void SalvarTaxas()
+    {
+        if (!_isAdmin) return;
+        var ok = new Dictionary<int, double?>();
+        foreach (var a in _taxasAnos)
+        {
+            var v = LerTaxa(_taxasTxt.GetValueOrDefault(a, ""));
+            if (v is { } x && (double.IsNaN(x) || x <= 0 || x >= 100)) { _taxasErro = $"Taxa inválida em {a}. Use um número entre 0 e 100 (ex.: 5,2000)."; return; }
+            ok[a] = v;
+        }
+        foreach (var (a, v) in ok)
+        {
+            if (v is { } t) { if (Cambio.Taxa(a) != t) Cambio.Salvar(a, t, _user); }
+            else if (Cambio.Taxa(a) is not null) Cambio.Remover(a);
+        }
+        _taxasErro = ""; _taxasAberto = false;
+    }
+}

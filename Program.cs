@@ -107,6 +107,9 @@ builder.Services.AddHostedService<AtualizacaoAgendada>();
 builder.Services.AddSingleton<DataSyncService>();
 // Guia Aplicação: planilhas de aplicadores (AFM + NB) unificadas numa tabela.
 builder.Services.AddSingleton<AplicacaoService>();
+// Módulo Conversão: planilha de propostas (rede) + taxa USD/BRL por ano.
+builder.Services.AddSingleton<ConversaoService>();
+builder.Services.AddSingleton<CambioAnualRepository>();
 // Recorte das telas durante a sessão: abrir uma proposta e voltar não refaz os
 // filtros. Scoped = por circuito, ou seja, por pessoa e por aba do navegador.
 builder.Services.AddScoped<FiltroMemoria>();
@@ -178,6 +181,11 @@ _ = Task.Run(() =>
         Etapa("sincronização das planilhas", () => sync.SyncAll());
         Anota($"[subida] {sync.LastNb.Message}");
         Anota($"[subida] {sync.LastAfm.Message}");
+
+        // Planilha do módulo Conversão: lida na subida (só relê se o arquivo mudou).
+        var conversao = app.Services.GetRequiredService<ConversaoService>();
+        Etapa("conversão de propostas", () => conversao.Carregar(false));
+        Anota($"[subida] Conversão: {conversao.Mensagem}");
     }
     catch { /* pasta indisponível ou lenta: o app segue no ar */ }
 });

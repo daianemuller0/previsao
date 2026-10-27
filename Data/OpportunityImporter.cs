@@ -102,7 +102,10 @@ public sealed class OpportunityImporter
     /// <param name="manterLinhasVazias">true = a posição de cada linha da grade é a
     /// linha da planilha (linha vazia vira array vazio). Necessário quando o
     /// cabeçalho é informado pelo NÚMERO da linha, como na guia Aplicação.</param>
-    public static List<Cel[]> LerGrade(string fileName, Stream stream, bool manterLinhasVazias = false)
+    /// <param name="aba">xlsx: nome da aba a ler (vazio = primeira, ou a maior se <paramref name="maiorAba"/>).</param>
+    /// <param name="maiorAba">xlsx sem nome de aba: usa a aba com mais linhas preenchidas.</param>
+    public static List<Cel[]> LerGrade(string fileName, Stream stream, bool manterLinhasVazias = false,
+        string? aba = null, bool maiorAba = false)
     {
         if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
         {
@@ -114,7 +117,7 @@ public sealed class OpportunityImporter
             return lines.Select(l => SplitCsv(l, delim).Select(t => new Cel(t.Trim(), null)).ToArray()).ToList();
         }
         if (fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase)) return GradeXls(stream);
-        return GradeXlsx(stream, manterLinhasVazias);
+        return GradeXlsx(stream, manterLinhasVazias, aba, maiorAba);
     }
 
     /// <summary>Normalização de nomes para casamento (minúsculas, sem acento,
@@ -179,10 +182,15 @@ public sealed class OpportunityImporter
     }
 
     // ---- Excel moderno (.xlsx / .xlsm) via ClosedXML -----------------------
-    private static List<Cel[]> GradeXlsx(Stream stream, bool manterLinhasVazias = false)
+    private static List<Cel[]> GradeXlsx(Stream stream, bool manterLinhasVazias = false, string? aba = null, bool maiorAba = false)
     {
         using var wb = new XLWorkbook(stream);
-        var ws = wb.Worksheets.FirstOrDefault();
+        IXLWorksheet? ws = null;
+        if (!string.IsNullOrWhiteSpace(aba))
+            ws = wb.Worksheets.FirstOrDefault(w => string.Equals(w.Name, aba.Trim(), StringComparison.OrdinalIgnoreCase));
+        ws ??= maiorAba
+            ? wb.Worksheets.OrderByDescending(w => w.LastRowUsed()?.RowNumber() ?? 0).FirstOrDefault()
+            : wb.Worksheets.FirstOrDefault();
         var grade = new List<Cel[]>();
         if (ws is null) return grade;
 

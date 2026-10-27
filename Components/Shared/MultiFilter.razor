@@ -18,7 +18,11 @@
                 @if (Selected.Count > 0) { <button class="btn-link" @onclick="ClearAll">Limpar</button> }
                 <button class="btn-link" @onclick="Close">Fechar</button>
             </div>
-            @foreach (var op in Options)
+            @if (Searchable)
+            {
+                <input class="flt-multi-search" placeholder="Buscar…" @bind="_q" @bind:event="oninput" />
+            }
+            @foreach (var op in Filtradas)
             {
                 var v = op;
                 <label class="flt-check">
@@ -34,6 +38,13 @@
 @implements IDisposable
 
 @code {
+    /// <summary>Mostra um campo de busca no topo da lista de opções.</summary>
+    [Parameter] public bool Searchable { get; set; }
+    private string _q = "";
+    private IEnumerable<string> Filtradas => string.IsNullOrWhiteSpace(_q)
+        ? Options
+        : Options.Where(o => o.Contains(_q.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public string AllText { get; set; } = "Todos";
     [Parameter] public string EmptyText { get; set; } = "Sem opções no recorte.";
