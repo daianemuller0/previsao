@@ -2453,3 +2453,8 @@ html { scroll-behavior: smooth; }
 .cvx-basebar.filterbar { position:static; border:1px solid var(--exec-border); border-radius:12px; padding:9px 12px; margin-bottom:12px; background:var(--panel); }
 .cvx-basebar .flt-search { min-width:260px; }
 .cvx-basebar .cv-cols { margin-left:auto; }
+
+/* Valores dos cartões: sem reticências, unidade sempre visível */
+.cvx-num { overflow:visible; text-overflow:clip; font-size:clamp(20px, 1.7vw, 26px); }
+.cvx-num.big { font-size:clamp(26px, 2.3vw, 34px); }
+.cvx-kpi { min-width:0; }

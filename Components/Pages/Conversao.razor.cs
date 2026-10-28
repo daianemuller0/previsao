@@ -208,7 +208,16 @@ public partial class Conversao
     }
 
     // ---- formatação ----------------------------------------------------------------
-    private static string R(double v) => "R$ " + Fmt.Compact(v);
+    private static string R(double v) => "R$ " + Mon(v);
+    /// <summary>Valor com a unidade por extenso: 527,7 mi · 1,06 bi · 850 mil.</summary>
+    private static string Mon(double v)
+    {
+        var a = Math.Abs(v); var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        if (a >= 1_000_000_000) return (v / 1_000_000_000).ToString("0.00", pt) + " bi";
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", pt) + " mi";
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", pt) + " mil";
+        return v.ToString("#,##0", pt);
+    }
     private static string P1(double v) => Fmt.Pct(v, 1);
     private static string N0(int v) => v.ToString("N0", _pt);
     private static string PctDe(double parte, double todo) => todo > 0 ? Fmt.Pct(parte / todo * 100, 1) : "—";
@@ -252,7 +261,7 @@ public partial class Conversao
     private (string Texto, string Css) DeltaWin()
     {
         if (_anos.Count != 1 || !int.TryParse(_anos.First(), out var ano))
-            return ("Selecione um ano para comparar com o anterior", "flat");
+            return ("", "flat");
         if (_prev is null) return ($"Sem dados comparáveis em {ano - 1}", "flat");
         if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return ($"Sem propostas decididas para comparar com {ano - 1}", "flat");
         var d = cur - ant;
@@ -523,7 +532,7 @@ public partial class Conversao
             if (!por.TryGetValue((a, m), out var r)) return null;
             return met == "winrate" ? (r.Decididas > 0 ? r.TaxaQtd : null) : met == "volume" ? r.Total : (r.TotConv > 0 ? r.VTotal : null);
         }
-        string Rot(double v) => met == "winrate" ? F(v) + "%" : met == "volume" ? N0((int)Math.Round(v)) : Fmt.Compact(v);
+        string Rot(double v) => met == "winrate" ? F(v) + "%" : met == "volume" ? N0((int)Math.Round(v)) : Mon(v);
         string Txt(int a, int m)
         {
             if (!por.TryGetValue((a, m), out var r)) return "sem propostas";
