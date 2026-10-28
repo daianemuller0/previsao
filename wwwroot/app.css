@@ -2458,3 +2458,18 @@ html { scroll-behavior: smooth; }
 .cvx-num { overflow:visible; text-overflow:clip; font-size:clamp(20px, 1.7vw, 26px); }
 .cvx-num.big { font-size:clamp(26px, 2.3vw, 34px); }
 .cvx-kpi { min-width:0; }
+
+/* Gráfico de linhas no padrão do "Vendas x Meta": legenda grande, rótulos nos pontos, área suave */
+.cvx-anual { max-height:340px; overflow:auto; padding-right:4px; }
+.cvx-anual svg { width:100%; min-width:980px; height:auto; min-height:0; }
+.cvx-anual::-webkit-scrollbar { width:8px; height:8px; }
+.cvx-anual::-webkit-scrollbar-thumb { background:#d7dfea; border-radius:999px; }
+.cvx-leg.top { gap:6px 34px; font-size:16px; font-weight:500; color:var(--text-2); margin:0 0 8px 6px; position:sticky; left:0; }
+.cvx-leg.top .cvx-ln { width:38px; border-top-width:4px; border-top-style:solid; vertical-align:5px; margin-right:10px; }
+.cvx-leg.top .cvx-ln.dash { border-top-style:dashed; border-top-width:3.5px; }
+
+/* Valor por unidade: valor sem quebrar de linha */
+.cvx-bb.v { grid-template-columns:minmax(110px,1fr) 2.2fr minmax(104px,auto); }
+.cvx-bb.v b { white-space:nowrap; }
+.cvx-bb .bar.stack { display:flex; overflow:hidden; }
+.cvx-bb .bar.stack i { display:block; height:100%; }
