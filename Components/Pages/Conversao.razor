@@ -204,6 +204,7 @@ else
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
         @Secao("unidades", "Conversão por Business Unit", "Coluna V da planilha", BlocoUnidades(i => i.P.Bu, _bus, "Business Unit"))
         @Secao("unidades-ic", "Conversão por BU Intercompany", "Coluna AG, senão AF · classificação independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "BU Intercompany"))
+        @Secao("valor-unidades", "Valor por unidade", "Ganho, perdido e aberto em R$, por BU e por BU Intercompany", ValorUnidades())
         @Secao("valor-mensal", "Valor mensal das propostas", "Janeiro a dezembro, por status", ValorMensal())
         @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
         @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
@@ -441,6 +442,11 @@ else
             </table>
         </div>
         <p class="cvx-note">Verde: taxa pelo menos 5 p.p. acima da média do recorte; laranja: 5 p.p. abaixo (só com @AmostraMinima+ decididas). Barras dos valores partem do zero, na mesma escala da tabela.</p>
+    </div>;
+
+    private RenderFragment ValorUnidades() => @<div class="cvx-two">
+        <div class="cvx-card"><h2 class="cvx-h2s">Valor por Business Unit (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))</div>
+        <div class="cvx-card"><h2 class="cvx-h2s">Valor por BU Intercompany (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.BuIc)))</div>
     </div>;
 
     private RenderFragment ValorMensal() => @<div>
