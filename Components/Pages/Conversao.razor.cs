@@ -235,6 +235,8 @@ public partial class Conversao : IAsyncDisposable
         if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", pt) + " mil";
         return v.ToString("#,##0", pt);
     }
+    /// <summary>Rótulo de eixo: marcas redondas sem a casa decimal vazia ("60 mi", não "60,0 mi").</summary>
+    private static string MonEixo(double v) { var t = Mon(v); return t.EndsWith(",0 mi") ? t[..^5] + " mi" : t.EndsWith(",00 bi") ? t[..^6] + " bi" : t; }
     private static string P1(double v) => Fmt.Pct(v, 1);
     private static string N0(int v) => v.ToString("N0", _pt);
     private static string PctDe(double parte, double todo) => todo > 0 ? Fmt.Pct(parte / todo * 100, 1) : "—";
@@ -464,19 +466,19 @@ public partial class Conversao : IAsyncDisposable
         var step = Nice(maxY * 1.12 / 4); var nTicks = Math.Max(2, (int)Math.Ceiling(maxY * 1.12 / step)); maxY = step * nTicks;
 
         // T deixa uma faixa acima da marca mais alta para a unidade "R$" não encostar no rótulo do eixo
-        const double W = 1000, H = 310, L = 74, Rr = 14, T = 38, B = 30;
-        var passo = (W - L - Rr) / meses.Count; var larg = Math.Min(passo * 0.62, 46);
+        const double W = 1200, H = 372, L = 84, Rr = 18, T = 44, B = 36;
+        var passo = (W - L - Rr) / meses.Count; var larg = Math.Min(passo * 0.6, 56);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
-        string Rot(double v) => qtd ? N0((int)Math.Round(v)) : Mon(v);
+        string Rot(double v) => qtd ? N0((int)Math.Round(v)) : MonEixo(v);
 
         var sb = new StringBuilder("<div class='chart-body'>");
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{(qtd ? "Volume" : "Valor")} mensal'>");
-        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='10' font-weight='700' fill='#93a1b5'>R$</text>");
+        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='12' font-weight='700' fill='#6b7a90'>R$</text>");
         for (var k = 0; k <= nTicks; k++)
         {
             var v = step * k;
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
-            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#6b7a90'>{Esc(Rot(v))}</text>");
+            sb.Append($"<text x='{F(L - 12)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(Rot(v))}</text>");
         }
         for (var i = 0; i < meses.Count; i++)
         {
@@ -495,11 +497,11 @@ public partial class Conversao : IAsyncDisposable
                 var parcial = !qtd && r.TotConv > 0 && r.TotConv < r.TotComUsd;
                 if (parcial) temParcial = true;
                 if (acum > 0)
-                    sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(acum) - 6)}' text-anchor='middle' font-size='11' font-weight='700' fill='#3b4a61'>{Esc(qtd ? N0((int)acum) : Mon(acum) + (parcial ? "*" : ""))}</text>");
+                    sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(acum) - 6)}' text-anchor='middle' font-size='12.5' font-weight='700' fill='#3b4a61'>{Esc(qtd ? N0((int)acum) : Mon(acum) + (parcial ? "*" : ""))}</text>");
                 else if (!qtd && r.TotComUsd > 0 && r.TotConv == 0)
                     sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(0) - 6)}' text-anchor='middle' font-size='11' fill='#c0392b'>n/c<title>Não convertido: falta a taxa de câmbio</title></text>");
             }
-            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 10)}' text-anchor='middle' font-size='11.5' fill='#6b7a90' letter-spacing='.04em'>{Esc(meses[i].ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
+            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 12)}' text-anchor='middle' font-size='12.5' font-weight='600' fill='#8a97ab' letter-spacing='.06em'>{Esc(meses[i].ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
         }
         sb.Append("</svg><div class='cvx-leg'>");
         for (var c = 0; c < cats; c++) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(Classes[c])}'></i>{NomeEn(Classes[c])}</span>");
@@ -590,7 +592,7 @@ public partial class Conversao : IAsyncDisposable
         {
             var v = met == "winrate" ? 25.0 * g : step * g;
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='{(g == 0 ? "#d3dcea" : "#edf1f6")}' stroke-width='{F(g == 0 ? 1.2 : 1)}'/>");
-            sb.Append($"<text x='{F(L - 14)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(Lbl(v))}</text>");
+            sb.Append($"<text x='{F(L - 14)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(met == "valor" ? MonEixo(v) : Lbl(v))}</text>");
         }
         // faixa do mês atual
         if (mesAtual > 0)
@@ -636,7 +638,7 @@ public partial class Conversao : IAsyncDisposable
                     var yv = Y(v.Value);
                     var acima = anos.Skip(1).Select(o => Val(o, m)).Where(x => x is not null).Any(x => { var oy = Y(x!.Value); return oy < yv && yv - oy < 28; });
                     var ly = acima ? yv + 20 : yv - 12;
-                    sb.Append($"<text x='{F(X(m))}' y='{F(ly)}' text-anchor='middle' font-size='12' font-weight='700' fill='{(fraco ? "#8a97ab" : cor)}' paint-order='stroke' stroke='#fff' stroke-width='4' stroke-linejoin='round'>{Esc(lab)}</text>");
+                    sb.Append($"<text x='{F(X(m))}' y='{F(ly)}' text-anchor='middle' font-size='12' font-weight='700' fill='{cor}' fill-opacity='{(fraco ? ".72" : "1")}' paint-order='stroke' stroke='#fff' stroke-width='4' stroke-linejoin='round'>{Esc(lab)}</text>");
                 }
                 else
                     sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='4' fill='{cor}' stroke='#fff' stroke-width='1.5'><title>{tip}</title></circle>");

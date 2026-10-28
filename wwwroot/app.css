@@ -2591,3 +2591,40 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 /* Barras do relatório: colunas fixas para a marca da taxa do recorte alinhar em todas as linhas */
 .rpt .cvx-bb { grid-template-columns:minmax(110px,1fr) 2fr 52px 96px; font-size:12px; }
 .rpt .cvx-seg { font-size:11px; padding:0 2px; letter-spacing:0; white-space:nowrap; overflow:hidden; }
+
+/* ===================== Conversão — polimento visual (rodada 1) ===================== */
+/* Tabelas de BU: duas linhas por unidade — em cima nome, taxa e valores; embaixo as barras, todas partindo do zero */
+.cvx-utbl th { white-space:nowrap; }
+.cvx-utbl td { vertical-align:top; line-height:18px; padding:9px 10px 10px; font-variant-numeric:tabular-nums; }
+.cvx-utbl td:first-child { min-width:220px; width:30%; }
+.cvx-un { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:7px; }
+.cvx-un .nm { font-weight:650; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cvx-un b { font-weight:750; color:var(--text); white-space:nowrap; }
+.cvx-un b.pos { color:var(--pos); } .cvx-un b.neg { color:var(--orange); }
+.cvx-un b.cvx-na { font-weight:500; font-size:11.5px; color:var(--muted); }
+.cvx-utbl .tr { position:relative; display:block; height:8px; background:#edf2f8; border-radius:999px; overflow:hidden; }
+.cvx-utbl .tr i { display:block; height:100%; min-width:4px; background:#12355B; border-radius:999px; }
+.cvx-utbl td.cvx-bc { min-width:116px; }
+.cvx-utbl td.cvx-bc span { display:block; white-space:nowrap; margin-bottom:7px; }
+.cvx-utbl td.cvx-bc::after { content:""; position:absolute; left:10px; right:10px; bottom:10px; height:8px; background:#edf2f8; border-radius:999px; z-index:0; }
+.cvx-utbl td.cvx-bc::before { left:10px; top:auto; bottom:10px; height:8px; transform:none; width:calc((100% - 20px) * var(--w,0) / 100); opacity:.9; border-radius:999px; z-index:1; }
+
+/* Vendedores: o campo do mínimo tem o tamanho de um número */
+.cvx-fld input[type=number] { width:68px; text-align:right; }
+
+/* Base: a busca cede espaço para o botão de exportar caber na mesma linha */
+.cvx-basebar .flt-search { min-width:180px; width:200px; }
+.cvx-basebar > .muted { white-space:nowrap; }
+
+/* Valor por unidade: um cartão por linha (lado a lado, o de BU ficava curto, com um vazio grande embaixo) */
+#valor-unidades .cvx-two { grid-template-columns:1fr; gap:0; }
+#valor-unidades .cvx-two .cvx-card { margin-bottom:14px; }
+
+/* Qualidade: aviso de leitura em âmbar (alerta), não no vermelho de erro */
+.cvx-checks .warn { color:#8a5a12; }
+
+/* Ranking de vendedores: barra, taxa, nome e números na mesma linha de base; "x de y" fica logo abaixo da barra */
+.cvx-vrow:not(.head) { padding:10px 8px 16px; }
+.cvx-vlist.cvx-scroll10 { max-height:550px; } /* cabeçalho + 10 linhas; a 11ª aparece só como deixa da rolagem */
+.cvx-vrow .wr { position:relative; }
+.cvx-vrow .wr small { position:absolute; left:0; top:calc(100% + 1px); margin:0; line-height:14px; white-space:nowrap; }

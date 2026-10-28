@@ -251,7 +251,7 @@ else
             @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
                  "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P), null, false)
             @Kpi("Total de Propostas", N0(_r.Total), $"{N0(_r.Decididas)} decididas · {N0(_r.A)} abertas",
-                 "Total no recorte = ganhas + perdidas + abertas + não classificadas.", CorN, DeltaPct(_r.Total, _prev?.Total))
+                 "Total no recorte = ganhas + perdidas + abertas + não classificadas.", "#64748b", DeltaPct(_r.Total, _prev?.Total))
         </div>
 
         <div class="cvx-second">
@@ -446,9 +446,9 @@ else
         }
         <h2 class="cvx-h2s">Unidades · @lista.Count</h2>
         <div class="cv-tw cvx-scroll10">
-            <table class="cvx-tbl">
+            <table class="cvx-tbl cvx-utbl">
                 <thead>
-                    <tr><th>Unidade · Taxa de conversão (ganhas de decididas)</th><th class="r">Decididas</th><th class="r">Propostas</th><th class="r">Valor ganho</th><th class="r">Valor perdido</th><th class="r">Valor aberto</th><th class="r">Taxa de conversão (valor)</th></tr>
+                    <tr><th title="Taxa de conversão = ganhas ÷ decididas (ganhas + perdidas)">Unidade · taxa de conversão</th><th class="r">Decididas</th><th class="r">Propostas</th><th class="r">Valor ganho</th><th class="r">Valor perdido</th><th class="r">Valor aberto</th><th class="r" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Conversão (valor)</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var (nome, r) in lista)
@@ -456,8 +456,8 @@ else
                         var un = nome;
                         <tr class="@(filtro.Count == 0 ? "" : filtro.Contains(nome) ? "on" : "dim")" title="Clique para filtrar por esta unidade" @onclick="() => Alternar(filtro, un)">
                             <td>
-                                <div class="nm">@nome</div>
-                                <div class="cvx-wr"><span class="tr"><i style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></i></span><b class="@RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</b></div>
+                                <div class="cvx-un"><span class="nm">@nome</span><b class="@RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</b></div>
+                                <span class="tr"><i style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></i></span>
                             </td>
                             <td class="r">@N0(r.Decididas)</td>
                             <td class="r">@N0(r.Total)</td>
@@ -570,7 +570,7 @@ else
         @if (Conv.Atual.Avisos.Count > 0)
         {
             <h2 class="cvx-h2s" style="margin-top:18px">Avisos da leitura da planilha</h2>
-            <ul class="cv-checks cvx-checks">@foreach (var a in Conv.Atual.Avisos) { <li class="bad">⚠ @a</li> }</ul>
+            <ul class="cv-checks cvx-checks">@foreach (var a in Conv.Atual.Avisos) { <li class="warn">⚠ @a</li> }</ul>
         }
         @if (_r.NC > 0)
         {
@@ -617,7 +617,7 @@ else
                 </div>
             </details>
             <div class="filterbar-spacer"></div>
-            <span class="muted" style="font-size:12px">@N0(linhas.Count) registro(s) · valor convertido @DinTotal(rt)</span>
+            <span class="muted" style="font-size:12px" title="Registros na tabela · soma do valor convertido em R$">@N0(linhas.Count) @(linhas.Count == 1 ? "registro" : "registros") · <b style="color:var(--text)">@DinTotal(rt)</b></span>
             <button class="btn-primary sm" disabled="@(linhas.Count == 0)" @onclick="() => Exportar(linhas, todas)">@Icons.Svg("download")Exportar Excel</button>
         </div>
         <div class="table-wrap tbl-compact" style="max-height:62vh;overflow:auto">
