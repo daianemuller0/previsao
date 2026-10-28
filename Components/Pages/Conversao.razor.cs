@@ -461,10 +461,22 @@ public partial class Conversao
     }
 
     /// <summary>Colunas empilhadas por mês: quantidade ou valor (R$), sempre partindo do zero.</summary>
+    private int? _anoBarras;
+    private List<int> AnosBarras() => _f.Where(i => i.Ano is not null).Select(i => i.Ano!.Value).Distinct().OrderBy(a => a).ToList();
+    private int AnoBarrasAtual()
+    {
+        var anos = AnosBarras();
+        if (anos.Count == 0) return DateTime.Today.Year;
+        return _anoBarras is { } y && anos.Contains(y) ? y : anos[^1];
+    }
+
+    /// <summary>Barras empilhadas de janeiro a dezembro do ano escolhido (ordem cronológica do calendário).</summary>
     private string SvgEmpilhado(IEnumerable<Item> src, int offset, bool qtd)
     {
-        var (meses, por) = Janela(src, offset);
-        if (meses.Count == 0) return Vazio("Nenhuma proposta com data de envio no recorte.");
+        var ano = AnoBarrasAtual();
+        var meses = Enumerable.Range(1, 12).Select(m => new DateTime(ano, m, 1)).ToList();
+        var por = src.Where(i => i.Ano == ano && i.Mes is not null).GroupBy(i => new DateTime(ano, i.Mes!.Value, 1)).ToDictionary(g => g.Key, g => Somar(g));
+        if (por.Count == 0) return Vazio("Nenhuma proposta com data de envio em " + ano + ".");
 
         double Val(Resumo r, int c) => qtd
             ? (c == 0 ? r.G : c == 1 ? r.P : c == 2 ? r.A : r.NC)
@@ -502,7 +514,7 @@ public partial class Conversao
                     acum += v;
                 }
             }
-            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 10)}' text-anchor='middle' font-size='10.5' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 10)}' text-anchor='middle' font-size='11.5' fill='#6b7a90' letter-spacing='.04em'>{Esc(meses[i].ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
         }
         sb.Append("</svg><div class='cvx-leg'>");
         for (var c = 0; c < cats; c++) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(Classes[c])}'></i>{NomeEn(Classes[c])}</span>");

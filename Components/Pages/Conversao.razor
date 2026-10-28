@@ -466,7 +466,19 @@ else
             <div class="cvx-card"><h2 class="cvx-h2s">Valor por BU Intercompany (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.BuIc)))</div>
         </div>
         <div class="cvx-card">
-            <div class="cvx-ch"><div><h2>Evolução mensal do valor das propostas (R$)</h2><p>Mês de envio, status atual · partem do zero</p></div></div>
+            <div class="cvx-ch">
+                <div><h2>Evolução mensal do valor das propostas (R$) · @AnoBarrasAtual()</h2><p>Janeiro a dezembro · mês de envio, status atual · barras partem do zero</p></div>
+                @if (AnosBarras().Count > 1)
+                {
+                    <div class="cvx-seg-ctl">
+                        @foreach (var y in AnosBarras())
+                        {
+                            var yy = y;
+                            <button class="@(AnoBarrasAtual() == yy ? "on" : "")" @onclick="() => _anoBarras = yy">@yy</button>
+                        }
+                    </div>
+                }
+            </div>
             @Html(SvgEmpilhado(_f, _offset, false))
         </div>
     </section>;
