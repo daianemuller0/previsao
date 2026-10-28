@@ -39,13 +39,17 @@ else
                 <button class="btn-ghost" title="Taxa USD/BRL de cada ano" @onclick="AbrirTaxas">@Icons.Svg("layers")Taxas de câmbio</button>
             }
             <button class="btn-ghost" title="Reler a planilha agora" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
-            <details class="cvx-menu">
-                <summary class="btn-primary">@Icons.Svg("download")Exportar</summary>
-                <div class="cvx-menu-p">
-                    <button disabled="@(!_temDados)" @onclick="AbrirRelatorio">Relatório executivo (PDF)</button>
-                    <button disabled="@(!_temDados)" @onclick="ExportarBase">Base de propostas (Excel)</button>
-                </div>
-            </details>
+            <div class="cvx-menu">
+                <button type="button" class="btn-primary" aria-expanded="@(_menuExp ? "true" : "false")" @onclick="() => _menuExp = !_menuExp">@Icons.Svg("download")Exportar</button>
+                @if (_menuExp)
+                {
+                    <div class="flt-multi-backdrop" @onclick="() => _menuExp = false"></div>
+                    <div class="cvx-menu-p">
+                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return AbrirRelatorio(); }">Relatório executivo (PDF)</button>
+                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return ExportarBase(); }">Base de propostas (Excel)</button>
+                    </div>
+                }
+            </div>
         </div>
     </div>
 
@@ -99,6 +103,12 @@ else
                 else { <span> Peça ao administrador para cadastrar a taxa.</span> }
             </div>
         }
+        @if (_r.SemData > 0)
+        {
+            <div class="cvx-alert">
+                <strong>@N0(_r.SemData) proposta(s) sem data de envio (US$ @_r.UsdSemData.ToString("N0", _pt))</strong> não entram nos valores em R$: sem data não há ano, logo não há taxa de câmbio. As quantidades estão completas.
+            </div>
+        }
 
         @if (_f.Count == 0)
         {
@@ -137,7 +147,9 @@ else
                     <tr>
                         <td class="col-strong">@a</td>
                         <td class="right"><input class="field num" style="max-width:120px;text-align:right" placeholder="ex.: 5,2000" value="@_taxasTxt.GetValueOrDefault(a, "")" @onchange="e => SetTaxa(a, e)" /></td>
-                        <td class="muted" style="font-size:12px">@(Cambio.Taxa(a) is { } t ? $"salva: {t.ToString("0.0000", _pt)}" : "sem taxa")</td>
+                        @if (Cambio.Taxa(a) is { } t) { <td class="muted" style="font-size:12px">salva: @t.ToString("0.0000", _pt)</td> }
+                        else if (TaxaPendente(a)) { <td style="font-size:12px;color:var(--neg);font-weight:700" title="Há propostas deste ano com valor em US$ que não estão sendo convertidas">pendente</td> }
+                        else { <td class="muted" style="font-size:12px">sem taxa</td> }
                     </tr>
                 }
             </tbody>
@@ -155,7 +167,8 @@ else
 }
 
 @code {
-    private Task ExportarBase() { var t = Colunas(); return Exportar(LinhasTabela(t), t); }
+    // Exportar do topo: o recorte global inteiro, sem a busca e a classificação da Base (essas valem no botão da própria Base).
+    private Task ExportarBase() { var t = Colunas(); return Exportar(_f.OrderByDescending(i => i.P.Data).ToList(), t); }
 
     private string TaxasTexto()
     {
@@ -224,7 +237,7 @@ else
             @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
                  "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
             @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas",
-                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
+                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta))
             @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
                  "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", CorG, DeltaPct(_r.G, _prev?.G))
             @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
@@ -354,17 +367,22 @@ else
         <div class="drawer-backdrop" @onclick="() => _vendSel = null"></div>
         <div class="drawer cvx-drawer">
             <div class="page-head">
-                <div><h2 style="color:var(--primary)">@nome</h2><p class="subtitle">Mesmos filtros e período do painel · @N0(rv.Total) propostas</p></div>
+                <div><h2 style="color:var(--primary)">@nome</h2><p class="subtitle">@(_seg is null ? "Mesmos filtros e período do painel" : "Mesmos filtros e período, sem o segmento") · @N0(rv.Total) propostas</p></div>
                 <button class="icon-btn" @onclick="() => _vendSel = null">@Icons.Svg("x")</button>
             </div>
+            @if (_seg is { } sgv) { <div class="cvx-note">Segmento @NomeEn(sgv) ignorado neste detalhamento: a taxa de conversão considera todas as classes.</div> }
             <div class="cvx-dkpis">
                 <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Decididas) decididas</span></div>
                 <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão por valor @TxValorGlobal(rv)</span></div>
             </div>
             <div class="cvx-dcmp">
-                @if (cmp is { } c)
+                @if (cmp is { } c && rv.Decididas < AmostraMinima)
                 {
-                    <span>Taxa de conversão <b>@(c >= 0 ? "acima" : "abaixo")</b> da média do grupo em <b>@Pp(c)</b> (grupo: @TxQtdGlobal(grp), @N0(grp.Decididas) decididas)</span>
+                    <span>Amostra pequena (@N0(rv.Decididas) decididas): comparação com o grupo (@TxQtdGlobal(grp)) apenas indicativa.</span>
+                }
+                else if (cmp is { } c2)
+                {
+                    <span>Taxa de conversão <b>@(c2 >= 0 ? "acima" : "abaixo")</b> da média do grupo em <b>@Pp(c2)</b> (grupo: @TxQtdGlobal(grp), @N0(grp.Decididas) decididas)</span>
                 }
                 else { <span>Comparação com o grupo indisponível: sem propostas decididas.</span> }
             </div>
@@ -464,7 +482,7 @@ else
                     </div>
                 }
             </div>
-            @Html(SvgEmpilhado(_f, _offset, false))
+            @Html(SvgEmpilhado(_fx, false))
         </div>
     </div>;
 
@@ -477,8 +495,15 @@ else
                 <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>Valor financeiro</button>
             </div>
         </div>
-        @Html(HtmlPareto(_metPerda == "qtd"))
-        <div class="cvx-insight static"><small>Loss Concentration</small><span>@TextoInsightPerda()</span></div>
+        @if (_seg is { } s && s != ClasseProposta.Perdida)
+        {
+            @Html(Vazio("Segmento " + NomeEn(s) + " ativo: a análise de perdas considera apenas propostas perdidas."))
+        }
+        else
+        {
+            @Html(HtmlPareto(_metPerda == "qtd"))
+            <div class="cvx-insight static"><small>Concentração das perdas</small><span>@TextoInsightPerda()</span></div>
+        }
     </section>;
 
     // ---- financeiro -----------------------------------------------------------
@@ -505,6 +530,10 @@ else
             <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@Fmt.Brl(geral.VTotal) na base toda)</li>
             <li class="@(okTabela ? "ok" : "bad")">@(okTabela ? "✔" : "✖") Base de Propostas e dashboard usam o mesmo recorte: @N0(_f.Count) registros</li>
             <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") Propostas com valor mas sem taxa de câmbio: @N0(geral.SemTaxa)@(geral.SemTaxa > 0 ? $" (US$ {geral.UsdSemTaxa.ToString("N0", _pt)} fora dos valores em R$)" : "")</li>
+            @if (geral.SemData > 0)
+            {
+                <li class="bad">✖ Propostas com valor mas sem data de envio: @N0(geral.SemData) (US$ @geral.UsdSemData.ToString("N0", _pt) fora dos valores em R$)</li>
+            }
             <li class="info">ℹ Propostas sem valor em US$ na planilha: @N0(geral.SemValor) — contam nas quantidades, não nos valores</li>
         </ul>
 
@@ -516,10 +545,10 @@ else
                 {
                     <tr>
                         <td><b>@l.Ano</b></td>
-                        <td class="r">@(l.Taxa is { } tx ? tx.ToString("0.0000", _pt) : "não cadastrada")</td>
+                        <td class="r">@(l.Taxa is { } tx ? tx.ToString("0.0000", _pt) : l.Ano == "Sem data" ? "sem data de envio" : "não cadastrada")</td>
                         <td class="r">@N0(l.Propostas)</td>
                         <td class="r">@l.Usd.ToString("N0", _pt)</td>
-                        <td class="r">@(l.Taxa is null ? "Não convertido" : Fmt.Brl(l.Brl))</td>
+                        <td class="r">@(l.Taxa is null ? (l.Ano == "Sem data" ? "—" : "Não convertido") : Fmt.Brl(l.Brl))</td>
                         <td class="r" style="@(l.SemTaxa > 0 ? "color:var(--neg);font-weight:700" : "")">@N0(l.SemTaxa)</td>
                     </tr>
                 }
@@ -689,8 +718,8 @@ else
                 </div>
                 <div class="rpt-box">
                     <h3>Concentração das perdas</h3>
-                    @Html(HtmlPareto(true))
-                    <p class="rpt-small">@TextoInsightPerda()</p>
+                    @Html(HtmlPareto(true, false))
+                    <p class="rpt-small">@TextoInsightPerda(false)</p>
                 </div>
             </div>
             <div class="rpt-box">

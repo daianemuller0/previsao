@@ -2119,9 +2119,9 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-err { background:rgba(194,105,64,.25); padding:2px 8px; border-radius:6px; }
 .cvx-actions { display:flex; gap:8px; align-items:center; }
 .cvx-menu { position:relative; }
-.cvx-menu > summary { list-style:none; cursor:pointer; }
-.cvx-menu > summary::-webkit-details-marker { display:none; }
-.cvx-menu-p { position:absolute; right:0; top:calc(100% + 6px); z-index:30; background:#fff; color:var(--cx-text); border:1px solid var(--cx-line); border-radius:10px; box-shadow:0 10px 30px rgba(18,38,63,.18); padding:6px; min-width:210px; display:flex; flex-direction:column; }
+.cvx-menu > .btn-primary { display:inline-flex; }
+.cvx-menu > .flt-multi-backdrop { z-index:58; }
+.cvx-menu-p { position:absolute; right:0; top:calc(100% + 6px); z-index:60; background:#fff; color:var(--cx-text); border:1px solid var(--cx-line); border-radius:10px; box-shadow:0 10px 30px rgba(18,38,63,.18); padding:6px; min-width:210px; display:flex; flex-direction:column; }
 .cvx-menu-p button { text-align:left; background:none; border:0; padding:8px 10px; border-radius:6px; font-size:13px; cursor:pointer; color:inherit; }
 .cvx-menu-p button:hover { background:var(--cx-bg); }
 
@@ -2364,7 +2364,6 @@ html { scroll-behavior: smooth; }
 .cvx .page-head h1 { color:var(--primary); }
 .cvx .page-head .subtitle { line-height:1.5; }
 .cvx-err { background:var(--orange-bg); color:#8a4a10; border-radius:6px; padding:1px 8px; margin-left:8px; }
-.cvx-menu > summary.btn-primary { display:inline-flex; }
 
 /* Barra de filtros + índice (mesma faixa fixa da Visão Executiva) */
 .cvx-fb { align-items:center; }

@@ -18,7 +18,7 @@ namespace HowdenSalesForecast.Components.Pages;
 //        segmento ativo, taxa de ganho não faz sentido (só ganhas, só perdidas…)
 //        e aparece como "—".
 // ===========================================================================
-public partial class Conversao
+public partial class Conversao : IAsyncDisposable
 {
     // ---- cultura, cores e nomes ------------------------------------------------
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
@@ -49,8 +49,8 @@ public partial class Conversao
     {
         ClasseProposta.Ganha => "Ganhas: status Closed - Won ou OTP.",
         ClasseProposta.Perdida => "Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid ou Closed - Unknown.",
-        ClasseProposta.Aberta => "Open: status Open — ainda sem resultado.",
-        _ => "Unclassified: status fora da lista combinada, aguardando validação. Fica fora de ganhas, perdidas e abertas.",
+        ClasseProposta.Aberta => "Abertas: status Open — ainda sem resultado.",
+        _ => "Não classificadas: status fora da lista combinada, aguardando validação. Fica fora de ganhas, perdidas e abertas.",
     };
     private static string ClasseCss(ClasseProposta c) => c switch
     {
@@ -71,7 +71,7 @@ public partial class Conversao
     private int Ativos => new[] { _anos, _meses, _vend, _bus, _buIcs }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
     private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
         new[] { ("Ano", _anos), ("Mês", _meses), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs) }.Where(x => x.Item2.Count > 0);
-    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _pag = 0; _offset = 0; }
+    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _pag = 0; }
     private void AlternarSeg(ClasseProposta c) => _seg = _seg == c ? null : c;
 
     private static void Alternar(HashSet<string> set, string v) { if (!set.Remove(v)) set.Add(v); }
@@ -81,8 +81,8 @@ public partial class Conversao
 
     private sealed class Resumo
     {
-        public int Total, G, P, A, NC, SemTaxa, SemValor;
-        public double VG, VP, VA, VNC, UsdSemTaxa;
+        public int Total, G, P, A, NC, SemTaxa, SemValor, SemData;
+        public double VG, VP, VA, VNC, UsdSemTaxa, UsdSemData;
         /// <summary>Por classe: quantas têm valor em US$ e quantas foram convertidas (têm taxa do ano).</summary>
         public readonly int[] ComUsd = new int[4];
         public readonly int[] Conv = new int[4];
@@ -100,8 +100,8 @@ public partial class Conversao
     private List<Item> _f = new(), _fx = new();
     private Resumo _r = new(), _rx = new();
     private Resumo? _prev;
+    private string _prevRotulo = "";                 // rótulo do período comparável: "2025" ou "jan–out/2025"
     private (int, int) _chave = (-1, -1);
-    private int _offset, _offsetMax;                 // navegação histórica da tendência (meses para trás)
 
     private void Recalcular()
     {
@@ -111,17 +111,18 @@ public partial class Conversao
         _fx = _seg is { } s ? _f.Where(i => i.P.Classe == s).ToList() : _f;
         _r = Somar(_f);
         _rx = ReferenceEquals(_fx, _f) ? _r : Somar(_fx);
-        _prev = null;
+        _prev = null; _prevRotulo = "";
         // Período comparável: só com UM ano escolhido — mesmos filtros e meses, ano anterior.
+        // Sem filtro de mês, compara o mesmo período do ano (YTD): jan até o último mês com dados do ano
+        // na BASE INTEIRA (o corte de calendário não pode depender de vendedor/BU filtrados).
         if (_anos.Count == 1 && int.TryParse(_anos.First(), out var a))
         {
-            var p = Somar(Aplicar("ano").Where(i => i.Ano == a - 1));
+            var mesMax = _meses.Count > 0 ? 12 : _itens.Where(i => i.Ano == a && i.Mes is not null).Select(i => i.Mes!.Value).DefaultIfEmpty(12).Max();
+            var p = Somar(Aplicar("ano").Where(i => i.Ano == a - 1 && i.Mes is { } m && m <= mesMax));
             if (p.Total > 0) _prev = p;
+            string MesAbrev(int m) => new DateTime(2000, m, 1).ToString("MMM", _pt).TrimEnd('.');
+            _prevRotulo = mesMax >= 12 ? (a - 1).ToString() : mesMax == 1 ? $"jan/{a - 1}" : $"jan\u2060–\u2060{MesAbrev(mesMax)}/{a - 1}"; // word joiner: o rótulo não quebra no traço
         }
-        var meses = _f.Where(i => i.Ano is not null).Select(i => i.Ano!.Value * 12 + i.Mes!.Value).Distinct().ToList();
-        _offsetMax = meses.Count == 0 ? 0 : Math.Max(0, meses.Max() - meses.Min() + 1 - 12);
-        if (_offset > _offsetMax) _offset = _offsetMax;
-        if (_offset < 0) _offset = 0;
     }
 
     private void Reconstruir()
@@ -168,7 +169,11 @@ public partial class Conversao
             else
             {
                 r.ComUsd[k]++;
-                if (i.Brl is null) { r.SemTaxa++; r.UsdSemTaxa += i.P.ValorUsd.Value; } else r.Conv[k]++;
+                var usd = i.P.ValorUsd.Value;
+                // sem data de envio não há ano, logo não há taxa: são problemas distintos
+                if (i.Ano is null) { r.SemData++; r.UsdSemData += usd; }
+                else if (i.Brl is null) { r.SemTaxa++; r.UsdSemTaxa += usd; }
+                else r.Conv[k]++;
             }
         }
         return r;
@@ -187,7 +192,7 @@ public partial class Conversao
     private IEnumerable<string> OpBuIcs => Aplicar("buic").Select(i => i.P.BuIc).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
 
     private IEnumerable<string> AnosSemTaxa() =>
-        _f.Where(i => i.P.ValorUsd is not null && i.Brl is null).Select(AnoTxt).Distinct().OrderBy(x => x);
+        _f.Where(i => i.Ano is not null && i.P.ValorUsd is not null && i.Brl is null).Select(AnoTxt).Distinct().OrderBy(x => x);
 
     // ---- ciclo de vida -----------------------------------------------------------
     protected override async Task OnInitializedAsync()
@@ -236,7 +241,7 @@ public partial class Conversao
     private static string EstadoTip(int comUsd, int conv, double v) =>
         comUsd == 0 ? "Nenhuma proposta com valor em US$ informado."
         : conv == 0 ? "Há valor em US$, mas falta a taxa de câmbio do ano da proposta (ou a data de envio)."
-        : Fmt.Brl(v) + (conv < comUsd ? $" · parcial: {comUsd - conv} proposta(s) sem taxa ficaram de fora." : "");
+        : Fmt.Brl(v) + (conv < comUsd ? $" · parcial: {comUsd - conv} proposta(s) sem taxa de câmbio ou sem data de envio ficaram de fora." : "");
 
     private static string Din(Resumo r, ClasseProposta c) => Estado(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
     private static string DinTip(Resumo r, ClasseProposta c) => EstadoTip(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
@@ -260,17 +265,17 @@ public partial class Conversao
 
     // variação sobre o período comparável
     private string? DeltaPct(double atual, double? anterior) =>
-        anterior is > 0 && _prev is not null ? $"{(atual - anterior.Value) / anterior.Value * 100:+0;-0;0}% vs {int.Parse(_anos.First()) - 1}" : null;
+        anterior is > 0 && _prev is not null ? $"{(atual - anterior.Value) / anterior.Value * 100:+0;-0;0}% vs {_prevRotulo}" : null;
 
     private (string Texto, string Css) DeltaWin()
     {
         if (_anos.Count != 1 || !int.TryParse(_anos.First(), out var ano))
             return ("", "flat");
-        if (_prev is null) return ($"Sem dados comparáveis em {ano - 1}", "flat");
-        if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return ($"Sem propostas decididas para comparar com {ano - 1}", "flat");
+        if (_prev is null) return ($"Sem dados comparáveis em {_prevRotulo}", "flat");
+        if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return ($"Sem propostas decididas para comparar com {_prevRotulo}", "flat");
         var d = cur - ant;
-        if (Math.Abs(d) < 0.05) return ($"Estável vs {ano - 1} (0,0 p.p.)", "flat");
-        return ($"{(d > 0 ? "▲" : "▼")} {Pp(d)} vs {ano - 1} ({P1(ant)})", d > 0 ? "up" : "down");
+        if (Math.Abs(d) < 0.05) return ($"Estável vs {_prevRotulo} (0,0 p.p.)", "flat");
+        return ($"{(d > 0 ? "▲" : "▼")} {Pp(d)} vs {_prevRotulo} ({P1(ant)})", d > 0 ? "up" : "down");
     }
 
     private string PeriodoTxt()
@@ -309,7 +314,7 @@ public partial class Conversao
         if (ano is { } y && _prev is not null && _r.Decididas >= AmostraMinima && _prev.Decididas >= AmostraMinima
             && _r.TaxaQtd is { } cur && _prev.TaxaQtd is { } ant && Math.Abs(cur - ant) >= 0.5)
             res.Add(new("Taxa de conversão",
-                $"A taxa de ganho {(cur > ant ? "avançou" : "recuou")} {Pp(cur - ant)} em relação a {y - 1} ({P1(ant)} → {P1(cur)}), sobre {N0(_r.Decididas)} propostas decididas.",
+                $"A taxa de ganho {(cur > ant ? "avançou" : "recuou")} {Pp(cur - ant)} em relação a {_prevRotulo} ({P1(ant)} → {P1(cur)}), sobre {N0(_r.Decididas)} propostas decididas.",
                 "overview", "", "Ver tendência"));
 
         // 3) concentração das perdas (status ≠ causa comercial)
@@ -344,7 +349,7 @@ public partial class Conversao
             var d = ((double)_r.Total - _prev.Total) / _prev.Total * 100;
             if (Math.Abs(d) >= 20)
                 res.Add(new("Volume de propostas",
-                    $"O volume de propostas enviadas {(d > 0 ? "cresceu" : "recuou")} {Math.Abs(d).ToString("0", _pt)}% frente a {y2 - 1}: {N0(_r.Total)} contra {N0(_prev.Total)}.",
+                    $"O volume de propostas enviadas {(d > 0 ? "cresceu" : "recuou")} {Math.Abs(d).ToString("0", _pt)}% frente a {_prevRotulo}: {N0(_r.Total)} contra {N0(_prev.Total)}.",
                     "overview", "", "Ver evolução"));
         }
 
@@ -475,12 +480,16 @@ public partial class Conversao
     }
 
     /// <summary>Barras empilhadas de janeiro a dezembro do ano escolhido (ordem cronológica do calendário).</summary>
-    private string SvgEmpilhado(IEnumerable<Item> src, int offset, bool qtd)
+    private string SvgEmpilhado(IEnumerable<Item> src, bool qtd)
     {
         var ano = AnoBarrasAtual();
         var meses = Enumerable.Range(1, 12).Select(m => new DateTime(ano, m, 1)).ToList();
         var por = src.Where(i => i.Ano == ano && i.Mes is not null).GroupBy(i => new DateTime(ano, i.Mes!.Value, 1)).ToDictionary(g => g.Key, g => Somar(g));
         if (por.Count == 0) return Vazio("Nenhuma proposta com data de envio em " + ano + ".");
+        // valor nunca vira zero silencioso: sem taxa do ano, o gráfico diz isso em vez de barras vazias
+        if (!qtd && por.Values.All(r => r.TotConv == 0))
+            return Vazio(por.Values.Any(r => r.TotComUsd > 0) ? $"Valores de {ano} não convertidos: falta a taxa USD/BRL do ano." : $"Nenhuma proposta com valor em US$ em {ano}.");
+        var temParcial = false;
 
         double Val(Resumo r, int c) => qtd
             ? (c == 0 ? r.G : c == 1 ? r.P : c == 2 ? r.A : r.NC)
@@ -490,7 +499,7 @@ public partial class Conversao
         double maxY = 1;
         foreach (var r in por.Values) maxY = Math.Max(maxY, Enumerable.Range(0, cats).Sum(c => Val(r, c)));
 
-        const double W = 1000, H = 300, L = 56, Rr = 14, T = 14, B = 30;
+        const double W = 1000, H = 300, L = 74, Rr = 14, T = 24, B = 30;
         var passo = (W - L - Rr) / meses.Count; var larg = Math.Min(passo * 0.62, 46);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
         string Rot(double v) => qtd ? F(Math.Round(v)) : R(v);
@@ -517,12 +526,20 @@ public partial class Conversao
                     sb.Append($"<rect class='cv-seg' x='{F(x)}' y='{F(Y(acum + v))}' width='{F(larg)}' height='{F(Y(acum) - Y(acum + v))}' fill='{Cor(cls)}' rx='2'><title>{EscTip(tip)}</title></rect>");
                     acum += v;
                 }
+                var parcial = !qtd && r.TotConv > 0 && r.TotConv < r.TotComUsd;
+                if (parcial) temParcial = true;
+                if (acum > 0)
+                    sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(acum) - 6)}' text-anchor='middle' font-size='11' font-weight='700' fill='#3b4a61'>{Esc(qtd ? N0((int)acum) : Mon(acum) + (parcial ? "*" : ""))}</text>");
+                else if (!qtd && r.TotComUsd > 0 && r.TotConv == 0)
+                    sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(0) - 6)}' text-anchor='middle' font-size='11' fill='#c0392b'>n/c<title>Não convertido: falta a taxa de câmbio</title></text>");
             }
             sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 10)}' text-anchor='middle' font-size='11.5' fill='#6b7a90' letter-spacing='.04em'>{Esc(meses[i].ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
         }
         sb.Append("</svg><div class='cvx-leg'>");
         for (var c = 0; c < cats; c++) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(Classes[c])}'></i>{NomeEn(Classes[c])}</span>");
-        sb.Append("</div></div>");
+        sb.Append("</div>");
+        if (temParcial) sb.Append("<p class='cvx-note'>* mês com propostas sem taxa de câmbio (valor parcial)</p>");
+        sb.Append("</div>");
         return sb.ToString();
     }
 
@@ -569,38 +586,39 @@ public partial class Conversao
 
         // Paleta no padrão dos gráficos executivos: ano atual em azul-petróleo sólido, anteriores em tons distintos.
         string[] cores = { "#0b6c8c", "#d98324", "#1f9254", "#6b4fa3", "#c0392b", "#93a1b5" };
-        var mesAtual = Enumerable.Range(1, 12).Where(m => Val(anos[0], m) is not null).DefaultIfEmpty(0).Max();
+        // mês corrente real (calendário), não o último mês com dado
+        var hoje = DateTime.Today; var mesAtual = anos[0] == hoje.Year ? hoje.Month : 0;
         double W = 1200, H = 400, L = 70, Rr = 30, T = 44, B = 40;
         var passo = (W - L - Rr) / 12;
         double X(int m) => L + passo * (m - 0.5);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
         string Lbl(double v) => met == "winrate" ? Math.Round(v).ToString(Inv) + "%" : Rot(v);
 
-        // Curva suave (Catmull-Rom → Bézier), como nas linhas do Power BI.
-        string Suave(List<(double X, double Y)> p)
+        // Linhas retas ponto a ponto (padrão das polylines da Visão Executiva): sem curvas que inventem picos.
+        string Suave(List<(double X, double Y)> p) => "M " + string.Join(" L ", p.Select(q => F(q.X) + "," + F(q.Y)));
+
+        // Ponto frágil: mês em andamento ou, na taxa, poucas decididas / mais de 30% ainda abertas.
+        bool Fraco(int a, int m)
         {
-            if (p.Count == 1) return $"M {F(p[0].X)},{F(p[0].Y)}";
-            var d = new StringBuilder($"M {F(p[0].X)},{F(p[0].Y)}");
-            for (var i = 0; i < p.Count - 1; i++)
-            {
-                var p0 = i == 0 ? p[i] : p[i - 1]; var p1 = p[i]; var p2 = p[i + 1]; var p3 = i + 2 < p.Count ? p[i + 2] : p2;
-                var c1x = p1.X + (p2.X - p0.X) / 6; var c1y = p1.Y + (p2.Y - p0.Y) / 6;
-                var c2x = p2.X - (p3.X - p1.X) / 6; var c2y = p2.Y - (p3.Y - p1.Y) / 6;
-                d.Append($" C {F(c1x)},{F(c1y)} {F(c2x)},{F(c2y)} {F(p2.X)},{F(p2.Y)}");
-            }
-            return d.ToString();
+            if (a == hoje.Year && m == hoje.Month) return true;
+            if (met != "winrate") return false;
+            por.TryGetValue((a, m), out var rr);
+            return rr is not null && (rr.Decididas < 5 || (rr.Total > 0 && (double)rr.A / rr.Total > .30));
         }
+        var temFraco = Enumerable.Range(1, 12).Any(m => Val(anos[0], m) is not null && Fraco(anos[0], m));
 
         var sb = new StringBuilder("<div class='chart-body cvx-anual'><div class='cvx-leg top'>");
         for (var k = 0; k < anos.Count; k++)
             sb.Append($"<span><i class='cvx-ln' style='border-top-color:{cores[k % cores.Length]}'></i>{anos[k]}</span>");
+        if (temFraco)
+            sb.Append($"<span><i class='cvx-pt' style='border-color:{cores[0]}'></i>{(met == "winrate" ? "Mês em andamento, poucas decididas ou mais de 30% abertas: o valor pode mudar" : "Mês em andamento: o valor pode mudar")}</span>");
         sb.Append("</div>");
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano' preserveAspectRatio='xMidYMid meet'>");
         sb.Append($"<defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cores[0]}' stop-opacity='.18'/><stop offset='100%' stop-color='{cores[0]}' stop-opacity='0'/></linearGradient></defs>");
         for (var g = 0; g <= 4; g++)
         {
             var v = maxY * g / 4;
-            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='{(g == 0 ? "#d3dcea" : "#edf1f6")}' stroke-width='{(g == 0 ? 1.2 : 1)}'/>");
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='{(g == 0 ? "#d3dcea" : "#edf1f6")}' stroke-width='{F(g == 0 ? 1.2 : 1)}'/>");
             sb.Append($"<text x='{F(L - 14)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(g == 0 ? "0" : Lbl(v))}</text>");
         }
         // faixa do mês atual
@@ -624,10 +642,10 @@ public partial class Conversao
             foreach (var s in segs)
             {
                 var caminho = Suave(s);
-                if (atual && s.Count > 1)
+                if (atual && met != "winrate" && s.Count > 1)
                     sb.Append($"<path d='{caminho} L {F(s[^1].X)},{F(Y(0))} L {F(s[0].X)},{F(Y(0))} Z' fill='url(#cvArea)' stroke='none'/>");
                 if (s.Count > 1)
-                    sb.Append($"<path d='{caminho}' fill='none' stroke='{cor}' stroke-width='{(atual ? 4 : 2.6)}' stroke-linejoin='round' stroke-linecap='round' opacity='{(atual ? 1 : .9)}'/>");
+                    sb.Append($"<path d='{caminho}' fill='none' stroke='{cor}' stroke-width='{F(atual ? 4 : 2.6)}' stroke-linejoin='round' stroke-linecap='round' opacity='{F(atual ? 1 : 0.9)}'/>");
             }
             for (var m = 1; m <= 12; m++)
             {
@@ -635,10 +653,14 @@ public partial class Conversao
                 var tip = EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}");
                 if (atual)
                 {
-                    sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='6' fill='#fff' stroke='{cor}' stroke-width='3'><title>{tip}</title></circle>");
+                    // ponto cheio = valor consolidado; vazado e tracejado = pode mudar
+                    var fraco = Fraco(a, m);
+                    sb.Append(fraco
+                        ? $"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='6' fill='#fff' stroke='{cor}' stroke-width='2.5' stroke-dasharray='3 2'><title>{tip}</title></circle>"
+                        : $"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='6' fill='{cor}' stroke='#fff' stroke-width='2.5'><title>{tip}</title></circle>");
                     var lab = Lbl(v.Value); var lw = lab.Length * 7.4 + 14;
                     sb.Append($"<rect x='{F(X(m) - lw / 2)}' y='{F(Y(v.Value) - 32)}' width='{F(lw)}' height='20' rx='10' fill='#fff' stroke='#d3dcea' stroke-width='1'/>");
-                    sb.Append($"<text x='{F(X(m))}' y='{F(Y(v.Value) - 18)}' text-anchor='middle' font-size='12' font-weight='700' fill='{cor}'>{Esc(lab)}</text>");
+                    sb.Append($"<text x='{F(X(m))}' y='{F(Y(v.Value) - 18)}' text-anchor='middle' font-size='12' font-weight='700' fill='{(fraco ? "#8a97ab" : cor)}'>{Esc(lab)}</text>");
                 }
                 else
                     sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='4' fill='{cor}' stroke='#fff' stroke-width='1.5'><title>{tip}</title></circle>");
@@ -679,9 +701,10 @@ public partial class Conversao
 
     private static readonly string[] StatusPerda = { "Cancelled", "Closed - Customer Lost", "Closed - Lost", "Closed - No Bid", "Closed - Unknown" };
 
-    private List<(string Nome, int Qtd, double Valor, int ComUsd, int Conv)> LinhasPareto(bool qtd)
+    private List<(string Nome, int Qtd, double Valor, int ComUsd, int Conv)> LinhasPareto(bool qtd, bool comSegmento)
     {
-        var perdidas = _f.Where(i => i.P.Classe == ClasseProposta.Perdida).ToList();
+        // Na página segue o segmento da barra de composição (_fx); no relatório, o recorte global (_f).
+        var perdidas = (comSegmento ? _fx : _f).Where(i => i.P.Classe == ClasseProposta.Perdida).ToList();
         var l = StatusPerda.Select(s =>
         {
             var chave = ConversaoService.NormalizarStatus(s);
@@ -694,9 +717,9 @@ public partial class Conversao
 
     private string _metPerda = "qtd";
     /// <summary>Pareto horizontal: barra por status, participação e % acumulado.</summary>
-    private string HtmlPareto(bool qtd)
+    private string HtmlPareto(bool qtd, bool comSegmento = true)
     {
-        var linhas = LinhasPareto(qtd);
+        var linhas = LinhasPareto(qtd, comSegmento);
         var totQ = linhas.Sum(x => x.Qtd); var totV = linhas.Sum(x => x.Valor);
         if (totQ == 0) return Vazio("Nenhuma proposta perdida no recorte.");
         var max = Math.Max(linhas.Max(x => qtd ? x.Qtd : x.Valor), 0.0000001);
@@ -717,15 +740,15 @@ public partial class Conversao
         return sb.ToString();
     }
 
-    private string TextoInsightPerda()
+    private string TextoInsightPerda(bool comSegmento = true)
     {
-        var linhas = LinhasPareto(true);
+        var linhas = LinhasPareto(true, comSegmento);
         var tot = linhas.Sum(x => x.Qtd);
         if (tot == 0) return "Sem propostas perdidas no recorte atual.";
         var top = linhas.First();
         var totV = linhas.Sum(x => x.Valor);
         var s = $"{top.Nome} representa {PctDe(top.Qtd, tot)} das propostas classificadas como perdidas ({N0(top.Qtd)} de {N0(tot)}).";
-        var topV = LinhasPareto(false).First();
+        var topV = LinhasPareto(false, comSegmento).First();
         if (totV > 0 && topV.Nome != top.Nome) s += $" Em valor, o maior impacto é de {topV.Nome} ({PctDe(topV.Valor, totV)} do valor perdido convertido).";
         else if (totV > 0) s += $" Em valor, também lidera, com {PctDe(topV.Valor, totV)} do valor perdido convertido.";
         return s;
@@ -782,10 +805,13 @@ public partial class Conversao
     /// <summary>Valor ganho/perdido/aberto por unidade, em barras empilhadas partindo do zero.</summary>
     private string HtmlValorPorUnidade(List<(string Nome, Resumo R)> grupos)
     {
-        var l = grupos.Where(x => x.R.TotConv > 0).OrderByDescending(x => x.R.VTotal).Take(10).ToList();
-        if (l.Count == 0) return Vazio("Sem valores convertidos por unidade no recorte.");
+        // participação sobre o total de TODAS as unidades convertidas, não só do top 10
+        var todos = grupos.Where(x => x.R.TotConv > 0).ToList();
+        var soma = Math.Max(todos.Sum(x => x.R.VTotal), 1e-7);
+        var l = todos.OrderByDescending(x => x.R.VTotal).Take(10).ToList();
+        var semConv = grupos.Count(x => x.R.TotComUsd > 0 && x.R.TotConv == 0);
+        if (l.Count == 0) return Vazio(semConv > 0 ? "Valores por unidade não convertidos: falta a taxa USD/BRL do ano." : "Sem valores convertidos por unidade no recorte.");
         var max = Math.Max(l.Max(x => x.R.VTotal), 0.0000001);
-        var soma = Math.Max(l.Sum(x => x.R.VTotal), 0.0000001);
         var sb = new StringBuilder("<div class='rank cvx-rk'>");
         sb.Append("<div class='rank-head'><span></span><span>Unidade</span><span>Ganho · perdido · aberto</span><span class='r'>Valor total</span><span class='r'>Part.</span></div>");
         var pos = 0;
@@ -797,11 +823,13 @@ public partial class Conversao
             sb.Append($"<span class='rank-num'>{pos}</span><span class='rank-name'>{Esc(nome)}</span>");
             sb.Append($"<span class='rank-barwrap'><span class='rank-track'><span class='cvx-stk' style='width:{F(r.VTotal / max * 100)}%'>");
             foreach (var cl in Classes) if (r.Val(cl) > 0) sb.Append($"<i style='flex:{F(r.Val(cl))};background:{Cor(cl)}'></i>");
-            sb.Append($"</span></span></span><span class='rank-val'>{Esc(R(r.VTotal))}</span><span class='rank-share'>{Esc(PctDe(r.VTotal, soma))}</span></div>");
+            sb.Append($"</span></span></span><span class='rank-val' title='{EscTip(DinTotalTip(r))}'>{Esc(DinTotal(r))}</span><span class='rank-share'>{Esc(PctDe(r.VTotal, soma))}</span></div>");
         }
         sb.Append("</div><div class='cvx-leg'>");
         foreach (var cl in Classes) if (cl != ClasseProposta.NaoClassificada || l.Any(x => x.R.VNC > 0)) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(cl)}'></i>{NomeEn(cl)}</span>");
         sb.Append("</div>");
+        if (semConv > 0) sb.Append($"<p class='cvx-note'>{semConv} unidade(s) com valor em US$ sem taxa de câmbio não aparecem.</p>");
+        if (todos.Count > 10) sb.Append($"<p class='cvx-note'>Top 10 de {todos.Count} unidades; participação sobre o total do recorte.</p>");
         return sb.ToString();
     }
 
@@ -866,7 +894,7 @@ public partial class Conversao
             new("classe", "Classificação", "center", i => NomeClasse(i.P.Classe), i => (int)i.P.Classe),
             new("usd", "Valor original (US$)", "right", i => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", _pt) : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)"), i => i.P.ValorUsd),
             new("taxa", "Taxa aplicada", "right", i => i.Taxa is { } t ? t.ToString("0.0000", _pt) : "sem taxa", i => i.Taxa),
-            new("brl", "Valor convertido (R$)", "right", i => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (i.P.ValorUsd is null ? "—" : "não convertido"), i => i.Brl),
+            new("brl", "Valor convertido (R$)", "right", i => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (i.P.ValorUsd is null ? "—" : "Não convertido"), i => i.Brl),
             new("linha", "Linha na planilha", "center", i => i.P.Linha.ToString(), i => i.P.Linha),
         };
         foreach (var c in Conv.Atual.Colunas)
@@ -931,41 +959,51 @@ public partial class Conversao
     private async Task Exportar(List<Item> linhas, List<Col> todas)
     {
         if (linhas.Count == 0) return;
-        using var wb = new ClosedXML.Excel.XLWorkbook();
-        var ws = wb.Worksheets.Add("Base de Propostas");
-        for (var c = 0; c < todas.Count; c++) ws.Cell(1, c + 1).Value = todas[c].Titulo;
-        ws.Row(1).Style.Font.Bold = true;
-        for (var r = 0; r < linhas.Count; r++)
+        // O workbook é montado fora do circuito do Blazor: bases grandes não travam a tela.
+        var bytes = await Task.Run(() =>
         {
-            var i = linhas[r];
-            for (var c = 0; c < todas.Count; c++)
+            using var wb = new ClosedXML.Excel.XLWorkbook();
+            var ws = wb.Worksheets.Add("Base de Propostas");
+            for (var c = 0; c < todas.Count; c++) ws.Cell(1, c + 1).Value = todas[c].Titulo;
+            ws.Row(1).Style.Font.Bold = true;
+            for (var r = 0; r < linhas.Count; r++)
             {
-                var cel = ws.Cell(r + 2, c + 1);
-                switch (todas[c].Key)
+                var i = linhas[r];
+                for (var c = 0; c < todas.Count; c++)
                 {
-                    case "usd": if (i.P.ValorUsd is { } u) { cel.Value = u; cel.Style.NumberFormat.Format = "#,##0.00"; } break;
-                    case "taxa": if (i.Taxa is { } t) { cel.Value = t; cel.Style.NumberFormat.Format = "0.0000"; } else cel.Value = "sem taxa"; break;
-                    case "brl": if (i.Brl is { } b) { cel.Value = b; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.ValorUsd is not null) cel.Value = "não convertido"; break;
-                    case "ano": if (i.Ano is { } a) cel.Value = a; break;
-                    case "linha": cel.Value = i.P.Linha; break;
-                    case "data": if (i.P.Data is { } d) { cel.Value = d; cel.Style.DateFormat.Format = "dd/MM/yyyy"; } break;
-                    default: cel.Value = todas[c].Texto(i) == "—" ? "" : todas[c].Texto(i); break;
+                    var cel = ws.Cell(r + 2, c + 1);
+                    switch (todas[c].Key)
+                    {
+                        // sinais de qualidade do dado (ilegível / inválida) não somem no Excel
+                        case "usd": if (i.P.ValorUsd is { } u) { cel.Value = u; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.ValorTexto != "") cel.Value = i.P.ValorTexto + " (ilegível)"; break;
+                        case "taxa": if (i.Taxa is { } t) { cel.Value = t; cel.Style.NumberFormat.Format = "0.0000"; } else cel.Value = "sem taxa"; break;
+                        case "brl": if (i.Brl is { } b) { cel.Value = b; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.ValorUsd is not null) cel.Value = "Não convertido"; break;
+                        case "ano": if (i.Ano is { } a) cel.Value = a; break;
+                        case "linha": cel.Value = i.P.Linha; break;
+                        case "data": if (i.P.Data is { } d) { cel.Value = d; cel.Style.DateFormat.Format = "dd/MM/yyyy"; } else if (i.P.DataTexto != "") cel.Value = i.P.DataTexto + " (inválida)"; break;
+                        default: cel.Value = todas[c].Texto(i) == "—" ? "" : todas[c].Texto(i); break;
+                    }
                 }
             }
+            ws.SheetView.FreezeRows(1);
+            ws.RangeUsed()?.SetAutoFilter();
+            ws.Columns(1, Math.Min(todas.Count, 12)).AdjustToContents();
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return ms.ToArray();
+        });
+        try
+        {
+            await JS.InvokeVoidAsync("appDownload", $"conversao_propostas_{DateTime.Now:yyyy-MM-dd_HHmm}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
         }
-        ws.SheetView.FreezeRows(1);
-        ws.RangeUsed()?.SetAutoFilter();
-        ws.Columns(1, Math.Min(todas.Count, 12)).AdjustToContents();
-        using var ms = new MemoryStream();
-        wb.SaveAs(ms);
-        await JS.InvokeVoidAsync("appDownload", $"base_de_propostas_{DateTime.Today:yyyy-MM-dd}.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(ms.ToArray()));
+        catch { /* download indisponível (circuito encerrado): ignora */ }
     }
 
     // ======================================================================
     //  RELATÓRIO EXECUTIVO (impressão / PDF)
     // ======================================================================
-    private bool _relatorio;
+    private bool _relatorio, _menuExp;
     private async Task AbrirRelatorio()
     {
         _relatorio = true;
@@ -981,6 +1019,12 @@ public partial class Conversao
         try { await JS.InvokeVoidAsync("appPrint"); } catch { }
     }
 
+    // Saindo da página com o relatório aberto: devolve o @page normal (retrato) às outras abas.
+    public async ValueTask DisposeAsync()
+    {
+        if (_relatorio) { try { await JS.InvokeVoidAsync("cvRelatorio", false); } catch { } }
+    }
+
     // ======================================================================
     //  TAXAS DE CÂMBIO (administrador)
     // ======================================================================
@@ -989,6 +1033,9 @@ public partial class Conversao
     private readonly Dictionary<int, string> _taxasTxt = new();
     private List<int> _taxasAnos = new();
 
+    /// <summary>Ano sem taxa salva que tem propostas com valor em US$ na base (independe dos filtros).</summary>
+    private bool TaxaPendente(int ano) => Cambio.Taxa(ano) is null && _itens.Any(i => i.Ano == ano && i.P.ValorUsd is not null);
+
     private void SetTaxa(int ano, ChangeEventArgs e) => _taxasTxt[ano] = e.Value?.ToString() ?? "";
 
     private void AbrirTaxas()
@@ -996,9 +1043,15 @@ public partial class Conversao
         if (!_isAdmin) return;
         _taxasErro = ""; _novoAno = "";
         var salvas = Cambio.Todas();
-        var maximo = new[] { DateTime.Today.Year, salvas.Count > 0 ? salvas.Keys.Max() : 0,
-            Conv.Atual.Propostas.Where(p => p.Data is not null).Select(p => p.Data!.Value.Year).DefaultIfEmpty(0).Max() }.Max();
-        _taxasAnos = Enumerable.Range(2024, Math.Max(maximo - 2024 + 1, 1)).Union(salvas.Keys).Distinct().OrderBy(x => x).ToList();
+        // todos os anos com propostas (inclusive os anteriores a 2024), o ano corrente e os já salvos
+        // Faixa contínua só entre anos plausíveis (±15 anos de hoje); um ano digitado errado na planilha
+        // (ex.: 1900, 2206) entra como linha avulsa em vez de gerar centenas de linhas.
+        var hojeAno = DateTime.Today.Year;
+        var anosDados = Conv.Atual.Propostas.Where(p => p.Data is not null).Select(p => p.Data!.Value.Year).Distinct().ToList();
+        var plausiveis = anosDados.Where(y => Math.Abs(y - hojeAno) <= 15).ToList();
+        var min = Math.Min(plausiveis.DefaultIfEmpty(hojeAno).Min(), hojeAno);
+        var max = Math.Max(hojeAno, plausiveis.DefaultIfEmpty(hojeAno).Max());
+        _taxasAnos = Enumerable.Range(min, max - min + 1).Union(anosDados).Union(salvas.Keys).Distinct().OrderBy(x => x).ToList();
         _taxasTxt.Clear();
         foreach (var a in _taxasAnos) _taxasTxt[a] = salvas.TryGetValue(a, out var t) ? t.ToString("0.0000", _pt) : "";
         _taxasAberto = true;
