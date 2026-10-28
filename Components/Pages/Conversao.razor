@@ -205,6 +205,7 @@ else
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
         @Secao("unidades", "Conversão por Business Unit", "Coluna V da planilha", BlocoUnidades(i => i.P.Bu, _bus, "Business Unit"))
         @Secao("unidades-ic", "Conversão por BU Intercompany", "Coluna AG, senão AF · classificação independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "BU Intercompany"))
+        @Secao("valor-mensal", "Valor mensal das propostas", "Janeiro a dezembro, por status", ValorMensal())
         @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
         @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
         @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
@@ -435,36 +436,7 @@ else
         <p class="cvx-note">Verde: taxa pelo menos 5 p.p. acima da média do recorte; laranja: 5 p.p. abaixo (só com @AmostraMinima+ decididas). Barras dos valores partem do zero, na mesma escala da tabela.</p>
     </div>;
 
-    // ---- perdas ---------------------------------------------------------------
-    private RenderFragment Perdas() => @<section class="cvx-card">
-        <div class="cvx-ch">
-            <div><h2>Onde concentramos as perdas: status das propostas perdidas, por impacto</h2><p>O status é a classificação no CRM, não a causa comercial · barras partem do zero</p></div>
-            <div class="cvx-seg-ctl">
-                <button class="@(_metPerda == "qtd" ? "on" : "")" @onclick='() => _metPerda = "qtd"'>Quantidade</button>
-                <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>Valor financeiro</button>
-            </div>
-        </div>
-        @Html(HtmlPareto(_metPerda == "qtd"))
-        <div class="cvx-insight static"><small>Loss Concentration</small><span>@TextoInsightPerda()</span></div>
-    </section>;
-
-    // ---- financeiro -----------------------------------------------------------
-    private RenderFragment Financeiro() => @<section>
-        <div class="cvx-fin">
-            @Kpi("Valor Total Cotado", DinTotal(_r), $"{N0(_r.Total)} propostas enviadas", "Soma em R$ de todas as propostas com valor convertido (inclui não classificadas, que aparecem em cinza).", "#0b4f6f", null, DinTotalTip(_r))
-            @Kpi("Receita Ganha", Din(_r, ClasseProposta.Ganha), $"{N0(_r.G)} propostas ganhas", "Valor das propostas ganhas, em R$.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
-            @Kpi("Valor Perdido", Din(_r, ClasseProposta.Perdida), $"{N0(_r.P)} propostas perdidas", "Valor das propostas perdidas, em R$.", CorP, DeltaVal(ClasseProposta.Perdida), DinTip(_r, ClasseProposta.Perdida))
-            @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "Valor das propostas abertas, em R$.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
-            @Kpi("Conversão por Valor", TxValorGlobal(_r), "Valor ganho ÷ (ganho + perdido)", "Valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas não entram.", "#0b4f6f")
-        </div>
-        <div class="cvx-card">
-            <h2 class="cvx-h2s">Distribuição do valor das propostas por status</h2>
-            @Html(HtmlComposicaoValor(_r))
-        </div>
-        <div class="cvx-two">
-            <div class="cvx-card"><h2 class="cvx-h2s">Valor por Business Unit (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.Bu)))</div>
-            <div class="cvx-card"><h2 class="cvx-h2s">Valor por BU Intercompany (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.BuIc)))</div>
-        </div>
+    private RenderFragment ValorMensal() => @<div>
         <div class="cvx-card">
             <div class="cvx-ch">
                 <div><h2>Evolução mensal do valor das propostas (R$) · @AnoBarrasAtual()</h2><p>Janeiro a dezembro · mês de envio, status atual · barras partem do zero</p></div>
@@ -480,6 +452,31 @@ else
                 }
             </div>
             @Html(SvgEmpilhado(_f, _offset, false))
+        </div>
+    </div>;
+
+    // ---- perdas ---------------------------------------------------------------
+    private RenderFragment Perdas() => @<section class="cvx-card">
+        <div class="cvx-ch">
+            <div><h2>Onde concentramos as perdas: status das propostas perdidas, por impacto</h2><p>O status é a classificação no CRM, não a causa comercial · barras partem do zero</p></div>
+            <div class="cvx-seg-ctl">
+                <button class="@(_metPerda == "qtd" ? "on" : "")" @onclick='() => _metPerda = "qtd"'>Quantidade</button>
+                <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>Valor financeiro</button>
+            </div>
+        </div>
+        @Html(HtmlPareto(_metPerda == "qtd"))
+        <div class="cvx-insight static"><small>Loss Concentration</small><span>@TextoInsightPerda()</span></div>
+    </section>;
+
+    // ---- financeiro -----------------------------------------------------------
+    private RenderFragment Financeiro() => @<section>
+        <div class="cvx-card">
+            <h2 class="cvx-h2s">Distribuição do valor das propostas por status</h2>
+            @Html(HtmlComposicaoValor(_r))
+        </div>
+        <div class="cvx-two">
+            <div class="cvx-card"><h2 class="cvx-h2s">Valor por Business Unit (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.Bu)))</div>
+            <div class="cvx-card"><h2 class="cvx-h2s">Valor por BU Intercompany (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.BuIc)))</div>
         </div>
     </section>;
 

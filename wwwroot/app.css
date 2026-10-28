@@ -2473,3 +2473,18 @@ html { scroll-behavior: smooth; }
 .cvx-bb.v b { white-space:nowrap; }
 .cvx-bb .bar.stack { display:flex; overflow:hidden; }
 .cvx-bb .bar.stack i { display:block; height:100%; }
+
+/* Ranking de valor por unidade (padrão do ranking executivo) */
+.cvx-rk .rank-head, .cvx-rk .rank-row { grid-template-columns:30px minmax(90px,190px) 1fr 118px 56px; cursor:default; }
+.cvx-rk .rank-head .r, .cvx-rk .rank-val, .cvx-rk .rank-share { text-align:right; }
+.cvx-rk .rank-row { padding:12px 8px; }
+.cvx-rk .rank-track { height:16px; background:#edf2f8; display:block; width:100%; }
+.cvx-rk .cvx-stk { display:flex; height:100%; min-width:6px; border-radius:999px; overflow:hidden; }
+.cvx-rk .cvx-stk i { display:block; height:100%; }
+.cvx-rk .rank-barwrap { display:block; }
+.cvx-rk + .cvx-leg { margin-top:12px; }
+
+/* Gráfico anual: legenda em linha, junto do gráfico, ocupando a largura toda */
+.cvx-anual.chart-body { display:block; min-height:0; }
+.cvx-anual .cvx-leg.top { display:flex; justify-content:flex-start; gap:6px 30px; margin:0 0 4px 4px; }
+.cvx-anual svg { height:auto; }

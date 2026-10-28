@@ -565,7 +565,7 @@ public partial class Conversao
 
         string[] cores = { CorA, CorP, CorG, "#6b4fa3", "#0b4f6f", CorN };
         var mesAtual = Enumerable.Range(1, 12).Where(m => Val(anos[0], m) is not null).DefaultIfEmpty(0).Max();
-        double W = 1100, H = 340, L = 74, Rr = 24, T = 26, B = 36;
+        double W = 1100, H = 320, L = 66, Rr = 24, T = 28, B = 34;
         var passo = (W - L - Rr) / 12;
         double X(int m) => L + passo * (m - 0.5);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
@@ -574,7 +574,7 @@ public partial class Conversao
         for (var k = 0; k < anos.Count; k++)
             sb.Append($"<span><i class='cvx-ln {(k == 0 ? "" : "dash")}' style='border-top-color:{cores[k % cores.Length]}'></i>{anos[k]}</span>");
         sb.Append("</div>");
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano'><defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{CorA}' stop-opacity='.22'/><stop offset='100%' stop-color='{CorA}' stop-opacity='0'/></linearGradient></defs>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano'><defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{CorA}' stop-opacity='.16'/><stop offset='100%' stop-color='{CorA}' stop-opacity='0'/></linearGradient></defs>");
         for (var g = 0; g <= 4; g++)
         {
             var v = maxY * g / 4;
@@ -610,11 +610,11 @@ public partial class Conversao
             FechaSeg();
             if (area.Length > 0) sb.Append($"<path d='{area.ToString().Trim()}' fill='url(#cvArea)' stroke='none'/>");
             if (d.Length > 0)
-                sb.Append($"<path d='{d.ToString().Trim()}' fill='none' stroke='{cor}' stroke-width='{(atual ? 3.2 : 2.4)}' stroke-linejoin='round' stroke-linecap='round'{(atual ? "" : " stroke-dasharray='7 5'")}/>");
+                sb.Append($"<path d='{d.ToString().Trim()}' fill='none' stroke='{cor}' stroke-width='{(atual ? 5 : 3.6)}' stroke-linejoin='round' stroke-linecap='round'{(atual ? "" : " stroke-dasharray='9 6'")}/>");
             for (var m = 1; m <= 12; m++)
             {
                 var v = Val(a, m); if (v is null) continue;
-                sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='{(atual ? 5.2 : 3.8)}' fill='#fff' stroke='{cor}' stroke-width='2.4'><title>{EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}")}</title></circle>");
+                sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='{(atual ? 6.5 : 5)}' fill='#fff' stroke='{cor}' stroke-width='3'><title>{EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}")}</title></circle>");
                 if (atual) sb.Append($"<text x='{F(X(m))}' y='{F(Y(v.Value) - 12)}' text-anchor='middle' font-size='12.5' font-weight='600' fill='#3b4a61'>{Esc(Rot(v.Value))}</text>");
             }
         }
@@ -759,13 +759,22 @@ public partial class Conversao
         var l = grupos.Where(x => x.R.TotConv > 0).OrderByDescending(x => x.R.VTotal).Take(10).ToList();
         if (l.Count == 0) return Vazio("Sem valores convertidos por unidade no recorte.");
         var max = Math.Max(l.Max(x => x.R.VTotal), 0.0000001);
-        var sb = new StringBuilder("<div class='cvx-bubars'>");
+        var soma = Math.Max(l.Sum(x => x.R.VTotal), 0.0000001);
+        var sb = new StringBuilder("<div class='rank cvx-rk'>");
+        sb.Append("<div class='rank-head'><span></span><span>Unidade</span><span>Ganho · perdido · aberto</span><span class='r'>Valor total</span><span class='r'>Part.</span></div>");
+        var pos = 0;
         foreach (var (nome, r) in l)
         {
-            sb.Append($"<div class='cvx-bb v' title='{EscTip($"{nome}\nGanho: {Din(r, ClasseProposta.Ganha)}\nPerdido: {Din(r, ClasseProposta.Perdida)}\nAberto: {Din(r, ClasseProposta.Aberta)}")}'><span class='nm'>{Esc(nome)}</span><span class='bar stack' style='width:{F(r.VTotal / max * 100)}%'>");
-            foreach (var c in Classes) if (r.Val(c) > 0) sb.Append($"<i style='flex:{F(r.Val(c))};background:{Cor(c)}'></i>");
-            sb.Append($"</span><b>{Esc(R(r.VTotal))}</b></div>");
+            pos++;
+            var tip = $"{nome}\nGanho: {Din(r, ClasseProposta.Ganha)}\nPerdido: {Din(r, ClasseProposta.Perdida)}\nAberto: {Din(r, ClasseProposta.Aberta)}";
+            sb.Append($"<div class='rank-row{(pos == 1 ? " top1" : pos == 2 ? " top2" : pos == 3 ? " top3" : "")}' title='{EscTip(tip)}'>");
+            sb.Append($"<span class='rank-num'>{pos}</span><span class='rank-name'>{Esc(nome)}</span>");
+            sb.Append($"<span class='rank-barwrap'><span class='rank-track'><span class='cvx-stk' style='width:{F(r.VTotal / max * 100)}%'>");
+            foreach (var cl in Classes) if (r.Val(cl) > 0) sb.Append($"<i style='flex:{F(r.Val(cl))};background:{Cor(cl)}'></i>");
+            sb.Append($"</span></span></span><span class='rank-val'>{Esc(R(r.VTotal))}</span><span class='rank-share'>{Esc(PctDe(r.VTotal, soma))}</span></div>");
         }
+        sb.Append("</div><div class='cvx-leg'>");
+        foreach (var cl in Classes) if (cl != ClasseProposta.NaoClassificada || l.Any(x => x.R.VNC > 0)) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(cl)}'></i>{NomeEn(cl)}</span>");
         sb.Append("</div>");
         return sb.ToString();
     }
