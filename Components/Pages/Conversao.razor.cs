@@ -466,7 +466,8 @@ public partial class Conversao : IAsyncDisposable
         var step = Nice(maxY * 1.12 / 4); var nTicks = Math.Max(2, (int)Math.Ceiling(maxY * 1.12 / step)); maxY = step * nTicks;
 
         // T deixa uma faixa acima da marca mais alta para a unidade "R$" não encostar no rótulo do eixo
-        const double W = 1200, H = 372, L = 84, Rr = 18, T = 44, B = 36;
+        // W = largura real do cartão (px): o texto fica com o tamanho escrito; a altura acompanha com limites
+        double W = _chartW, H = Math.Round(Math.Clamp(W * .30, 320, 400)), L = 84, Rr = 18, T = 44, B = 36;
         var passo = (W - L - Rr) / meses.Count; var larg = Math.Min(passo * 0.6, 56);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
         string Rot(double v) => qtd ? N0((int)Math.Round(v)) : MonEixo(v);
@@ -557,7 +558,8 @@ public partial class Conversao : IAsyncDisposable
         string? Traco(int k) => k == 0 ? null : k == 1 ? "6 4" : "2 4";
         // mês corrente real (calendário), não o último mês com dado
         var hoje = DateTime.Today; var mesAtual = anos[0] == hoje.Year ? hoje.Month : 0;
-        double W = 1200, H = 400, L = 70, Rr = 30, T = 44, B = 40;
+        // W = largura real do cartão (px): o texto fica com o tamanho escrito; a altura acompanha com limites
+        double W = _chartW, H = Math.Round(Math.Clamp(W * .31, 330, 430)), L = 70, Rr = 30, T = 44, B = 40;
         var passo = (W - L - Rr) / 12;
         double X(int m) => L + passo * (m - 0.5);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
@@ -1016,6 +1018,41 @@ public partial class Conversao : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_relatorio) { try { await JS.InvokeVoidAsync("cvRelatorio", false); } catch { } }
+        if (_ref is not null)
+        {
+            try { await JS.InvokeVoidAsync("cvLargura.parar"); } catch { }
+            _ref.Dispose();
+        }
+    }
+
+    // ======================================================================
+    //  LARGURA DOS GRÁFICOS
+    // ======================================================================
+    // O viewBox dos gráficos de evolução e de valor mensal segue a largura real do cartão:
+    // o texto sai com o tamanho escrito (12,5 px) a 1366 e a 1920 px, como nos gráficos do Power BI.
+    private double _chartW = 1200;
+    private bool _largObs;
+    private DotNetObjectReference<Conversao>? _ref;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_largObs || !_temDados || _relatorio) return;
+        try
+        {
+            _ref ??= DotNetObjectReference.Create(this);
+            var w = await JS.InvokeAsync<double>("cvLargura.observar", _ref);
+            if (w > 0) { _largObs = true; CvLargura(w); }
+        }
+        catch { }
+    }
+
+    [JSInvokable]
+    public void CvLargura(double w)
+    {
+        var n = Math.Round(Math.Clamp(w, 640, 1800));
+        if (Math.Abs(n - _chartW) < 1) return;
+        _chartW = n;
+        StateHasChanged();
     }
 
     // ======================================================================

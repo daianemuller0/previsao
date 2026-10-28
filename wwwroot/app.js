@@ -14,6 +14,40 @@ window.cvIr = (id) => {
     window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' });
 };
 
+// Largura útil (px CSS) dos cartões de gráfico da Conversão. O Blazor usa o valor como largura do
+// viewBox, para que o texto dos gráficos SVG saia no tamanho escrito em qualquer monitor (sem crescer
+// a 1920 px nem encolher a 1366 px). Observa o contêiner do layout, que sobrevive à troca para o relatório.
+window.cvLargura = (function () {
+    let ro = null, ref = null, t = 0, ult = 0;
+    function medir() {
+        const c = document.querySelector('.cvx .cvx-sec .cvx-card');
+        if (!c) return 0;
+        const cs = getComputedStyle(c);
+        return Math.round(c.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0));
+    }
+    function avisar() {
+        clearTimeout(t);
+        t = setTimeout(() => {
+            const w = medir();
+            if (w > 0 && ref && Math.abs(w - ult) >= 16) { ult = w; ref.invokeMethodAsync('CvLargura', w).catch(() => { }); }
+        }, 150);
+    }
+    return {
+        observar(dotnet) {
+            ref = dotnet;
+            const cvx = document.querySelector('.cvx');
+            if (!cvx) return 0;
+            if (!ro) {
+                ro = new ResizeObserver(avisar);
+                ro.observe(cvx.parentElement || cvx);
+            }
+            ult = medir();
+            return ult;
+        },
+        parar() { if (ro) ro.disconnect(); ro = null; ref = null; clearTimeout(t); }
+    };
+})();
+
 // Relatório executivo (Conversão): papel A4 horizontal só enquanto o relatório está aberto.
 window.cvRelatorio = (abrir) => {
     const id = 'cvx-page-style';

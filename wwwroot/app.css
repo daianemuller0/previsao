@@ -2628,3 +2628,9 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-vlist.cvx-scroll10 { max-height:550px; } /* cabeçalho + 10 linhas; a 11ª aparece só como deixa da rolagem */
 .cvx-vrow .wr { position:relative; }
 .cvx-vrow .wr small { position:absolute; left:0; top:calc(100% + 1px); margin:0; line-height:14px; white-space:nowrap; }
+
+/* Ranking de vendedores em tela larga: as colunas numéricas ganham respiro e a barra da taxa não domina a linha */
+@media (min-width: 1281px) {
+    .cvx-vrow { grid-template-columns:30px minmax(184px,1.2fr) minmax(220px,2.2fr) repeat(4,minmax(62px,.45fr)) minmax(108px,.6fr); }
+}
+.cvx-vrow:not(.head) .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
