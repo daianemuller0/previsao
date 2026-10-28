@@ -201,7 +201,7 @@ else
 
     private RenderFragment Pagina() => @<div class="cvx-page">
         @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: contagens e valores seguem o segmento; taxas de conversão não se aplicam.</div> }
-        @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", Resumo())
+        @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", ResumoGeral())
         @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio e leituras automáticas", Evolucao())
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
         @Secao("unidades", "Conversão por Business Unit", "Coluna V da planilha", BlocoUnidades(i => i.P.Bu, _bus, "Business Unit"))
@@ -212,7 +212,7 @@ else
         @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
     </div>;
 
-    private RenderFragment Resumo() => @<div>
+    private RenderFragment ResumoGeral() => @<div>
         <div class="cvx-kpis">
             <article class="cvx-kpi main" style="--kc:@CorA" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
                 <div class="cvx-lab">Taxa de Conversão</div>
