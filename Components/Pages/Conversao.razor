@@ -298,8 +298,8 @@ else
         @{ var lista = VendLista(out var ocultos); }
         <div class="cvx-ch">
             <div>
-                <h2>@(_taxaOk ? "Quem converte mais: taxa de conversão por vendedor, só com amostra relevante" : "Propostas por vendedor no segmento selecionado")</h2>
-                <p>Taxa de conversão = ganhas ÷ decididas · o denominador aparece em cada linha · a marca vertical é a média do grupo</p>
+                <h2>@(_taxaOk ? "Taxa de conversão por vendedor" : "Propostas por vendedor no segmento selecionado")</h2>
+                <p>Ganhas ÷ decididas · 10 vendedores por vez, role para ver os demais · a marca vertical é a média do grupo</p>
             </div>
             <div class="cvx-ctrl">
                 <label class="cvx-fld">Ordenar por
@@ -322,7 +322,7 @@ else
         }
         else
         {
-            <div class="cvx-vlist">
+            <div class="cvx-vlist cvx-scroll10">
                 <div class="cvx-vrow head"><span></span><span>Vendedor</span><span>Taxa de conversão (ganhas de decididas)</span><span class="r">Ganhas</span><span class="r">Perdidas</span><span class="r">Abertas</span><span class="r">Decididas</span><span class="r">Valor ganho</span></div>
                 @for (var i = 0; i < lista.Count; i++)
                 {
@@ -416,7 +416,7 @@ else
             var maxV = Math.Max(lista.Select(x => Math.Max(x.R.VG, Math.Max(x.R.VP, x.R.VA))).DefaultIfEmpty(0).Max(), 0.0000001);
         }
         <h2 class="cvx-h2s">@titulo · taxa de conversão e valores por unidade</h2>
-        <div class="cv-tw">
+        <div class="cv-tw cvx-scroll10">
             <table class="cvx-tbl">
                 <thead>
                     <tr><th>Unidade · Taxa de conversão (ganhas de decididas)</th><th class="r">Decididas</th><th class="r">Propostas</th><th class="r">Valor ganho</th><th class="r">Valor perdido</th><th class="r">Valor aberto</th><th class="r">Taxa de conversão (valor)</th></tr>

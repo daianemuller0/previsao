@@ -567,59 +567,81 @@ public partial class Conversao
         }
         var maxY = met == "winrate" ? 100 : Nice(maxV);
 
-        string[] cores = { CorA, CorP, CorG, "#6b4fa3", "#0b4f6f", CorN };
+        // Paleta no padrão dos gráficos executivos: ano atual em azul-petróleo sólido, anteriores em tons distintos.
+        string[] cores = { "#0b6c8c", "#d98324", "#1f9254", "#6b4fa3", "#c0392b", "#93a1b5" };
         var mesAtual = Enumerable.Range(1, 12).Where(m => Val(anos[0], m) is not null).DefaultIfEmpty(0).Max();
-        double W = 1100, H = 320, L = 66, Rr = 24, T = 28, B = 34;
+        double W = 1200, H = 400, L = 70, Rr = 30, T = 44, B = 40;
         var passo = (W - L - Rr) / 12;
         double X(int m) => L + passo * (m - 0.5);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
+        string Lbl(double v) => met == "winrate" ? Math.Round(v).ToString(Inv) + "%" : Rot(v);
+
+        // Curva suave (Catmull-Rom → Bézier), como nas linhas do Power BI.
+        string Suave(List<(double X, double Y)> p)
+        {
+            if (p.Count == 1) return $"M {F(p[0].X)},{F(p[0].Y)}";
+            var d = new StringBuilder($"M {F(p[0].X)},{F(p[0].Y)}");
+            for (var i = 0; i < p.Count - 1; i++)
+            {
+                var p0 = i == 0 ? p[i] : p[i - 1]; var p1 = p[i]; var p2 = p[i + 1]; var p3 = i + 2 < p.Count ? p[i + 2] : p2;
+                var c1x = p1.X + (p2.X - p0.X) / 6; var c1y = p1.Y + (p2.Y - p0.Y) / 6;
+                var c2x = p2.X - (p3.X - p1.X) / 6; var c2y = p2.Y - (p3.Y - p1.Y) / 6;
+                d.Append($" C {F(c1x)},{F(c1y)} {F(c2x)},{F(c2y)} {F(p2.X)},{F(p2.Y)}");
+            }
+            return d.ToString();
+        }
 
         var sb = new StringBuilder("<div class='chart-body cvx-anual'><div class='cvx-leg top'>");
         for (var k = 0; k < anos.Count; k++)
-            sb.Append($"<span><i class='cvx-ln {(k == 0 ? "" : "dash")}' style='border-top-color:{cores[k % cores.Length]}'></i>{anos[k]}</span>");
+            sb.Append($"<span><i class='cvx-ln' style='border-top-color:{cores[k % cores.Length]}'></i>{anos[k]}</span>");
         sb.Append("</div>");
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano'><defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{CorA}' stop-opacity='.16'/><stop offset='100%' stop-color='{CorA}' stop-opacity='0'/></linearGradient></defs>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano' preserveAspectRatio='xMidYMid meet'>");
+        sb.Append($"<defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cores[0]}' stop-opacity='.18'/><stop offset='100%' stop-color='{cores[0]}' stop-opacity='0'/></linearGradient></defs>");
         for (var g = 0; g <= 4; g++)
         {
             var v = maxY * g / 4;
-            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#eef2f7'/>");
-            sb.Append($"<text x='{F(L - 12)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='13' fill='#93a1b5'>{Esc(g == 0 ? "0" : Rot(v))}</text>");
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='{(g == 0 ? "#d3dcea" : "#edf1f6")}' stroke-width='{(g == 0 ? 1.2 : 1)}'/>");
+            sb.Append($"<text x='{F(L - 14)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(g == 0 ? "0" : Lbl(v))}</text>");
         }
+        // faixa do mês atual
+        if (mesAtual > 0)
+            sb.Append($"<rect x='{F(L + passo * (mesAtual - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='#0b6c8c' opacity='.045' rx='6'/>");
         for (var m = 1; m <= 12; m++)
-            sb.Append($"<text x='{F(X(m))}' y='{F(H - 10)}' text-anchor='middle' font-size='13' font-weight='{(m == mesAtual ? 700 : 500)}' fill='{(m == mesAtual ? CorA : "#93a1b5")}' letter-spacing='.04em'>{Esc(new DateTime(2000, m, 1).ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
+            sb.Append($"<text x='{F(X(m))}' y='{F(H - 14)}' text-anchor='middle' font-size='12.5' font-weight='{(m == mesAtual ? 700 : 600)}' fill='{(m == mesAtual ? cores[0] : "#8a97ab")}' letter-spacing='.06em'>{Esc(new DateTime(2000, m, 1).ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
 
         // anos antigos primeiro, para o mais recente ficar por cima
         for (var k = anos.Count - 1; k >= 0; k--)
         {
             var a = anos[k]; var cor = cores[k % cores.Length]; var atual = k == 0;
-            var d = new StringBuilder(); var area = new StringBuilder();
-            var seg = new List<(double X, double Y)>();
-            void FechaSeg()
-            {
-                if (atual && seg.Count > 1)
-                {
-                    area.Append("M ").Append(F(seg[0].X)).Append(',').Append(F(Y(0)));
-                    foreach (var p in seg) area.Append(" L ").Append(F(p.X)).Append(',').Append(F(p.Y));
-                    area.Append(" L ").Append(F(seg[^1].X)).Append(',').Append(F(Y(0))).Append(" Z ");
-                }
-                seg.Clear();
-            }
+            var segs = new List<List<(double X, double Y)>>(); var seg = new List<(double X, double Y)>();
             for (var m = 1; m <= 12; m++)
             {
                 var v = Val(a, m);
-                if (v is null) { FechaSeg(); continue; }
-                d.Append(seg.Count > 0 ? " L " : " M ").Append(F(X(m))).Append(',').Append(F(Y(v.Value)));
+                if (v is null) { if (seg.Count > 0) { segs.Add(seg); seg = new(); } continue; }
                 seg.Add((X(m), Y(v.Value)));
             }
-            FechaSeg();
-            if (area.Length > 0) sb.Append($"<path d='{area.ToString().Trim()}' fill='url(#cvArea)' stroke='none'/>");
-            if (d.Length > 0)
-                sb.Append($"<path d='{d.ToString().Trim()}' fill='none' stroke='{cor}' stroke-width='{(atual ? 5 : 3.6)}' stroke-linejoin='round' stroke-linecap='round'{(atual ? "" : " stroke-dasharray='9 6'")}/>");
+            if (seg.Count > 0) segs.Add(seg);
+            foreach (var s in segs)
+            {
+                var caminho = Suave(s);
+                if (atual && s.Count > 1)
+                    sb.Append($"<path d='{caminho} L {F(s[^1].X)},{F(Y(0))} L {F(s[0].X)},{F(Y(0))} Z' fill='url(#cvArea)' stroke='none'/>");
+                if (s.Count > 1)
+                    sb.Append($"<path d='{caminho}' fill='none' stroke='{cor}' stroke-width='{(atual ? 4 : 2.6)}' stroke-linejoin='round' stroke-linecap='round' opacity='{(atual ? 1 : .9)}'/>");
+            }
             for (var m = 1; m <= 12; m++)
             {
                 var v = Val(a, m); if (v is null) continue;
-                sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='{(atual ? 6.5 : 5)}' fill='#fff' stroke='{cor}' stroke-width='3'><title>{EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}")}</title></circle>");
-                if (atual) sb.Append($"<text x='{F(X(m))}' y='{F(Y(v.Value) - 12)}' text-anchor='middle' font-size='12.5' font-weight='600' fill='#3b4a61'>{Esc(Rot(v.Value))}</text>");
+                var tip = EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}");
+                if (atual)
+                {
+                    sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='6' fill='#fff' stroke='{cor}' stroke-width='3'><title>{tip}</title></circle>");
+                    var lab = Lbl(v.Value); var lw = lab.Length * 7.4 + 14;
+                    sb.Append($"<rect x='{F(X(m) - lw / 2)}' y='{F(Y(v.Value) - 32)}' width='{F(lw)}' height='20' rx='10' fill='#fff' stroke='#d3dcea' stroke-width='1'/>");
+                    sb.Append($"<text x='{F(X(m))}' y='{F(Y(v.Value) - 18)}' text-anchor='middle' font-size='12' font-weight='700' fill='{cor}'>{Esc(lab)}</text>");
+                }
+                else
+                    sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='4' fill='{cor}' stroke='#fff' stroke-width='1.5'><title>{tip}</title></circle>");
             }
         }
         // faixa por mês: tooltip com todos os anos lado a lado
