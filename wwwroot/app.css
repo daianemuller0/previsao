@@ -2099,10 +2099,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cv-sort { cursor: pointer; user-select: none; }
 .cv-pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 10px 2px; font-size: 12px; }
 .cv-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.cv-badge.g { background: var(--pos-bg); color: var(--pos); }
-.cv-badge.p { background: var(--neg-bg); color: var(--neg); }
-.cv-badge.a { background: #e6f0fb; color: #1b5fa9; }
-.cv-badge.n { background: #eef2f7; color: #64748b; }
 @media (max-width: 900px) { .cv-taxas { grid-template-columns: 1fr; } .cv-row { grid-template-columns: 26px 1fr 80px 70px 70px; } }
 
 /* ===================== Conversão — redesign executivo (cvx-*) ===================== */
@@ -2160,14 +2156,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-delta { font-size:13px; font-weight:600; margin-top:8px; }
 .cvx-delta.pos { color:#6fd1b0; } .cvx-delta.neg { color:#f0a47f; } .cvx-delta.neu { color:#c3cfdd; }
 .cvx-hero-foot { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; opacity:.8; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.18); }
-.cvx-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-.cvx-kpi { background:#fff; border:1px solid var(--cx-line); border-top:3px solid var(--kc,var(--cx-sky)); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; justify-content:center; }
-.cvx-kpi .cvx-lab { color:var(--cx-mut); opacity:1; }
-.cvx-num { font-size:30px; font-weight:800; margin:4px 0 2px; color:var(--cx-navy); line-height:1.1; }
-.cvx-ksub { font-size:12px; color:var(--cx-mut); }
-.cvx-kdelta { font-size:12px; color:var(--cx-mut); margin-top:5px; font-weight:600; }
-.cvx-second { display:flex; flex-wrap:wrap; gap:6px 24px; font-size:12px; color:var(--cx-mut); margin:0 2px 12px; }
-.cvx-second b { color:var(--cx-text); margin-left:4px; }
 
 /* Composição: barra 100% */
 .cvx-total { text-align:right; } .cvx-total small { display:block; font-size:10px; letter-spacing:.07em; color:var(--cx-mut); } .cvx-total b { font-size:15px; color:var(--cx-navy); }
@@ -2188,9 +2176,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-mid { display:grid; grid-template-columns:2fr 1fr; gap:12px; }
 .cvx-mid .cvx-card { margin-bottom:0; }
 .cvx-trend-foot { display:flex; flex-wrap:wrap; gap:8px 16px; justify-content:space-between; align-items:center; margin-top:8px; }
-.cvx-nav { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--cx-mut); }
-.cvx-nav button { border:1px solid var(--cx-line); background:#fff; border-radius:6px; padding:3px 10px; cursor:pointer; }
-.cvx-nav button:disabled { opacity:.4; cursor:default; }
 .cvx-insight { display:block; width:100%; text-align:left; background:var(--cx-bg); border:1px solid var(--cx-line); border-left:4px solid var(--cx-sky); border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer; color:inherit; }
 .cvx-insight:hover { background:#e9eff7; }
 .cvx-insight.static { cursor:default; margin:0 0 12px; } .cvx-insight.static:hover { background:var(--cx-bg); }
@@ -2263,9 +2248,9 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .rpt-row1 .cvx-hero { padding:12px 16px; } .rpt-row1 .cvx-big { font-size:36px; }
 .rpt-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .rpt-row2 { display:grid; grid-template-columns:1fr 1.6fr; gap:10px; }
+.rpt-row2.inv { grid-template-columns:1.35fr 1fr; } /* página 2: a tabela de vendedores é a coluna larga */
 .rpt-box { border:1px solid var(--cx-line); border-radius:8px; padding:10px 12px; font-size:11px; overflow:hidden; }
 .rpt-box h3 { font-size:12px; margin:0 0 6px; color:var(--cx-navy); }
-.rpt-box.wide { }
 .rpt-ins { border-left:3px solid var(--cx-sky); padding:3px 8px; margin-bottom:6px; font-size:11px; } .rpt-ins small { display:block; font-size:9px; text-transform:uppercase; color:var(--cx-mut); font-weight:700; }
 .rpt-small { font-size:10.5px; color:var(--cx-mut); margin:4px 0 0; }
 .rpt-notes { margin:0; padding-left:16px; font-size:10.5px; color:var(--cx-mut); line-height:1.5; }
@@ -2275,13 +2260,11 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 @media (max-width: 1280px) {
     .cvx-top { grid-template-columns:1fr; }
     .cvx-mid, .cvx-two { grid-template-columns:1fr; }
-    .cvx-kpis { grid-template-columns:repeat(2,1fr); }
     .cvx-vrow { grid-template-columns:26px minmax(120px,1fr) minmax(160px,1.6fr) repeat(2,54px) 100px; }
     .cvx-vrow > span:nth-child(6), .cvx-vrow > span:nth-child(7) { display:none; }
 }
 @media (max-width: 720px) {
     .cvx-title { font-size:19px; } .cvx-big { font-size:36px; }
-    .cvx-kpis { grid-template-columns:1fr; }
     .cvx-prow { grid-template-columns:1fr 1fr 70px; } .cvx-prow > span:nth-child(5), .cvx-prow > span:nth-child(2) { display:none; }
 }
 
@@ -2329,29 +2312,11 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-h3 { font-size:15px; font-weight:700; color:var(--cx-navy); margin:0; }
 .cvx-sec .cvx-card { padding:14px 18px; margin-bottom:12px; }
 
-/* Indicadores compactos: 6 cartões, o primeiro em destaque */
-.cvx-kpis { display:grid; grid-template-columns:1.5fr repeat(5, minmax(0,1fr)); gap:10px; margin-bottom:10px; }
-.cvx-kpi { padding:11px 14px; min-width:0; justify-content:flex-start; }
-.cvx-kpi .cvx-lab { font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cvx-num { font-size:23px; margin:3px 0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cvx-num.big { font-size:34px; color:var(--cx-navy); }
-.cvx-kpi.main { background:linear-gradient(180deg,#fff,#F3F7FC); border-color:#c9d8ea; }
-.cvx-kpi.main .cvx-delta { margin-top:4px; }
-.cvx-delta.pos { color:var(--cx-pos); } .cvx-delta.neg { color:var(--cx-neg); } .cvx-delta.neu { color:var(--cx-mut); }
-.cvx-ksub { font-size:11.5px; line-height:1.35; }
-.cvx-second { margin:0 2px 12px; }
-
-/* Insights em linha */
-.cvx-insights { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px; }
-.cvx-insights .cvx-insight { margin:0; }
-.cvx-insight em { display:block; font-style:normal; font-size:11.5px; font-weight:600; color:var(--cx-sky); margin-top:4px; }
-
 /* Gráficos com altura confortável */
 .cvx-trend svg { width:100%; height:auto; }
 .cvx-page .cvx-card { overflow-x:auto; }
 
-@media (max-width: 1360px) { .cvx-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); } .cvx-kpi.main { grid-column:span 3; } }
-@media (max-width: 720px) { .cvx-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); } .cvx-kpi.main { grid-column:span 2; } .cvx-meta { justify-content:flex-start; } }
+@media (max-width: 720px) { .cvx-meta { justify-content:flex-start; } }
 @media print { .cvx-index { display:none !important; } }
 
 /* ===== Conversão — mesma linguagem visual da Visão Executiva ===== */
@@ -2382,21 +2347,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-total b { font-size:14.5px; font-weight:800; color:var(--text); }
 .cvx-note { color:var(--muted); }
 
-/* Indicadores (cartões KPI) */
-.cvx-kpis { gap:16px; margin-bottom:12px; }
-.cvx-kpi { position:relative; overflow:hidden; background:var(--exec-card); border:1px solid var(--exec-border); border-top:1px solid var(--exec-border); border-radius:14px; box-shadow:var(--exec-shadow); padding:16px 18px 14px; gap:3px; transition:box-shadow .16s ease, transform .16s ease; }
-.cvx-kpi:hover { box-shadow:var(--exec-shadow-hover); transform:translateY(-2px); }
-.cvx-kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--kc,var(--teal)); opacity:.95; }
-.cvx-kpi.main { background:var(--exec-card); border-color:var(--exec-border); }
-.cvx-kpi .cvx-lab { font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted); }
-.cvx-num { font-size:25px; font-weight:800; letter-spacing:-.8px; color:var(--text); }
-.cvx-num.big { font-size:32px; color:var(--text); }
-.cvx-ksub { font-size:12px; color:var(--muted); }
-.cvx-kdelta, .cvx-delta { font-size:12px; font-weight:650; }
-.cvx-delta.pos { color:var(--pos); } .cvx-delta.neg { color:var(--orange); } .cvx-delta.neu { color:var(--muted); }
-.cvx-second { gap:6px 26px; font-size:12px; color:var(--muted); }
-.cvx-second b { color:var(--text); font-weight:700; }
-
 /* Controles */
 .cvx-seg-ctl { border:0; background:var(--panel-2); border-radius:9px; padding:3px; gap:2px; border:1px solid var(--border); }
 .cvx-seg-ctl button { border:0 !important; border-radius:7px; background:none; color:var(--text-2); padding:5px 12px; }
@@ -2404,7 +2354,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-fld select, .cvx-fld input { border:1px solid var(--border); background:var(--panel-2); border-radius:8px; }
 .cvx-insight { background:var(--panel-2); border:1px solid var(--exec-border); border-left:3px solid var(--teal); border-radius:10px; }
 .cvx-insight:hover { background:var(--teal-050); }
-.cvx-insight em { color:var(--teal); }
 .cvx-pills button.on { background:var(--teal-deep); border-color:var(--teal-deep); }
 
 /* Ranking de vendedores no padrão do ranking executivo */
@@ -2419,7 +2368,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-vrow .n { font-weight:650; font-variant-numeric:tabular-nums; }
 .cvx-vrow .n.g { color:var(--pos); } .cvx-vrow .n.p { color:var(--orange); } .cvx-vrow .n.a { color:var(--teal); }
 .cvx-vrow .tr, .cvx-wr .tr { height:11px; background:#edf2f8; box-shadow:inset 0 1px 2px rgba(18,38,63,.05); border-radius:999px; }
-.cvx-vrow .tr i, .cvx-wr .tr i { background:linear-gradient(90deg,#0a6f92 0%,#159bbd 70%,#1fb0d0 100%); border-radius:999px; min-width:4px; }
+.cvx-vrow .tr i, .cvx-wr .tr i { border-radius:999px; min-width:4px; }
 .cvx-vrow .tr em { background:var(--text); opacity:.55; }
 .cvx-vrow .wr b { font-weight:750; }
 .cvx-wr b.pos { color:var(--pos); } .cvx-wr b.neg { color:var(--orange); }
@@ -2436,31 +2385,13 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-drawer .cvx-dcmp { background:var(--panel-2); }
 .cvx-skel .skel { border-radius:14px; }
 
-/* Evolução anual: gráfico grande, legenda por ano */
-.cvx-anual svg { width:100%; height:auto; min-height:360px; display:block; }
-.cvx-leg.top { margin:0 0 6px; gap:6px 22px; font-size:13px; }
-.cvx-leg.top b { color:var(--text); }
-.cvx-leg.top .cvx-ln { width:26px; border-top-style:solid; border-top-width:3px; vertical-align:4px; }
+/* Evolução: nota abaixo do gráfico */
 .cvx-trend .cvx-note { margin:8px 0 0; }
 
 /* Busca da base de propostas no padrão da Visão Executiva */
 .cvx-basebar.filterbar { position:static; border:1px solid var(--exec-border); border-radius:12px; padding:9px 12px; margin-bottom:12px; background:var(--panel); }
 .cvx-basebar .flt-search { min-width:260px; }
 .cvx-basebar .cv-cols { margin-left:auto; }
-
-/* Valores dos cartões: sem reticências, unidade sempre visível */
-.cvx-num { overflow:visible; text-overflow:clip; font-size:clamp(20px, 1.7vw, 26px); }
-.cvx-num.big { font-size:clamp(26px, 2.3vw, 34px); }
-.cvx-kpi { min-width:0; }
-
-/* Gráfico de linhas no padrão do "Vendas x Meta": legenda grande, rótulos nos pontos, área suave */
-.cvx-anual { max-height:340px; overflow:auto; padding-right:4px; }
-.cvx-anual svg { width:100%; min-width:980px; height:auto; min-height:0; }
-.cvx-anual::-webkit-scrollbar { width:8px; height:8px; }
-.cvx-anual::-webkit-scrollbar-thumb { background:#d7dfea; border-radius:999px; }
-.cvx-leg.top { gap:6px 34px; font-size:16px; font-weight:500; color:var(--text-2); margin:0 0 8px 6px; position:sticky; left:0; }
-.cvx-leg.top .cvx-ln { width:38px; border-top-width:4px; border-top-style:solid; vertical-align:5px; margin-right:10px; }
-.cvx-leg.top .cvx-ln.dash { border-top-style:dashed; border-top-width:3.5px; }
 
 /* Valor por unidade: valor sem quebrar de linha */
 .cvx-bb.v { grid-template-columns:minmax(110px,1fr) 2.2fr minmax(104px,auto); }
@@ -2469,7 +2400,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-bb .bar.stack i { display:block; height:100%; }
 
 /* Ranking de valor por unidade (padrão do ranking executivo) */
-.cvx-rk .rank-head, .cvx-rk .rank-row { grid-template-columns:30px minmax(90px,190px) 1fr 118px 56px; cursor:default; }
+.cvx-rk .rank-head, .cvx-rk .rank-row { cursor:default; }
 .cvx-rk .rank-head .r, .cvx-rk .rank-val, .cvx-rk .rank-share { text-align:right; }
 .cvx-rk .rank-row { padding:12px 8px; }
 .cvx-rk .rank-track { height:16px; background:#edf2f8; display:block; width:100%; }
@@ -2478,37 +2409,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-rk .rank-barwrap { display:block; }
 .cvx-rk + .cvx-leg { margin-top:12px; }
 
-/* Gráfico anual: legenda em linha, junto do gráfico, ocupando a largura toda */
-.cvx-anual.chart-body { display:block; min-height:0; }
-.cvx-anual .cvx-leg.top { display:flex; justify-content:flex-start; gap:6px 30px; margin:0 0 4px 4px; }
-.cvx-anual svg { height:auto; }
-
-/* Composição das propostas — barra alta com rótulos e cartões de legenda */
-.cvx-stackbar.tall { height:64px; border-radius:14px; gap:3px; background:transparent; overflow:visible; }
-.cvx-stackbar.tall .cvx-seg { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border-radius:12px; box-shadow:0 2px 8px rgba(18,38,63,.14); line-height:1.15; transition:transform .14s ease, box-shadow .14s ease, opacity .14s ease; }
-.cvx-stackbar.tall .cvx-seg:first-child { border-top-left-radius:14px; border-bottom-left-radius:14px; }
-.cvx-stackbar.tall .cvx-seg:last-child { border-top-right-radius:14px; border-bottom-right-radius:14px; }
-.cvx-stackbar.tall .cvx-seg:hover { transform:translateY(-2px); box-shadow:0 8px 18px rgba(18,38,63,.22); }
-.cvx-stackbar.tall .cvx-seg .t { font-size:17px; font-weight:800; letter-spacing:-.3px; }
-.cvx-stackbar.tall .cvx-seg .v { font-size:12px; font-weight:600; opacity:.92; }
-.cvx-stackbar.tall .cvx-seg.on { box-shadow:0 0 0 3px #fff, 0 0 0 5px rgba(0,122,158,.55); }
-.cvx-lgd { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-top:16px; }
-.cvx-lg { position:relative; display:grid; grid-template-columns:auto 1fr; column-gap:10px; align-items:baseline; text-align:left; background:var(--panel-2); border:1px solid var(--exec-border); border-radius:12px; padding:12px 14px 12px 18px; cursor:pointer; overflow:hidden; font:inherit; color:inherit; transition:background .14s ease, box-shadow .14s ease; }
-.cvx-lg::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--lc); }
-.cvx-lg:hover { background:#fff; box-shadow:var(--exec-shadow); }
-.cvx-lg.on { background:var(--teal-050); border-color:#bcdde8; }
-.cvx-lg i { display:none; }
-.cvx-lg .n { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); grid-column:1; }
-.cvx-lg b { grid-column:2; justify-self:end; font-size:22px; font-weight:800; letter-spacing:-.5px; color:var(--text); }
-.cvx-lg .p { grid-column:1 / -1; font-size:12px; color:var(--muted); margin-top:2px; }
-.cvx-lg .m { grid-column:1 / -1; font-size:14px; font-weight:700; color:var(--lc); margin-top:2px; }
-
-/* Gráfico anual: sem rolagem, largura total, estilo executivo */
-.cvx-anual, .cvx-anual.chart-body { max-height:none; overflow:visible; padding:0; }
-.cvx-anual svg { width:100%; min-width:0; height:auto; display:block; }
-.cvx-anual .cvx-leg.top { position:static; gap:6px 28px; font-size:14px; font-weight:600; color:var(--text-2); margin:2px 0 10px 4px; }
-.cvx-anual .cvx-leg.top .cvx-ln { width:30px; border-top-width:4px; border-top-style:solid; border-radius:2px; vertical-align:4px; margin-right:8px; }
-
 /* Listas longas: 10 linhas visíveis, o restante na rolagem (cabeçalho fixo) */
 .cvx-scroll10 { max-height:520px; overflow-y:auto; padding-right:6px; }
 .cvx-scroll10::-webkit-scrollbar { width:8px; }
@@ -2516,7 +2416,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-scroll10::-webkit-scrollbar-track { background:transparent; }
 .cvx-vlist.cvx-scroll10 { max-height:560px; }
 .cvx-vlist.cvx-scroll10 .cvx-vrow.head { position:sticky; top:0; background:#fff; z-index:2; }
-.cv-tw.cvx-scroll10 { max-height:540px; overflow:auto; }
+.cv-tw.cvx-scroll10 { max-height:566px; overflow:auto; } /* cabeçalho + 10 linhas inteiras; a 11ª aparece só na rolagem */
 .cv-tw.cvx-scroll10 .cvx-tbl thead th { position:sticky; top:0; background:#fff; z-index:2; box-shadow:0 1px 0 var(--exec-border); }
 
 /* Âncoras: o cvIr mede a barra fixa real; esta margem é só o fallback (link direto #id, sem JS) */
@@ -2531,17 +2431,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-chip .t { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 @media (max-height: 820px) { .cvx-fb { padding:6px 16px; gap:6px; } }
 
-/* Tabelas de unidade: a linha filtrada fica marcada e as demais esmaecidas (padrão .rank-row.xf-on da Visão Executiva) */
-.cvx .cvx-tbl tbody tr { cursor:pointer; }
-.cvx .cvx-tbl tbody tr.on td { background:var(--teal-050); }
-.cvx .cvx-tbl tbody tr.on td:first-child { box-shadow:inset 3px 0 0 var(--teal); }
-.cvx .cvx-tbl tbody tr.dim td { opacity:.55; }
-.cvx .cvx-tbl tbody tr.dim:hover td { opacity:.85; }
-
-/* Aviso de leitura falha: acima de tudo, com ação de tentar de novo */
-.cvx-alert.erro { background:var(--orange-bg); border-color:#f0c9a8; color:#8a4a10; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
-.cvx-alert.erro .btn-link { margin-left:auto; }
-
 /* Chips ocupam só o espaço que sobra à direita dos filtros: encolhem (reticências) antes de quebrar a linha */
 .cvx-chips { flex:1 1 0; min-width:0; display:flex; flex-wrap:nowrap; align-items:center; justify-content:flex-end; gap:6px; }
 .cvx-chips .cvx-chip { flex:0 1 auto; overflow:hidden; }
@@ -2549,29 +2438,141 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-chips .cvx-chip .t { flex:0 1 auto; }
 .cvx-chips .btn-link { flex:none; white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
 
-/* Etapa G4 (estética): suporte mínimo às classes novas do Razor; o acabamento fica na etapa de CSS */
-.cvx-kdelta.pos { color:var(--pos); } .cvx-kdelta.neg { color:var(--orange); } .cvx-kdelta.neu { color:var(--muted); }
-.cvx-seg.g, .cvx-seg.a { color:#fff; }
-.cvx-seg.p, .cvx-seg.n { color:#1d2939; }
-.cvx-wr b.cvx-na { color:var(--muted); font-weight:600; font-size:11px; }
-.cvx-anual .cvx-leg.top .cvx-ln.dash { border-top-style:dashed; border-radius:0; }
-.cvx-leg-aviso { font-size:12px; font-weight:500; color:var(--muted); }
-/* Resumo em grade 3×2: Taxa em destaque + 5 indicadores, rótulos sem corte */
-.cvx .cvx-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); }
-.cvx .cvx-kpi.main { grid-column:auto; }
-@media (max-width: 720px) { .cvx .cvx-kpis { grid-template-columns:minmax(0,1fr); } }
-/* Gráficos da Conversão: legenda abaixo do SVG (o .chart-body global é flex em linha) */
-.cvx .chart-body, .cvx-drawer .chart-body, .rpt .chart-body { display:block; min-height:0; }
-.cvx .chart-body > svg, .cvx-drawer .chart-body > svg, .rpt .chart-body > svg { height:auto; }
-/* Painel do vendedor: indicadores empilhados (rótulo, número, contexto) */
-.cvx-dkpis > div { background:var(--panel-2); border:1px solid var(--exec-border); border-radius:10px; padding:10px 14px; }
-.cvx-dkpis small { display:block; font-size:10.5px; font-weight:700; letter-spacing:.06em; color:var(--muted); }
-.cvx-dkpis b { display:block; font-size:22px; font-weight:800; letter-spacing:-.4px; color:var(--text); margin:2px 0 1px; }
-.cvx-dkpis span { display:block; font-size:12px; color:var(--muted); }
+/* ===================== Conversão — padrão Visão Executiva (final) =====================
+   Bloco único que fecha o acabamento da aba: o que está aqui prevalece sobre as camadas anteriores. */
+
 /* Relatório e painel do vendedor ficam fora do .cvx: recebem os mesmos tokens (sem eles o cabeçalho e o
    cartão da taxa do relatório ficavam sem fundo, com texto branco sobre branco) */
 .rpt, .cvx-drawer { --cx-navy:var(--primary); --cx-blue:var(--teal-deep); --cx-sky:var(--teal); --cx-bg:var(--panel-2); --cx-text:var(--text);
-       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--orange); --cx-warn:var(--warn); --cx-neu:var(--muted-2); }
+       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--orange); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
+       color:var(--text); font-variant-numeric:tabular-nums; }
+
+/* Botões herdam a fonte da página (só família e algarismos: os tamanhos de cada botão continuam valendo) */
+.cvx button, .cvx-drawer button, .rpt button { font-family:inherit; font-variant-numeric:inherit; }
+
+/* Gráficos: SVG na largura toda e legenda abaixo (o .chart-body global é flex em linha) */
+.cvx .chart-body, .cvx-drawer .chart-body, .rpt .chart-body { display:block; min-height:0; }
+.cvx .chart-body > svg, .cvx-drawer .chart-body > svg, .rpt .chart-body > svg { display:block; width:100%; height:auto; }
+.chart-body > .cvx-leg { margin-top:10px; }
+
+/* Evolução anual: sem rolagem, largura total, legenda por ano acima do gráfico */
+.cvx-anual, .cvx-anual.chart-body { max-height:none; overflow:visible; padding:0; }
+.cvx-anual svg { min-width:0; }
+.cvx-anual .cvx-leg.top { display:flex; justify-content:flex-start; position:static; gap:6px 28px; font-size:14px; font-weight:600; color:var(--text-2); margin:2px 0 10px 4px; }
+.cvx-anual .cvx-leg.top b { color:var(--text); }
+.cvx-anual .cvx-leg.top .cvx-ln { width:30px; border-top-width:4px; border-top-style:solid; border-radius:2px; vertical-align:4px; margin-right:8px; }
+.cvx-anual .cvx-leg.top .cvx-ln.dash { border-top-style:dashed; border-radius:0; }
 .cvx-anual .cvx-leg.top .cvx-ln.dash.dot { border-top-style:dotted; }
-/* Relatório: variação dentro do cartão azul-marinho da taxa precisa de tons claros para ter contraste */
-.rpt .cvx-hero .cvx-delta.pos { color:#7fe0bd; } .rpt .cvx-hero .cvx-delta.neg { color:#ffc48f; } .rpt .cvx-hero .cvx-delta.neu { color:#c3cfdd; }
+.cvx-leg-aviso { font-size:12px; font-weight:500; color:var(--muted); }
+/* Item "mês em andamento" da legenda: nota secundária, não compete com os anos */
+.cvx-anual .cvx-leg.top span:has(> .cvx-pt) { font-size:12.5px; font-weight:500; color:var(--muted); }
+.cvx-ln { border-top-color:var(--teal); }
+.cvx-ln.dash { border-top-style:dashed; border-top-color:var(--muted-2); }
+
+/* Resumo: grade 3×2 (Taxa em destaque + 5 indicadores), valores e rótulos sem corte */
+.cvx-kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px; margin-bottom:12px; }
+.cvx-kpi { position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-start; gap:3px; min-width:0; container-type:inline-size;
+           background:var(--exec-card); border:1px solid var(--exec-border); border-radius:14px; box-shadow:var(--exec-shadow); padding:16px 18px 14px;
+           transition:box-shadow .16s ease, transform .16s ease; }
+.cvx-kpi:hover { box-shadow:var(--exec-shadow-hover); transform:translateY(-2px); }
+.cvx-kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--kc,var(--teal)); opacity:.95; }
+.cvx-kpi.main { grid-column:auto; }
+.cvx-kpi.main .cvx-delta { margin-top:4px; }
+.cvx-kpi .cvx-lab { font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted); opacity:1; white-space:normal; line-height:1.25; }
+.cvx-num { font-size:clamp(19px, 12cqi, 26px); font-weight:800; letter-spacing:-.8px; line-height:1.1; margin:3px 0 1px; color:var(--text); white-space:nowrap; }
+.cvx-num.big { font-size:clamp(26px, 15cqi, 34px); }
+.cvx-ksub { font-size:12px; line-height:1.35; color:var(--muted); }
+.cvx-kdelta, .cvx-delta { font-size:12px; font-weight:650; }
+.cvx-kdelta { margin-top:5px; color:var(--muted); }
+.cvx-kdelta.pos, .cvx-delta.pos { color:var(--pos); }
+.cvx-kdelta.neg, .cvx-delta.neg { color:var(--orange); }
+.cvx-kdelta.neu, .cvx-delta.neu { color:var(--muted); }
+/* Taxa do relatório fica no cartão azul-marinho: variação em tons claros para ter contraste */
+.cvx-hero .cvx-delta.pos { color:#6fd1b0; } .cvx-hero .cvx-delta.neg { color:#f0a47f; } .cvx-hero .cvx-delta.neu { color:#c3cfdd; }
+.cvx-second { display:flex; flex-wrap:wrap; gap:6px 26px; font-size:12px; color:var(--muted); margin:0 2px 12px; }
+.cvx-second b { color:var(--text); font-weight:700; margin-left:4px; }
+@media (max-width: 720px) {
+    .cvx-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .cvx-kpi.main, .cvx-kpi:last-child { grid-column:span 2; }
+}
+@media (max-width: 460px) {
+    .cvx-kpis { grid-template-columns:minmax(0,1fr); }
+    .cvx-kpi.main, .cvx-kpi:last-child { grid-column:auto; }
+}
+
+/* Composição das propostas: barra 100% chapada, rótulo de % e valor em cada segmento */
+.cvx-stackbar.tall { height:52px; gap:2px; border-radius:10px; overflow:hidden; background:#edf2f8; }
+.cvx-stackbar.tall .cvx-seg { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border-radius:0; box-shadow:none; line-height:1.15; transition:filter .14s ease, opacity .14s ease; }
+.cvx-stackbar.tall .cvx-seg:hover { transform:none; box-shadow:none; filter:brightness(1.06); }
+.cvx-stackbar.tall .cvx-seg.on { box-shadow:inset 0 0 0 2px #fff; }
+.cvx-stackbar.tall .cvx-seg .t { font-size:15px; font-weight:800; letter-spacing:-.2px; }
+.cvx-stackbar.tall .cvx-seg .v { font-size:11.5px; font-weight:600; opacity:.92; }
+/* Segmento estreito (tela pequena): o rótulo encolhe ou sai em vez de ser cortado; o detalhe segue no title e na legenda */
+.cvx-stackbar.tall .cvx-seg { container-type:inline-size; min-width:0; overflow:hidden; white-space:nowrap; }
+@container (max-width: 78px) { .cvx-stackbar.tall .cvx-seg .v { display:none; } }
+@container (max-width: 52px) { .cvx-stackbar.tall .cvx-seg .t { font-size:12px; letter-spacing:-.3px; } }
+@container (max-width: 40px) { .cvx-stackbar.tall .cvx-seg .t { display:none; } }
+.cvx-seg.g, .cvx-seg.a { color:#fff; }
+.cvx-seg.p, .cvx-seg.n { color:#172B43; }
+/* Legenda em cartões: a cor do status fica só na faixa lateral */
+.cvx-lgd { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-top:16px; }
+.cvx-lg { position:relative; display:grid; grid-template-columns:auto 1fr; column-gap:10px; align-items:baseline; text-align:left; background:var(--panel-2); border:1px solid var(--exec-border); border-radius:12px; padding:12px 14px 12px 18px; cursor:pointer; overflow:hidden; font:inherit; color:inherit; transition:background .14s ease, box-shadow .14s ease; }
+.cvx-lg::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--lc); }
+.cvx-lg:hover { background:#fff; box-shadow:var(--exec-shadow); }
+.cvx-lg.on { background:var(--teal-050); border-color:#bcdde8; }
+.cvx-lg i { display:none; }
+.cvx-lg .n { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); grid-column:1; }
+.cvx-lg b { grid-column:2; justify-self:end; font-size:18px; font-weight:800; letter-spacing:-.4px; color:var(--text); }
+.cvx-lg .p { grid-column:1 / -1; font-size:12px; color:var(--muted); margin-top:2px; }
+.cvx-lg .m { grid-column:1 / -1; font-size:14px; font-weight:700; color:var(--text); margin-top:2px; }
+
+/* Barras de taxa (ranking e tabelas de unidade): cor chapada da taxa de conversão */
+.cvx-vrow .tr i, .cvx-wr .tr i { background:#12355B; }
+.cvx-vrow .tr em { box-shadow:0 0 0 1px rgba(255,255,255,.9); }
+/* "Não calculável" cabe na coluna sem estourar a grade */
+.cvx-wr { grid-template-columns:minmax(80px,1fr) minmax(56px,auto); }
+.cvx-vrow .wr { grid-template-columns:1fr minmax(56px,auto); }
+.cvx-wr b, .cvx-vrow .wr b { white-space:nowrap; }
+.cvx-na, .cvx-wr b.cvx-na { font-weight:500; font-size:11.5px; color:var(--muted); }
+
+/* Tabelas de unidade: linha clicável; a filtrada fica marcada e as demais esmaecidas (padrão .rank-row.xf-on da Visão Executiva) */
+.cvx .cvx-tbl tbody tr { cursor:pointer; }
+.cvx .cvx-tbl tbody tr.on td { background:var(--teal-050); }
+.cvx .cvx-tbl tbody tr.on td:first-child { box-shadow:inset 3px 0 0 var(--teal); }
+.cvx .cvx-tbl tbody tr.dim td { opacity:.55; }
+.cvx .cvx-tbl tbody tr.dim:hover td { opacity:.85; }
+
+/* Valor por unidade: barra com largura legível, nome com reticências, valor sem quebra */
+.cvx-rk .rank-head, .cvx-rk .rank-row { grid-template-columns:24px minmax(80px,150px) minmax(110px,1fr) 96px 46px; gap:10px; }
+.cvx-rk .rank-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cvx-rk .rank-val { white-space:nowrap; }
+.cvx-two { align-items:start; } /* lado a lado, o cartão com menos unidades não estica em branco */
+@media (max-width: 1500px) { .cvx-two { grid-template-columns:1fr; } }
+
+/* Base: os painéis dos filtros abrem por cima do cartão (a tabela rola no .table-wrap) */
+#base .cvx-card { overflow:visible; }
+
+/* Painel do vendedor: cartões no padrão KPI executivo */
+.cvx-dkpis > div { position:relative; overflow:hidden; display:flex; flex-direction:column; gap:3px; min-width:0; background:var(--exec-card); border:1px solid var(--exec-border); border-radius:14px; box-shadow:var(--exec-shadow); padding:14px 16px 12px 18px; }
+.cvx-dkpis > div::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--grad-teal); }
+.cvx-dkpis small { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); }
+.cvx-dkpis b { font-size:24px; font-weight:800; letter-spacing:-.6px; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cvx-dkpis span { font-size:12px; color:var(--muted); }
+
+/* Cores semânticas: ganho verde, perda laranja, aberto azul, neutro cinza */
+.cv-badge.g { background:var(--pos-bg); color:var(--pos); }
+.cv-badge.p { background:var(--orange-bg); color:#a35f12; }
+.cv-badge.a { background:var(--teal-050); color:var(--teal-deep); }
+.cv-badge.n { background:var(--panel-2); color:var(--muted); border:1px solid var(--border); }
+.cvx-insight.static { border-left-color:var(--orange); }
+
+/* Aviso de leitura falha: acima de tudo, com ação de tentar de novo */
+.cvx-alert.erro { background:var(--orange-bg); border-color:#f0c9a8; color:#8a4a10; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.cvx-alert.erro .btn-link { margin-left:auto; }
+
+/* Relatório: tabelas compactas, sem quebrar nome nem cortar colunas */
+.rpt .cvx-mini-tbl { font-size:11.5px; }
+.rpt .cvx-mini-tbl th { font-size:9.5px; padding:4px 6px; }
+.rpt .cvx-mini-tbl td { padding:5px 6px; white-space:nowrap; }
+.rpt .cvx-prow { grid-template-columns:minmax(0,1.8fr) minmax(36px,1fr) 62px 80px 70px; gap:8px; padding:5px 2px; font-size:11.5px; }
+.rpt .cvx-prow.head { font-size:9px; letter-spacing:.2px; }
