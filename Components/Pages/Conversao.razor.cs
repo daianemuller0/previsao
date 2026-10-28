@@ -294,93 +294,28 @@ public partial class Conversao : IAsyncDisposable
 
     private string PeriodoTxt()
     {
-        var anos = _anos.Count == 0 ? "Todos os anos" : string.Join(", ", _anos.OrderBy(x => x));
-        var meses = _meses.Count == 0 ? "" : " · " + string.Join(", ", _meses.Take(3)) + (_meses.Count > 3 ? $" +{_meses.Count - 3}" : "");
+        string anos;
+        if (_anos.Count > 0)
+            anos = string.Join(", ", _anos.OrderBy(x => x));
+        else
+        {
+            // sem filtro de ano: mostra o intervalo real de envio do recorte
+            var ds = _f.Where(i => i.P.Data is not null).Select(i => i.P.Data!.Value).ToList();
+            anos = ds.Count == 0 ? "Todos os anos" : $"{ds.Min().ToString("MMM/yyyy", _pt)} a {ds.Max().ToString("MMM/yyyy", _pt)}";
+        }
+        // meses em ordem de calendário, não na ordem em que foram marcados
+        var ms = Enumerable.Range(1, 12).Select(Fmt.MonthLong).Where(_meses.Contains).ToList();
+        var meses = ms.Count == 0 ? "" : " · " + string.Join(", ", ms.Take(3)) + (ms.Count > 3 ? $" +{ms.Count - 3}" : "");
         return anos + meses;
     }
 
     private string NotasFiltros()
     {
         var l = ConjuntosAtivos().Select(x => $"{x.Item1}: {string.Join(", ", x.Item2.Take(3))}{(x.Item2.Count > 3 ? "…" : "")}").ToList();
-        if (_seg is { } s) l.Add("Segmento: " + NomeEn(s));
         return l.Count == 0 ? "Sem filtros adicionais" : string.Join(" · ", l);
     }
 
-    // ======================================================================
-    //  EXECUTIVE INSIGHTS · regras determinísticas sobre os dados filtrados
-    // ======================================================================
-    private sealed record Insight(string Categoria, string Texto, string Aba, string Secao, string Link);
-
     private const int AmostraMinima = 20;   // decididas para comparar taxas sem ruído
-
-    private List<Insight> Insights()
-    {
-        var res = new List<Insight>();
-        var ano = _anos.Count == 1 && int.TryParse(_anos.First(), out var a0) ? a0 : (int?)null;
-
-        // 1) integridade dos dados — números errados valem mais que qualquer análise
-        var dados = new List<string>();
-        if (_r.SemTaxa > 0) dados.Add($"{N0(_r.SemTaxa)} proposta(s) (US$ {_r.UsdSemTaxa.ToString("N0", _pt)}) sem taxa de câmbio ficam fora dos valores em R$");
-        if (_r.NC > 0) dados.Add($"{N0(_r.NC)} proposta(s) com status não classificado ficam fora de ganhas, perdidas e abertas");
-        if (dados.Count > 0) res.Add(new("Qualidade dos dados", string.Join("; ", dados) + ".", "deep", "dados", "Ver validação dos dados"));
-
-        // 2) variação da taxa de ganho
-        if (ano is { } y && _prev is not null && _r.Decididas >= AmostraMinima && _prev.Decididas >= AmostraMinima
-            && _r.TaxaQtd is { } cur && _prev.TaxaQtd is { } ant && Math.Abs(cur - ant) >= 0.5)
-            res.Add(new("Taxa de conversão",
-                $"A taxa de ganho {(cur > ant ? "avançou" : "recuou")} {Pp(cur - ant)} em relação a {_prevRotulo} ({P1(ant)} → {P1(cur)}), sobre {N0(_r.Decididas)} propostas decididas.",
-                "overview", "", "Ver tendência"));
-
-        // 3) concentração das perdas (status ≠ causa comercial)
-        var perdidas = _f.Where(i => i.P.Classe == ClasseProposta.Perdida).ToList();
-        if (perdidas.Count >= 10)
-        {
-            var top = perdidas.GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal))
-                .Select(g => (Nome: g.First().P.StatusOriginal, Qtd: g.Count())).OrderByDescending(x => x.Qtd).First();
-            var share = (double)top.Qtd / perdidas.Count * 100;
-            if (share >= 50)
-                res.Add(new("Concentração de perdas",
-                    $"{top.Nome} representa {P1(share)} das propostas classificadas como perdidas ({N0(top.Qtd)} de {N0(perdidas.Count)}). O status indica a classificação no CRM, não a causa comercial.",
-                    "deep", "perdas", "Ver análise de perdas"));
-        }
-
-        // 4) diferença de desempenho entre unidades
-        var bus = Grupos(_f, i => i.P.Bu).Where(x => x.R.Decididas >= AmostraMinima && x.R.TaxaQtd is not null && x.Nome != ConversaoService.NaoInformado)
-            .OrderByDescending(x => x.R.TaxaQtd).ToList();
-        if (bus.Count >= 2)
-        {
-            var hi = bus.First(); var lo = bus.Last();
-            var gap = hi.R.TaxaQtd!.Value - lo.R.TaxaQtd!.Value;
-            if (gap >= 10)
-                res.Add(new("Diferença entre unidades",
-                    $"{hi.Nome} converte {P1(hi.R.TaxaQtd.Value)} das propostas decididas ({N0(hi.R.Decididas)}); {lo.Nome}, {P1(lo.R.TaxaQtd.Value)} ({N0(lo.R.Decididas)}) — diferença de {Pp(gap)}.",
-                    "deep", "bu", "Comparar unidades"));
-        }
-
-        // 5) volume de propostas
-        if (_prev is not null && _prev.Total >= AmostraMinima && ano is { } y2)
-        {
-            var d = ((double)_r.Total - _prev.Total) / _prev.Total * 100;
-            if (Math.Abs(d) >= 20)
-                res.Add(new("Volume de propostas",
-                    $"O volume de propostas enviadas {(d > 0 ? "cresceu" : "recuou")} {Math.Abs(d).ToString("0", _pt)}% frente a {_prevRotulo}: {N0(_r.Total)} contra {N0(_prev.Total)}.",
-                    "overview", "", "Ver evolução"));
-        }
-
-        // 6) exposição em propostas abertas
-        if (_r.Conv[(int)ClasseProposta.Aberta] > 0 && _r.VTotal > 0 && _r.A > 0)
-            res.Add(new("Pipeline em aberto",
-                $"O pipeline aberto soma {R(_r.VA)} em {N0(_r.A)} propostas, {PctDe(_r.VA, _r.VTotal)} do valor total convertido.",
-                "deep", "fin", "Ver análise financeira"));
-
-        return res.Take(3).ToList();
-    }
-
-    private void IrPara(Insight i)
-    {
-        var alvo = i.Secao switch { "vend" => "vendedores", "bu" => "unidades", "perdas" => "perdas", "fin" => "receita", "dados" => "qualidade", _ => "evolucao" };
-        _ = JS.InvokeVoidAsync("cvIr", alvo);
-    }
 
     // ======================================================================
     //  SÉRIES MENSAIS (mês de ENVIO · status atual — coorte, não fechamento)
@@ -802,7 +737,7 @@ public partial class Conversao : IAsyncDisposable
         var l = Grupos(_f, i => i.P.Vendedor).Where(x => x.R.Decididas >= minDec && x.R.TaxaQtd is not null)
             .OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(n).ToList();
         if (l.Count == 0) return Vazio($"Nenhum vendedor com {minDec}+ propostas decididas no recorte.");
-        var sb = new StringBuilder("<table class='cvx-mini-tbl'><thead><tr><th>#</th><th>Vendedor</th><th class='r'>taxa de conversão</th><th class='r'>Ganhas</th><th class='r'>Perdidas</th><th class='r'>Abertas</th><th class='r'>Decididas</th><th class='r'>Valor ganho</th></tr></thead><tbody>");
+        var sb = new StringBuilder("<table class='cvx-mini-tbl'><thead><tr><th>#</th><th>Vendedor</th><th class='r'>Taxa de conversão</th><th class='r'>Ganhas</th><th class='r'>Perdidas</th><th class='r'>Abertas</th><th class='r'>Decididas</th><th class='r'>Valor ganho</th></tr></thead><tbody>");
         for (var i = 0; i < l.Count; i++)
         {
             var (nome, r) = l[i];
@@ -812,14 +747,22 @@ public partial class Conversao : IAsyncDisposable
         return sb.ToString();
     }
 
-    private string HtmlBuBars(List<(string Nome, Resumo R)> grupos, int max)
+    /// <summary>Ranking de BU do relatório: só unidades com amostra mínima; a marca vertical é a taxa do recorte.</summary>
+    private string HtmlBuBars(List<(string Nome, Resumo R)> grupos, int max, int minDec)
     {
-        var l = grupos.Where(x => x.R.Decididas > 0).OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(max).ToList();
-        if (l.Count == 0) return Vazio("Sem propostas decididas no recorte.");
+        var l = grupos.Where(x => x.R.Decididas >= minDec && x.R.TaxaQtd is not null)
+            .OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(max).ToList();
+        var fora = grupos.Count - l.Count;
+        if (l.Count == 0) return Vazio($"Nenhuma unidade com {minDec}+ propostas decididas.");
+        var media = F(_r.TaxaQtd ?? 0);
         var sb = new StringBuilder("<div class='cvx-bubars'>");
         foreach (var (nome, r) in l)
-            sb.Append($"<div class='cvx-bb' title='{EscTip($"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas")}'><span class='nm'>{Esc(nome)}</span><span class='bar'><i style='width:{F(r.TaxaQtd!.Value)}%;background:{CorTx}'></i></span><b>{Esc(P1(r.TaxaQtd.Value))}</b><small>{N0(r.Decididas)} decididas</small></div>");
+            sb.Append($"<div class='cvx-bb' title='{EscTip($"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas")}'><span class='nm'>{Esc(nome)}</span>"
+                + $"<span class='bar' style='position:relative;overflow:visible'><i style='width:{F(r.TaxaQtd!.Value)}%;background:{CorTx}'></i>"
+                + $"<em style='position:absolute;left:{media}%;top:-3px;bottom:-3px;width:2px;background:#3b4a61'></em></span>"
+                + $"<b>{Esc(P1(r.TaxaQtd.Value))}</b><small>{N0(r.Decididas)} decididas</small></div>");
         sb.Append("</div>");
+        if (fora > 0) sb.Append($"<p class='rpt-small'>{fora} unidade(s) com menos de {minDec} decididas ou além das {max} primeiras não aparecem.</p>");
         return sb.ToString();
     }
 

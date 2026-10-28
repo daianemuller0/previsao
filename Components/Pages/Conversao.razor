@@ -231,7 +231,8 @@ else
         @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
     </div>;
 
-    private RenderFragment ResumoGeral() => @<div>
+    /// <summary>Os 6 indicadores e a faixa secundária do Resumo — usados na tela e no relatório (mesmos números).</summary>
+    private RenderFragment KpisResumo() => @<div>
         <div class="cvx-kpis">
             <article class="cvx-kpi main" style="--kc:@CorTx" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
                 <div class="cvx-lab">Taxa de Conversão</div>
@@ -257,6 +258,10 @@ else
             <span title="@DinTip(_r, ClasseProposta.Perdida)">Valor perdido <b>@Din(_r, ClasseProposta.Perdida)</b></span>
             <span title="@DinTotalTip(_r)">Valor total cotado <b>@DinTotal(_r)</b></span>
         </div>
+    </div>;
+
+    private RenderFragment ResumoGeral() => @<div>
+        @KpisResumo()
 
         <section class="cvx-card cvx-comp">
             <div class="cvx-ch">
@@ -675,50 +680,36 @@ else
 
         <section class="rpt-page">
             <header class="rpt-head">
-                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de propostas e receita</div></div>
-                <div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span><span><b>Atualizado</b> @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy HH:mm") : "—")</span><span><b>Filtros</b> @NotasFiltros()</span></div>
+                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de Propostas · Howden Brasil · valores em R$</div></div>
+                <div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span><span><b>Dados lidos em</b> @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—")</span><span><b>Emitido em</b> @DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm", _pt) · @_user</span><span><b>Filtros</b> @NotasFiltros()</span></div>
             </header>
-            <div class="rpt-row1">
-                <article class="cvx-hero">
-                    <div class="cvx-lab">TAXA DE CONVERSÃO</div>
-                    <div class="cvx-big">@TxQtdGlobal(_r)</div>
-                    <div class="cvx-frac">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
-                    @{ var dw = DeltaWin(); }
-                    @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
-                    <div class="cvx-hero-foot"><span>Conversão por valor <b>@TxValorGlobal(_r)</b></span></div>
-                </article>
-                <div class="rpt-kpis">
-                    @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Valor ganho, R$", "", CorG)
-                    @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "", CorA)
-                    @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total", "", CorG)
-                    @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total", "", CorP)
-                </div>
-            </div>
+            @if (!Conv.Ok) { <p class="rpt-alert">@Conv.Mensagem</p> }
+            @if (_seg is not null) { <p class="rpt-small" style="margin:0">O segmento selecionado na tela não se aplica ao relatório.</p> }
+            @KpisResumo()
+            @if (_r.SemTaxa > 0) { <p class="rpt-alert">* Valor parcial: @N0(_r.SemTaxa) proposta(s) (US$ @_r.UsdSemTaxa.ToString("N0", _pt)) de @string.Join(", ", AnosSemTaxa()) sem taxa de câmbio ficaram fora dos totais em R$. As quantidades estão completas.</p> }
             <div class="rpt-row2">
                 <div class="rpt-box">
                     <h3>Composição das @N0(_r.Total) propostas enviadas</h3>
                     @Html(HtmlComposicao(_r))
-                    <h3 style="margin-top:12px">Leituras automáticas</h3>
-                    @{ var ins = Insights(); }
-                    @if (ins.Count == 0) { <p class="rpt-small">Sem variações relevantes ou amostra suficiente neste recorte.</p> }
-                    @foreach (var i in ins) { <div class="rpt-ins"><small>@i.Categoria</small><span>@i.Texto</span></div> }
+                    <h3 style="margin-top:12px">Composição por valor (R$)</h3>
+                    @Html(HtmlComposicaoValor(_r))
                 </div>
-                <div class="rpt-box wide">
+                <div class="rpt-box">
                     <h3>Taxa de conversão mensal — mês de envio, status atual</h3>
                     @Html(SvgWinRate(_f, 0, true, true, 640))
                 </div>
             </div>
             <div class="rpt-box">
-                <h3>Taxa de conversão por Business Unit</h3>
-                @Html(HtmlBuBars(Grupos(_f, i => i.P.Bu), 6))
+                <h3>Taxa de conversão por Business Unit (mínimo de @AmostraMinima decididas)</h3>
+                @Html(HtmlBuBars(Grupos(_f, i => i.P.Bu), 6, AmostraMinima))
             </div>
-            <footer class="rpt-foot">Howden Sales Forecast · página 1 de 2</footer>
+            <footer class="rpt-foot">Howden Brasil · Conversão de Propostas · uso interno · página 1 de 2</footer>
         </section>
 
         <section class="rpt-page">
             <header class="rpt-head slim"><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span></div></header>
-            <div class="rpt-row2 inv">
-                <div class="rpt-box wide">
+            <div class="rpt-row2 rev">
+                <div class="rpt-box">
                     <h3>Vendedores com maior taxa de conversão (mínimo de 10 propostas decididas)</h3>
                     @Html(HtmlVendTop(8, 10))
                 </div>
@@ -735,11 +726,11 @@ else
                     <li><b>Classificação</b> pelo status do CRM — Ganhas: Closed - Won, OTP · Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid, Closed - Unknown · Abertas: Open · demais: não classificadas, fora das três categorias.</li>
                     <li><b>Coorte de envio</b>: o eixo de tempo é o mês de envio da proposta e mostra o status atual dela — não a data de fechamento. Meses recentes têm mais propostas abertas, e a taxa deles pode mudar.</li>
                     <li><b>Valores</b> em R$ = valor em US$ × taxa USD/BRL do ano da data de envio @TaxasTexto(). Propostas sem taxa ficam fora dos valores e são sinalizadas.</li>
-                    <li><b>BU</b> e <b>BU Intercompany</b> são campos distintos; a BU Intercompany usa a coluna AG e, se vazia, a AF. Comparações de taxa consideram amostras de pelo menos @AmostraMinima propostas decididas.</li>
-                    <li><b>Qualidade dos dados</b>: @N0(_r.SemTaxa) proposta(s) sem taxa de câmbio · @N0(_r.NC) não classificada(s) · @N0(_r.SemValor) sem valor em US$ · @N0(Conv.Atual.Propostas.Count) registros na base. Dados da planilha de propostas do CRM, atualizados em @(Conv.AtualizadoEm is { } q2 ? q2.ToString("dd/MM/yyyy HH:mm") : "—").</li>
+                    <li><b>BU</b> e <b>BU Intercompany</b> são campos distintos; a BU Intercompany usa a coluna AG e, se vazia, a AF. Comparações de taxa consideram amostras de pelo menos @AmostraMinima propostas decididas; os rankings do relatório exigem no mínimo 10 decididas por vendedor e @AmostraMinima por BU.</li>
+                    <li><b>Qualidade dos dados</b>: @N0(_r.SemTaxa) proposta(s) sem taxa de câmbio · @N0(_r.NC) não classificada(s) · @N0(_r.SemValor) sem valor em US$ · @N0(Conv.Atual.Propostas.Count) registros na base. Dados da planilha de propostas do CRM, atualizados em @(Conv.AtualizadoEm is { } q2 ? q2.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—").</li>
                 </ul>
             </div>
-            <footer class="rpt-foot">Howden Sales Forecast · página 2 de 2</footer>
+            <footer class="rpt-foot">Howden Brasil · Conversão de Propostas · uso interno · página 2 de 2</footer>
         </section>
     </div>;
 }
