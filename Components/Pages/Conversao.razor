@@ -8,10 +8,8 @@
 
 @* ===========================================================================
    Conversão · Commercial Performance Intelligence
-   Nível 1 — Executive Overview (uma tela): Win Rate, indicadores críticos,
-   composição, tendência e insights.
-   Nível 2 — Performance Deep Dive: vendedores, BU, intercompany, perdas,
-   financeiro e qualidade dos dados.  + Base de Propostas.
+   Página única de rolagem contínua: resumo, evolução, vendedores, BU, BU Intercompany,
+   receita, perdas, qualidade dos dados e base de propostas (índice com âncoras).
    Toda a lógica e os números vêm de Conversao.razor.cs (Recalcular/Somar).
    =========================================================================== *@
 
@@ -27,8 +25,8 @@ else
 
     <header class="cvx-head">
         <div class="cvx-id">
-            <div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">—</span>Commercial Performance Intelligence</div>
-            <div class="cvx-sub">Sales Conversion &amp; Revenue Performance</div>
+            <div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">—</span>Inteligência Comercial</div>
+            <div class="cvx-sub">Conversão de propostas e receita</div>
         </div>
         <div class="cvx-meta">
             <span><b>Período</b> @PeriodoTxt()</span>
@@ -52,11 +50,16 @@ else
         </div>
     </header>
 
-    <div class="cvx-tabs">
-        <button class="@(_aba == "overview" ? "on" : "")" @onclick='() => _aba = "overview"'>Executive Overview</button>
-        <button class="@(_aba == "deep" ? "on" : "")" @onclick='() => _aba = "deep"'>Performance Deep Dive</button>
-        <button class="@(_aba == "base" ? "on" : "")" @onclick='() => _aba = "base"'>Base de Propostas @if (_temDados) { <span class="cvx-badge">@N0(_f.Count)</span> }</button>
-    </div>
+    @if (_temDados && _f.Count > 0)
+    {
+        <nav class="cvx-index" aria-label="Índice da página">
+            @foreach (var (id, t) in Ancoras)
+            {
+                var ii = id;
+                <button type="button" @onclick="() => Ir(ii)">@t</button>
+            }
+        </nav>
+    }
 
     @if (_carregando && !_temDados)
     {
@@ -103,9 +106,7 @@ else
         {
             <div class="cvx-card"><div class="empty" style="padding:34px 12px">Nenhuma proposta com os filtros atuais. <button class="btn-link" @onclick="Limpar">Limpar filtros</button></div></div>
         }
-        else if (_aba == "overview") { @Overview() }
-        else if (_aba == "deep") { @Deep() }
-        else { @Base() }
+        else { @Pagina() }
     }
 </div>
 }
@@ -180,51 +181,72 @@ else
 
     private string TituloTendencia() => _metTrend switch
     {
-        "volume" => "Volume mensal de propostas enviadas, por status atual",
+        "volume" => "Quantidade mensal de propostas enviadas, por status atual",
         "valor" => "Valor mensal das propostas enviadas (R$), por status atual",
-        _ => "Win Rate mensal: tendência de conversão das propostas enviadas",
+        _ => "Taxa de conversão mensal das propostas enviadas",
     };
 
-    private RenderFragment Overview() => @<div class="cvx-over">
-        <section class="cvx-top">
-            <article class="cvx-hero" title="Win Rate = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
-                <div class="cvx-lab">WIN RATE</div>
-                <div class="cvx-big">@TxQtdGlobal(_r)</div>
-                <div class="cvx-frac">@N0(_r.G) propostas ganhas / @N0(_r.Decididas) propostas decididas</div>
+    private static readonly (string Id, string Titulo)[] Ancoras =
+    {
+        ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "Unidades"),
+        ("receita", "Receita"), ("perdas", "Perdas"), ("qualidade", "Qualidade dos Dados"), ("base", "Base de Propostas"),
+    };
+
+    private Task Ir(string id) => JS.InvokeVoidAsync("cvIr", id).AsTask();
+
+    private RenderFragment Secao(string id, string titulo, string sub, RenderFragment corpo) => @<section id="@id" class="cvx-sec">
+        <div class="cvx-sec-h"><h2>@titulo</h2><span>@sub</span></div>
+        @corpo
+    </section>;
+
+    private RenderFragment Pagina() => @<div class="cvx-page">
+        @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: contagens e valores seguem o segmento; taxas de conversão não se aplicam.</div> }
+        @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", Resumo())
+        @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio e leituras automáticas", Evolucao())
+        @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
+        @Secao("unidades", "Conversão por Business Unit", "Coluna V da planilha", BlocoUnidades(i => i.P.Bu, _bus, "Business Unit"))
+        @Secao("unidades-ic", "Conversão por BU Intercompany", "Coluna AG, senão AF · classificação independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "BU Intercompany"))
+        @Secao("receita", "Inteligência de receita", "Valores em R$ convertidos pela taxa do ano de envio", Financeiro())
+        @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
+        @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
+        @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
+    </div>;
+
+    private RenderFragment Resumo() => @<div>
+        <div class="cvx-kpis">
+            <article class="cvx-kpi main" style="--kc:@CorA" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
+                <div class="cvx-lab">Taxa de Conversão</div>
+                <div class="cvx-num big">@TxQtdGlobal(_r)</div>
+                <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
                 @{ var dw = DeltaWin(); }
                 <div class="cvx-delta @dw.Css">@dw.Texto</div>
-                <div class="cvx-hero-foot">
-                    <span title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Win Rate por valor <b>@TxValorGlobal(_r)</b></span>
-                    <span>Abertas ficam fora do denominador</span>
-                </div>
+                <div class="cvx-ksub" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Por valor: <b>@TxValorGlobal(_r)</b></div>
             </article>
-            <div class="cvx-kpis">
-                @Kpi("Won Value", Din(_r, ClasseProposta.Ganha), "Valor das propostas ganhas, em R$",
-                     "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
-                @Kpi("Open Pipeline Value", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas — exposição financeira",
-                     "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
-                @Kpi("Proposals Won", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
-                     "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de ganho.", CorG, DeltaPct(_r.G, _prev?.G))
-                @Kpi("Proposals Lost", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
-                     "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P))
-            </div>
-        </section>
+            @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
+                 "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
+            @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas",
+                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
+            @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
+                 "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", CorG, DeltaPct(_r.G, _prev?.G))
+            @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
+                 "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P))
+            @Kpi("Total de Propostas", N0(_r.Total), $"{N0(_r.Decididas)} decididas · {N0(_r.A)} abertas",
+                 "Total no recorte = ganhas + perdidas + abertas + não classificadas.", CorN, DeltaPct(_r.Total, _prev?.Total))
+        </div>
 
         <div class="cvx-second">
-            <span title="Total de propostas no recorte = ganhas + perdidas + abertas + não classificadas">Proposals Submitted <b>@N0(_r.Total)</b></span>
-            <span title="Propostas com status Open">Open Pipeline <b>@N0(_r.A)</b></span>
-            <span title="@DinTip(_r, ClasseProposta.Perdida)">Lost Opportunity Value <b>@Din(_r, ClasseProposta.Perdida)</b></span>
-            <span title="@DinTotalTip(_r)">Total Quoted Value <b>@DinTotal(_r)</b></span>
-            <span title="Ganhas ÷ (Ganhas + Perdidas), sobre o total de propostas enviadas é outro número">Decididas <b>@N0(_r.Decididas)</b></span>
+            <span title="@DinTip(_r, ClasseProposta.Perdida)">Valor perdido <b>@Din(_r, ClasseProposta.Perdida)</b></span>
+            <span title="@DinTotalTip(_r)">Valor total cotado <b>@DinTotal(_r)</b></span>
+            <span title="Valor ganho ÷ (valor ganho + valor perdido)">Conversão por valor <b>@TxValorGlobal(_r)</b></span>
         </div>
 
         <section class="cvx-card cvx-comp">
             <div class="cvx-ch">
                 <div>
-                    <h2>Resultado das propostas enviadas: @PctDe(_r.G, _r.Total) do total foram ganhas</h2>
-                    <p>Participação de cada status sobre o total · clique num segmento para filtrar os gráficos abaixo · não é a Win Rate (que usa só as decididas)</p>
+                    <h3 class="cvx-h3">Composição das propostas: @PctDe(_r.G, _r.Total) do total foram ganhas</h3>
+                    <p>Participação de cada status sobre o total · clique num segmento para filtrar todos os gráficos · não é a taxa de conversão (que usa só as decididas)</p>
                 </div>
-                <div class="cvx-total"><small>PROPOSALS SUBMITTED</small><b>@N0(_r.Total)</b></div>
+                <div class="cvx-total"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
             </div>
             <div class="cvx-stackbar">
                 @foreach (var c in Classes)
@@ -244,77 +266,54 @@ else
                 }
             </div>
         </section>
-
-        <section class="cvx-mid">
-            <div class="cvx-card cvx-trend">
-                <div class="cvx-ch">
-                    <div>
-                        <h2>@TituloTendencia()</h2>
-                        <p>Mês de ENVIO da proposta, com o status atual — não é a data de fechamento.</p>
-                    </div>
-                    <div class="cvx-ctrl">
-                        <div class="cvx-seg-ctl">
-                            <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Win Rate</button>
-                            <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Proposal Volume</button>
-                            <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Revenue Value</button>
-                        </div>
-                    </div>
-                </div>
-                @Tendencia(_offset)
-                <div class="cvx-trend-foot">
-                    <p class="cvx-note">Meses recentes têm mais propostas ainda abertas: a taxa deles pode mudar quando forem decididas. Até 12 meses por vez.</p>
-                    <div class="cvx-nav">
-                        <button class="btn-ghost sm" disabled="@(_offset >= _offsetMax)" @onclick="() => _offset = Math.Min(_offset + 6, _offsetMax)">‹ Anteriores</button>
-                        <button class="btn-ghost sm" disabled="@(_offset <= 0)" @onclick="() => _offset = Math.Max(_offset - 6, 0)">Recentes ›</button>
-                    </div>
-                </div>
-            </div>
-            <div class="cvx-card cvx-ins">
-                <div class="cvx-ch"><div><h2>Executive Insights</h2><p>Calculados sobre os dados filtrados</p></div></div>
-                @{ var ins = Insights(); }
-                @if (ins.Count == 0)
-                {
-                    <div class="cvx-empty-ins">Sem variações relevantes ou amostra suficiente (mínimo de @AmostraMinima propostas decididas) para destacar insights neste recorte.</div>
-                }
-                else
-                {
-                    @foreach (var i in ins)
-                    {
-                        var ii = i;
-                        <button type="button" class="cvx-insight" @onclick="() => IrPara(ii)">
-                            <small>@i.Categoria</small>
-                            <span>@i.Texto</span>
-                            <em>@i.Link →</em>
-                        </button>
-                    }
-                }
-            </div>
-        </section>
     </div>;
 
-    // =====================================================================
-    //  NÍVEL 2 · PERFORMANCE DEEP DIVE
-    // =====================================================================
-    private static readonly (string Key, string Titulo)[] Secoes =
-    {
-        ("vend", "Vendedores"), ("bu", "Business Units"), ("perdas", "Inteligência de perdas"),
-        ("fin", "Revenue Intelligence"), ("dados", "Qualidade dos dados"),
-    };
-
-    private RenderFragment Deep() => @<div>
-        <nav class="cvx-pills">
-            @foreach (var (k, t) in Secoes)
+    private RenderFragment Evolucao() => @<div>
+        <div class="cvx-card cvx-trend">
+            <div class="cvx-ch">
+                <div>
+                    <h3 class="cvx-h3">@TituloTendencia()</h3>
+                    <p>Mês de ENVIO da proposta, com o status atual — não é a data de fechamento.</p>
+                </div>
+                <div class="cvx-ctrl">
+                    <div class="cvx-seg-ctl">
+                        <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Taxa de conversão (%)</button>
+                        <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Quantidade</button>
+                        <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (R$)</button>
+                    </div>
+                </div>
+            </div>
+            @Tendencia(_offset)
+            <div class="cvx-trend-foot">
+                <p class="cvx-note">Meses recentes têm mais propostas ainda abertas: a taxa deles pode mudar quando forem decididas. Até 12 meses por vez.</p>
+                <div class="cvx-nav">
+                    <button class="btn-ghost sm" disabled="@(_offset >= _offsetMax)" @onclick="() => _offset = Math.Min(_offset + 6, _offsetMax)">‹ Anteriores</button>
+                    <button class="btn-ghost sm" disabled="@(_offset <= 0)" @onclick="() => _offset = Math.Max(_offset - 6, 0)">Recentes ›</button>
+                </div>
+            </div>
+        </div>
+        <div class="cvx-card">
+            <div class="cvx-ch"><div><h3 class="cvx-h3">Leituras automáticas</h3><p>Calculadas sobre os dados filtrados · clique para ir à análise</p></div></div>
+            @{ var ins = Insights(); }
+            @if (ins.Count == 0)
             {
-                var kk = k;
-                <button class="@(_secao == k ? "on" : "")" @onclick="() => _secao = kk">@t</button>
+                <div class="cvx-empty-ins">Sem variações relevantes ou amostra suficiente (mínimo de @AmostraMinima propostas decididas) para destacar leituras neste recorte.</div>
             }
-        </nav>
-        @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: contagens e valores seguem o segmento; taxas de ganho não se aplicam.</div> }
-        @if (_secao == "vend") { @Vendedores() }
-        else if (_secao == "bu") { @Unidades() }
-        else if (_secao == "perdas") { @Perdas() }
-        else if (_secao == "fin") { @Financeiro() }
-        else { @Qualidade() }
+            else
+            {
+                <div class="cvx-insights">
+                @foreach (var i in ins)
+                {
+                    var ii = i;
+                    <button type="button" class="cvx-insight" @onclick="() => IrPara(ii)">
+                        <small>@i.Categoria</small>
+                        <span>@i.Texto</span>
+                        <em>@i.Link →</em>
+                    </button>
+                }
+                </div>
+            }
+        </div>
     </div>;
 
     // ---- vendedores -------------------------------------------------------
@@ -322,13 +321,13 @@ else
         @{ var lista = VendLista(out var ocultos); }
         <div class="cvx-ch">
             <div>
-                <h2>@(_taxaOk ? "Quem converte mais: Win Rate por vendedor, só com amostra relevante" : "Propostas por vendedor no segmento selecionado")</h2>
-                <p>Win Rate = ganhas ÷ decididas · o denominador aparece em cada linha · a marca vertical é a média do grupo</p>
+                <h2>@(_taxaOk ? "Quem converte mais: taxa de conversão por vendedor, só com amostra relevante" : "Propostas por vendedor no segmento selecionado")</h2>
+                <p>Taxa de conversão = ganhas ÷ decididas · o denominador aparece em cada linha · a marca vertical é a média do grupo</p>
             </div>
             <div class="cvx-ctrl">
                 <label class="cvx-fld">Ordenar por
                     <select @bind="_ordVend">
-                        <option value="wr">Win Rate</option>
+                        <option value="wr">Taxa de conversão</option>
                         <option value="valor">Valor ganho</option>
                         <option value="ganhas">Propostas ganhas</option>
                         <option value="decididas">Propostas decididas</option>
@@ -347,7 +346,7 @@ else
         else
         {
             <div class="cvx-vlist">
-                <div class="cvx-vrow head"><span></span><span>Vendedor</span><span>Win Rate (ganhas de decididas)</span><span class="r">Ganhas</span><span class="r">Perdidas</span><span class="r">Abertas</span><span class="r">Decididas</span><span class="r">Valor ganho</span></div>
+                <div class="cvx-vrow head"><span></span><span>Vendedor</span><span>Taxa de conversão (ganhas de decididas)</span><span class="r">Ganhas</span><span class="r">Perdidas</span><span class="r">Abertas</span><span class="r">Decididas</span><span class="r">Valor ganho</span></div>
                 @for (var i = 0; i < lista.Count; i++)
                 {
                     var (nome, r) = lista[i];
@@ -382,23 +381,23 @@ else
                 <button class="icon-btn" @onclick="() => _vendSel = null">@Icons.Svg("x")</button>
             </div>
             <div class="cvx-dkpis">
-                <div><small>WIN RATE</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Decididas) decididas</span></div>
-                <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Win Rate por valor @TxValorGlobal(rv)</span></div>
+                <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Decididas) decididas</span></div>
+                <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão por valor @TxValorGlobal(rv)</span></div>
             </div>
             <div class="cvx-dcmp">
                 @if (cmp is { } c)
                 {
-                    <span>Win Rate <b>@(c >= 0 ? "acima" : "abaixo")</b> da média do grupo em <b>@Pp(c)</b> (grupo: @TxQtdGlobal(grp), @N0(grp.Decididas) decididas)</span>
+                    <span>Taxa de conversão <b>@(c >= 0 ? "acima" : "abaixo")</b> da média do grupo em <b>@Pp(c)</b> (grupo: @TxQtdGlobal(grp), @N0(grp.Decididas) decididas)</span>
                 }
                 else { <span>Comparação com o grupo indisponível: sem propostas decididas.</span> }
             </div>
             <h3 class="cvx-dh">Composição das propostas</h3>
             @Html(HtmlComposicao(rv))
-            <h3 class="cvx-dh">Histórico mensal de Win Rate</h3>
+            <h3 class="cvx-dh">Histórico mensal da taxa de conversão</h3>
             @Html(SvgWinRate(itens, 0, true, false))
             <h3 class="cvx-dh">Distribuição por BU</h3>
             <table class="cvx-mini-tbl">
-                <thead><tr><th>BU</th><th class="r">Propostas</th><th class="r">Decididas</th><th class="r">Win Rate</th><th class="r">Valor ganho</th></tr></thead>
+                <thead><tr><th>BU</th><th class="r">Propostas</th><th class="r">Decididas</th><th class="r">Conversão</th><th class="r">Valor ganho</th></tr></thead>
                 <tbody>
                     @foreach (var (bn, br) in Grupos(itens, i => i.P.Bu))
                     {
@@ -434,33 +433,16 @@ else
     private string RelCss(Resumo r) =>
         !_taxaOk || r.Decididas < AmostraMinima || r.TaxaQtd is not { } t || _rx.TaxaQtd is not { } m ? "" : t >= m + 5 ? "up" : t <= m - 5 ? "down" : "";
 
-    private RenderFragment Unidades() => @<section>
-        <div class="cvx-ch" style="margin:0 2px 10px">
-            <div><h2>Onde convertemos melhor: comparação entre unidades</h2><p>BU (coluna V) e BU Intercompany (AG, senão AF) são análises independentes · clique numa unidade para filtrar todo o painel por ela</p></div>
-            <div class="cvx-seg-ctl">
-                <button class="@(_buModo == "bu" ? "on" : "")" @onclick='() => _buModo = "bu"'>Business Unit</button>
-                <button class="@(_buModo == "ic" ? "on" : "")" @onclick='() => _buModo = "ic"'>Intercompany</button>
-                <button class="@(_buModo == "lado" ? "on" : "")" @onclick='() => _buModo = "lado"'>Lado a lado</button>
-            </div>
-        </div>
-        @if (_buModo == "lado")
-        {
-            <div class="cvx-two">@BlocoUnidades(i => i.P.Bu, _bus, "Business Unit") @BlocoUnidades(i => i.P.BuIc, _buIcs, "BU Intercompany")</div>
-        }
-        else if (_buModo == "ic") { @BlocoUnidades(i => i.P.BuIc, _buIcs, "BU Intercompany") }
-        else { @BlocoUnidades(i => i.P.Bu, _bus, "Business Unit") }
-    </section>;
-
     private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string titulo) => @<div class="cvx-card">
         @{
             var lista = UnidadesOrdenadas(sel);
             var maxV = Math.Max(lista.Select(x => Math.Max(x.R.VG, Math.Max(x.R.VP, x.R.VA))).DefaultIfEmpty(0).Max(), 0.0000001);
         }
-        <h2 class="cvx-h2s">@titulo · Win Rate e valores por unidade</h2>
+        <h2 class="cvx-h2s">@titulo · taxa de conversão e valores por unidade</h2>
         <div class="cv-tw">
             <table class="cvx-tbl">
                 <thead>
-                    <tr><th>Unidade · Win Rate (ganhas de decididas)</th><th class="r">Decididas</th><th class="r">Propostas</th><th class="r">Valor ganho</th><th class="r">Valor perdido</th><th class="r">Valor aberto</th><th class="r">Win Rate (valor)</th></tr>
+                    <tr><th>Unidade · Taxa de conversão (ganhas de decididas)</th><th class="r">Decididas</th><th class="r">Propostas</th><th class="r">Valor ganho</th><th class="r">Valor perdido</th><th class="r">Valor aberto</th><th class="r">Taxa de conversão (valor)</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var (nome, r) in lista)
@@ -501,11 +483,11 @@ else
     // ---- financeiro -----------------------------------------------------------
     private RenderFragment Financeiro() => @<section>
         <div class="cvx-fin">
-            @Kpi("Total Quoted Value", DinTotal(_r), $"{N0(_r.Total)} propostas enviadas", "Soma em R$ de todas as propostas com valor convertido (inclui não classificadas, que aparecem em cinza).", "#155A96", null, DinTotalTip(_r))
-            @Kpi("Won Revenue", Din(_r, ClasseProposta.Ganha), $"{N0(_r.G)} propostas ganhas", "Valor das propostas ganhas, em R$.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
-            @Kpi("Lost Opportunity Value", Din(_r, ClasseProposta.Perdida), $"{N0(_r.P)} propostas perdidas", "Valor das propostas perdidas, em R$.", CorP, DeltaVal(ClasseProposta.Perdida), DinTip(_r, ClasseProposta.Perdida))
-            @Kpi("Open Pipeline Value", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "Valor das propostas abertas, em R$.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
-            @Kpi("Value-Based Win Rate", TxValorGlobal(_r), "Valor ganho ÷ (ganho + perdido)", "Valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas não entram.", "#122E50")
+            @Kpi("Valor Total Cotado", DinTotal(_r), $"{N0(_r.Total)} propostas enviadas", "Soma em R$ de todas as propostas com valor convertido (inclui não classificadas, que aparecem em cinza).", "#155A96", null, DinTotalTip(_r))
+            @Kpi("Receita Ganha", Din(_r, ClasseProposta.Ganha), $"{N0(_r.G)} propostas ganhas", "Valor das propostas ganhas, em R$.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
+            @Kpi("Valor Perdido", Din(_r, ClasseProposta.Perdida), $"{N0(_r.P)} propostas perdidas", "Valor das propostas perdidas, em R$.", CorP, DeltaVal(ClasseProposta.Perdida), DinTip(_r, ClasseProposta.Perdida))
+            @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "Valor das propostas abertas, em R$.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
+            @Kpi("Conversão por Valor", TxValorGlobal(_r), "Valor ganho ÷ (ganho + perdido)", "Valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas não entram.", "#122E50")
         </div>
         <div class="cvx-card">
             <h2 class="cvx-h2s">Distribuição do valor das propostas por status</h2>
@@ -538,7 +520,7 @@ else
         <ul class="cv-checks cvx-checks">
             <li class="@(okQtd ? "ok" : "bad")">@(okQtd ? "✔" : "✖") Total de registros (@N0(total)) = ganhas (@N0(geral.G)) + perdidas (@N0(geral.P)) + abertas (@N0(geral.A)) + não classificadas (@N0(geral.NC))</li>
             <li class="@(okFiltro ? "ok" : "bad")">@(okFiltro ? "✔" : "✖") No recorte atual: @N0(_f.Count) = @N0(_r.G) + @N0(_r.P) + @N0(_r.A) + @N0(_r.NC)</li>
-            <li class="@(okDec ? "ok" : "bad")">@(okDec ? "✔" : "✖") Decididas (@N0(_r.Decididas)) = ganhas + perdidas · abertas e não classificadas fora do denominador da Win Rate</li>
+            <li class="@(okDec ? "ok" : "bad")">@(okDec ? "✔" : "✖") Decididas (@N0(_r.Decididas)) = ganhas + perdidas · abertas e não classificadas fora do denominador da Taxa de conversão</li>
             <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@Fmt.Brl(geral.VTotal) na base toda)</li>
             <li class="@(okTabela ? "ok" : "bad")">@(okTabela ? "✔" : "✖") Base de Propostas e dashboard usam o mesmo recorte: @N0(_f.Count) registros</li>
             <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") Propostas com valor mas sem taxa de câmbio: @N0(geral.SemTaxa)@(geral.SemTaxa > 0 ? $" (US$ {geral.UsdSemTaxa.ToString("N0", _pt)} fora dos valores em R$)" : "")</li>
@@ -677,51 +659,51 @@ else
 
         <section class="rpt-page">
             <header class="rpt-head">
-                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">—</span>Commercial Performance Intelligence</div><div class="cvx-sub">Sales Conversion &amp; Revenue Performance</div></div>
+                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de propostas e receita</div></div>
                 <div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span><span><b>Atualizado</b> @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy HH:mm") : "—")</span><span><b>Filtros</b> @NotasFiltros()</span></div>
             </header>
             <div class="rpt-row1">
                 <article class="cvx-hero">
-                    <div class="cvx-lab">WIN RATE</div>
+                    <div class="cvx-lab">TAXA DE CONVERSÃO</div>
                     <div class="cvx-big">@TxQtdGlobal(_r)</div>
                     <div class="cvx-frac">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
                     @{ var dw = DeltaWin(); }
                     <div class="cvx-delta @dw.Css">@dw.Texto</div>
-                    <div class="cvx-hero-foot"><span>Win Rate por valor <b>@TxValorGlobal(_r)</b></span></div>
+                    <div class="cvx-hero-foot"><span>Conversão por valor <b>@TxValorGlobal(_r)</b></span></div>
                 </article>
                 <div class="rpt-kpis">
-                    @Kpi("Won Value", Din(_r, ClasseProposta.Ganha), "Valor ganho, R$", "", CorG)
-                    @Kpi("Open Pipeline Value", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "", CorA)
-                    @Kpi("Proposals Won", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total", "", CorG)
-                    @Kpi("Proposals Lost", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total", "", CorP)
+                    @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Valor ganho, R$", "", CorG)
+                    @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "", CorA)
+                    @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total", "", CorG)
+                    @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total", "", CorP)
                 </div>
             </div>
             <div class="rpt-row2">
                 <div class="rpt-box">
                     <h3>Composição das @N0(_r.Total) propostas enviadas</h3>
                     @Html(HtmlComposicao(_r))
-                    <h3 style="margin-top:12px">Executive Insights</h3>
+                    <h3 style="margin-top:12px">Leituras automáticas</h3>
                     @{ var ins = Insights(); }
                     @if (ins.Count == 0) { <p class="rpt-small">Sem variações relevantes ou amostra suficiente neste recorte.</p> }
                     @foreach (var i in ins) { <div class="rpt-ins"><small>@i.Categoria</small><span>@i.Texto</span></div> }
                 </div>
                 <div class="rpt-box wide">
-                    <h3>Win Rate mensal — mês de envio, status atual</h3>
+                    <h3>Taxa de conversão mensal — mês de envio, status atual</h3>
                     @Html(SvgWinRate(_f, 0, true))
                 </div>
             </div>
             <div class="rpt-box">
-                <h3>Win Rate por Business Unit</h3>
+                <h3>Taxa de conversão por Business Unit</h3>
                 @Html(HtmlBuBars(Grupos(_f, i => i.P.Bu), 6))
             </div>
             <footer class="rpt-foot">Howden Sales Forecast · página 1 de 2</footer>
         </section>
 
         <section class="rpt-page">
-            <header class="rpt-head slim"><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">—</span>Commercial Performance Intelligence</div><div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span></div></header>
+            <header class="rpt-head slim"><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span></div></header>
             <div class="rpt-row2">
                 <div class="rpt-box wide">
-                    <h3>Vendedores com maior Win Rate (mínimo de 10 propostas decididas)</h3>
+                    <h3>Vendedores com maior taxa de conversão (mínimo de 10 propostas decididas)</h3>
                     @Html(HtmlVendTop(8, 10))
                 </div>
                 <div class="rpt-box">
@@ -733,7 +715,7 @@ else
             <div class="rpt-box">
                 <h3>Definições e notas metodológicas</h3>
                 <ul class="rpt-notes">
-                    <li><b>Win Rate</b> = ganhas ÷ (ganhas + perdidas). Abertas e não classificadas não entram no denominador. <b>Win Rate por valor</b> = valor ganho ÷ (valor ganho + valor perdido), em R$.</li>
+                    <li><b>Taxa de conversão</b> = ganhas ÷ (ganhas + perdidas). Abertas e não classificadas não entram no denominador. <b>Conversão por valor</b> = valor ganho ÷ (valor ganho + valor perdido), em R$.</li>
                     <li><b>Classificação</b> pelo status do CRM — Ganhas: Closed - Won, OTP · Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid, Closed - Unknown · Abertas: Open · demais: não classificadas, fora das três categorias.</li>
                     <li><b>Coorte de envio</b>: o eixo de tempo é o mês de envio da proposta e mostra o status atual dela — não a data de fechamento. Meses recentes têm mais propostas abertas, e a taxa deles pode mudar.</li>
                     <li><b>Valores</b> em R$ = valor em US$ × taxa USD/BRL do ano da data de envio @TaxasTexto(). Propostas sem taxa ficam fora dos valores e são sinalizadas.</li>

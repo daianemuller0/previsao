@@ -2293,3 +2293,66 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
     .rpt-page:last-of-type { page-break-after:auto; break-after:auto; }
     .rpt-head, .cvx-hero, .cvx-seg, .cvx-bc::before, .cvx-prow .bar i { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
+
+/* ===== Conversão — página única (rolagem contínua) ===== */
+html { scroll-behavior: smooth; }
+.cvx { max-width: 1480px; margin: 0 auto; }
+/* Cabeçalho compacto e claro */
+.cvx-head { background:#fff; color:var(--cx-text); border:1px solid var(--cx-line); border-left:5px solid var(--cx-navy); padding:10px 18px; gap:8px 24px; align-items:center; margin-bottom:10px; }
+.cvx-title { font-size:20px; color:var(--cx-navy); }
+.cvx-mark { font-weight:800; letter-spacing:.12em; }
+.cvx-dash { opacity:.4; margin:0 8px; }
+.cvx-sub { font-size:12.5px; color:var(--cx-mut); opacity:1; margin-top:1px; }
+.cvx-meta { opacity:1; color:var(--cx-mut); gap:2px 16px; flex:1; justify-content:center; }
+.cvx-meta b { color:var(--cx-text); opacity:1; }
+.cvx-err { background:#FBEDE5; color:#8a4524; }
+.rpt-head .cvx-title, .rpt-head .cvx-sub { color:#fff; }
+
+/* Índice fixo */
+.cvx-index { position:sticky; top:var(--topbar-h,56px); z-index:20; display:flex; gap:2px; flex-wrap:wrap; background:rgba(243,246,250,.94); backdrop-filter:blur(6px); border:1px solid var(--cx-line); border-radius:10px; padding:4px; margin-bottom:10px; }
+.cvx-index button { background:none; border:0; border-radius:7px; padding:5px 12px; font-size:12.5px; font-weight:600; color:var(--cx-mut); cursor:pointer; }
+.cvx-index button:hover { background:#fff; color:var(--cx-navy); }
+
+/* Filtros: cada painel abre junto do seu campo */
+.cvx-filters { position:relative; z-index:30; gap:8px 10px; padding:8px 12px; }
+.cvx-filters .flt { display:flex; align-items:center; gap:6px; font-size:12px; background:var(--cx-bg); border:1px solid var(--cx-line); border-radius:999px; padding:5px 12px; }
+.cvx-filters .flt-multi { position:relative; }
+.cvx-filters .flt-label { color:var(--cx-mut); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }
+.cvx-filters .flt-multi-btn { border:0; background:none; outline:0; font:inherit; font-size:12px; font-weight:600; color:var(--cx-text); cursor:pointer; display:inline-flex; align-items:center; gap:5px; padding:0; }
+.cvx-filters .flt-caret { font-size:10px; color:var(--cx-mut); }
+.cvx-filters .flt-multi-panel { top:calc(100% + 6px); left:0; z-index:80; }
+.cvx-filters .flt-multi-backdrop { z-index:70; }
+
+/* Seções */
+.cvx-sec { scroll-margin-top:118px; margin-top:26px; padding-top:4px; }
+.cvx-sec:first-child { margin-top:6px; }
+.cvx-sec-h { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; padding-bottom:7px; margin-bottom:12px; border-bottom:1px solid var(--cx-line); }
+.cvx-sec-h h2 { font-size:19px; font-weight:800; color:var(--cx-navy); margin:0; letter-spacing:-.01em; }
+.cvx-sec-h span { font-size:12.5px; color:var(--cx-mut); }
+.cvx-h3 { font-size:15px; font-weight:700; color:var(--cx-navy); margin:0; }
+.cvx-sec .cvx-card { padding:14px 18px; margin-bottom:12px; }
+
+/* Indicadores compactos: 6 cartões, o primeiro em destaque */
+.cvx-kpis { display:grid; grid-template-columns:1.5fr repeat(5, minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+.cvx-kpi { padding:11px 14px; min-width:0; justify-content:flex-start; }
+.cvx-kpi .cvx-lab { font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cvx-num { font-size:23px; margin:3px 0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cvx-num.big { font-size:34px; color:var(--cx-navy); }
+.cvx-kpi.main { background:linear-gradient(180deg,#fff,#F3F7FC); border-color:#c9d8ea; }
+.cvx-kpi.main .cvx-delta { margin-top:4px; }
+.cvx-delta.pos { color:var(--cx-pos); } .cvx-delta.neg { color:var(--cx-neg); } .cvx-delta.neu { color:var(--cx-mut); }
+.cvx-ksub { font-size:11.5px; line-height:1.35; }
+.cvx-second { margin:0 2px 12px; }
+
+/* Insights em linha */
+.cvx-insights { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px; }
+.cvx-insights .cvx-insight { margin:0; }
+.cvx-insight em { display:block; font-style:normal; font-size:11.5px; font-weight:600; color:var(--cx-sky); margin-top:4px; }
+
+/* Gráficos com altura confortável */
+.cvx-trend svg { width:100%; height:auto; }
+.cvx-page .cvx-card { overflow-x:auto; }
+
+@media (max-width: 1360px) { .cvx-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); } .cvx-kpi.main { grid-column:span 3; } }
+@media (max-width: 720px) { .cvx-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); } .cvx-kpi.main { grid-column:span 2; } .cvx-meta { justify-content:flex-start; } }
+@media print { .cvx-index { display:none !important; } }

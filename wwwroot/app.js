@@ -1,6 +1,12 @@
 // Utilitários chamados pelo Blazor via JS interop.
 window.appPrint = () => window.print();
 
+// Rolagem suave até uma seção da página Conversão.
+window.cvIr = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
 // Relatório executivo (Conversão): papel A4 horizontal só enquanto o relatório está aberto.
 window.cvRelatorio = (abrir) => {
     const id = 'cvx-page-style';

@@ -35,7 +35,7 @@ public partial class Conversao
     };
     private static string NomeEn(ClasseProposta c) => c switch
     {
-        ClasseProposta.Ganha => "Won", ClasseProposta.Perdida => "Lost", ClasseProposta.Aberta => "Open", _ => "Unclassified",
+        ClasseProposta.Ganha => "Ganhas", ClasseProposta.Perdida => "Perdidas", ClasseProposta.Aberta => "Abertas", _ => "Não classificadas",
     };
     private static string NomeClasse(ClasseProposta c) => c switch
     {
@@ -43,8 +43,8 @@ public partial class Conversao
     };
     private static string DefClasse(ClasseProposta c) => c switch
     {
-        ClasseProposta.Ganha => "Won: status Closed - Won ou OTP.",
-        ClasseProposta.Perdida => "Lost: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid ou Closed - Unknown.",
+        ClasseProposta.Ganha => "Ganhas: status Closed - Won ou OTP.",
+        ClasseProposta.Perdida => "Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid ou Closed - Unknown.",
         ClasseProposta.Aberta => "Open: status Open — ainda sem resultado.",
         _ => "Unclassified: status fora da lista combinada, aguardando validação. Fica fora de ganhas, perdidas e abertas.",
     };
@@ -57,8 +57,6 @@ public partial class Conversao
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private bool _isAdmin, _carregando;
     private string _login = "", _user = "—";
-    private string _aba = "overview";          // overview | deep | base
-    private string _secao = "vend";            // vend | bu | perdas | fin | dados
     private bool _temDados => Conv.Atual.Propostas.Count > 0;
 
     // ---- filtros globais --------------------------------------------------------
@@ -292,12 +290,12 @@ public partial class Conversao
         var dados = new List<string>();
         if (_r.SemTaxa > 0) dados.Add($"{N0(_r.SemTaxa)} proposta(s) (US$ {_r.UsdSemTaxa.ToString("N0", _pt)}) sem taxa de câmbio ficam fora dos valores em R$");
         if (_r.NC > 0) dados.Add($"{N0(_r.NC)} proposta(s) com status não classificado ficam fora de ganhas, perdidas e abertas");
-        if (dados.Count > 0) res.Add(new("Data Quality", string.Join("; ", dados) + ".", "deep", "dados", "Ver validação dos dados"));
+        if (dados.Count > 0) res.Add(new("Qualidade dos dados", string.Join("; ", dados) + ".", "deep", "dados", "Ver validação dos dados"));
 
         // 2) variação da taxa de ganho
         if (ano is { } y && _prev is not null && _r.Decididas >= AmostraMinima && _prev.Decididas >= AmostraMinima
             && _r.TaxaQtd is { } cur && _prev.TaxaQtd is { } ant && Math.Abs(cur - ant) >= 0.5)
-            res.Add(new("Conversion Performance",
+            res.Add(new("Taxa de conversão",
                 $"A taxa de ganho {(cur > ant ? "avançou" : "recuou")} {Pp(cur - ant)} em relação a {y - 1} ({P1(ant)} → {P1(cur)}), sobre {N0(_r.Decididas)} propostas decididas.",
                 "overview", "", "Ver tendência"));
 
@@ -309,7 +307,7 @@ public partial class Conversao
                 .Select(g => (Nome: g.First().P.StatusOriginal, Qtd: g.Count())).OrderByDescending(x => x.Qtd).First();
             var share = (double)top.Qtd / perdidas.Count * 100;
             if (share >= 50)
-                res.Add(new("Loss Concentration",
+                res.Add(new("Concentração de perdas",
                     $"{top.Nome} representa {P1(share)} das propostas classificadas como perdidas ({N0(top.Qtd)} de {N0(perdidas.Count)}). O status indica a classificação no CRM, não a causa comercial.",
                     "deep", "perdas", "Ver análise de perdas"));
         }
@@ -322,7 +320,7 @@ public partial class Conversao
             var hi = bus.First(); var lo = bus.Last();
             var gap = hi.R.TaxaQtd!.Value - lo.R.TaxaQtd!.Value;
             if (gap >= 10)
-                res.Add(new("Business Unit Gap",
+                res.Add(new("Diferença entre unidades",
                     $"{hi.Nome} converte {P1(hi.R.TaxaQtd.Value)} das propostas decididas ({N0(hi.R.Decididas)}); {lo.Nome}, {P1(lo.R.TaxaQtd.Value)} ({N0(lo.R.Decididas)}) — diferença de {Pp(gap)}.",
                     "deep", "bu", "Comparar unidades"));
         }
@@ -332,14 +330,14 @@ public partial class Conversao
         {
             var d = ((double)_r.Total - _prev.Total) / _prev.Total * 100;
             if (Math.Abs(d) >= 20)
-                res.Add(new("Proposal Volume",
+                res.Add(new("Volume de propostas",
                     $"O volume de propostas enviadas {(d > 0 ? "cresceu" : "recuou")} {Math.Abs(d).ToString("0", _pt)}% frente a {y2 - 1}: {N0(_r.Total)} contra {N0(_prev.Total)}.",
                     "overview", "", "Ver evolução"));
         }
 
         // 6) exposição em propostas abertas
         if (_r.Conv[(int)ClasseProposta.Aberta] > 0 && _r.VTotal > 0 && _r.A > 0)
-            res.Add(new("Open Pipeline",
+            res.Add(new("Pipeline em aberto",
                 $"O pipeline aberto soma {R(_r.VA)} em {N0(_r.A)} propostas, {PctDe(_r.VA, _r.VTotal)} do valor total convertido.",
                 "deep", "fin", "Ver análise financeira"));
 
@@ -348,8 +346,8 @@ public partial class Conversao
 
     private void IrPara(Insight i)
     {
-        _aba = i.Aba;
-        if (i.Secao != "") _secao = i.Secao;
+        var alvo = i.Secao switch { "vend" => "vendedores", "bu" => "unidades", "perdas" => "perdas", "fin" => "receita", "dados" => "qualidade", _ => "evolucao" };
+        _ = JS.InvokeVoidAsync("cvIr", alvo);
     }
 
     // ======================================================================
@@ -374,7 +372,7 @@ public partial class Conversao
 
     private static string Vazio(string msg) => $"<div class='empty'>{Esc(msg)}</div>";
 
-    /// <summary>Win Rate mensal (linha, eixo 0–100%) + decididas (barras, escala própria, abaixo).</summary>
+    /// <summary>taxa de conversão mensal (linha, eixo 0–100%) + decididas (barras, escala própria, abaixo).</summary>
     private string SvgWinRate(IEnumerable<Item> src, int offset, bool compact, bool comparar = true)
     {
         var (meses, por) = Janela(src, offset);
@@ -392,7 +390,7 @@ public partial class Conversao
         var baseStrip = T + plotH + gap + strip;
 
         var sb = new StringBuilder("<div class='chart-body'>");
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='Win Rate mensal'>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='taxa de conversão mensal'>");
         foreach (var v in new[] { 0, 25, 50, 75, 100 })
         {
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#E1E8F0'/>");
@@ -434,7 +432,7 @@ public partial class Conversao
             hist.TryGetValue(meses[i].AddYears(-1), out var ra);
             var tip = $"{meses[i].ToString("MMMM/yyyy", _pt)}\n" +
                       (r is null ? "Sem propostas enviadas" :
-                       $"Win Rate: {(r.Decididas > 0 ? P1(r.TaxaQtd!.Value) : "não calculável")} ({N0(r.G)} ganhas de {N0(r.Decididas)} decididas)\n" +
+                       $"taxa de conversão: {(r.Decididas > 0 ? P1(r.TaxaQtd!.Value) : "não calculável")} ({N0(r.G)} ganhas de {N0(r.Decididas)} decididas)\n" +
                        $"Perdidas: {N0(r.P)} · Abertas: {N0(r.A)} ({PctDe(r.A, r.Total)} do mês)" +
                        (r.NC > 0 ? $" · Não classificadas: {N0(r.NC)}" : "")) +
                       (ra is not null && ra.Decididas > 0 ? $"\nMesmo mês de {meses[i].Year - 1}: {P1(ra.TaxaQtd!.Value)} ({N0(ra.Decididas)} decididas)" : "");
@@ -445,7 +443,7 @@ public partial class Conversao
         sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip)}' text-anchor='end' font-size='9.5' fill='#64748B'>0</text>");
         sb.Append("</svg>");
         sb.Append("<div class='cvx-leg'>");
-        sb.Append($"<span><i class='cvx-ln' style='background:{CorA}'></i>Win Rate do mês</span>");
+        sb.Append($"<span><i class='cvx-ln' style='background:{CorA}'></i>Taxa de conversão do mês</span>");
         if (comparar) sb.Append("<span><i class='cvx-ln dash'></i>Mesmo mês do ano anterior</span>");
         sb.Append($"<span><i class='cvx-pt' style='border-color:{CorA}'></i>Mais de 30% das propostas do mês ainda abertas (a taxa pode mudar)</span>");
         sb.Append("<span><i class='cvx-bx'></i>Propostas decididas (escala própria, embaixo)</span>");
@@ -508,7 +506,7 @@ public partial class Conversao
     {
         string html;
         if (_metTrend == "winrate")
-            html = !_taxaOk ? Vazio("Win Rate não se aplica com um segmento selecionado na barra de composição. Remova o segmento para ver a taxa.")
+            html = !_taxaOk ? Vazio("taxa de conversão não se aplica com um segmento selecionado na barra de composição. Remova o segmento para ver a taxa.")
                             : SvgWinRate(_f, offset, compact);
         else html = SvgEmpilhado(_fx, offset, _metTrend == "volume");
         builder.AddMarkupContent(0, html);
@@ -596,7 +594,7 @@ public partial class Conversao
         var l = Grupos(_f, i => i.P.Vendedor).Where(x => x.R.Decididas >= minDec && x.R.TaxaQtd is not null)
             .OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(n).ToList();
         if (l.Count == 0) return Vazio($"Nenhum vendedor com {minDec}+ propostas decididas no recorte.");
-        var sb = new StringBuilder("<table class='cvx-mini-tbl'><thead><tr><th>#</th><th>Vendedor</th><th class='r'>Win Rate</th><th class='r'>Ganhas</th><th class='r'>Perdidas</th><th class='r'>Abertas</th><th class='r'>Decididas</th><th class='r'>Valor ganho</th></tr></thead><tbody>");
+        var sb = new StringBuilder("<table class='cvx-mini-tbl'><thead><tr><th>#</th><th>Vendedor</th><th class='r'>taxa de conversão</th><th class='r'>Ganhas</th><th class='r'>Perdidas</th><th class='r'>Abertas</th><th class='r'>Decididas</th><th class='r'>Valor ganho</th></tr></thead><tbody>");
         for (var i = 0; i < l.Count; i++)
         {
             var (nome, r) = l[i];
@@ -685,7 +683,6 @@ public partial class Conversao
     // ======================================================================
     //  UNIDADES (BU e BU Intercompany)
     // ======================================================================
-    private string _buModo = "bu";   // bu | ic | lado
 
     private List<(string Nome, Resumo R)> UnidadesOrdenadas(Func<Item, string> sel) =>
         Grupos(_fx, sel).OrderByDescending(x => x.R.Decididas > 0 && _taxaOk ? x.R.TaxaQtd : -1)
