@@ -184,12 +184,13 @@ else
     // =====================================================================
     //  NÍVEL 1 · EXECUTIVE OVERVIEW
     // =====================================================================
-    private RenderFragment Kpi(string rotulo, string valor, string sub, string tip, string cor, string? delta = null, string? valorTip = null) =>
+    // maiorEhMelhor: true = subir é bom (verde), false = subir é ruim (laranja), null = só informativo (neutro)
+    private RenderFragment Kpi(string rotulo, string valor, string sub, string tip, string cor, string? delta = null, string? valorTip = null, bool? maiorEhMelhor = true) =>
         @<article class="cvx-kpi" style="--kc:@cor" title="@tip">
             <div class="cvx-lab">@rotulo</div>
             <div class="cvx-num" title="@valorTip">@valor</div>
             <div class="cvx-ksub">@sub</div>
-            @if (delta is not null) { <div class="cvx-kdelta">@delta</div> }
+            @if (delta is not null) { <div class="cvx-kdelta @DeltaCls(delta, maiorEhMelhor)">@Seta(delta)</div> }
         </article>;
 
     private string? DeltaVal(ClasseProposta c) =>
@@ -232,22 +233,22 @@ else
 
     private RenderFragment ResumoGeral() => @<div>
         <div class="cvx-kpis">
-            <article class="cvx-kpi main" style="--kc:@CorA" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
+            <article class="cvx-kpi main" style="--kc:@CorTx" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
                 <div class="cvx-lab">Taxa de Conversão</div>
                 <div class="cvx-num big">@TxQtdGlobal(_r)</div>
                 <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
                 @{ var dw = DeltaWin(); }
-                <div class="cvx-delta @dw.Css">@dw.Texto</div>
+                @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
                 <div class="cvx-ksub" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Por valor: <b>@TxValorGlobal(_r)</b></div>
             </article>
             @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
                  "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
             @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas",
-                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta))
+                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta), null)
             @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
                  "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", CorG, DeltaPct(_r.G, _prev?.G))
             @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
-                 "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P))
+                 "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P), null, false)
             @Kpi("Total de Propostas", N0(_r.Total), $"{N0(_r.Decididas)} decididas · {N0(_r.A)} abertas",
                  "Total no recorte = ganhas + perdidas + abertas + não classificadas.", CorN, DeltaPct(_r.Total, _prev?.Total))
         </div>
@@ -255,13 +256,12 @@ else
         <div class="cvx-second">
             <span title="@DinTip(_r, ClasseProposta.Perdida)">Valor perdido <b>@Din(_r, ClasseProposta.Perdida)</b></span>
             <span title="@DinTotalTip(_r)">Valor total cotado <b>@DinTotal(_r)</b></span>
-            <span title="Valor ganho ÷ (valor ganho + valor perdido)">Conversão por valor <b>@TxValorGlobal(_r)</b></span>
         </div>
 
         <section class="cvx-card cvx-comp">
             <div class="cvx-ch">
                 <div>
-                    <h3 class="cvx-h3">Composição das propostas: @PctDe(_r.G, _r.Total) do total foram ganhas</h3>
+                    <h3 class="cvx-h3">Composição das propostas</h3>
                     <p>Participação de cada status no total · clique num segmento para destacá-lo no ranking, nas unidades, nos valores e nas perdas</p>
                 </div>
                 <div class="cvx-total"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
@@ -272,7 +272,7 @@ else
                     var n = _r.Qtd(c);
                     if (n == 0) { continue; }
                     var pct = Largura(n, _r.Total);
-                    <button type="button" class="cvx-seg @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(pct)%;background:linear-gradient(135deg, @Cor(c), @CorFim(c))"
+                    <button type="button" class="cvx-seg @ClasseCss(c) @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(pct)%;background:@Cor(c)"
                             title="@($"{NomeEn(c)}: {N0(n)} ({PctDe(n, _r.Total)}) · {Din(_r, c)}\n{DefClasse(c)}")" @onclick="() => AlternarSeg(c)">
                         @if (pct >= 9) { <span class="t">@P1(pct)</span><span class="v">@Din(_r, c)</span> }
                     </button>
@@ -395,7 +395,7 @@ else
             <h3 class="cvx-dh">Composição das propostas</h3>
             @Html(HtmlComposicao(rv))
             <h3 class="cvx-dh">Histórico mensal da taxa de conversão</h3>
-            @Html(SvgWinRate(itens, 0, true, false))
+            @Html(SvgWinRate(itens, 0, true, false, 600))
             <h3 class="cvx-dh">Distribuição por BU</h3>
             <table class="cvx-mini-tbl">
                 <thead><tr><th>BU</th><th class="r">Propostas</th><th class="r">Decididas</th><th class="r">Conversão</th><th class="r">Valor ganho</th></tr></thead>
@@ -432,7 +432,7 @@ else
 
     // ---- unidades -----------------------------------------------------------
     private string RelCss(Resumo r) =>
-        !_taxaOk || r.Decididas < AmostraMinima || r.TaxaQtd is not { } t || _rx.TaxaQtd is not { } m ? "" : t >= m + 5 ? "up" : t <= m - 5 ? "down" : "";
+        !_taxaOk || r.Decididas < AmostraMinima || r.TaxaQtd is not { } t || _rx.TaxaQtd is not { } m ? "" : t >= m + 5 ? "pos" : t <= m - 5 ? "neg" : "";
 
     private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string exceto) => @<div class="cvx-card">
         @{
@@ -452,13 +452,13 @@ else
                         <tr class="@(filtro.Count == 0 ? "" : filtro.Contains(nome) ? "on" : "dim")" title="Clique para filtrar por esta unidade" @onclick="() => Alternar(filtro, un)">
                             <td>
                                 <div class="nm">@nome</div>
-                                <div class="cvx-wr"><span class="tr"><i style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></i></span><b class="@RelCss(r)">@TxQtd(r)</b></div>
+                                <div class="cvx-wr"><span class="tr"><i style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></i></span><b class="@RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</b></div>
                             </td>
                             <td class="r">@N0(r.Decididas)</td>
                             <td class="r">@N0(r.Total)</td>
-                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Ganha] > 0 ? r.VG / maxV * 100 : 0)%;--bc:@CorG" title="@DinTip(r, ClasseProposta.Ganha)"><span>@Din(r, ClasseProposta.Ganha)</span></td>
-                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Perdida] > 0 ? r.VP / maxV * 100 : 0)%;--bc:@CorP" title="@DinTip(r, ClasseProposta.Perdida)"><span>@Din(r, ClasseProposta.Perdida)</span></td>
-                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Aberta] > 0 ? r.VA / maxV * 100 : 0)%;--bc:@CorA" title="@DinTip(r, ClasseProposta.Aberta)"><span>@Din(r, ClasseProposta.Aberta)</span></td>
+                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Ganha] > 0 ? r.VG / maxV * 100 : 0);--bc:@CorG" title="@DinTip(r, ClasseProposta.Ganha)"><span>@Din(r, ClasseProposta.Ganha)</span></td>
+                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Perdida] > 0 ? r.VP / maxV * 100 : 0);--bc:@CorP" title="@DinTip(r, ClasseProposta.Perdida)"><span>@Din(r, ClasseProposta.Perdida)</span></td>
+                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Aberta] > 0 ? r.VA / maxV * 100 : 0);--bc:@CorA" title="@DinTip(r, ClasseProposta.Aberta)"><span>@Din(r, ClasseProposta.Aberta)</span></td>
                             <td class="r"><b>@TxValor(r)</b></td>
                         </tr>
                     }
@@ -684,7 +684,7 @@ else
                     <div class="cvx-big">@TxQtdGlobal(_r)</div>
                     <div class="cvx-frac">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
                     @{ var dw = DeltaWin(); }
-                    <div class="cvx-delta @dw.Css">@dw.Texto</div>
+                    @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
                     <div class="cvx-hero-foot"><span>Conversão por valor <b>@TxValorGlobal(_r)</b></span></div>
                 </article>
                 <div class="rpt-kpis">
@@ -705,7 +705,7 @@ else
                 </div>
                 <div class="rpt-box wide">
                     <h3>Taxa de conversão mensal — mês de envio, status atual</h3>
-                    @Html(SvgWinRate(_f, 0, true))
+                    @Html(SvgWinRate(_f, 0, true, true, 640))
                 </div>
             </div>
             <div class="rpt-box">

@@ -26,16 +26,14 @@ public partial class Conversao : IAsyncDisposable
 
     // Um conceito, uma cor, em todas as visualizações.
     private const string CorG = "#1f9254", CorP = "#d98324", CorA = "#007A9E", CorN = "#93a1b5";
+    // Taxa de conversão tem cor própria (azul-marinho); #007A9E fica exclusivo de Abertas.
+    private const string CorTx = "#12355B";
     private static readonly ClasseProposta[] Classes =
         { ClasseProposta.Ganha, ClasseProposta.Perdida, ClasseProposta.Aberta, ClasseProposta.NaoClassificada };
 
     private static string Cor(ClasseProposta c) => c switch
     {
         ClasseProposta.Ganha => CorG, ClasseProposta.Perdida => CorP, ClasseProposta.Aberta => CorA, _ => CorN,
-    };
-    private static string CorFim(ClasseProposta c) => c switch
-    {
-        ClasseProposta.Ganha => "#2fae6a", ClasseProposta.Perdida => "#ec9a43", ClasseProposta.Aberta => "#1aa5c4", _ => "#b6c1d0",
     };
     private static string NomeEn(ClasseProposta c) => c switch
     {
@@ -277,15 +275,21 @@ public partial class Conversao : IAsyncDisposable
     private string? DeltaPct(double atual, double? anterior) =>
         anterior is > 0 && _prev is not null ? $"{(atual - anterior.Value) / anterior.Value * 100:+0;-0;0}% vs {_prevRotulo}" : null;
 
+    /// <summary>Cor da variação: pos/neg conforme o sentido desejado do indicador; null = neutro (sem juízo de valor).</summary>
+    private static string DeltaCls(string? d, bool? maior) =>
+        d is null || maior is null || d.StartsWith("+0") || d.StartsWith("0") ? "neu" : (d.StartsWith("+") == maior.Value ? "pos" : "neg");
+    /// <summary>Seta ▲/▼ à frente da variação (o texto continua começando pelo sinal, que DeltaCls lê).</summary>
+    private static string Seta(string d) => d.StartsWith("+0") || d.StartsWith("0") ? d : (d.StartsWith("+") ? "▲ " : d.StartsWith("-") ? "▼ " : "") + d;
+
     private (string Texto, string Css) DeltaWin()
     {
         if (_anos.Count != 1 || !int.TryParse(_anos.First(), out var ano))
-            return ("", "flat");
-        if (_prev is null) return ($"Sem dados comparáveis em {_prevRotulo}", "flat");
-        if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return ($"Sem propostas decididas para comparar com {_prevRotulo}", "flat");
+            return ("", "neu");
+        if (_prev is null) return ($"Sem dados comparáveis em {_prevRotulo}", "neu");
+        if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return ($"Sem propostas decididas para comparar com {_prevRotulo}", "neu");
         var d = cur - ant;
-        if (Math.Abs(d) < 0.05) return ($"Estável vs {_prevRotulo} (0,0 p.p.)", "flat");
-        return ($"{(d > 0 ? "▲" : "▼")} {Pp(d)} vs {_prevRotulo} ({P1(ant)})", d > 0 ? "up" : "down");
+        if (Math.Abs(d) < 0.05) return ($"Estável vs {_prevRotulo} (0,0 p.p.)", "neu");
+        return ($"{(d > 0 ? "▲" : "▼")} {Pp(d)} vs {_prevRotulo} ({P1(ant)})", d > 0 ? "pos" : "neg");
     }
 
     private string PeriodoTxt()
@@ -401,7 +405,7 @@ public partial class Conversao : IAsyncDisposable
     private static string Vazio(string msg) => $"<div class='empty'>{Esc(msg)}</div>";
 
     /// <summary>taxa de conversão mensal (linha, eixo 0–100%) + decididas (barras, escala própria, abaixo).</summary>
-    private string SvgWinRate(IEnumerable<Item> src, int offset, bool compact, bool comparar = true)
+    private string SvgWinRate(IEnumerable<Item> src, int offset, bool compact, bool comparar = true, double largura = 1000)
     {
         var (meses, por) = Janela(src, offset);
         if (meses.Count == 0) return Vazio("Nenhuma proposta com data de envio no recorte.");
@@ -409,9 +413,12 @@ public partial class Conversao : IAsyncDisposable
         // individual (vendedor) ele compararia coisas diferentes e fica desligado.
         var hist = comparar ? SerieBase() : new Dictionary<DateTime, Resumo>();
 
-        double W = 1000, H = compact ? 250 : 320, L = 46, Rr = 16, T = 14, B = 26, strip = 46, gap = 12;
+        // largura menor (drawer, PDF) = viewBox mais estreito: o SVG escala menos e as fontes continuam legíveis
+        double W = largura, H = compact ? 256 : 320, L = 46, Rr = 16, T = 14, B = 26, strip = 46, gap = compact ? 18 : 12;
+        var fs = compact ? 11 : 10.5;
         var plotH = H - T - B - strip - gap;
         var passo = (W - L - Rr) / meses.Count;
+        var soPares = passo < 50;   // pouco espaço por mês: rotula só os meses pares
         double X(int i) => L + passo * (i + 0.5);
         double Y(double v) => T + plotH * (1 - v / 100);
         var maxD = Math.Max(meses.Max(m => por.TryGetValue(m, out var rr) ? rr.Decididas : 0), 1);
@@ -422,7 +429,7 @@ public partial class Conversao : IAsyncDisposable
         foreach (var v in new[] { 0, 25, 50, 75, 100 })
         {
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
-            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#6b7a90'>{v}%</text>");
+            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='{F(fs)}' fill='#6b7a90'>{v}%</text>");
         }
 
         // linha do ano anterior (tracejada) e linha atual, quebrando onde não há propostas decididas
@@ -443,7 +450,7 @@ public partial class Conversao : IAsyncDisposable
         var anterior = Caminho(m => Taxa(hist, m.AddYears(-1)));
         if (anterior != "") sb.Append($"<path d='{anterior}' fill='none' stroke='#93a1b5' stroke-width='1.6' stroke-dasharray='5 4'/>");
         var atual = Caminho(m => Taxa(por, m));
-        if (atual != "") sb.Append($"<path d='{atual}' fill='none' stroke='{CorA}' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/>");
+        if (atual != "") sb.Append($"<path d='{atual}' fill='none' stroke='{CorTx}' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/>");
 
         for (var i = 0; i < meses.Count; i++)
         {
@@ -455,7 +462,7 @@ public partial class Conversao : IAsyncDisposable
                 sb.Append($"<rect x='{F(x - Math.Min(passo * 0.28, 18))}' y='{F(baseStrip - h)}' width='{F(Math.Min(passo * 0.56, 36))}' height='{F(h)}' rx='2' fill='#C9D6E4'/>");
                 var abertas = r.Total > 0 ? (double)r.A / r.Total : 0;
                 var imaturo = abertas > 0.30;
-                sb.Append($"<circle cx='{F(x)}' cy='{F(Y(r.TaxaQtd!.Value))}' r='4.5' fill='{(imaturo ? "#FFFFFF" : CorA)}' stroke='{CorA}' stroke-width='2'/>");
+                sb.Append($"<circle cx='{F(x)}' cy='{F(Y(r.TaxaQtd!.Value))}' r='4.5' fill='{(imaturo ? "#FFFFFF" : CorTx)}' stroke='{CorTx}' stroke-width='2'/>");
             }
             hist.TryGetValue(meses[i].AddYears(-1), out var ra);
             var tip = $"{meses[i].ToString("MMMM/yyyy", _pt)}\n" +
@@ -465,15 +472,16 @@ public partial class Conversao : IAsyncDisposable
                        (r.NC > 0 ? $" · Não classificadas: {N0(r.NC)}" : "")) +
                       (ra is not null && ra.Decididas > 0 ? $"\nMesmo mês de {meses[i].Year - 1}: {P1(ra.TaxaQtd!.Value)} ({N0(ra.Decididas)} decididas)" : "");
             sb.Append($"<rect x='{F(L + passo * i)}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B + 6)}' fill='transparent'><title>{EscTip(tip)}</title></rect>");
-            sb.Append($"<text x='{F(x)}' y='{F(H - 8)}' text-anchor='middle' font-size='10.5' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+            if (!soPares || meses[i].Month % 2 == 0)
+                sb.Append($"<text x='{F(x)}' y='{F(H - 8)}' text-anchor='middle' font-size='{F(fs)}' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
         }
-        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip - strip + 6)}' text-anchor='end' font-size='9.5' fill='#6b7a90'>{maxD}</text>");
-        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip)}' text-anchor='end' font-size='9.5' fill='#6b7a90'>0</text>");
+        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip - strip + 6)}' text-anchor='end' font-size='{F(compact ? 10.5 : 9.5)}' fill='#6b7a90'>{maxD}</text>");
+        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip)}' text-anchor='end' font-size='{F(compact ? 10.5 : 9.5)}' fill='#6b7a90'>0</text>");
         sb.Append("</svg>");
         sb.Append("<div class='cvx-leg'>");
-        sb.Append($"<span><i class='cvx-ln' style='background:{CorA}'></i>Taxa de conversão do mês</span>");
+        sb.Append($"<span><i class='cvx-ln' style='border-top-color:{CorTx}'></i>Taxa de conversão do mês</span>");
         if (comparar) sb.Append("<span><i class='cvx-ln dash'></i>Mesmo mês do ano anterior</span>");
-        sb.Append($"<span><i class='cvx-pt' style='border-color:{CorA}'></i>Mais de 30% das propostas do mês ainda abertas (a taxa pode mudar)</span>");
+        sb.Append($"<span><i class='cvx-pt' style='border-color:{CorTx}'></i>Mais de 30% das propostas do mês ainda abertas (a taxa pode mudar)</span>");
         sb.Append("<span><i class='cvx-bx'></i>Propostas decididas (escala própria, embaixo)</span>");
         sb.Append("</div></div>");
         return sb.ToString();
@@ -487,6 +495,14 @@ public partial class Conversao : IAsyncDisposable
         var anos = AnosBarras();
         if (anos.Count == 0) return DateTime.Today.Year;
         return _anoBarras is { } y && anos.Contains(y) ? y : anos[^1];
+    }
+
+    /// <summary>Passo "redondo" do eixo (1, 2, 2,5 ou 5 × 10ⁿ) imediatamente acima de v.</summary>
+    private static double Nice(double v)
+    {
+        if (v <= 0) return 1;
+        var p = Math.Pow(10, Math.Floor(Math.Log10(v))); var f = v / p;
+        return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
     }
 
     /// <summary>Barras empilhadas de janeiro a dezembro do ano escolhido (ordem cronológica do calendário).</summary>
@@ -508,17 +524,22 @@ public partial class Conversao : IAsyncDisposable
         var cats = temNc ? 4 : 3;
         double maxY = 1;
         foreach (var r in por.Values) maxY = Math.Max(maxY, Enumerable.Range(0, cats).Sum(c => Val(r, c)));
+        // 4 faixas de passo redondo, com folga de 12% para o total escrito em cima da coluna
+        // 3 ou 4 faixas: o eixo para na primeira marca redonda acima do maior total (sem metade do gráfico vazia)
+        var step = Nice(maxY * 1.12 / 4); var nTicks = Math.Max(2, (int)Math.Ceiling(maxY * 1.12 / step)); maxY = step * nTicks;
 
-        const double W = 1000, H = 300, L = 74, Rr = 14, T = 24, B = 30;
+        // T deixa uma faixa acima da marca mais alta para a unidade "R$" não encostar no rótulo do eixo
+        const double W = 1000, H = 310, L = 74, Rr = 14, T = 38, B = 30;
         var passo = (W - L - Rr) / meses.Count; var larg = Math.Min(passo * 0.62, 46);
         double Y(double v) => T + (H - T - B) * (1 - v / maxY);
-        string Rot(double v) => qtd ? F(Math.Round(v)) : R(v);
+        string Rot(double v) => qtd ? N0((int)Math.Round(v)) : Mon(v);
 
         var sb = new StringBuilder("<div class='chart-body'>");
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{(qtd ? "Volume" : "Valor")} mensal'>");
-        for (var k = 0; k <= 4; k++)
+        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='10' font-weight='700' fill='#93a1b5'>R$</text>");
+        for (var k = 0; k <= nTicks; k++)
         {
-            var v = maxY * k / 4;
+            var v = step * k;
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
             sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#6b7a90'>{Esc(Rot(v))}</text>");
         }
@@ -586,16 +607,17 @@ public partial class Conversao : IAsyncDisposable
 
         var maxV = 0.0;
         foreach (var a in anos) for (var m = 1; m <= 12; m++) maxV = Math.Max(maxV, Val(a, m) ?? 0);
-        double Nice(double v)
-        {
-            if (v <= 0) return 1;
-            var p = Math.Pow(10, Math.Floor(Math.Log10(v))); var f = v / p;
-            return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
-        }
-        var maxY = met == "winrate" ? 100 : Nice(maxV);
+        // marcas redondas; o eixo para na primeira marca acima do maior valor (com folga para o rótulo do ano atual)
+        var step = Nice(maxV / 4);
+        var nTicks = met == "winrate" ? 4 : Math.Max(2, (int)Math.Ceiling(maxV * 1.08 / step));
+        var maxY = met == "winrate" ? 100 : step * nTicks;
 
-        // Paleta no padrão dos gráficos executivos: ano atual em azul-petróleo sólido, anteriores em tons distintos.
-        string[] cores = { "#0b6c8c", "#d98324", "#1f9254", "#6b4fa3", "#c0392b", "#93a1b5" };
+        // Paleta de anos em tons de azul/cinza: sem verde, laranja, vermelho ou roxo, que já significam status.
+        // Ano atual em azul-marinho sólido; anteriores mais claros e tracejados. Nenhum ano é cortado e as cores
+        // não são recicladas (o 7º ano não pode herdar o azul do atual): além do 6º, todos ficam no último cinza e a legenda avisa.
+        string[] cores = { "#12355B", "#4F7AA8", "#8DA2BC", "#B3C0D1", "#6E7F96", "#C9D3DE" };
+        string CorAno(int k) => cores[Math.Min(k, cores.Length - 1)];
+        string? Traco(int k) => k == 0 ? null : k == 1 ? "6 4" : "2 4";
         // mês corrente real (calendário), não o último mês com dado
         var hoje = DateTime.Today; var mesAtual = anos[0] == hoje.Year ? hoje.Month : 0;
         double W = 1200, H = 400, L = 70, Rr = 30, T = 44, B = 40;
@@ -619,28 +641,33 @@ public partial class Conversao : IAsyncDisposable
 
         var sb = new StringBuilder("<div class='chart-body cvx-anual'><div class='cvx-leg top'>");
         for (var k = 0; k < anos.Count; k++)
-            sb.Append($"<span><i class='cvx-ln' style='border-top-color:{cores[k % cores.Length]}'></i>{anos[k]}</span>");
+            sb.Append($"<span><i class='cvx-ln{(k == 1 ? " dash" : k >= 2 ? " dash dot" : "")}' style='border-top-color:{CorAno(k)}'></i>{anos[k]}</span>");
+        if (anos.Count > cores.Length)
+            sb.Append($"<span class='cvx-leg-aviso'>{anos.Count} anos no recorte: de {anos[^1]} a {anos[cores.Length - 1]} na mesma cor cinza · filtre por Ano para comparar menos anos</span>");
         if (temFraco)
             sb.Append($"<span><i class='cvx-pt' style='border-color:{cores[0]}'></i>{(met == "winrate" ? "Mês em andamento, poucas decididas ou mais de 30% abertas: o valor pode mudar" : "Mês em andamento: o valor pode mudar")}</span>");
         sb.Append("</div>");
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano' preserveAspectRatio='xMidYMid meet'>");
         sb.Append($"<defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cores[0]}' stop-opacity='.18'/><stop offset='100%' stop-color='{cores[0]}' stop-opacity='0'/></linearGradient></defs>");
-        for (var g = 0; g <= 4; g++)
+        // título do eixo: a unidade fica explícita (taxa, quantidade ou R$)
+        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? "Taxa de conversão (%)" : met == "volume" ? "Propostas enviadas" : "Valor (R$)")}</text>");
+        for (var g = 0; g <= nTicks; g++)
         {
-            var v = maxY * g / 4;
+            var v = met == "winrate" ? 25.0 * g : step * g;
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='{(g == 0 ? "#d3dcea" : "#edf1f6")}' stroke-width='{F(g == 0 ? 1.2 : 1)}'/>");
-            sb.Append($"<text x='{F(L - 14)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(g == 0 ? "0" : Lbl(v))}</text>");
+            sb.Append($"<text x='{F(L - 14)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12.5' fill='#8a97ab'>{Esc(Lbl(v))}</text>");
         }
         // faixa do mês atual
         if (mesAtual > 0)
-            sb.Append($"<rect x='{F(L + passo * (mesAtual - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='#0b6c8c' opacity='.045' rx='6'/>");
+            sb.Append($"<rect x='{F(L + passo * (mesAtual - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='{cores[0]}' opacity='.045' rx='6'/>");
         for (var m = 1; m <= 12; m++)
             sb.Append($"<text x='{F(X(m))}' y='{F(H - 14)}' text-anchor='middle' font-size='12.5' font-weight='{(m == mesAtual ? 700 : 600)}' fill='{(m == mesAtual ? cores[0] : "#8a97ab")}' letter-spacing='.06em'>{Esc(new DateTime(2000, m, 1).ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
 
         // anos antigos primeiro, para o mais recente ficar por cima
         for (var k = anos.Count - 1; k >= 0; k--)
         {
-            var a = anos[k]; var cor = cores[k % cores.Length]; var atual = k == 0;
+            var a = anos[k]; var cor = CorAno(k); var atual = k == 0;
+            var traco = Traco(k) is { } tr ? $" stroke-dasharray='{tr}'" : "";
             var segs = new List<List<(double X, double Y)>>(); var seg = new List<(double X, double Y)>();
             for (var m = 1; m <= 12; m++)
             {
@@ -655,7 +682,7 @@ public partial class Conversao : IAsyncDisposable
                 if (atual && met != "winrate" && s.Count > 1)
                     sb.Append($"<path d='{caminho} L {F(s[^1].X)},{F(Y(0))} L {F(s[0].X)},{F(Y(0))} Z' fill='url(#cvArea)' stroke='none'/>");
                 if (s.Count > 1)
-                    sb.Append($"<path d='{caminho}' fill='none' stroke='{cor}' stroke-width='{F(atual ? 4 : 2.6)}' stroke-linejoin='round' stroke-linecap='round' opacity='{F(atual ? 1 : 0.9)}'/>");
+                    sb.Append($"<path d='{caminho}' fill='none' stroke='{cor}' stroke-width='{F(atual ? 4 : 2.6)}'{traco} stroke-linejoin='round' stroke-linecap='round' opacity='{F(atual ? 1 : 0.9)}'/>");
             }
             for (var m = 1; m <= 12; m++)
             {
@@ -668,9 +695,13 @@ public partial class Conversao : IAsyncDisposable
                     sb.Append(fraco
                         ? $"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='6' fill='#fff' stroke='{cor}' stroke-width='2.5' stroke-dasharray='3 2'><title>{tip}</title></circle>"
                         : $"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='6' fill='{cor}' stroke='#fff' stroke-width='2.5'><title>{tip}</title></circle>");
-                    var lab = Lbl(v.Value); var lw = lab.Length * 7.4 + 14;
-                    sb.Append($"<rect x='{F(X(m) - lw / 2)}' y='{F(Y(v.Value) - 32)}' width='{F(lw)}' height='20' rx='10' fill='#fff' stroke='#d3dcea' stroke-width='1'/>");
-                    sb.Append($"<text x='{F(X(m))}' y='{F(Y(v.Value) - 18)}' text-anchor='middle' font-size='12' font-weight='700' fill='{(fraco ? "#8a97ab" : cor)}'>{Esc(lab)}</text>");
+                    // rótulo sem pílula: halo branco (paint-order) separa o texto das linhas; desce para baixo
+                    // do ponto quando outro ano passa logo acima, para não encavalar
+                    var lab = Lbl(v.Value);
+                    var yv = Y(v.Value);
+                    var acima = anos.Skip(1).Select(o => Val(o, m)).Where(x => x is not null).Any(x => { var oy = Y(x!.Value); return oy < yv && yv - oy < 28; });
+                    var ly = acima ? yv + 20 : yv - 12;
+                    sb.Append($"<text x='{F(X(m))}' y='{F(ly)}' text-anchor='middle' font-size='12' font-weight='700' fill='{(fraco ? "#8a97ab" : cor)}' paint-order='stroke' stroke='#fff' stroke-width='4' stroke-linejoin='round'>{Esc(lab)}</text>");
                 }
                 else
                     sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='4' fill='{cor}' stroke='#fff' stroke-width='1.5'><title>{tip}</title></circle>");
@@ -697,7 +728,7 @@ public partial class Conversao : IAsyncDisposable
         {
             var n = r.Qtd(c); if (n == 0) continue;
             var pct = Largura(n, r.Total);
-            sb.Append($"<span class='cvx-seg' style='width:{F(pct)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {N0(n)} ({PctDe(n, r.Total)})\n{DefClasse(c)}")}'>{(pct >= 8 ? Esc(P1(pct)) : "")}</span>");
+            sb.Append($"<span class='cvx-seg {ClasseCss(c)}' style='width:{F(pct)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {N0(n)} ({PctDe(n, r.Total)})\n{DefClasse(c)}")}'>{(pct >= 8 ? Esc(P1(pct)) : "")}</span>");
         }
         sb.Append("</div><div class='cvx-legend'>");
         foreach (var c in Classes)
@@ -787,7 +818,7 @@ public partial class Conversao : IAsyncDisposable
         if (l.Count == 0) return Vazio("Sem propostas decididas no recorte.");
         var sb = new StringBuilder("<div class='cvx-bubars'>");
         foreach (var (nome, r) in l)
-            sb.Append($"<div class='cvx-bb' title='{EscTip($"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas")}'><span class='nm'>{Esc(nome)}</span><span class='bar'><i style='width:{F(r.TaxaQtd!.Value)}%;background:{CorA}'></i></span><b>{Esc(P1(r.TaxaQtd.Value))}</b><small>{N0(r.Decididas)} decididas</small></div>");
+            sb.Append($"<div class='cvx-bb' title='{EscTip($"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas")}'><span class='nm'>{Esc(nome)}</span><span class='bar'><i style='width:{F(r.TaxaQtd!.Value)}%;background:{CorTx}'></i></span><b>{Esc(P1(r.TaxaQtd.Value))}</b><small>{N0(r.Decididas)} decididas</small></div>");
         sb.Append("</div>");
         return sb.ToString();
     }
@@ -802,7 +833,7 @@ public partial class Conversao : IAsyncDisposable
         {
             var v = r.Val(c); if (v <= 0) continue;
             var pct = v / tot * 100;
-            sb.Append($"<span class='cvx-seg' style='width:{F(pct)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {DinTip(r, c)}")}'>{(pct >= 9 ? Esc(P1(pct)) : "")}</span>");
+            sb.Append($"<span class='cvx-seg {ClasseCss(c)}' style='width:{F(pct)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {DinTip(r, c)}")}'>{(pct >= 9 ? Esc(P1(pct)) : "")}</span>");
         }
         sb.Append("</div><div class='cvx-legend'>");
         foreach (var c in Classes)

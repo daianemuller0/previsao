@@ -2548,3 +2548,30 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-chips .cvx-chip.seg { flex:none; }
 .cvx-chips .cvx-chip .t { flex:0 1 auto; }
 .cvx-chips .btn-link { flex:none; white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
+
+/* Etapa G4 (estética): suporte mínimo às classes novas do Razor; o acabamento fica na etapa de CSS */
+.cvx-kdelta.pos { color:var(--pos); } .cvx-kdelta.neg { color:var(--orange); } .cvx-kdelta.neu { color:var(--muted); }
+.cvx-seg.g, .cvx-seg.a { color:#fff; }
+.cvx-seg.p, .cvx-seg.n { color:#1d2939; }
+.cvx-wr b.cvx-na { color:var(--muted); font-weight:600; font-size:11px; }
+.cvx-anual .cvx-leg.top .cvx-ln.dash { border-top-style:dashed; border-radius:0; }
+.cvx-leg-aviso { font-size:12px; font-weight:500; color:var(--muted); }
+/* Resumo em grade 3×2: Taxa em destaque + 5 indicadores, rótulos sem corte */
+.cvx .cvx-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); }
+.cvx .cvx-kpi.main { grid-column:auto; }
+@media (max-width: 720px) { .cvx .cvx-kpis { grid-template-columns:minmax(0,1fr); } }
+/* Gráficos da Conversão: legenda abaixo do SVG (o .chart-body global é flex em linha) */
+.cvx .chart-body, .cvx-drawer .chart-body, .rpt .chart-body { display:block; min-height:0; }
+.cvx .chart-body > svg, .cvx-drawer .chart-body > svg, .rpt .chart-body > svg { height:auto; }
+/* Painel do vendedor: indicadores empilhados (rótulo, número, contexto) */
+.cvx-dkpis > div { background:var(--panel-2); border:1px solid var(--exec-border); border-radius:10px; padding:10px 14px; }
+.cvx-dkpis small { display:block; font-size:10.5px; font-weight:700; letter-spacing:.06em; color:var(--muted); }
+.cvx-dkpis b { display:block; font-size:22px; font-weight:800; letter-spacing:-.4px; color:var(--text); margin:2px 0 1px; }
+.cvx-dkpis span { display:block; font-size:12px; color:var(--muted); }
+/* Relatório e painel do vendedor ficam fora do .cvx: recebem os mesmos tokens (sem eles o cabeçalho e o
+   cartão da taxa do relatório ficavam sem fundo, com texto branco sobre branco) */
+.rpt, .cvx-drawer { --cx-navy:var(--primary); --cx-blue:var(--teal-deep); --cx-sky:var(--teal); --cx-bg:var(--panel-2); --cx-text:var(--text);
+       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--orange); --cx-warn:var(--warn); --cx-neu:var(--muted-2); }
+.cvx-anual .cvx-leg.top .cvx-ln.dash.dot { border-top-style:dotted; }
+/* Relatório: variação dentro do cartão azul-marinho da taxa precisa de tons claros para ter contraste */
+.rpt .cvx-hero .cvx-delta.pos { color:#7fe0bd; } .rpt .cvx-hero .cvx-delta.neg { color:#ffc48f; } .rpt .cvx-hero .cvx-delta.neu { color:#c3cfdd; }
