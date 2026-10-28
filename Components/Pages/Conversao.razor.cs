@@ -25,7 +25,7 @@ public partial class Conversao
     private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
 
     // Um conceito, uma cor, em todas as visualizações.
-    private const string CorG = "#198467", CorP = "#C26940", CorA = "#2478B8", CorN = "#8493A3";
+    private const string CorG = "#1f9254", CorP = "#d98324", CorA = "#007A9E", CorN = "#93a1b5";
     private static readonly ClasseProposta[] Classes =
         { ClasseProposta.Ganha, ClasseProposta.Perdida, ClasseProposta.Aberta, ClasseProposta.NaoClassificada };
 
@@ -393,8 +393,8 @@ public partial class Conversao
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='taxa de conversão mensal'>");
         foreach (var v in new[] { 0, 25, 50, 75, 100 })
         {
-            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#E1E8F0'/>");
-            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#64748B'>{v}%</text>");
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
+            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#6b7a90'>{v}%</text>");
         }
 
         // linha do ano anterior (tracejada) e linha atual, quebrando onde não há propostas decididas
@@ -413,7 +413,7 @@ public partial class Conversao
         double? Taxa(Dictionary<DateTime, Resumo> dic, DateTime m) => dic.TryGetValue(m, out var rr) && rr.Decididas > 0 ? rr.TaxaQtd : null;
 
         var anterior = Caminho(m => Taxa(hist, m.AddYears(-1)));
-        if (anterior != "") sb.Append($"<path d='{anterior}' fill='none' stroke='#8493A3' stroke-width='1.6' stroke-dasharray='5 4'/>");
+        if (anterior != "") sb.Append($"<path d='{anterior}' fill='none' stroke='#93a1b5' stroke-width='1.6' stroke-dasharray='5 4'/>");
         var atual = Caminho(m => Taxa(por, m));
         if (atual != "") sb.Append($"<path d='{atual}' fill='none' stroke='{CorA}' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/>");
 
@@ -437,10 +437,10 @@ public partial class Conversao
                        (r.NC > 0 ? $" · Não classificadas: {N0(r.NC)}" : "")) +
                       (ra is not null && ra.Decididas > 0 ? $"\nMesmo mês de {meses[i].Year - 1}: {P1(ra.TaxaQtd!.Value)} ({N0(ra.Decididas)} decididas)" : "");
             sb.Append($"<rect x='{F(L + passo * i)}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B + 6)}' fill='transparent'><title>{EscTip(tip)}</title></rect>");
-            sb.Append($"<text x='{F(x)}' y='{F(H - 8)}' text-anchor='middle' font-size='10.5' fill='#475569'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+            sb.Append($"<text x='{F(x)}' y='{F(H - 8)}' text-anchor='middle' font-size='10.5' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
         }
-        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip - strip + 6)}' text-anchor='end' font-size='9.5' fill='#64748B'>{maxD}</text>");
-        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip)}' text-anchor='end' font-size='9.5' fill='#64748B'>0</text>");
+        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip - strip + 6)}' text-anchor='end' font-size='9.5' fill='#6b7a90'>{maxD}</text>");
+        sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip)}' text-anchor='end' font-size='9.5' fill='#6b7a90'>0</text>");
         sb.Append("</svg>");
         sb.Append("<div class='cvx-leg'>");
         sb.Append($"<span><i class='cvx-ln' style='background:{CorA}'></i>Taxa de conversão do mês</span>");
@@ -475,8 +475,8 @@ public partial class Conversao
         for (var k = 0; k <= 4; k++)
         {
             var v = maxY * k / 4;
-            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#E1E8F0'/>");
-            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#64748B'>{Esc(Rot(v))}</text>");
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
+            sb.Append($"<text x='{F(L - 8)}' y='{F(Y(v) + 3)}' text-anchor='end' font-size='10.5' fill='#6b7a90'>{Esc(Rot(v))}</text>");
         }
         for (var i = 0; i < meses.Count; i++)
         {
@@ -493,7 +493,7 @@ public partial class Conversao
                     acum += v;
                 }
             }
-            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 10)}' text-anchor='middle' font-size='10.5' fill='#475569'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 10)}' text-anchor='middle' font-size='10.5' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
         }
         sb.Append("</svg><div class='cvx-leg'>");
         for (var c = 0; c < cats; c++) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(Classes[c])}'></i>{NomeEn(Classes[c])}</span>");

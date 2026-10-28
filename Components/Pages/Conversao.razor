@@ -23,43 +23,31 @@ else
 {
 <div class="cvx">
 
-    <header class="cvx-head">
-        <div class="cvx-id">
-            <div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">—</span>Inteligência Comercial</div>
-            <div class="cvx-sub">Conversão de propostas e receita</div>
+    <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span>Conversão de Propostas</span></div>
+    <div class="page-head">
+        <div>
+            <h1>Conversão de Propostas</h1>
+            <p class="subtitle">
+                @PeriodoTxt() · Howden Brasil · BRL<br />
+                Última atualização @(Conv.AtualizadoEm is { } quando ? quando.ToString("dd/MM/yyyy 'às' HH:mm") : "—") · CRM, planilha de propostas · @N0(Conv.Atual.Propostas.Count) registros
+                @if (!Conv.Ok) { <span class="cvx-err">@Conv.Mensagem</span> }
+            </p>
         </div>
-        <div class="cvx-meta">
-            <span><b>Período</b> @PeriodoTxt()</span>
-            <span><b>Atualizado</b> @(Conv.AtualizadoEm is { } quando ? quando.ToString("dd/MM/yyyy HH:mm") : "—")</span>
-            <span title="Planilha de propostas exportada do CRM"><b>Fonte</b> CRM · planilha de propostas · @N0(Conv.Atual.Propostas.Count) registros</span>
-            @if (!Conv.Ok) { <span class="cvx-err">@Conv.Mensagem</span> }
-        </div>
-        <div class="cvx-actions">
+        <div class="page-actions">
             @if (_isAdmin)
             {
-                <button class="btn-ghost sm" title="Taxa USD/BRL de cada ano" @onclick="AbrirTaxas">@Icons.Svg("layers")Taxas de câmbio</button>
+                <button class="btn-ghost" title="Taxa USD/BRL de cada ano" @onclick="AbrirTaxas">@Icons.Svg("layers")Taxas de câmbio</button>
             }
-            <button class="btn-ghost sm" title="Reler a planilha agora" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
+            <button class="btn-ghost" title="Reler a planilha agora" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
             <details class="cvx-menu">
-                <summary class="btn-primary sm">@Icons.Svg("download")Exportar</summary>
+                <summary class="btn-primary">@Icons.Svg("download")Exportar</summary>
                 <div class="cvx-menu-p">
                     <button disabled="@(!_temDados)" @onclick="AbrirRelatorio">Relatório executivo (PDF)</button>
                     <button disabled="@(!_temDados)" @onclick="ExportarBase">Base de propostas (Excel)</button>
                 </div>
             </details>
         </div>
-    </header>
-
-    @if (_temDados && _f.Count > 0)
-    {
-        <nav class="cvx-index" aria-label="Índice da página">
-            @foreach (var (id, t) in Ancoras)
-            {
-                var ii = id;
-                <button type="button" @onclick="() => Ir(ii)">@t</button>
-            }
-        </nav>
-    }
+    </div>
 
     @if (_carregando && !_temDados)
     {
@@ -71,7 +59,7 @@ else
     }
     else
     {
-        <div class="cvx-filters">
+        <div class="filterbar filterbar-sticky cvx-fb">
             <MultiFilter Label="Ano" AllText="Todos" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
             <MultiFilter Label="Mês" AllText="Todos" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
             <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
@@ -89,6 +77,16 @@ else
                     <span class="cvx-chip seg" style="--sc:@Cor(sg)"><b>Segmento</b> @NomeEn(sg) <button title="Remover o segmento" @onclick="() => _seg = null">✕</button></span>
                 }
                 <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
+            }
+            @if (_f.Count > 0)
+            {
+                <nav class="cvx-index" aria-label="Índice da página">
+                    @foreach (var (id, t) in Ancoras)
+                    {
+                        var ii = id;
+                        <button type="button" @onclick="() => Ir(ii)">@t</button>
+                    }
+                </nav>
             }
         </div>
 
@@ -195,7 +193,7 @@ else
     private Task Ir(string id) => JS.InvokeVoidAsync("cvIr", id).AsTask();
 
     private RenderFragment Secao(string id, string titulo, string sub, RenderFragment corpo) => @<section id="@id" class="cvx-sec">
-        <div class="cvx-sec-h"><h2>@titulo</h2><span>@sub</span></div>
+        <div class="xsec @(id == "resumo" ? "lvl1" : "")"><span class="xsec-t">@titulo</span><span class="xsec-s">@sub</span><span class="xsec-line"></span></div>
         @corpo
     </section>;
 
@@ -483,11 +481,11 @@ else
     // ---- financeiro -----------------------------------------------------------
     private RenderFragment Financeiro() => @<section>
         <div class="cvx-fin">
-            @Kpi("Valor Total Cotado", DinTotal(_r), $"{N0(_r.Total)} propostas enviadas", "Soma em R$ de todas as propostas com valor convertido (inclui não classificadas, que aparecem em cinza).", "#155A96", null, DinTotalTip(_r))
+            @Kpi("Valor Total Cotado", DinTotal(_r), $"{N0(_r.Total)} propostas enviadas", "Soma em R$ de todas as propostas com valor convertido (inclui não classificadas, que aparecem em cinza).", "#0b4f6f", null, DinTotalTip(_r))
             @Kpi("Receita Ganha", Din(_r, ClasseProposta.Ganha), $"{N0(_r.G)} propostas ganhas", "Valor das propostas ganhas, em R$.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
             @Kpi("Valor Perdido", Din(_r, ClasseProposta.Perdida), $"{N0(_r.P)} propostas perdidas", "Valor das propostas perdidas, em R$.", CorP, DeltaVal(ClasseProposta.Perdida), DinTip(_r, ClasseProposta.Perdida))
             @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas", "Valor das propostas abertas, em R$.", CorA, DeltaVal(ClasseProposta.Aberta), DinTip(_r, ClasseProposta.Aberta))
-            @Kpi("Conversão por Valor", TxValorGlobal(_r), "Valor ganho ÷ (ganho + perdido)", "Valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas não entram.", "#122E50")
+            @Kpi("Conversão por Valor", TxValorGlobal(_r), "Valor ganho ÷ (ganho + perdido)", "Valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas não entram.", "#0b4f6f")
         </div>
         <div class="cvx-card">
             <h2 class="cvx-h2s">Distribuição do valor das propostas por status</h2>
