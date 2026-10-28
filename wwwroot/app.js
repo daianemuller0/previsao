@@ -1,6 +1,18 @@
 // Utilitários chamados pelo Blazor via JS interop.
 window.appPrint = () => window.print();
 
+// Relatório executivo (Conversão): papel A4 horizontal só enquanto o relatório está aberto.
+window.cvRelatorio = (abrir) => {
+    const id = 'cvx-page-style';
+    const antigo = document.getElementById(id);
+    if (antigo) antigo.remove();
+    if (!abrir) return;
+    const st = document.createElement('style');
+    st.id = id;
+    st.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+    document.head.appendChild(st);
+};
+
 window.appDownload = (fileName, mime, base64) => {
     const a = document.createElement('a');
     a.href = `data:${mime};base64,${base64}`;
