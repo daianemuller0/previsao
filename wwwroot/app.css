@@ -2441,3 +2441,15 @@ html { scroll-behavior: smooth; }
 .cvx-drawer .cvx-dcmp { background:var(--panel-2); }
 .cvx-skel .skel { border-radius:14px; }
 @media (max-width: 1360px) { .cvx-sec { scroll-margin-top:210px; } }
+
+/* Evolução anual: gráfico grande, legenda por ano */
+.cvx-anual svg { width:100%; height:auto; min-height:360px; display:block; }
+.cvx-leg.top { margin:0 0 6px; gap:6px 22px; font-size:13px; }
+.cvx-leg.top b { color:var(--text); }
+.cvx-leg.top .cvx-ln { width:26px; border-top-style:solid; border-top-width:3px; vertical-align:4px; }
+.cvx-trend .cvx-note { margin:8px 0 0; }
+
+/* Busca da base de propostas no padrão da Visão Executiva */
+.cvx-basebar.filterbar { position:static; border:1px solid var(--exec-border); border-radius:12px; padding:9px 12px; margin-bottom:12px; background:var(--panel); }
+.cvx-basebar .flt-search { min-width:260px; }
+.cvx-basebar .cv-cols { margin-left:auto; }

@@ -505,12 +505,92 @@ public partial class Conversao
     private RenderFragment Tendencia(int offset, bool compact = false) => builder =>
     {
         string html;
-        if (_metTrend == "winrate")
-            html = !_taxaOk ? Vazio("taxa de conversão não se aplica com um segmento selecionado na barra de composição. Remova o segmento para ver a taxa.")
-                            : SvgWinRate(_f, offset, compact);
-        else html = SvgEmpilhado(_fx, offset, _metTrend == "volume");
+        if (_metTrend == "winrate" && !_taxaOk)
+            html = Vazio("taxa de conversão não se aplica com um segmento selecionado na barra de composição. Remova o segmento para ver a taxa.");
+        else html = SvgAnual(_metTrend == "winrate" ? _f : _fx, _metTrend);
         builder.AddMarkupContent(0, html);
     };
+
+    /// <summary>Uma linha por ano de envio, janeiro a dezembro. A métrica (taxa, quantidade ou valor) vem do botão do topo; nunca mistura escalas.</summary>
+    private string SvgAnual(IEnumerable<Item> src, string met)
+    {
+        var com = src.Where(i => i.Ano is not null && i.Mes is not null).ToList();
+        if (com.Count == 0) return Vazio("Nenhuma proposta com data de envio no recorte.");
+        var por = com.GroupBy(i => (A: i.Ano!.Value, M: i.Mes!.Value)).ToDictionary(g => g.Key, g => Somar(g));
+        var anos = por.Keys.Select(k => k.A).Distinct().OrderByDescending(a => a).ToList();
+        double? Val(int a, int m)
+        {
+            if (!por.TryGetValue((a, m), out var r)) return null;
+            return met == "winrate" ? (r.Decididas > 0 ? r.TaxaQtd : null) : met == "volume" ? r.Total : (r.TotConv > 0 ? r.VTotal : null);
+        }
+        string Rot(double v) => met == "winrate" ? F(v) + "%" : met == "volume" ? N0((int)Math.Round(v)) : Fmt.Compact(v);
+        string Txt(int a, int m)
+        {
+            if (!por.TryGetValue((a, m), out var r)) return "sem propostas";
+            return met == "winrate" ? (r.Decididas > 0 ? $"{P1(r.TaxaQtd!.Value)} ({N0(r.G)} ganhas de {N0(r.Decididas)} decididas)" : "não calculável (sem propostas decididas)")
+                 : met == "volume" ? $"{N0(r.Total)} propostas · {N0(r.G)} ganhas, {N0(r.P)} perdidas, {N0(r.A)} abertas"
+                 : (r.TotConv > 0 ? $"{R(r.VTotal)} · ganho {Din(r, ClasseProposta.Ganha)}, perdido {Din(r, ClasseProposta.Perdida)}, aberto {Din(r, ClasseProposta.Aberta)}" : "valor não convertido (sem taxa de câmbio)");
+        }
+
+        var maxV = 0.0;
+        foreach (var a in anos) for (var m = 1; m <= 12; m++) maxV = Math.Max(maxV, Val(a, m) ?? 0);
+        double Nice(double v)
+        {
+            if (v <= 0) return 1;
+            var p = Math.Pow(10, Math.Floor(Math.Log10(v))); var f = v / p;
+            return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+        }
+        var maxY = met == "winrate" ? 100 : Nice(maxV);
+
+        string[] cores = { CorA, CorP, CorG, "#6b4fa3", "#0b4f6f", CorN };
+        double W = 1100, H = 440, L = 62, Rr = 20, T = 16, B = 34;
+        var passo = (W - L - Rr) / 12;
+        double X(int m) => L + passo * (m - 0.5);
+        double Y(double v) => T + (H - T - B) * (1 - v / maxY);
+
+        var sb = new StringBuilder("<div class='chart-body cvx-anual'><div class='cvx-leg top'>");
+        for (var k = 0; k < anos.Count; k++)
+            sb.Append($"<span><i class='cvx-ln' style='border-top-color:{cores[k % cores.Length]};border-top-width:{(k == 0 ? 3.5 : 2.5)}px'></i><b>{anos[k]}</b></span>");
+        sb.Append("</div>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano'>");
+        for (var g = 0; g <= 4; g++)
+        {
+            var v = maxY * g / 4;
+            sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
+            sb.Append($"<text x='{F(L - 10)}' y='{F(Y(v) + 4)}' text-anchor='end' font-size='12' fill='#6b7a90'>{Esc(Rot(v))}</text>");
+        }
+        for (var m = 1; m <= 12; m++)
+            sb.Append($"<text x='{F(X(m))}' y='{F(H - 10)}' text-anchor='middle' font-size='12.5' fill='#3b4a61'>{Esc(new DateTime(2000, m, 1).ToString("MMM", _pt))}</text>");
+
+        // anos antigos primeiro, para o mais recente ficar por cima
+        for (var k = anos.Count - 1; k >= 0; k--)
+        {
+            var a = anos[k]; var cor = cores[k % cores.Length];
+            var d = new StringBuilder(); var aberto = false;
+            for (var m = 1; m <= 12; m++)
+            {
+                var v = Val(a, m);
+                if (v is null) { aberto = false; continue; }
+                d.Append(aberto ? " L " : " M ").Append(F(X(m))).Append(',').Append(F(Y(v.Value)));
+                aberto = true;
+            }
+            if (d.Length > 0)
+                sb.Append($"<path d='{d.ToString().Trim()}' fill='none' stroke='{cor}' stroke-width='{(k == 0 ? 3.2 : 2.2)}' stroke-linejoin='round' stroke-linecap='round' opacity='{(k == 0 ? 1 : 0.85)}'/>");
+            for (var m = 1; m <= 12; m++)
+            {
+                var v = Val(a, m); if (v is null) continue;
+                sb.Append($"<circle cx='{F(X(m))}' cy='{F(Y(v.Value))}' r='{(k == 0 ? 4.8 : 3.8)}' fill='#fff' stroke='{cor}' stroke-width='2.2'><title>{EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}")}</title></circle>");
+            }
+        }
+        // faixa por mês: tooltip com todos os anos lado a lado
+        for (var m = 1; m <= 12; m++)
+        {
+            var linhas = string.Join("\n", anos.Select(a => $"{a}: {Txt(a, m)}"));
+            sb.Append($"<rect x='{F(L + passo * (m - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='transparent'><title>{EscTip(new DateTime(2000, m, 1).ToString("MMMM", _pt) + "\n" + linhas)}</title></rect>");
+        }
+        sb.Append("</svg></div>");
+        return sb.ToString();
+    }
     private RenderFragment Html(string html) => builder => builder.AddMarkupContent(0, html);
 
     // ======================================================================

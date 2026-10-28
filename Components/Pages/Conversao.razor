@@ -179,15 +179,15 @@ else
 
     private string TituloTendencia() => _metTrend switch
     {
-        "volume" => "Quantidade mensal de propostas enviadas, por status atual",
-        "valor" => "Valor mensal das propostas enviadas (R$), por status atual",
-        _ => "Taxa de conversão mensal das propostas enviadas",
+        "volume" => "Propostas enviadas por mês, comparando os anos",
+        "valor" => "Valor das propostas enviadas por mês (R$), comparando os anos",
+        _ => "Taxa de conversão mensal, comparando os anos",
     };
 
     private static readonly (string Id, string Titulo)[] Ancoras =
     {
         ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "Unidades"),
-        ("receita", "Receita"), ("perdas", "Perdas"), ("qualidade", "Qualidade dos Dados"), ("base", "Base de Propostas"),
+        ("receita", "Receita"), ("perdas", "Perdas"), ("base", "Base de Propostas"), ("qualidade", "Qualidade dos Dados"),
     };
 
     private Task Ir(string id) => JS.InvokeVoidAsync("cvIr", id).AsTask();
@@ -200,14 +200,14 @@ else
     private RenderFragment Pagina() => @<div class="cvx-page">
         @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: contagens e valores seguem o segmento; taxas de conversão não se aplicam.</div> }
         @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", ResumoGeral())
-        @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio e leituras automáticas", Evolucao())
+        @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio, um ano contra o outro", Evolucao())
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
         @Secao("unidades", "Conversão por Business Unit", "Coluna V da planilha", BlocoUnidades(i => i.P.Bu, _bus, "Business Unit"))
         @Secao("unidades-ic", "Conversão por BU Intercompany", "Coluna AG, senão AF · classificação independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "BU Intercompany"))
         @Secao("receita", "Inteligência de receita", "Valores em R$ convertidos pela taxa do ano de envio", Financeiro())
         @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
-        @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
         @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
+        @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
     </div>;
 
     private RenderFragment ResumoGeral() => @<div>
@@ -266,52 +266,22 @@ else
         </section>
     </div>;
 
-    private RenderFragment Evolucao() => @<div>
-        <div class="cvx-card cvx-trend">
-            <div class="cvx-ch">
-                <div>
-                    <h3 class="cvx-h3">@TituloTendencia()</h3>
-                    <p>Mês de ENVIO da proposta, com o status atual — não é a data de fechamento.</p>
-                </div>
-                <div class="cvx-ctrl">
-                    <div class="cvx-seg-ctl">
-                        <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Taxa de conversão (%)</button>
-                        <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Quantidade</button>
-                        <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (R$)</button>
-                    </div>
-                </div>
+    private RenderFragment Evolucao() => @<div class="cvx-card cvx-trend">
+        <div class="cvx-ch">
+            <div>
+                <h3 class="cvx-h3">@TituloTendencia()</h3>
+                <p>Uma linha por ano · mês de ENVIO da proposta, com o status atual — não é a data de fechamento.</p>
             </div>
-            @Tendencia(_offset)
-            <div class="cvx-trend-foot">
-                <p class="cvx-note">Meses recentes têm mais propostas ainda abertas: a taxa deles pode mudar quando forem decididas. Até 12 meses por vez.</p>
-                <div class="cvx-nav">
-                    <button class="btn-ghost sm" disabled="@(_offset >= _offsetMax)" @onclick="() => _offset = Math.Min(_offset + 6, _offsetMax)">‹ Anteriores</button>
-                    <button class="btn-ghost sm" disabled="@(_offset <= 0)" @onclick="() => _offset = Math.Max(_offset - 6, 0)">Recentes ›</button>
+            <div class="cvx-ctrl">
+                <div class="cvx-seg-ctl">
+                    <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Taxa de conversão</button>
+                    <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Quantidade</button>
+                    <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (R$)</button>
                 </div>
             </div>
         </div>
-        <div class="cvx-card">
-            <div class="cvx-ch"><div><h3 class="cvx-h3">Leituras automáticas</h3><p>Calculadas sobre os dados filtrados · clique para ir à análise</p></div></div>
-            @{ var ins = Insights(); }
-            @if (ins.Count == 0)
-            {
-                <div class="cvx-empty-ins">Sem variações relevantes ou amostra suficiente (mínimo de @AmostraMinima propostas decididas) para destacar leituras neste recorte.</div>
-            }
-            else
-            {
-                <div class="cvx-insights">
-                @foreach (var i in ins)
-                {
-                    var ii = i;
-                    <button type="button" class="cvx-insight" @onclick="() => IrPara(ii)">
-                        <small>@i.Categoria</small>
-                        <span>@i.Texto</span>
-                        <em>@i.Link →</em>
-                    </button>
-                }
-                </div>
-            }
-        </div>
+        @Tendencia(0)
+        <p class="cvx-note">Meses recentes têm mais propostas ainda abertas: a taxa deles pode mudar quando forem decididas. Para comparar anos, deixe o filtro de Ano em "Todos".</p>
     </div>;
 
     // ---- vendedores -------------------------------------------------------
@@ -580,8 +550,8 @@ else
             var pagina = linhas.Skip(_pag * PorPagina).Take(PorPagina).ToList();
             var rt = Somar(linhas);
         }
-        <div class="cv-tools">
-            <input class="flt-search" style="min-width:240px" placeholder="Pesquisar em qualquer coluna…" value="@_busca" @oninput="Buscar" />
+        <div class="cv-tools filterbar cvx-basebar">
+            <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="qualquer coluna da proposta…" value="@_busca" @oninput="Buscar" /></div>
             <MultiFilter Label="Classificação" AllText="Todas" Options="NomesClasse" Selected="_classes" OnChanged="StateHasChanged" />
             <details class="cv-cols">
                 <summary class="btn-ghost sm">@Icons.Svg("layers")Colunas</summary>
