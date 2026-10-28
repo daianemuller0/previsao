@@ -1,10 +1,17 @@
 // Utilitários chamados pelo Blazor via JS interop.
 window.appPrint = () => window.print();
 
-// Rolagem suave até uma seção da página Conversão.
+// Rolagem suave até uma seção da página Conversão, descontando a altura REAL do topo
+// fixo e da barra de filtros (que muda com chips e com a largura da tela).
 window.cvIr = (id) => {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!el) return;
+    const fb = document.querySelector('.cvx-fb');
+    const tb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 60;
+    // O "top" da barra fixa já inclui o topbar (e, no modo apresentação, o cabeçalho congelado).
+    const topo = fb ? (parseFloat(getComputedStyle(fb).top) || tb) : tb;
+    const off = topo + (fb ? fb.offsetHeight : 0) + 12;
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' });
 };
 
 // Relatório executivo (Conversão): papel A4 horizontal só enquanto o relatório está aberto.

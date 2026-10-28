@@ -2116,7 +2116,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-sub { font-size:14px; opacity:.8; margin-top:3px; }
 .cvx-meta { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:12px; opacity:.85; align-self:center; }
 .cvx-meta b { opacity:.7; font-weight:600; margin-right:4px; }
-.cvx-err { background:rgba(194,105,64,.25); padding:2px 8px; border-radius:6px; }
 .cvx-actions { display:flex; gap:8px; align-items:center; }
 .cvx-menu { position:relative; }
 .cvx-menu > .btn-primary { display:inline-flex; }
@@ -2295,7 +2294,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 }
 
 /* ===== Conversão — página única (rolagem contínua) ===== */
-html { scroll-behavior: smooth; }
 .cvx { max-width: 1480px; margin: 0 auto; }
 /* Cabeçalho compacto e claro */
 .cvx-head { background:#fff; color:var(--cx-text); border:1px solid var(--cx-line); border-left:5px solid var(--cx-navy); padding:10px 18px; gap:8px 24px; align-items:center; margin-bottom:10px; }
@@ -2305,7 +2303,6 @@ html { scroll-behavior: smooth; }
 .cvx-sub { font-size:12.5px; color:var(--cx-mut); opacity:1; margin-top:1px; }
 .cvx-meta { opacity:1; color:var(--cx-mut); gap:2px 16px; flex:1; justify-content:center; }
 .cvx-meta b { color:var(--cx-text); opacity:1; }
-.cvx-err { background:#FBEDE5; color:#8a4524; }
 .rpt-head .cvx-title, .rpt-head .cvx-sub { color:#fff; }
 
 /* Índice fixo */
@@ -2324,7 +2321,7 @@ html { scroll-behavior: smooth; }
 .cvx-filters .flt-multi-backdrop { z-index:70; }
 
 /* Seções */
-.cvx-sec { scroll-margin-top:118px; margin-top:26px; padding-top:4px; }
+.cvx-sec { margin-top:26px; padding-top:4px; }
 .cvx-sec:first-child { margin-top:6px; }
 .cvx-sec-h { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; padding-bottom:7px; margin-bottom:12px; border-bottom:1px solid var(--cx-line); }
 .cvx-sec-h h2 { font-size:19px; font-weight:800; color:var(--cx-navy); margin:0; letter-spacing:-.01em; }
@@ -2363,7 +2360,6 @@ html { scroll-behavior: smooth; }
        font-family:var(--font); max-width:none; margin:0; }
 .cvx .page-head h1 { color:var(--primary); }
 .cvx .page-head .subtitle { line-height:1.5; }
-.cvx-err { background:var(--orange-bg); color:#8a4a10; border-radius:6px; padding:1px 8px; margin-left:8px; }
 
 /* Barra de filtros + índice (mesma faixa fixa da Visão Executiva) */
 .cvx-fb { align-items:center; }
@@ -2373,7 +2369,7 @@ html { scroll-behavior: smooth; }
 .cvx-index button:hover { background:var(--teal-050); color:var(--teal-deep); border-color:#cfe5ee; }
 
 /* Seções */
-.cvx-sec { scroll-margin-top:170px; margin-top:0; padding-top:0; }
+.cvx-sec { margin-top:0; padding-top:0; }
 .cvx-sec .xsec { margin-top:28px; }
 .cvx-sec:first-child .xsec { margin-top:6px; }
 
@@ -2439,7 +2435,6 @@ html { scroll-behavior: smooth; }
 .cvx-alert { background:var(--warn-bg); border-color:#ecd9a8; }
 .cvx-drawer .cvx-dcmp { background:var(--panel-2); }
 .cvx-skel .skel { border-radius:14px; }
-@media (max-width: 1360px) { .cvx-sec { scroll-margin-top:210px; } }
 
 /* Evolução anual: gráfico grande, legenda por ano */
 .cvx-anual svg { width:100%; height:auto; min-height:360px; display:block; }
@@ -2523,3 +2518,33 @@ html { scroll-behavior: smooth; }
 .cvx-vlist.cvx-scroll10 .cvx-vrow.head { position:sticky; top:0; background:#fff; z-index:2; }
 .cv-tw.cvx-scroll10 { max-height:540px; overflow:auto; }
 .cv-tw.cvx-scroll10 .cvx-tbl thead th { position:sticky; top:0; background:#fff; z-index:2; box-shadow:0 1px 0 var(--exec-border); }
+
+/* Âncoras: o cvIr mede a barra fixa real; esta margem é só o fallback (link direto #id, sem JS) */
+.cvx-sec { scroll-margin-top:calc(var(--topbar-h) + 120px); }
+
+/* Índice e chips compactos dentro da barra fixa: uma linha só, sem empurrar o conteúdo */
+.cvx-index { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-top:6px; }
+.cvx-index::-webkit-scrollbar { display:none; }
+.cvx-index button { flex:none; padding:3px 11px; }
+.cvx-chip { max-width:240px; white-space:nowrap; }
+.cvx-chip b, .cvx-chip button { flex:none; }
+.cvx-chip .t { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+@media (max-height: 820px) { .cvx-fb { padding:6px 16px; gap:6px; } }
+
+/* Tabelas de unidade: a linha filtrada fica marcada e as demais esmaecidas (padrão .rank-row.xf-on da Visão Executiva) */
+.cvx .cvx-tbl tbody tr { cursor:pointer; }
+.cvx .cvx-tbl tbody tr.on td { background:var(--teal-050); }
+.cvx .cvx-tbl tbody tr.on td:first-child { box-shadow:inset 3px 0 0 var(--teal); }
+.cvx .cvx-tbl tbody tr.dim td { opacity:.55; }
+.cvx .cvx-tbl tbody tr.dim:hover td { opacity:.85; }
+
+/* Aviso de leitura falha: acima de tudo, com ação de tentar de novo */
+.cvx-alert.erro { background:var(--orange-bg); border-color:#f0c9a8; color:#8a4a10; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.cvx-alert.erro .btn-link { margin-left:auto; }
+
+/* Chips ocupam só o espaço que sobra à direita dos filtros: encolhem (reticências) antes de quebrar a linha */
+.cvx-chips { flex:1 1 0; min-width:0; display:flex; flex-wrap:nowrap; align-items:center; justify-content:flex-end; gap:6px; }
+.cvx-chips .cvx-chip { flex:0 1 auto; overflow:hidden; }
+.cvx-chips .cvx-chip.seg { flex:none; }
+.cvx-chips .cvx-chip .t { flex:0 1 auto; }
+.cvx-chips .btn-link { flex:none; white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }

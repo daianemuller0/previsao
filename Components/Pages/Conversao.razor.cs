@@ -50,7 +50,7 @@ public partial class Conversao : IAsyncDisposable
         ClasseProposta.Ganha => "Ganhas: status Closed - Won ou OTP.",
         ClasseProposta.Perdida => "Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid ou Closed - Unknown.",
         ClasseProposta.Aberta => "Abertas: status Open — ainda sem resultado.",
-        _ => "Não classificadas: status fora da lista combinada, aguardando validação. Fica fora de ganhas, perdidas e abertas.",
+        _ => "Não classificadas: status fora da lista combinada, aguardando validação. Ficam fora de ganhas, perdidas e abertas.",
     };
     private static string ClasseCss(ClasseProposta c) => c switch
     {
@@ -71,7 +71,17 @@ public partial class Conversao : IAsyncDisposable
     private int Ativos => new[] { _anos, _meses, _vend, _bus, _buIcs }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
     private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
         new[] { ("Ano", _anos), ("Mês", _meses), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs) }.Where(x => x.Item2.Count > 0);
-    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _pag = 0; }
+    // Largura mínima de cada chip (rótulo + "…" + ✕) e da faixa de chips: abaixo disso a faixa
+    // desce para a linha de baixo, em vez de os chips se sobreporem aos filtros.
+    private static string ChipTxt(HashSet<string> set) => string.Join(", ", set.Take(2)) + (set.Count > 2 ? $" +{set.Count - 2}" : "");
+    private static string ChipRot(string rot) => rot == "BU Intercompany" ? "BU IC" : rot;
+    private static int ChipMin(string rot, HashSet<string> set) => 58 + 8 * ChipRot(rot).Length + Math.Min(ChipTxt(set).Length, 4) * 8;
+    // Chip curto não encolhe (nada a cortar); o longo pode reduzir até rótulo + 4 letras e "…".
+    private static string ChipStyle(string rot, HashSet<string> set) =>
+        ChipTxt(set).Length <= 4 ? "flex:none" : $"min-width:{ChipMin(rot, set)}px";
+    private int ChipsMin() => ConjuntosAtivos().Sum(x => ChipMin(x.Item1, x.Item2) + 6) + (_seg is { } sg ? 64 + 8 * ("Segmento".Length + NomeEn(sg).Length) : 0) + 112;
+    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++; }
+    private int _limpezas;
     private void AlternarSeg(ClasseProposta c) => _seg = _seg == c ? null : c;
 
     private static void Alternar(HashSet<string> set, string v) { if (!set.Remove(v)) set.Add(v); }
@@ -727,7 +737,7 @@ public partial class Conversao : IAsyncDisposable
         var sb = new StringBuilder("<div class='cvx-pareto'>");
         sb.Append("<div class='cvx-prow head'><span>Status no CRM</span><span></span><span class='r'>" + (qtd ? "Propostas" : "Valor") + "</span><span class='r'>Participação</span><span class='r'>Acumulado</span></div>");
         double acum = 0;
-        foreach (var l in linhas)
+        foreach (var l in linhas.Where(x => x.Qtd > 0))
         {
             var v = qtd ? l.Qtd : l.Valor; acum += v;
             var valorTxt = qtd ? N0(l.Qtd) : Estado(l.ComUsd, l.Conv, l.Valor);
@@ -737,6 +747,8 @@ public partial class Conversao : IAsyncDisposable
             sb.Append($"<span class='r'><b>{Esc(valorTxt)}</b></span><span class='r'>{Esc(PctDe(v, total))}</span><span class='r muted'>{Esc(PctDe(acum, total))}</span></div>");
         }
         sb.Append("</div>");
+        var zeros = linhas.Where(x => x.Qtd == 0).Select(x => x.Nome).ToList();
+        if (zeros.Count > 0) sb.Append($"<p class='cvx-note'>Sem ocorrências no recorte: {Esc(string.Join(", ", zeros))}</p>");
         return sb.ToString();
     }
 
@@ -863,9 +875,15 @@ public partial class Conversao : IAsyncDisposable
     //  UNIDADES (BU e BU Intercompany)
     // ======================================================================
 
-    private List<(string Nome, Resumo R)> UnidadesOrdenadas(Func<Item, string> sel) =>
-        Grupos(_fx, sel).OrderByDescending(x => x.R.Decididas > 0 && _taxaOk ? x.R.TaxaQtd : -1)
+    // A tabela ignora o próprio filtro (BU não filtra a tabela de BU): a seleção aparece destacada,
+    // as demais unidades ficam esmaecidas e continuam clicáveis.
+    private List<(string Nome, Resumo R)> UnidadesOrdenadas(Func<Item, string> sel, string exceto)
+    {
+        var src = Aplicar(exceto);
+        if (_seg is { } s) src = src.Where(i => i.P.Classe == s);
+        return Grupos(src, sel).OrderByDescending(x => x.R.Decididas > 0 && _taxaOk ? x.R.TaxaQtd : -1)
                         .ThenByDescending(x => x.R.Decididas).ThenByDescending(x => x.R.VTotal).ToList();
+    }
 
     // ======================================================================
     //  BASE DE PROPOSTAS (mesmo recorte _f)
@@ -940,7 +958,6 @@ public partial class Conversao : IAsyncDisposable
         if (_ordCol == key) _ordAsc = !_ordAsc; else { _ordCol = key; _ordAsc = true; }
         _pag = 0;
     }
-    private void Buscar(ChangeEventArgs e) { _busca = e.Value?.ToString() ?? ""; _pag = 0; }
 
     private List<Item> LinhasTabela(List<Col> cols)
     {
