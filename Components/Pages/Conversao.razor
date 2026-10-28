@@ -186,7 +186,7 @@ else
 
     private static readonly (string Id, string Titulo)[] Ancoras =
     {
-        ("resumo", "Resumo"), ("receita", "Receita"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "Unidades"),
+        ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "Unidades"),
         ("perdas", "Perdas"), ("base", "Base de Propostas"), ("qualidade", "Qualidade dos Dados"),
     };
 
@@ -200,7 +200,6 @@ else
     private RenderFragment Pagina() => @<div class="cvx-page">
         @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: contagens e valores seguem o segmento; taxas de conversão não se aplicam.</div> }
         @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", ResumoGeral())
-        @Secao("receita", "Inteligência de receita", "Valores em R$ convertidos pela taxa do ano de envio", Financeiro())
         @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio, um ano contra o outro", Evolucao())
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
         @Secao("unidades", "Conversão por Business Unit", "Coluna V da planilha", BlocoUnidades(i => i.P.Bu, _bus, "Business Unit"))
@@ -247,21 +246,29 @@ else
                 </div>
                 <div class="cvx-total"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
             </div>
-            <div class="cvx-stackbar">
+            <div class="cvx-stackbar tall">
                 @foreach (var c in Classes)
                 {
                     var n = _r.Qtd(c);
                     if (n == 0) { continue; }
                     var pct = Largura(n, _r.Total);
-                    <button type="button" class="cvx-seg @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(pct)%;background:@Cor(c)"
-                            title="@($"{NomeEn(c)}: {N0(n)} ({PctDe(n, _r.Total)})\n{DefClasse(c)}")" @onclick="() => AlternarSeg(c)">@(pct >= 8 ? P1(pct) : "")</button>
+                    <button type="button" class="cvx-seg @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(pct)%;background:linear-gradient(135deg, @Cor(c), @CorFim(c))"
+                            title="@($"{NomeEn(c)}: {N0(n)} ({PctDe(n, _r.Total)}) · {Din(_r, c)}\n{DefClasse(c)}")" @onclick="() => AlternarSeg(c)">
+                        @if (pct >= 9) { <span class="t">@P1(pct)</span><span class="v">@Din(_r, c)</span> }
+                    </button>
                 }
             </div>
-            <div class="cvx-legend">
+            <div class="cvx-lgd">
                 @foreach (var c in Classes)
                 {
                     if (c == ClasseProposta.NaoClassificada && _r.NC == 0) { continue; }
-                    <span><i class="cvx-dot" style="background:@Cor(c)"></i>@NomeEn(c) <b>@N0(_r.Qtd(c))</b> · @PctDe(_r.Qtd(c), _r.Total)</span>
+                    <button type="button" class="cvx-lg @(_seg == c ? "on" : "")" style="--lc:@Cor(c)" title="@DinTip(_r, c)" @onclick="() => AlternarSeg(c)">
+                        <i></i>
+                        <span class="n">@NomeEn(c)</span>
+                        <b>@N0(_r.Qtd(c))</b>
+                        <span class="p">@PctDe(_r.Qtd(c), _r.Total) das propostas</span>
+                        <span class="m">@Din(_r, c)</span>
+                    </button>
                 }
             </div>
         </section>
@@ -469,16 +476,7 @@ else
     </section>;
 
     // ---- financeiro -----------------------------------------------------------
-    private RenderFragment Financeiro() => @<section>
-        <div class="cvx-card">
-            <h2 class="cvx-h2s">Distribuição do valor das propostas por status</h2>
-            @Html(HtmlComposicaoValor(_r))
-        </div>
-        <div class="cvx-two">
-            <div class="cvx-card"><h2 class="cvx-h2s">Valor por Business Unit (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.Bu)))</div>
-            <div class="cvx-card"><h2 class="cvx-h2s">Valor por BU Intercompany (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_f, i => i.P.BuIc)))</div>
-        </div>
-    </section>;
+
 
     // ---- qualidade e validação ------------------------------------------------
     private RenderFragment Qualidade() => @<section class="cvx-card">

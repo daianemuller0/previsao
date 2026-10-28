@@ -2488,3 +2488,23 @@ html { scroll-behavior: smooth; }
 .cvx-anual.chart-body { display:block; min-height:0; }
 .cvx-anual .cvx-leg.top { display:flex; justify-content:flex-start; gap:6px 30px; margin:0 0 4px 4px; }
 .cvx-anual svg { height:auto; }
+
+/* Composição das propostas — barra alta com rótulos e cartões de legenda */
+.cvx-stackbar.tall { height:64px; border-radius:14px; gap:3px; background:transparent; overflow:visible; }
+.cvx-stackbar.tall .cvx-seg { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border-radius:12px; box-shadow:0 2px 8px rgba(18,38,63,.14); line-height:1.15; transition:transform .14s ease, box-shadow .14s ease, opacity .14s ease; }
+.cvx-stackbar.tall .cvx-seg:first-child { border-top-left-radius:14px; border-bottom-left-radius:14px; }
+.cvx-stackbar.tall .cvx-seg:last-child { border-top-right-radius:14px; border-bottom-right-radius:14px; }
+.cvx-stackbar.tall .cvx-seg:hover { transform:translateY(-2px); box-shadow:0 8px 18px rgba(18,38,63,.22); }
+.cvx-stackbar.tall .cvx-seg .t { font-size:17px; font-weight:800; letter-spacing:-.3px; }
+.cvx-stackbar.tall .cvx-seg .v { font-size:12px; font-weight:600; opacity:.92; }
+.cvx-stackbar.tall .cvx-seg.on { box-shadow:0 0 0 3px #fff, 0 0 0 5px rgba(0,122,158,.55); }
+.cvx-lgd { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-top:16px; }
+.cvx-lg { position:relative; display:grid; grid-template-columns:auto 1fr; column-gap:10px; align-items:baseline; text-align:left; background:var(--panel-2); border:1px solid var(--exec-border); border-radius:12px; padding:12px 14px 12px 18px; cursor:pointer; overflow:hidden; font:inherit; color:inherit; transition:background .14s ease, box-shadow .14s ease; }
+.cvx-lg::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--lc); }
+.cvx-lg:hover { background:#fff; box-shadow:var(--exec-shadow); }
+.cvx-lg.on { background:var(--teal-050); border-color:#bcdde8; }
+.cvx-lg i { display:none; }
+.cvx-lg .n { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); grid-column:1; }
+.cvx-lg b { grid-column:2; justify-self:end; font-size:22px; font-weight:800; letter-spacing:-.5px; color:var(--text); }
+.cvx-lg .p { grid-column:1 / -1; font-size:12px; color:var(--muted); margin-top:2px; }
+.cvx-lg .m { grid-column:1 / -1; font-size:14px; font-weight:700; color:var(--lc); margin-top:2px; }

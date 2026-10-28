@@ -33,6 +33,10 @@ public partial class Conversao
     {
         ClasseProposta.Ganha => CorG, ClasseProposta.Perdida => CorP, ClasseProposta.Aberta => CorA, _ => CorN,
     };
+    private static string CorFim(ClasseProposta c) => c switch
+    {
+        ClasseProposta.Ganha => "#2fae6a", ClasseProposta.Perdida => "#ec9a43", ClasseProposta.Aberta => "#1aa5c4", _ => "#b6c1d0",
+    };
     private static string NomeEn(ClasseProposta c) => c switch
     {
         ClasseProposta.Ganha => "Ganhas", ClasseProposta.Perdida => "Perdidas", ClasseProposta.Aberta => "Abertas", _ => "Não classificadas",
