@@ -7,7 +7,7 @@ namespace HowdenSalesForecast.Data;
 // ---------------------------------------------------------------------------
 // Módulo Conversão · leitura da planilha de propostas (pasta da rede).
 //
-// A pasta tem UM arquivo .xlsx (se houver mais, usa o mais recente e avisa). A
+// A pasta tem UMA planilha (.xlsx/.xlsm/.xls/.csv; se houver mais, usa a mais recente e avisa). A
 // leitura reaproveita a infraestrutura do projeto: LeituraSegura (copia para a
 // memória sem travar quem salva) e OpportunityImporter.LerGrade.
 //
@@ -111,7 +111,7 @@ public sealed class ConversaoService
                 var file = Resolver(out var aviso);
                 if (file is null)
                 {
-                    Falhou("Planilha de conversão não encontrada.");
+                    Falhou(aviso != "" ? aviso : "Planilha de conversão não encontrada.");
                     return;
                 }
                 var fi = new FileInfo(file);
@@ -146,19 +146,60 @@ public sealed class ConversaoService
         Version++;
     }
 
+    /// <summary>Formatos aceitos (o CRM exporta .xls; também vale .xlsx/.xlsm/.csv).</summary>
+    private static readonly string[] Exts = { ".xlsx", ".xlsm", ".xls", ".csv" };
+
     private string? Resolver(out string aviso)
     {
         aviso = "";
-        var path = _cfg["Conversao:Path"] ?? "";
-        if (string.IsNullOrWhiteSpace(path)) return null;
-        if (File.Exists(path)) return path;
-        if (!Directory.Exists(path)) return null;
-        var arqs = new DirectoryInfo(path).GetFiles("*.xlsx")
-            .Where(f => !f.Name.StartsWith("~$", StringComparison.Ordinal))
-            .OrderByDescending(f => f.LastWriteTimeUtc).ToList();
-        if (arqs.Count > 1)
-            aviso = $"A pasta tem {arqs.Count} arquivos .xlsx; foi usado o mais recente ({arqs[0].Name}).";
-        return arqs.FirstOrDefault()?.FullName;
+        var path = (_cfg["Conversao:Path"] ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(path)) { aviso = "Caminho da planilha de conversão não configurado (Conversao:Path)."; return null; }
+        try
+        {
+            if (File.Exists(path)) return path;
+            var pasta = Pasta(path);
+            if (pasta is null) { aviso = $"Pasta da planilha de conversão não encontrada ou sem acesso: {path}"; return null; }
+            var arqs = pasta.EnumerateFiles()
+                .Where(f => Exts.Contains(f.Extension.ToLowerInvariant()) && !f.Name.StartsWith("~$", StringComparison.Ordinal))
+                .OrderByDescending(f => f.LastWriteTimeUtc).ToList();
+            if (arqs.Count == 0)
+            {
+                aviso = $"Nenhuma planilha (.xlsx, .xlsm, .xls ou .csv) na pasta {pasta.FullName}.";
+                return null;
+            }
+            if (arqs.Count > 1)
+                aviso = $"A pasta tem {arqs.Count} planilhas; foi usada a mais recente ({arqs[0].Name}).";
+            return arqs[0].FullName;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            aviso = $"Sem acesso à pasta da planilha de conversão ({path}).";
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// A pasta configurada. Se o nome com acento ("Conversão") não bater exatamente — acento
+    /// gravado em outra forma Unicode, ou digitado sem acento —, procura na pasta-mãe um nome
+    /// equivalente ignorando acentos e maiúsculas.
+    /// </summary>
+    private static DirectoryInfo? Pasta(string path)
+    {
+        if (Directory.Exists(path)) return new DirectoryInfo(path);
+        var di = new DirectoryInfo(path.TrimEnd('\\', '/'));
+        var mae = di.Parent;
+        if (mae is null || !mae.Exists) return null;
+        var alvo = SemAcento(di.Name);
+        return mae.EnumerateDirectories().FirstOrDefault(d => SemAcento(d.Name) == alvo);
+    }
+
+    private static string SemAcento(string s)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in s.Normalize(System.Text.NormalizationForm.FormD))
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(char.ToLowerInvariant(ch));
+        return sb.ToString();
     }
 
     // ---- montagem ---------------------------------------------------------------
