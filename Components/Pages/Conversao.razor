@@ -1,5 +1,5 @@
 @page "/conversao"
-@attribute [Authorize(Roles = "admin,diretor")]
+@attribute [Authorize(Roles = "admin")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject ConversaoService Conv
 @inject CambioAnualRepository Cambio
@@ -90,7 +90,7 @@ else
             @if (_f.Count > 0)
             {
                 <nav class="cvx-index" aria-label="Índice da página">
-                    @foreach (var (id, t) in Ancoras)
+                    @foreach (var (id, t) in Ancoras.Where(a => _isAdmin || a.Id != "qualidade"))
                     {
                         var ii = id;
                         <button type="button" @onclick="() => Ir(ii)">@t</button>
@@ -228,7 +228,10 @@ else
         @Secao("valor-mensal", "Valor mensal das propostas", "Janeiro a dezembro · por status · R$", ValorMensal())
         @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
         @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
-        @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
+        @if (_isAdmin)
+        {
+            @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
+        }
     </div>;
 
     /// <summary>Os 6 indicadores e a faixa secundária do Resumo — usados na tela e no relatório (mesmos números).</summary>

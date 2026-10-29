@@ -66,7 +66,7 @@ public static class AccessRoles
     public static readonly Dictionary<string, string[]> Tabs = new()
     {
         [Vendedor] = new[] { "executivo", "oportunidades", "followup" },
-        [Diretor]  = new[] { "executivo", "conversao", "oportunidades", "followup" },
+        [Diretor]  = new[] { "executivo", "oportunidades", "followup" },
         [Controle] = new[] { "executivo", "oportunidades", "controle" },
         [GestorAfm] = new[] { "executivo", "oportunidades", "controle", "aplicacao" },
         [Admin]    = new[] { "executivo", "conversao", "oportunidades", "followup", "controle", "aplicacao", "listas", "configuracoes", "identidade", "administracao" },
