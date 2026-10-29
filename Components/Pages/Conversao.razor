@@ -497,9 +497,9 @@ else
             @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))
         </div>
         <div class="cvx-card">
-            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
-                <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(_rx)">@DinTotal(_rx)</b></span></div>
-            @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.BuIc)))
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Só propostas intercompany · valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+                <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(ResumoIc())">@DinTotal(ResumoIc())</b></span></div>
+            @Html(HtmlValorPorUnidade(Grupos(SoIc(_fx), i => i.P.BuIc)))
         </div>
     </div>;
 

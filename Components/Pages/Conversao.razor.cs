@@ -870,10 +870,15 @@ public partial class Conversao : IAsyncDisposable
 
     // A tabela ignora o próprio filtro (BU não filtra a tabela de BU): a seleção aparece destacada,
     // as demais unidades ficam esmaecidas e continuam clicáveis.
+    private static IEnumerable<Item> SoIc(IEnumerable<Item> src) => src.Where(i => i.P.BuIc != ConversaoService.NaoIntercompany);
+    private Resumo ResumoIc() => Somar(SoIc(_fx));
+
     private List<(string Nome, Resumo R)> UnidadesOrdenadas(Func<Item, string> sel, string exceto)
     {
         var src = Aplicar(exceto);
         if (_seg is { } s) src = src.Where(i => i.P.Classe == s);
+        // BU Intercompany: propostas que não são intercompany não entram no ranking das unidades IC
+        if (exceto == "buic") src = src.Where(i => i.P.BuIc != ConversaoService.NaoIntercompany);
         return Grupos(src, sel).OrderByDescending(x => x.R.Decididas > 0 && _taxaOk ? x.R.TaxaQtd : -1)
                         .ThenByDescending(x => x.R.Decididas).ThenByDescending(x => x.R.VTotal).ToList();
     }
