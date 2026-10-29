@@ -1,0 +1,62 @@
+@implements IDisposable
+
+@* Campo de busca com espera: só avisa o pai depois de 300 ms sem digitar.
+   Cada tecla cancela a espera anterior; a espera cancelada não chama nada.
+   Assim a tabela grande não é refeita a cada letra digitada. *@
+
+<div class="flt">
+    <span class="flt-label">Buscar</span>
+    <input class="flt-search" placeholder="qualquer coluna da proposta…" value="@_texto" @oninput="Digitou" />
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> OnBuscar { get; set; }
+    /// <summary>O pai incrementa ao limpar os filtros: descarta a espera pendente e volta ao Value.</summary>
+    [Parameter] public int Geracao { get; set; }
+
+    private const int EsperaMs = 300;
+    private string _texto = "";
+    private string? _ultimoValue;
+    private int _ultimaGeracao;
+    private CancellationTokenSource? _cts;
+
+    protected override void OnParametersSet()
+    {
+        // Só sincroniza quando o pai muda o valor (ex.: "Limpar filtros"); um re-render
+        // comum do pai, com o valor antigo, não apaga o que está sendo digitado.
+        if (_ultimaGeracao != Geracao)
+        {
+            // "Limpar filtros" com uma busca ainda na espera: a espera não pode reaplicar o texto.
+            _ultimaGeracao = Geracao;
+            _cts?.Cancel();
+            _ultimoValue = Value;
+            _texto = Value;
+        }
+        else if (_ultimoValue != Value)
+        {
+            _ultimoValue = Value;
+            _texto = Value;
+        }
+    }
+
+    private async Task Digitou(ChangeEventArgs e)
+    {
+        _texto = e.Value?.ToString() ?? "";
+        _cts?.Cancel();
+        _cts?.Dispose();
+        var cts = _cts = new CancellationTokenSource();
+        try { await Task.Delay(EsperaMs, cts.Token); }
+        catch (TaskCanceledException) { return; }
+        if (cts.IsCancellationRequested) return;
+        _ultimoValue = _texto;                 // o pai vai devolver este mesmo valor
+        await OnBuscar.InvokeAsync(_texto);
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
+}

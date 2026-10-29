@@ -69,7 +69,7 @@ public static class AccessRoles
         [Diretor]  = new[] { "executivo", "oportunidades", "followup" },
         [Controle] = new[] { "executivo", "oportunidades", "controle" },
         [GestorAfm] = new[] { "executivo", "oportunidades", "controle", "aplicacao" },
-        [Admin]    = new[] { "executivo", "oportunidades", "followup", "controle", "aplicacao", "listas", "configuracoes", "identidade", "administracao" },
+        [Admin]    = new[] { "executivo", "conversao", "oportunidades", "followup", "controle", "aplicacao", "listas", "configuracoes", "identidade", "administracao" },
     };
 
     public static bool CanTab(string role, string tabKey) =>

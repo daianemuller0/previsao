@@ -1,0 +1,765 @@
+@page "/conversao"
+@attribute [Authorize(Roles = "admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject ConversaoService Conv
+@inject CambioAnualRepository Cambio
+@inject ColumnPrefsRepository ColPrefs
+@inject IJSRuntime JS
+
+@* ===========================================================================
+   Conversão · Commercial Performance Intelligence
+   Página única de rolagem contínua: resumo, evolução, vendedores, BU, BU Intercompany,
+   receita, perdas, qualidade dos dados e base de propostas (índice com âncoras).
+   Toda a lógica e os números vêm de Conversao.razor.cs (Recalcular/Somar).
+   =========================================================================== *@
+
+@{ Recalcular(); }
+
+@if (_relatorio)
+{
+    @Relatorio()
+}
+else
+{
+<div class="cvx">
+
+    <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span>Conversão de Propostas</span></div>
+    <div class="page-head">
+        <div>
+            <h1>Conversão de Propostas</h1>
+            <p class="subtitle">
+                @PeriodoTxt() · Howden Brasil · valores em R$<br />
+                Última atualização @(Conv.AtualizadoEm is { } quando ? quando.ToString("dd/MM/yyyy 'às' HH:mm") : "—") · CRM, planilha de propostas · @N0(Conv.Atual.Propostas.Count) registros
+            </p>
+        </div>
+        <div class="page-actions">
+            @if (_isAdmin)
+            {
+                <button class="btn-ghost" title="Taxa USD/BRL de cada ano" @onclick="AbrirTaxas">@Icons.Svg("layers")Taxas de câmbio</button>
+            }
+            <button class="btn-ghost" title="Reler a planilha agora" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
+            <div class="cvx-menu">
+                <button type="button" class="btn-primary" aria-expanded="@(_menuExp ? "true" : "false")" @onclick="() => _menuExp = !_menuExp">@Icons.Svg("download")Exportar</button>
+                @if (_menuExp)
+                {
+                    <div class="flt-multi-backdrop" @onclick="() => _menuExp = false"></div>
+                    <div class="cvx-menu-p">
+                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return AbrirRelatorio(); }">Relatório executivo (PDF)</button>
+                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return ExportarBase(); }">Base de propostas (Excel)</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!Conv.Ok && _temDados)
+    {
+        <div class="cvx-alert erro"><strong>Dados possivelmente desatualizados.</strong> @Conv.Mensagem <button class="btn-link" disabled="@_carregando" @onclick="Atualizar">Tentar de novo</button></div>
+    }
+
+    @if (_carregando && !_temDados)
+    {
+        <div class="cvx-skel"><div class="skel" style="height:190px"></div><div class="skel" style="height:110px"></div><div class="skel" style="height:300px"></div></div>
+    }
+    else if (!_temDados)
+    {
+        <div class="cvx-card"><div class="empty" style="padding:34px 12px">@Conv.Mensagem</div></div>
+    }
+    else
+    {
+        <div class="filterbar filterbar-sticky cvx-fb">
+            <MultiFilter Label="Ano" AllText="Todos" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
+            <MultiFilter Label="Mês" AllText="Todos" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
+            <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
+            <MultiFilter Label="BU" AllText="Todas" Options="OpBus" Selected="_bus" OnChanged="StateHasChanged" />
+            <MultiFilter Label="BU Intercompany" AllText="Todas" Options="OpBuIcs" Selected="_buIcs" OnChanged="StateHasChanged" />
+            <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
+            @if (Ativos > 0)
+            {
+                @foreach (var (rot, set) in ConjuntosAtivos())
+                {
+                    <span class="cvx-chip" style="@ChipStyle(rot, set)" title="@rot: @string.Join(", ", set)"><b>@ChipRot(rot)</b><span class="t">@ChipTxt(set)</span><button title="Remover filtro @rot" @onclick="() => { set.Clear(); _pag = 0; }">✕</button></span>
+                }
+                @if (_seg is { } sg)
+                {
+                    <span class="cvx-chip seg" style="--sc:@Cor(sg)"><b>Segmento</b> @NomeEn(sg) <button title="Remover o segmento" @onclick="() => _seg = null">✕</button></span>
+                }
+                <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
+            }
+            </div>
+            @if (_f.Count > 0)
+            {
+                <nav class="cvx-index" aria-label="Índice da página">
+                    @foreach (var (id, t) in Ancoras.Where(a => _isAdmin || a.Id != "qualidade"))
+                    {
+                        var ii = id;
+                        <button type="button" @onclick="() => Ir(ii)">@t</button>
+                    }
+                </nav>
+            }
+        </div>
+
+        @if (_r.SemTaxa > 0)
+        {
+            <div class="cvx-alert">
+                <strong>@N0(_r.SemTaxa) proposta(s) (US$ @_r.UsdSemTaxa.ToString("N0", _pt)) sem taxa de câmbio</strong> para @string.Join(", ", AnosSemTaxa()).
+                Esses valores ficam <strong>fora dos totais em R$</strong> — as quantidades estão completas.
+                @if (_isAdmin) { <span> <button class="btn-link" @onclick="AbrirTaxas">Cadastrar taxas</button></span> }
+                else { <span> Peça ao administrador para cadastrar a taxa.</span> }
+            </div>
+        }
+        @if (_r.SemData > 0)
+        {
+            <div class="cvx-alert">
+                <strong>@N0(_r.SemData) proposta(s) sem data de envio (US$ @_r.UsdSemData.ToString("N0", _pt))</strong> não entram nos valores em R$: sem data não há ano, logo não há taxa de câmbio. As quantidades estão completas.
+            </div>
+        }
+
+        @if (_f.Count == 0)
+        {
+            <div class="cvx-card"><div class="empty" style="padding:34px 12px">Nenhuma proposta com os filtros atuais. <button class="btn-link" @onclick="Limpar">Limpar filtros</button></div></div>
+        }
+        else { @Pagina() }
+    }
+</div>
+}
+
+@* ---- painel lateral do vendedor ---- *@
+@if (_vendSel is not null && !_relatorio)
+{
+    @PainelVendedor(_vendSel)
+}
+
+@* ---- taxas de câmbio (administrador) ---- *@
+@if (_taxasAberto && !_relatorio)
+{
+    <div class="drawer-backdrop" @onclick="() => _taxasAberto = false"></div>
+    <div class="drawer">
+        <div class="page-head">
+            <div>
+                <h2 style="color:var(--primary)">Taxas de câmbio</h2>
+                <p class="subtitle">USD/BRL de cada ano · aplicada nas propostas enviadas naquele ano</p>
+            </div>
+            <button class="icon-btn" @onclick="() => _taxasAberto = false">@Icons.Svg("x")</button>
+        </div>
+        <p class="muted" style="font-size:12px">Valor em R$ = valor em US$ × taxa do ano da data de envio. Sem taxa cadastrada, a proposta <strong>não é convertida</strong> e a tela avisa. As taxas ficam guardadas e não precisam ser digitadas de novo.</p>
+        <table class="grid-tbl tbl-compact">
+            <thead><tr><th>Ano</th><th class="right">Taxa USD/BRL</th><th>Situação</th></tr></thead>
+            <tbody>
+                @foreach (var ano in _taxasAnos)
+                {
+                    var a = ano;
+                    <tr>
+                        <td class="col-strong">@a</td>
+                        <td class="right"><input class="field num" style="max-width:120px;text-align:right" placeholder="ex.: 5,2000" value="@_taxasTxt.GetValueOrDefault(a, "")" @onchange="e => SetTaxa(a, e)" /></td>
+                        @if (Cambio.Taxa(a) is { } t) { <td class="muted" style="font-size:12px">salva: @t.ToString("0.0000", _pt)</td> }
+                        else if (TaxaPendente(a)) { <td style="font-size:12px;color:var(--neg);font-weight:700" title="Há propostas deste ano com valor em US$ que não estão sendo convertidas">pendente</td> }
+                        else { <td class="muted" style="font-size:12px">sem taxa</td> }
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+            <input class="field num" style="max-width:110px" placeholder="novo ano" @bind="_novoAno" />
+            <button class="btn-ghost sm" @onclick="AdicionarAno">Adicionar ano</button>
+        </div>
+        @if (_taxasErro != "") { <div class="confirm-err">@_taxasErro</div> }
+        <div class="modal-actions">
+            <button class="btn-ghost" @onclick="() => _taxasAberto = false">Cancelar</button>
+            <button class="btn-primary" @onclick="SalvarTaxas">@Icons.Svg("check")Salvar taxas</button>
+        </div>
+    </div>
+}
+
+@code {
+    // Exportar do topo: o recorte global inteiro, sem a busca e a classificação da Base (essas valem no botão da própria Base).
+    private Task ExportarBase() { var t = Colunas(); return Exportar(_f.OrderByDescending(i => i.P.Data).ToList(), t); }
+
+    private string TaxasTexto()
+    {
+        var l = RastroCambio().Where(x => x.Taxa is not null).Select(x => "(" + x.Ano + ": " + x.Taxa!.Value.ToString("0.0000", _pt) + ")").ToList();
+        return l.Count == 0 ? "(nenhuma taxa cadastrada)" : string.Join(" ", l);
+    }
+
+    // =====================================================================
+    //  NÍVEL 1 · EXECUTIVE OVERVIEW
+    // =====================================================================
+    // maiorEhMelhor: true = subir é bom (verde), false = subir é ruim (laranja), null = só informativo (neutro)
+    private RenderFragment Kpi(string rotulo, string valor, string sub, string tip, string cor, string? delta = null, string? valorTip = null, bool? maiorEhMelhor = true) =>
+        @<article class="cvx-kpi" style="--kc:@cor" title="@tip">
+            <div class="cvx-lab">@rotulo</div>
+            <div class="cvx-num" title="@valorTip">@valor</div>
+            <div class="cvx-ksub">@sub</div>
+            @if (delta is not null) { <div class="cvx-kdelta @DeltaCls(delta, maiorEhMelhor)">@Seta(delta)</div> }
+        </article>;
+
+    private string? DeltaVal(ClasseProposta c) =>
+        _prev is not null && _r.Conv[(int)c] > 0 && _prev.Conv[(int)c] > 0 ? DeltaPct(_r.Val(c), _prev.Val(c)) : null;
+
+    private string TituloTendencia() => _metTrend switch
+    {
+        "volume" => "Propostas enviadas por mês, comparando os anos",
+        "valor" => "Valor das propostas enviadas por mês (R$), comparando os anos",
+        _ => "Taxa de conversão mensal, comparando os anos",
+    };
+
+    private static readonly (string Id, string Titulo)[] Ancoras =
+    {
+        ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "BU"),
+        ("unidades-ic", "BU Intercompany"), ("valor-unidades", "Valor por unidade"), ("valor-mensal", "Valor mensal"),
+        ("perdas", "Perdas"), ("base", "Base"), ("qualidade", "Qualidade"),
+    };
+
+    private Task Ir(string id) => JS.InvokeVoidAsync("cvIr", id).AsTask();
+
+    private RenderFragment Secao(string id, string titulo, string sub, RenderFragment corpo) => @<section id="@id" class="cvx-sec">
+        <div class="xsec @(id == "resumo" ? "lvl1" : "")"><span class="xsec-t">@titulo</span><span class="xsec-s">@sub</span><span class="xsec-line"></span></div>
+        @corpo
+    </section>;
+
+    private RenderFragment Pagina() => @<div class="cvx-page">
+        @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: ranking, unidades, evolução de volume e valor, valor mensal e perdas seguem o segmento; o Resumo mostra o total do recorte e as taxas de conversão não se aplicam.</div> }
+        @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", ResumoGeral())
+        @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio, um ano contra o outro", Evolucao())
+        @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
+        @Secao("unidades", "Conversão por Business Unit", "Taxa e valores por unidade de negócio · clique numa linha para filtrar", BlocoUnidades(i => i.P.Bu, _bus, "bu"))
+        @Secao("unidades-ic", "Conversão por BU Intercompany", "Taxa e valores por unidade intercompany · independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "buic"))
+        @Secao("valor-unidades", "Valor por unidade", "Ganho, perdido e aberto em R$, por BU e por BU Intercompany", ValorUnidades())
+        @Secao("valor-mensal", "Valor mensal das propostas", "Janeiro a dezembro · por status · R$", ValorMensal())
+        @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
+        @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
+        @if (_isAdmin)
+        {
+            @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
+        }
+    </div>;
+
+    /// <summary>Os 6 indicadores e a faixa secundária do Resumo — usados na tela e no relatório (mesmos números).</summary>
+    private RenderFragment KpisResumo() => @<div>
+        <div class="cvx-kpis">
+            <article class="cvx-kpi main" style="--kc:@CorTx" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
+                <div class="cvx-lab">Taxa de Conversão</div>
+                <div class="cvx-num big">@TxQtdGlobal(_r)</div>
+                <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
+                @{ var dw = DeltaWin(); }
+                @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
+                <div class="cvx-ksub" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Por valor: <b>@TxValorGlobal(_r)</b></div>
+            </article>
+            @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
+                 "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
+            @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas",
+                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta), null)
+            @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
+                 "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", CorG, DeltaPct(_r.G, _prev?.G))
+            @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
+                 "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P), null, false)
+            @Kpi("Total de Propostas", N0(_r.Total), $"{N0(_r.Decididas)} decididas · {N0(_r.A)} abertas",
+                 "Total no recorte = ganhas + perdidas + abertas + não classificadas.", "#64748b", DeltaPct(_r.Total, _prev?.Total))
+        </div>
+
+        <div class="cvx-second">
+            <span title="@DinTip(_r, ClasseProposta.Perdida)">Valor perdido <b>@Din(_r, ClasseProposta.Perdida)</b></span>
+            <span title="@DinTotalTip(_r)">Valor total cotado <b>@DinTotal(_r)</b></span>
+        </div>
+    </div>;
+
+    private RenderFragment ResumoGeral() => @<div>
+        @KpisResumo()
+
+        <section class="cvx-card cvx-comp">
+            <div class="cvx-ch">
+                <div>
+                    <h3 class="cvx-h3">Composição das propostas</h3>
+                    <p>Participação de cada status no total · clique num segmento para destacá-lo no ranking, nas unidades, nos valores e nas perdas</p>
+                </div>
+                <div class="cvx-total" title="@(_r.NC > 0 ? $"Inclui {N0(_r.NC)} proposta(s) com status fora da lista (não classificadas), detalhadas em Qualidade dos dados." : "Ganhas + perdidas + abertas")"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
+            </div>
+            @{ var baseBarra = Math.Max(_r.G + _r.P + _r.A, 1); }
+            <div class="cvx-stackbar tall">
+                @foreach (var c in ClassesBarra)
+                {
+                    var n = _r.Qtd(c);
+                    if (n == 0) { continue; }
+                    var pct = Largura(n, _r.Total);
+                    <button type="button" class="cvx-seg @ClasseCss(c) @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(n * 100.0 / baseBarra)%;background:@Cor(c)"
+                            title="@($"{NomeEn(c)}: {N0(n)} ({PctDe(n, _r.Total)}) · {Din(_r, c)}\n{DefClasse(c)}")" @onclick="() => AlternarSeg(c)">
+                        @if (pct >= 9) { <span class="t">@P1(pct)</span><span class="v">@Din(_r, c)</span> }
+                    </button>
+                }
+            </div>
+            <div class="cvx-lgd">
+                @foreach (var c in ClassesBarra)
+                {
+                    <button type="button" class="cvx-lg @(_seg == c ? "on" : "")" style="--lc:@Cor(c)" title="@DinTip(_r, c)" @onclick="() => AlternarSeg(c)">
+                        <i></i>
+                        <span class="n">@NomeEn(c)</span>
+                        <b>@N0(_r.Qtd(c))</b>
+                        <span class="p">@PctDe(_r.Qtd(c), _r.Total) das propostas</span>
+                        <span class="m">@Din(_r, c)</span>
+                    </button>
+                }
+            </div>
+        </section>
+    </div>;
+
+    private RenderFragment Evolucao() => @<div class="cvx-card cvx-trend">
+        <div class="cvx-ch">
+            <div>
+                <h3 class="cvx-h3">@TituloTendencia()</h3>
+                <p>Uma linha por ano · mês de ENVIO da proposta, com o status atual — não é a data de fechamento.</p>
+            </div>
+            <div class="cvx-ctrl">
+                <div class="cvx-seg-ctl">
+                    <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Taxa de conversão</button>
+                    <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Quantidade</button>
+                    <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (R$)</button>
+                </div>
+            </div>
+        </div>
+        @Tendencia(0)
+        <p class="cvx-note">@(_metTrend == "winrate" ? "Taxa do mês = propostas ganhas ÷ todas as propostas enviadas naquele mês. Meses recentes têm mais propostas ainda abertas: a taxa deles tende a subir quando forem decididas." : "O mês em andamento ainda recebe propostas: o número dele pode mudar.") Para comparar anos, deixe o filtro de Ano em "Todos".</p>
+    </div>;
+
+    // ---- vendedores -------------------------------------------------------
+    private RenderFragment Vendedores() => @<section class="cvx-card">
+        @{ var lista = VendLista(out var ocultos); }
+        <div class="cvx-ch">
+            <div class="cvx-xh">
+                <span class="xcard-ico">@Icons.Svg("users")</span>
+                <div>
+                    <h2>@(_taxaOk ? "Taxa de conversão por vendedor" : "Propostas por vendedor no segmento selecionado")</h2>
+                    <p>@lista.Count vendedores · ganhas ÷ decididas · role para ver todos · a marca vertical é a média do grupo</p>
+                </div>
+            </div>
+            @if (_taxaOk) { <span class="xcard-total"><span>Média do grupo</span><b>@TxQtdGlobal(_rx)</b></span> }
+            <div class="cvx-ctrl">
+                <label class="cvx-fld">Ordenar por
+                    <select @bind="_ordVend">
+                        <option value="wr">Taxa de conversão</option>
+                        <option value="valor">Valor ganho</option>
+                        <option value="ganhas">Propostas ganhas</option>
+                        <option value="decididas">Propostas decididas</option>
+                        <option value="perdidas">Propostas perdidas</option>
+                    </select>
+                </label>
+                <label class="cvx-fld" title="Esconde vendedores com poucas propostas decididas: uma única venda não pode virar 100% de conversão no topo.">Mínimo de decididas
+                    <input type="number" min="0" value="@_minDec" @onchange="SetMinDec" />
+                </label>
+            </div>
+        </div>
+        @if (lista.Count == 0)
+        {
+            <div class="empty" style="padding:24px">Nenhum vendedor com @_minDec ou mais propostas decididas. Reduza o mínimo.</div>
+        }
+        else
+        {
+            <div class="ibar cvx-ibar scroll-y @(_vendSel is not null ? "has-active" : "")">
+                @for (var i = 0; i < lista.Count; i++)
+                {
+                    var (nome, r) = lista[i];
+                    var vn = nome;
+                    <div class="ibar-item @(i < 3 ? $"top{i + 1}" : "") @(_vendSel == nome ? "xf-on" : "")" title="Clique para ver o detalhe de @nome" @onclick="() => AbrirVendedor(vn)">
+                        <div class="ibar-head">
+                            <span class="ibar-num">@(i + 1)</span>
+                            <span class="ibar-name">@nome</span>
+                            @if (_taxaOk && r.Decididas < AmostraMinima) { <span class="cv-amostra" title="Menos de @AmostraMinima decididas: a taxa oscila muito">amostra pequena</span> }
+                            <span class="ibar-metrics">
+                                <span class="cvx-ibm g" title="Propostas ganhas">@N0(r.G) <small>ganhas</small></span>
+                                <span class="cvx-ibm p" title="Propostas perdidas">@N0(r.P) <small>perdidas</small></span>
+                                <span class="cvx-ibm a" title="Propostas abertas">@N0(r.A) <small>abertas</small></span>
+                                <span class="ibar-sep"></span>
+                                <span class="cvx-ibm" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
+                                <span class="ibar-sep"></span>
+                                <span class="ibar-val">@TxQtd(r)</span>
+                                <span class="ibar-share" title="Ganhas de decididas">@N0(r.G)/@N0(r.Decididas)</span>
+                            </span>
+                        </div>
+                        <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do grupo: @P1(gm)"></em> }</div>
+                    </div>
+                }
+            </div>
+            @if (ocultos > 0) { <p class="cvx-note">@ocultos vendedor(es) com menos de @_minDec propostas decididas estão ocultos do ranking (continuam nos totais).</p> }
+        }
+    </section>;
+
+    private RenderFragment PainelVendedor(string nome) => @<div>
+        @{
+            var itens = _f.Where(i => i.P.Vendedor == nome).ToList();
+            var rv = Somar(itens);
+            var grp = _r;
+            var cmp = rv.TaxaQtd is { } vr && grp.TaxaQtd is { } gr && rv.Decididas > 0 ? vr - gr : (double?)null;
+        }
+        <div class="drawer-backdrop" @onclick="() => _vendSel = null"></div>
+        <div class="drawer cvx-drawer">
+            <div class="page-head">
+                <div><h2 style="color:var(--primary)">@nome</h2><p class="subtitle">@(_seg is null ? "Mesmos filtros e período do painel" : "Mesmos filtros e período, sem o segmento") · @N0(rv.Total) propostas</p></div>
+                <button class="icon-btn" @onclick="() => _vendSel = null">@Icons.Svg("x")</button>
+            </div>
+            @if (_seg is { } sgv) { <div class="cvx-note">Segmento @NomeEn(sgv) ignorado neste detalhamento: a taxa de conversão considera todas as classes.</div> }
+            <div class="cvx-dkpis">
+                <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Decididas) decididas</span></div>
+                <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão por valor @TxValorGlobal(rv)</span></div>
+            </div>
+            <div class="cvx-dcmp">
+                @if (cmp is { } c && rv.Decididas < AmostraMinima)
+                {
+                    <span>Amostra pequena (@N0(rv.Decididas) decididas): comparação com o grupo (@TxQtdGlobal(grp)) apenas indicativa.</span>
+                }
+                else if (cmp is { } c2)
+                {
+                    <span>Taxa de conversão <b>@(c2 >= 0 ? "acima" : "abaixo")</b> da média do grupo em <b>@Pp(c2)</b> (grupo: @TxQtdGlobal(grp), @N0(grp.Decididas) decididas)</span>
+                }
+                else { <span>Comparação com o grupo indisponível: sem propostas decididas.</span> }
+            </div>
+            <h3 class="cvx-dh">Composição das propostas</h3>
+            @Html(HtmlComposicao(rv))
+            <h3 class="cvx-dh">Histórico mensal da taxa de conversão</h3>
+            @Html(SvgWinRate(itens, 0, true, false, 600))
+            <h3 class="cvx-dh">Distribuição por BU</h3>
+            <table class="cvx-mini-tbl">
+                <thead><tr><th>BU</th><th class="r">Propostas</th><th class="r">Decididas</th><th class="r">Conversão</th><th class="r">Valor ganho</th></tr></thead>
+                <tbody>
+                    @foreach (var (bn, br) in Grupos(itens, i => i.P.Bu))
+                    {
+                        <tr><td><b>@bn</b></td><td class="r">@N0(br.Total)</td><td class="r">@N0(br.Decididas)</td><td class="r">@TxQtdGlobal(br)</td><td class="r" title="@DinTip(br, ClasseProposta.Ganha)">@Din(br, ClasseProposta.Ganha)</td></tr>
+                    }
+                </tbody>
+            </table>
+            <h3 class="cvx-dh">Distribuição das perdas (status no CRM)</h3>
+            @{
+                var perdas = itens.Where(i => i.P.Classe == ClasseProposta.Perdida)
+                    .GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal))
+                    .Select(g => (Nome: g.First().P.StatusOriginal, Qtd: g.Count(), Valor: g.Sum(i => i.Brl ?? 0), ComUsd: g.Count(i => i.P.ValorUsd is not null), Conv: g.Count(i => i.Brl is not null)))
+                    .OrderByDescending(x => x.Qtd).ToList();
+            }
+            @if (perdas.Count == 0) { <div class="cvx-note">Nenhuma proposta perdida deste vendedor no recorte.</div> }
+            else
+            {
+                <table class="cvx-mini-tbl">
+                    <thead><tr><th>Status</th><th class="r">Propostas</th><th class="r">Participação</th><th class="r">Valor</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in perdas)
+                        {
+                            <tr><td><b>@p.Nome</b></td><td class="r">@N0(p.Qtd)</td><td class="r">@PctDe(p.Qtd, rv.P)</td><td class="r" title="@EstadoTip(p.ComUsd, p.Conv, p.Valor)">@Estado(p.ComUsd, p.Conv, p.Valor)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            <div class="modal-actions"><button class="btn-ghost" @onclick="() => _vendSel = null">Fechar</button></div>
+        </div>
+    </div>;
+
+    // ---- unidades -----------------------------------------------------------
+    private string RelCss(Resumo r) =>
+        !_taxaOk || r.Decididas < AmostraMinima || r.TaxaQtd is not { } t || _rx.TaxaQtd is not { } m ? "" : t >= m + 5 ? "pos" : t <= m - 5 ? "neg" : "";
+
+    private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string exceto) => @<div class="cvx-card">
+        @{
+            var lista = UnidadesOrdenadas(sel, exceto);
+        }
+        <div class="cvx-ch">
+            <div class="cvx-xh">
+                <span class="xcard-ico">@Icons.Svg("bar-chart")</span>
+                <div><h2>Taxa de conversão por unidade</h2><p>@lista.Count unidades · ganhas ÷ decididas · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
+            </div>
+            @if (_taxaOk) { <span class="xcard-total"><span>Média do recorte</span><b>@TxQtdGlobal(_rx)</b></span> }
+        </div>
+        <div class="ibar cvx-ibar scroll-y @(filtro.Count > 0 ? "has-active" : "")">
+            @{ var pos = 0; }
+            @foreach (var (nome, r) in lista)
+            {
+                pos++;
+                var un = nome;
+                <div class="ibar-item @(pos <= 3 ? $"top{pos}" : "") @(filtro.Contains(nome) ? "xf-on" : "")" title="Clique para filtrar por @nome" @onclick="() => Alternar(filtro, un)">
+                    <div class="ibar-head">
+                        <span class="ibar-num">@pos</span>
+                        <span class="ibar-name">@nome</span>
+                        <span class="ibar-metrics">
+                            <span class="cvx-ibm" title="Propostas enviadas">@N0(r.Total) <small>propostas</small></span>
+                            <span class="cvx-ibm" title="Ganhas + perdidas">@N0(r.Decididas) <small>decididas</small></span>
+                            <span class="ibar-sep"></span>
+                            <span class="cvx-ibm g" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
+                            <span class="cvx-ibm p" title="@DinTip(r, ClasseProposta.Perdida)">@Din(r, ClasseProposta.Perdida) <small>perdido</small></span>
+                            <span class="cvx-ibm a" title="@DinTip(r, ClasseProposta.Aberta)">@Din(r, ClasseProposta.Aberta) <small>aberto</small></span>
+                            <span class="ibar-sep"></span>
+                            <span class="cvx-ibm" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">@TxValor(r) <small>em valor</small></span>
+                            <span class="ibar-val @RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</span>
+                        </span>
+                    </div>
+                    <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do recorte: @P1(gm)"></em> }</div>
+                </div>
+            }
+        </div>
+        <p class="cvx-note">Taxa em verde: pelo menos 5 p.p. acima da média do recorte; em vermelho: 5 p.p. abaixo (só com @AmostraMinima+ decididas). As barras partem do zero e vão até 100%.</p>
+    </div>;
+
+    private RenderFragment ValorUnidades() => @<div class="cvx-two">
+        <div class="cvx-card">
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por Business Unit</h2><p>Valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+                <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(_rx)">@DinTotal(_rx)</b></span></div>
+            @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))
+        </div>
+        <div class="cvx-card">
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Só propostas intercompany · valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+                <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(ResumoIc())">@DinTotal(ResumoIc())</b></span></div>
+            @Html(HtmlValorPorUnidade(Grupos(SoIc(_fx), i => i.P.BuIc)))
+        </div>
+    </div>;
+
+    private RenderFragment ValorMensal() => @<div>
+        <div class="cvx-card">
+            <div class="cvx-ch">
+                <div><h2>Valor por mês · @AnoBarrasAtual()</h2><p>Mês de envio e status atual de cada proposta · barras partem do zero</p></div>
+                @if (AnosBarras().Count > 1)
+                {
+                    <div class="cvx-seg-ctl">
+                        @foreach (var y in AnosBarras())
+                        {
+                            var yy = y;
+                            <button class="@(AnoBarrasAtual() == yy ? "on" : "")" @onclick="() => _anoBarras = yy">@yy</button>
+                        }
+                    </div>
+                }
+            </div>
+            @Html(SvgEmpilhado(_fx, false))
+        </div>
+    </div>;
+
+    // ---- perdas ---------------------------------------------------------------
+    private RenderFragment Perdas() => @<section class="cvx-card">
+        <div class="cvx-ch">
+            <div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("pie")</span><div><h2>Status das perdidas por impacto</h2><p>O status é a classificação no CRM, não a causa comercial · barras partem do zero</p></div></div>
+            <span class="xcard-total cvx-xt-mid"><span>Perdidas</span><b>@(_metPerda == "qtd" ? N0(_rx.P) : Din(_rx, ClasseProposta.Perdida))</b></span>
+            <div class="cvx-seg-ctl">
+                <button class="@(_metPerda == "qtd" ? "on" : "")" @onclick='() => _metPerda = "qtd"'>Quantidade</button>
+                <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>Valor financeiro</button>
+            </div>
+        </div>
+        @if (_seg is { } s && s != ClasseProposta.Perdida)
+        {
+            @Html(Vazio("Segmento " + NomeEn(s) + " ativo: a análise de perdas considera apenas propostas perdidas."))
+        }
+        else
+        {
+            @Html(HtmlPareto(_metPerda == "qtd"))
+            <div class="cvx-insight static"><small>Concentração das perdas</small><span>@TextoInsightPerda()</span></div>
+        }
+    </section>;
+
+    // ---- financeiro -----------------------------------------------------------
+
+
+    // ---- qualidade e validação ------------------------------------------------
+    private RenderFragment Qualidade() => @<section class="cvx-card">
+        @{
+            var total = Conv.Atual.Propostas.Count;
+            var geral = Somar(_itens);
+            var somaCat = geral.G + geral.P + geral.A + geral.NC;
+            var okQtd = total == somaCat && total == _itens.Count;
+            var okFiltro = _f.Count == _r.G + _r.P + _r.A + _r.NC;
+            var okDec = _r.Decididas == _r.G + _r.P;
+            var indep = _itens.Sum(i => i.Brl ?? 0);
+            var okValor = Math.Abs(indep - geral.VTotal) < 0.01 && Math.Abs(_f.Sum(i => i.Brl ?? 0) - _r.VTotal) < 0.01;
+            var okTabela = _f.Count == _r.Total;
+        }
+        <h2 class="cvx-h2s">Verificações de integridade</h2>
+        <ul class="cv-checks cvx-checks">
+            <li class="@(okQtd ? "ok" : "bad")">@(okQtd ? "✔" : "✖") Total de registros (@N0(total)) = ganhas (@N0(geral.G)) + perdidas (@N0(geral.P)) + abertas (@N0(geral.A)) + não classificadas (@N0(geral.NC))</li>
+            <li class="@(okFiltro ? "ok" : "bad")">@(okFiltro ? "✔" : "✖") No recorte atual: @N0(_f.Count) = @N0(_r.G) + @N0(_r.P) + @N0(_r.A) + @N0(_r.NC)</li>
+            <li class="@(okDec ? "ok" : "bad")">@(okDec ? "✔" : "✖") Decididas (@N0(_r.Decididas)) = ganhas + perdidas · abertas e não classificadas fora do denominador da Taxa de conversão</li>
+            <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@Fmt.Brl(geral.VTotal) na base toda)</li>
+            <li class="@(okTabela ? "ok" : "bad")">@(okTabela ? "✔" : "✖") Base de Propostas e dashboard usam o mesmo recorte: @N0(_f.Count) registros</li>
+            <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") Propostas com valor mas sem taxa de câmbio: @N0(geral.SemTaxa)@(geral.SemTaxa > 0 ? $" (US$ {geral.UsdSemTaxa.ToString("N0", _pt)} fora dos valores em R$)" : "")</li>
+            @if (geral.SemData > 0)
+            {
+                <li class="bad">✖ Propostas com valor mas sem data de envio: @N0(geral.SemData) (US$ @geral.UsdSemData.ToString("N0", _pt) fora dos valores em R$)</li>
+            }
+            <li class="info">ℹ Propostas sem valor em US$ na planilha: @N0(geral.SemValor) — contam nas quantidades, não nos valores</li>
+        </ul>
+
+        <h2 class="cvx-h2s" style="margin-top:18px">Conversão cambial rastreável (recorte atual)</h2>
+        <table class="cvx-mini-tbl">
+            <thead><tr><th>Ano de envio</th><th class="r">Taxa USD/BRL</th><th class="r">Propostas</th><th class="r">Valor original (US$)</th><th class="r">Valor convertido (R$)</th><th class="r">Sem taxa</th></tr></thead>
+            <tbody>
+                @foreach (var l in RastroCambio())
+                {
+                    <tr>
+                        <td><b>@l.Ano</b></td>
+                        <td class="r">@(l.Taxa is { } tx ? tx.ToString("0.0000", _pt) : l.Ano == "Sem data" ? "sem data de envio" : "não cadastrada")</td>
+                        <td class="r">@N0(l.Propostas)</td>
+                        <td class="r">@l.Usd.ToString("N0", _pt)</td>
+                        <td class="r">@(l.Taxa is null ? (l.Ano == "Sem data" ? "—" : "Não convertido") : Fmt.Brl(l.Brl))</td>
+                        <td class="r" style="@(l.SemTaxa > 0 ? "color:var(--neg);font-weight:700" : "")">@N0(l.SemTaxa)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="cvx-note">Valor em R$ = valor em US$ × taxa do ano da data de envio da proposta. O estado do valor é sempre explícito: R$ 0 (zero real), — (sem informação), Não convertido (sem taxa) e Não calculável (sem denominador).</p>
+
+        @if (Conv.Atual.Avisos.Count > 0)
+        {
+            <h2 class="cvx-h2s" style="margin-top:18px">Avisos da leitura da planilha</h2>
+            <ul class="cv-checks cvx-checks">@foreach (var a in Conv.Atual.Avisos) { <li class="warn">⚠ @a</li> }</ul>
+        }
+        @if (_r.NC > 0)
+        {
+            <h2 class="cvx-h2s" style="margin-top:18px">Status não classificados (aguardando validação)</h2>
+            <table class="cvx-mini-tbl">
+                <thead><tr><th>Status na planilha</th><th class="r">Propostas</th></tr></thead>
+                <tbody>
+                    @foreach (var g in _f.Where(i => i.P.Classe == ClasseProposta.NaoClassificada).GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal)).Select(x => (Nome: x.First().P.StatusOriginal == "" ? "(vazio)" : x.First().P.StatusOriginal, Qtd: x.Count())).OrderByDescending(x => x.Qtd))
+                    {
+                        <tr><td><b>@g.Nome</b></td><td class="r">@N0(g.Qtd)</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <h2 class="cvx-h2s" style="margin-top:18px">Colunas lidas da planilha</h2>
+        <ul class="cv-checks cvx-checks">@foreach (var m in Conv.Atual.Mapeamento) { <li class="info">@m</li> }</ul>
+    </section>;
+
+    // =====================================================================
+    //  BASE DE PROPOSTAS
+    // =====================================================================
+    private RenderFragment Base() => @<div class="cvx-card">
+        @{
+            if (_ocultas is null) CarregarOcultas();
+            var todas = Colunas();
+            var visiveis = todas.Where(c => _ocultas is null || !_ocultas.Contains(c.Key)).ToList();
+            var linhas = LinhasTabela(todas);
+            var paginas = Math.Max(1, (linhas.Count + PorPagina - 1) / PorPagina);
+            if (_pag >= paginas) _pag = paginas - 1;
+            var pagina = linhas.Skip(_pag * PorPagina).Take(PorPagina).ToList();
+            var rt = Somar(linhas);
+        }
+        <div class="cv-tools filterbar cvx-basebar">
+            <BuscaAdiada Value="@_busca" Geracao="_limpezas" OnBuscar="t => { _busca = t; _pag = 0; }" />
+            <MultiFilter Label="Classificação" AllText="Todas" Options="NomesClasse" Selected="_classes" OnChanged="StateHasChanged" />
+            <details class="cv-cols">
+                <summary class="btn-ghost sm">@Icons.Svg("layers")Colunas</summary>
+                <div class="cv-cols-panel">
+                    @foreach (var c in todas)
+                    {
+                        var k = c.Key;
+                        <label class="flt-check"><input type="checkbox" checked="@(_ocultas is null || !_ocultas.Contains(k))" @onchange="() => AlternarColuna(k)" /><span>@c.Titulo</span></label>
+                    }
+                </div>
+            </details>
+            <div class="filterbar-spacer"></div>
+            <span class="muted" style="font-size:12px" title="Registros na tabela · soma do valor convertido em R$">@N0(linhas.Count) @(linhas.Count == 1 ? "registro" : "registros") · <b style="color:var(--text)">@DinTotal(rt)</b></span>
+            <button class="btn-primary sm" disabled="@(linhas.Count == 0)" @onclick="() => Exportar(linhas, todas)">@Icons.Svg("download")Exportar Excel</button>
+        </div>
+        <div class="table-wrap tbl-compact" style="max-height:62vh;overflow:auto">
+            <table class="grid-tbl">
+                <thead>
+                    <tr>
+                        @foreach (var c in visiveis)
+                        {
+                            var k = c.Key;
+                            <th class="@c.Align cv-sort" title="Ordenar" @onclick="() => Ordenar(k)">@c.Titulo@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in pagina)
+                    {
+                        <tr>
+                            @foreach (var c in visiveis)
+                            {
+                                if (c.Key == "classe")
+                                {
+                                    <td class="center"><span class="cv-badge @ClasseCss(i.P.Classe)">@NomeClasse(i.P.Classe)</span></td>
+                                }
+                                else if (c.Key == "taxa" && i.Taxa is null)
+                                {
+                                    <td class="right" style="color:var(--neg)" title="Sem taxa de câmbio para este ano">sem taxa</td>
+                                }
+                                else
+                                {
+                                    <td class="@c.Align">@c.Texto(i)</td>
+                                }
+                            }
+                        </tr>
+                    }
+                    @if (linhas.Count == 0)
+                    {
+                        <tr><td colspan="@Math.Max(visiveis.Count, 1)" class="empty">Nenhum registro com os filtros atuais.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="cv-pager">
+            <span class="muted">Mostrando @(linhas.Count == 0 ? 0 : _pag * PorPagina + 1)–@Math.Min((_pag + 1) * PorPagina, linhas.Count) de @N0(linhas.Count)</span>
+            <button class="btn-ghost sm" disabled="@(_pag == 0)" @onclick="() => _pag = 0">«</button>
+            <button class="btn-ghost sm" disabled="@(_pag == 0)" @onclick="() => _pag--">‹</button>
+            <span>página @(_pag + 1) de @paginas</span>
+            <button class="btn-ghost sm" disabled="@(_pag >= paginas - 1)" @onclick="() => _pag++">›</button>
+            <button class="btn-ghost sm" disabled="@(_pag >= paginas - 1)" @onclick="() => _pag = paginas - 1">»</button>
+        </div>
+    </div>;
+
+    // =====================================================================
+    //  RELATÓRIO EXECUTIVO · 2 páginas A4 horizontais (imprimir / salvar PDF)
+    // =====================================================================
+    private RenderFragment Relatorio() => @<div class="rpt">
+        <div class="rpt-bar no-print">
+            <span>Relatório executivo · use <b>Imprimir</b> e escolha <b>Salvar como PDF</b> (A4 horizontal)</span>
+            <div><button class="btn-primary sm" @onclick="Imprimir">@Icons.Svg("download")Imprimir / Salvar PDF</button> <button class="btn-ghost sm" @onclick="FecharRelatorio">Voltar ao painel</button></div>
+        </div>
+
+        <section class="rpt-page">
+            <header class="rpt-head">
+                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de Propostas · Howden Brasil · valores em R$</div></div>
+                <div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span><span><b>Dados lidos em</b> @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—")</span><span><b>Emitido em</b> @DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm", _pt) · @_user</span><span><b>Filtros</b> @NotasFiltros()</span></div>
+            </header>
+            @if (!Conv.Ok) { <p class="rpt-alert">@Conv.Mensagem</p> }
+            @if (_seg is not null) { <p class="rpt-small" style="margin:0">O segmento selecionado na tela não se aplica ao relatório.</p> }
+            @KpisResumo()
+            @if (_r.SemTaxa > 0) { <p class="rpt-alert">* Valor parcial: @N0(_r.SemTaxa) proposta(s) (US$ @_r.UsdSemTaxa.ToString("N0", _pt)) de @string.Join(", ", AnosSemTaxa()) sem taxa de câmbio ficaram fora dos totais em R$. As quantidades estão completas.</p> }
+            <div class="rpt-row2">
+                <div class="rpt-box">
+                    <h3>Composição das @N0(_r.Total) propostas enviadas</h3>
+                    @Html(HtmlComposicao(_r))
+                    <h3 style="margin-top:12px">Composição por valor (R$)</h3>
+                    @Html(HtmlComposicaoValor(_r))
+                </div>
+                <div class="rpt-box">
+                    <h3>Taxa de conversão mensal — mês de envio, status atual</h3>
+                    @Html(SvgWinRate(_f, 0, true, true, 640))
+                </div>
+            </div>
+            <div class="rpt-box">
+                <h3>Taxa de conversão por Business Unit (mínimo de @AmostraMinima decididas)</h3>
+                @Html(HtmlBuBars(Grupos(_f, i => i.P.Bu), 6, AmostraMinima))
+            </div>
+            <footer class="rpt-foot">Howden Brasil · Conversão de Propostas · uso interno · página 1 de 2</footer>
+        </section>
+
+        <section class="rpt-page">
+            <header class="rpt-head slim"><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span></div></header>
+            <div class="rpt-row2 rev">
+                <div class="rpt-box">
+                    <h3>Vendedores com maior taxa de conversão (mínimo de 10 propostas decididas)</h3>
+                    @Html(HtmlVendTop(8, 10))
+                </div>
+                <div class="rpt-box">
+                    <h3>Concentração das perdas</h3>
+                    @Html(HtmlPareto(true, false))
+                    <p class="rpt-small">@TextoInsightPerda(false)</p>
+                </div>
+            </div>
+            <div class="rpt-box">
+                <h3>Definições e notas metodológicas</h3>
+                <ul class="rpt-notes">
+                    <li><b>Taxa de conversão</b> = ganhas ÷ (ganhas + perdidas). Abertas e não classificadas não entram no denominador. <b>Conversão por valor</b> = valor ganho ÷ (valor ganho + valor perdido), em R$.</li>
+                    <li><b>Classificação</b> pelo status do CRM — Ganhas: Closed - Won, OTP · Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid, Closed - Unknown · Abertas: Open · demais: não classificadas, fora das três categorias.</li>
+                    <li><b>Coorte de envio</b>: o eixo de tempo é o mês de envio da proposta e mostra o status atual dela — não a data de fechamento. Meses recentes têm mais propostas abertas, e a taxa deles pode mudar.</li>
+                    <li><b>Valores</b> em R$ = valor em US$ × taxa USD/BRL do ano da data de envio @TaxasTexto(). Propostas sem taxa ficam fora dos valores e são sinalizadas.</li>
+                    <li><b>BU</b> e <b>BU Intercompany</b> são campos distintos; a BU Intercompany usa a coluna AG e, se vazia, a AF. Comparações de taxa consideram amostras de pelo menos @AmostraMinima propostas decididas; os rankings do relatório exigem no mínimo 10 decididas por vendedor e @AmostraMinima por BU.</li>
+                    <li><b>Qualidade dos dados</b>: @N0(_r.SemTaxa) proposta(s) sem taxa de câmbio · @N0(_r.NC) não classificada(s) · @N0(_r.SemValor) sem valor em US$ · @N0(Conv.Atual.Propostas.Count) registros na base. Dados da planilha de propostas do CRM, atualizados em @(Conv.AtualizadoEm is { } q2 ? q2.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—").</li>
+                </ul>
+            </div>
+            <footer class="rpt-foot">Howden Brasil · Conversão de Propostas · uso interno · página 2 de 2</footer>
+        </section>
+    </div>;
+}

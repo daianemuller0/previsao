@@ -2036,3 +2036,643 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .pod-num { position: absolute; right: 10px; top: 0; height: 22px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; color: #1f2a3a; font-variant-numeric: tabular-nums; }
 .pod-share { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .pod-top { grid-template-columns: 1fr; } .pod-row { grid-template-columns: 26px 26px 1fr 1fr 48px; } }
+
+.flt-multi-search { width: calc(100% - 16px); margin: 6px 8px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 12.5px; background: var(--panel); color: var(--text); }
+
+/* ---- Conversão de propostas ---- */
+.cv-kpis { margin-bottom: 16px; }
+.cv-mini { height: 5px; border-radius: 999px; background: #eef2f7; overflow: hidden; margin: 8px 0 2px; }
+.cv-mini i { display: block; height: 100%; border-radius: 999px; animation: cv-grow .7s ease both; transform-origin: left; }
+@keyframes cv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes cv-fade { from { opacity: 0; } to { opacity: 1; } }
+.cv-arc { animation: cv-fade .8s ease both; }
+.cv-seg { animation: cv-fade .5s ease both; }
+.cv-seg:hover, .cv-arc:hover { filter: brightness(1.12); }
+.cv-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.cv-donut { padding: 8px 4px; }
+.cv-donut .donut-svg { width: 190px; height: 190px; flex-basis: 190px; }
+.cv-vals { display: flex; flex-direction: column; gap: 14px; padding: 6px 4px 4px; }
+.cv-val-top { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; font-size: 13px; margin-bottom: 5px; }
+.cv-val-top b { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text); }
+.cv-val-top em { font-style: normal; font-size: 11.5px; color: var(--muted); min-width: 110px; text-align: right; }
+.cv-track { height: 12px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+.cv-fill { height: 100%; border-radius: 999px; min-width: 3px; animation: cv-grow .8s ease both; transform-origin: left; }
+.cv-taxas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 4px 6px; }
+.cv-taxa { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--panel-2); display: flex; flex-direction: column; gap: 3px; }
+.cv-taxa span { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.cv-taxa b { font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cv-taxa small { font-size: 11.5px; color: var(--muted); }
+.cv-nota { font-size: 11.5px; color: var(--muted); margin: 8px 6px 0; }
+.cv-leg { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); padding: 4px 8px; }
+.cv-scroll { max-height: 560px; }
+.cv-list { display: flex; flex-direction: column; }
+.cv-row { display: grid; grid-template-columns: 26px 1fr 120px 90px 90px; column-gap: 12px; row-gap: 6px; align-items: center; padding: 12px 6px; border-top: 1px solid #f1f4f9; }
+.cv-row:first-child { border-top: none; }
+.cv-row:hover { background: var(--panel-2); border-radius: 9px; }
+.cv-name { font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-k { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.cv-k small { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2, #93a1b5); font-weight: 700; }
+.cv-k b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.cv-stack { grid-column: 2 / 6; display: flex; height: 9px; border-radius: 999px; overflow: hidden; background: #eef2f7; min-width: 6px; }
+.cv-stack i { display: block; height: 100%; }
+.cv-sub { grid-column: 2 / 6; font-size: 11.5px; color: var(--muted); }
+.cv-amostra { background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 1px 8px; font-weight: 700; font-size: 10.5px; }
+.cv-tw { overflow-x: auto; }
+.cv-tbl td, .cv-tbl th { white-space: nowrap; }
+.cv-bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: #eef2f7; margin-top: 5px; min-width: 120px; }
+.cv-bar i { display: block; height: 100%; }
+.cv-alert { background: var(--neg-bg); border: 1px solid #f0c9c4; color: #7a271d; border-radius: var(--radius); padding: 11px 16px; font-size: 12.5px; line-height: 1.55; margin-bottom: 14px; }
+.cv-alert.warn { background: var(--warn-bg); border-color: #f1dfb5; color: #6b4a0a; }
+.cv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.cv-chip { background: var(--teal-050, #eaf4f8); color: var(--teal-deep, #0b4f6f); border-radius: 999px; padding: 3px 11px; font-size: 11.5px; }
+.cv-chip b { margin-right: 4px; }
+.cv-det summary { cursor: pointer; font-weight: 700; color: var(--primary); }
+.cv-checks { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.cv-checks .ok { color: var(--pos); }
+.cv-checks .bad { color: var(--neg); }
+.cv-checks .info { color: var(--text-2); }
+.cv-sub-h { margin: 14px 0 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cv-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.cv-cols { position: relative; }
+.cv-cols summary { list-style: none; cursor: pointer; }
+.cv-cols-panel { position: absolute; z-index: 30; top: 36px; left: 0; width: 280px; max-height: 320px; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.12)); padding: 8px; }
+.cv-sort { cursor: pointer; user-select: none; }
+.cv-pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 10px 2px; font-size: 12px; }
+.cv-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+@media (max-width: 900px) { .cv-taxas { grid-template-columns: 1fr; } .cv-row { grid-template-columns: 26px 1fr 80px 70px 70px; } }
+
+/* ===================== Conversão — redesign executivo (cvx-*) ===================== */
+.cvx { --cx-navy:#122E50; --cx-blue:#155A96; --cx-sky:#2478B8; --cx-bg:#F3F6FA; --cx-text:#172B43; --cx-mut:#64748B; --cx-line:#E1E8F0;
+       --cx-pos:#198467; --cx-neg:#C26940; --cx-warn:#C99535; --cx-neu:#8493A3; color: var(--cx-text); font-variant-numeric: tabular-nums; }
+.cvx .r { text-align: right; }
+.cvx-head { display:flex; flex-wrap:wrap; gap:14px 28px; align-items:flex-start; justify-content:space-between; background:var(--cx-navy); color:#fff; border-radius:12px; padding:16px 22px; margin-bottom:12px; }
+.cvx-title { font-size:24px; font-weight:700; letter-spacing:-.01em; line-height:1.15; }
+.cvx-mark { letter-spacing:.14em; }
+.cvx-dash { margin:0 10px; opacity:.55; }
+.cvx-sub { font-size:14px; opacity:.8; margin-top:3px; }
+.cvx-meta { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:12px; opacity:.85; align-self:center; }
+.cvx-meta b { opacity:.7; font-weight:600; margin-right:4px; }
+.cvx-actions { display:flex; gap:8px; align-items:center; }
+.cvx-menu { position:relative; }
+.cvx-menu > .btn-primary { display:inline-flex; }
+.cvx-menu > .flt-multi-backdrop { z-index:58; }
+.cvx-menu-p { position:absolute; right:0; top:calc(100% + 6px); z-index:60; background:#fff; color:var(--cx-text); border:1px solid var(--cx-line); border-radius:10px; box-shadow:0 10px 30px rgba(18,38,63,.18); padding:6px; min-width:210px; display:flex; flex-direction:column; }
+.cvx-menu-p button { text-align:left; background:none; border:0; padding:8px 10px; border-radius:6px; font-size:13px; cursor:pointer; color:inherit; }
+.cvx-menu-p button:hover { background:var(--cx-bg); }
+
+.cvx-tabs { display:flex; gap:4px; border-bottom:1px solid var(--cx-line); margin-bottom:12px; }
+.cvx-tabs button { background:none; border:0; border-bottom:3px solid transparent; padding:9px 16px; font-size:14px; font-weight:600; color:var(--cx-mut); cursor:pointer; }
+.cvx-tabs button.on { color:var(--cx-navy); border-bottom-color:var(--cx-sky); }
+.cvx-badge { background:var(--cx-bg); color:var(--cx-mut); border-radius:10px; font-size:11px; padding:1px 7px; margin-left:6px; }
+
+.cvx-skel { display:grid; gap:12px; }
+.cvx-filters { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; background:#fff; border:1px solid var(--cx-line); border-radius:10px; padding:8px 12px; margin-bottom:12px; }
+.cvx-chip { display:inline-flex; gap:5px; align-items:center; background:var(--cx-bg); border:1px solid var(--cx-line); border-radius:14px; padding:2px 10px; font-size:12px; color:var(--cx-mut); }
+.cvx-chip b { color:var(--cx-text); font-weight:600; }
+.cvx-chip.seg { border-color:var(--sc,var(--cx-sky)); }
+.cvx-chip button { background:none; border:0; cursor:pointer; color:var(--cx-mut); }
+.cvx-alert { background:#FBF3E2; border:1px solid #EAD3A0; color:#6b5316; border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:12px; }
+.cvx-card { background:#fff; border:1px solid var(--cx-line); border-radius:12px; padding:16px 18px; margin-bottom:12px; box-shadow:0 1px 2px rgba(18,38,63,.04); }
+.cvx-ch { display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+.cvx-ch h2, .cvx-h2s { font-size:16px; font-weight:700; margin:0; color:var(--cx-navy); }
+.cvx-h2s { margin-bottom:10px; }
+.cvx-ch p { font-size:12px; color:var(--cx-mut); margin:2px 0 0; }
+.cvx-dh { font-size:13px; font-weight:700; color:var(--cx-navy); margin:18px 0 8px; }
+.cvx-note { font-size:12px; color:var(--cx-mut); line-height:1.45; }
+.cvx-ctrl { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.cvx-fld { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--cx-mut); }
+.cvx-fld select, .cvx-fld input { border:1px solid var(--cx-line); border-radius:6px; padding:4px 8px; font-size:13px; background:#fff; }
+.cvx-seg-ctl { display:inline-flex; border:1px solid var(--cx-line); border-radius:8px; overflow:hidden; }
+.cvx-seg-ctl button { background:#fff; border:0; padding:5px 12px; font-size:12px; font-weight:600; color:var(--cx-mut); cursor:pointer; }
+.cvx-seg-ctl button + button { border-left:1px solid var(--cx-line); }
+.cvx-seg-ctl button.on { background:var(--cx-navy); color:#fff; }
+
+/* Primeira dobra */
+.cvx-top { display:grid; grid-template-columns:minmax(300px,.9fr) 2fr; gap:12px; margin-bottom:12px; }
+.cvx-lab { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.75; }
+.cvx-delta { font-size:13px; font-weight:600; margin-top:8px; }
+.cvx-delta.pos { color:#6fd1b0; } .cvx-delta.neg { color:#f0a47f; } .cvx-delta.neu { color:#c3cfdd; }
+
+/* Composição: barra 100% */
+.cvx-total { text-align:right; } .cvx-total small { display:block; font-size:10px; letter-spacing:.07em; color:var(--cx-mut); } .cvx-total b { font-size:15px; color:var(--cx-navy); }
+.cvx-stackbar { display:flex; height:38px; border-radius:8px; overflow:hidden; background:var(--cx-bg); }
+.cvx-seg { border:0; color:#fff; font-size:12px; font-weight:700; cursor:pointer; padding:0 4px; white-space:nowrap; overflow:hidden; transition:opacity .15s; }
+.cvx-stackbar.static .cvx-seg { cursor:default; text-align:center; line-height:38px; }
+.cvx-seg.dim { opacity:.35; } .cvx-seg.on { box-shadow:inset 0 0 0 2px rgba(255,255,255,.7); }
+.cvx-stackbar:not(.static) .cvx-seg:hover { filter:brightness(1.08); }
+.cvx-legend, .cvx-leg { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12px; color:var(--cx-mut); margin-top:10px; }
+.cvx-legend b { color:var(--cx-text); }
+.cvx-dot { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+.cvx-ln { display:inline-block; width:18px; height:0; border-top:2.5px solid #2478B8; margin-right:6px; vertical-align:3px; }
+.cvx-ln.dash { border-top:2px dashed #8493A3; }
+.cvx-pt { display:inline-block; width:8px; height:8px; border:2px solid; border-radius:50%; background:#fff; margin-right:6px; }
+.cvx-bx { display:inline-block; width:10px; height:8px; background:#cfd9e6; margin-right:6px; }
+
+/* Tendência + insights */
+.cvx-mid { display:grid; grid-template-columns:2fr 1fr; gap:12px; }
+.cvx-mid .cvx-card { margin-bottom:0; }
+.cvx-trend-foot { display:flex; flex-wrap:wrap; gap:8px 16px; justify-content:space-between; align-items:center; margin-top:8px; }
+.cvx-insight { display:block; width:100%; text-align:left; background:var(--cx-bg); border:1px solid var(--cx-line); border-left:4px solid var(--cx-sky); border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer; color:inherit; }
+.cvx-insight:hover { background:#e9eff7; }
+.cvx-insight.static { cursor:default; margin:0 0 12px; } .cvx-insight.static:hover { background:var(--cx-bg); }
+.cvx-insight small { display:block; font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--cx-mut); margin-bottom:3px; }
+.cvx-insight span { font-size:13px; line-height:1.4; }
+.cvx-empty-ins { font-size:13px; color:var(--cx-mut); padding:10px 2px; }
+
+/* Segundo nível */
+.cvx-pills { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.cvx-pills button { background:#fff; border:1px solid var(--cx-line); border-radius:18px; padding:6px 14px; font-size:13px; font-weight:600; color:var(--cx-mut); cursor:pointer; }
+.cvx-pills button.on { background:var(--cx-navy); border-color:var(--cx-navy); color:#fff; }
+.cvx-two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.cvx-two .cvx-card { margin-bottom:0; }
+
+/* Ranking de vendedores */
+.cvx-vlist { display:flex; flex-direction:column; }
+.cvx-vrow { display:grid; grid-template-columns:30px minmax(150px,1.2fr) minmax(220px,2.2fr) repeat(4,64px) 110px; gap:10px; align-items:center; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--cx-line); padding:8px 6px; font-size:13px; color:inherit; cursor:pointer; }
+.cvx-vrow.head { font-size:11px; font-weight:700; color:var(--cx-mut); text-transform:uppercase; letter-spacing:.04em; cursor:default; }
+.cvx-vrow:not(.head):hover, .cvx-vrow.on { background:var(--cx-bg); }
+.cvx-vrow .rk { color:var(--cx-mut); font-size:12px; } .cvx-vrow .nm { font-weight:600; }
+.cvx-vrow .n { text-align:right; } .cvx-vrow .n.g { color:var(--cx-pos); } .cvx-vrow .n.p { color:var(--cx-neg); } .cvx-vrow .n.a { color:var(--cx-sky); }
+.cvx-vrow .n.v { font-weight:600; }
+.cvx-vrow .wr { display:grid; grid-template-columns:1fr 54px; gap:2px 10px; align-items:center; }
+.cvx-vrow .wr b { text-align:right; } .cvx-vrow .wr small { grid-column:1 / -1; font-size:11px; color:var(--cx-mut); margin-top:-2px; }
+.cvx-vrow .tr, .cvx-wr .tr { position:relative; display:block; height:10px; background:var(--cx-bg); border-radius:5px; }
+.cvx-vrow .tr i, .cvx-wr .tr i { display:block; height:100%; background:var(--cx-sky); border-radius:5px; }
+.cvx-vrow .tr em { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--cx-navy); }
+.cvx-wr { display:grid; grid-template-columns:1fr 48px; gap:8px; align-items:center; min-width:130px; } .cvx-wr b { text-align:right; }
+.cvx-wr b.pos { color:var(--cx-pos); } .cvx-wr b.neg { color:var(--cx-neg); }
+
+/* Tabelas */
+.cvx-tbl, .cvx-mini-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.cvx-tbl th, .cvx-mini-tbl th { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--cx-mut); text-align:left; padding:6px 8px; border-bottom:1px solid var(--cx-line); }
+.cvx-tbl th.r, .cvx-mini-tbl th.r { text-align:right; }
+.cvx-tbl td, .cvx-mini-tbl td { padding:7px 8px; border-bottom:1px solid var(--cx-line); }
+.cvx-tbl td.r, .cvx-mini-tbl td.r { text-align:right; }
+.cvx-bc { position:relative; z-index:0; }
+.cvx-bc::before { content:""; position:absolute; left:6px; top:50%; height:60%; transform:translateY(-50%); width:calc((100% - 12px) * var(--w,0) / 100); background:var(--bc,var(--cx-sky)); opacity:.16; border-radius:3px; z-index:-1; }
+.cvx-bc span { position:relative; }
+
+/* Pareto e barras por unidade */
+.cvx-pareto { display:flex; flex-direction:column; }
+.cvx-prow { display:grid; grid-template-columns:minmax(150px,1.2fr) 2fr 90px 90px 90px; gap:10px; align-items:center; padding:8px 4px; border-bottom:1px solid var(--cx-line); font-size:13px; }
+.cvx-prow.head { font-size:11px; font-weight:700; color:var(--cx-mut); text-transform:uppercase; }
+.cvx-prow .bar, .cvx-bb .bar { display:block; height:12px; background:var(--cx-bg); border-radius:6px; overflow:hidden; }
+.cvx-prow .bar i, .cvx-bb .bar i { display:block; height:100%; border-radius:6px; }
+.cvx-prow .nm { font-weight:600; } .cvx-prow .muted { color:var(--cx-mut); }
+.cvx-bubars { display:flex; flex-direction:column; gap:7px; }
+.cvx-bb { display:grid; grid-template-columns:minmax(110px,1fr) 2fr 52px minmax(80px,auto); gap:10px; align-items:center; font-size:13px; }
+.cvx-bb b { text-align:right; } .cvx-bb small { color:var(--cx-mut); font-size:11px; }
+.cvx-fin { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:12px; }
+.cvx-checks li { font-size:13px; }
+
+/* Painel lateral do vendedor */
+.cvx-drawer { width:620px; }
+.cvx-dkpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:12px 0; }
+.cvx-dcmp { font-size:13px; background:var(--cx-bg); border-radius:8px; padding:10px 12px; margin-bottom:8px; line-height:1.45; }
+
+/* Gráficos SVG */
+.cvx svg text { font-variant-numeric: tabular-nums; }
+
+/* Relatório executivo (tela + impressão) */
+.rpt-bar { display:flex; gap:10px; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--cx-line); border-radius:10px; padding:8px 14px; margin-bottom:12px; }
+.rpt-page { background:#fff; border:1px solid var(--cx-line); border-radius:6px; padding:16px 20px; margin:0 auto 14px; max-width:1180px; aspect-ratio:297/210; display:flex; flex-direction:column; gap:10px; box-sizing:border-box; }
+.rpt-head { display:flex; justify-content:space-between; gap:16px; background:var(--cx-navy); color:#fff; border-radius:8px; padding:10px 16px; }
+.rpt-head .cvx-title { font-size:18px; } .rpt-head .cvx-sub { font-size:12px; }
+.rpt-head.slim { padding:6px 14px; }
+.rpt-meta { display:flex; flex-wrap:wrap; gap:2px 14px; font-size:10.5px; align-self:center; justify-content:flex-end; opacity:.9; max-width:60%; } .rpt-meta b { opacity:.7; margin-right:3px; }
+.rpt-row2 { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
+.rpt-row2.rev { grid-template-columns:1.4fr 1fr; } /* página 2: a tabela de vendedores é a coluna larga; o Pareto mantém espaço para as 5 colunas */
+.rpt-box { border:1px solid var(--cx-line); border-radius:8px; padding:10px 12px; font-size:11px; overflow:hidden; }
+.rpt-box h3 { font-size:12px; margin:0 0 6px; color:var(--cx-navy); }
+.rpt-alert { font-size:10.5px; color:#6b5316; background:var(--warn-bg); border:1px solid #ecd9a8; border-radius:6px; padding:4px 8px; margin:0; }
+.rpt-small { font-size:10.5px; color:var(--cx-mut); margin:4px 0 0; }
+.rpt-notes { margin:0; padding-left:16px; font-size:10.5px; color:var(--cx-mut); line-height:1.5; }
+.rpt-foot { margin-top:auto; font-size:10px; color:var(--cx-mut); text-align:right; }
+
+/* Responsivo */
+@media (max-width: 1280px) {
+    .cvx-top { grid-template-columns:1fr; }
+    .cvx-mid, .cvx-two { grid-template-columns:1fr; }
+    .cvx-vrow { grid-template-columns:26px minmax(120px,1fr) minmax(160px,1.6fr) repeat(2,54px) 100px; }
+    .cvx-vrow > span:nth-child(6), .cvx-vrow > span:nth-child(7) { display:none; }
+}
+@media (max-width: 720px) {
+    .cvx-title { font-size:19px; }
+    .cvx-prow { grid-template-columns:1fr 1fr 70px; } .cvx-prow > span:nth-child(5), .cvx-prow > span:nth-child(2) { display:none; }
+}
+
+/* Impressão do relatório: cada folha vira uma página A4 horizontal */
+@media print {
+    .rpt-bar { display:none !important; }
+    /* altura livre até a folha útil (192 mm); sem overflow:hidden, para nada ficar escondido */
+    .rpt-page { border:0; border-radius:0; margin:0; max-width:none; width:100%; height:auto; min-height:0; max-height:192mm; aspect-ratio:auto; padding:0; page-break-after:always; break-after:page; break-inside:avoid; }
+    .rpt-page:last-of-type { page-break-after:auto; break-after:auto; }
+    .rpt, .rpt *, .rpt *::before, .rpt *::after { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    .rpt .chart-body { display:block; min-height:0; }
+    .rpt .chart-body svg { height:auto; max-height:62mm; }
+    .rpt .cvx-kpi { box-shadow:none; transform:none; }
+}
+
+/* ===== Conversão — página única (rolagem contínua) ===== */
+.cvx { max-width: 1480px; margin: 0 auto; }
+/* Cabeçalho compacto e claro */
+.cvx-head { background:#fff; color:var(--cx-text); border:1px solid var(--cx-line); border-left:5px solid var(--cx-navy); padding:10px 18px; gap:8px 24px; align-items:center; margin-bottom:10px; }
+.cvx-title { font-size:20px; color:var(--cx-navy); }
+.cvx-mark { font-weight:800; letter-spacing:.12em; }
+.cvx-dash { opacity:.4; margin:0 8px; }
+.cvx-sub { font-size:12.5px; color:var(--cx-mut); opacity:1; margin-top:1px; }
+.cvx-meta { opacity:1; color:var(--cx-mut); gap:2px 16px; flex:1; justify-content:center; }
+.cvx-meta b { color:var(--cx-text); opacity:1; }
+
+/* Índice fixo */
+.cvx-index { position:sticky; top:var(--topbar-h,56px); z-index:20; display:flex; gap:2px; flex-wrap:wrap; background:rgba(243,246,250,.94); backdrop-filter:blur(6px); border:1px solid var(--cx-line); border-radius:10px; padding:4px; margin-bottom:10px; }
+.cvx-index button { background:none; border:0; border-radius:7px; padding:5px 12px; font-size:12.5px; font-weight:600; color:var(--cx-mut); cursor:pointer; }
+.cvx-index button:hover { background:#fff; color:var(--cx-navy); }
+
+/* Filtros: cada painel abre junto do seu campo */
+.cvx-filters { position:relative; z-index:30; gap:8px 10px; padding:8px 12px; }
+.cvx-filters .flt { display:flex; align-items:center; gap:6px; font-size:12px; background:var(--cx-bg); border:1px solid var(--cx-line); border-radius:999px; padding:5px 12px; }
+.cvx-filters .flt-multi { position:relative; }
+.cvx-filters .flt-label { color:var(--cx-mut); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }
+.cvx-filters .flt-multi-btn { border:0; background:none; outline:0; font:inherit; font-size:12px; font-weight:600; color:var(--cx-text); cursor:pointer; display:inline-flex; align-items:center; gap:5px; padding:0; }
+.cvx-filters .flt-caret { font-size:10px; color:var(--cx-mut); }
+.cvx-filters .flt-multi-panel { top:calc(100% + 6px); left:0; z-index:80; }
+.cvx-filters .flt-multi-backdrop { z-index:70; }
+
+/* Seções */
+.cvx-sec { margin-top:26px; padding-top:4px; }
+.cvx-sec:first-child { margin-top:6px; }
+.cvx-sec-h { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; padding-bottom:7px; margin-bottom:12px; border-bottom:1px solid var(--cx-line); }
+.cvx-sec-h h2 { font-size:19px; font-weight:800; color:var(--cx-navy); margin:0; letter-spacing:-.01em; }
+.cvx-sec-h span { font-size:12.5px; color:var(--cx-mut); }
+.cvx-h3 { font-size:15px; font-weight:700; color:var(--cx-navy); margin:0; }
+.cvx-sec .cvx-card { padding:14px 18px; margin-bottom:12px; }
+
+/* Gráficos com altura confortável */
+.cvx-trend svg { width:100%; height:auto; }
+.cvx-page .cvx-card { overflow-x:auto; }
+
+@media (max-width: 720px) { .cvx-meta { justify-content:flex-start; } }
+@media print { .cvx-index { display:none !important; } }
+
+/* ===== Conversão — mesma linguagem visual da Visão Executiva ===== */
+.cvx { --cx-navy:var(--primary); --cx-blue:var(--teal-deep); --cx-sky:var(--teal); --cx-bg:var(--panel-2); --cx-text:var(--text);
+       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--neg); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
+       font-family:var(--font); max-width:none; margin:0; }
+.cvx .page-head h1 { color:var(--primary); }
+.cvx .page-head .subtitle { line-height:1.5; }
+
+/* Barra de filtros + índice (mesma faixa fixa da Visão Executiva) */
+.cvx-fb { align-items:center; }
+.cvx-fb .cvx-chip { background:var(--panel-2); }
+.cvx-index { position:static; flex:1 0 100%; display:flex; gap:4px; flex-wrap:wrap; background:none; border:0; border-top:1px solid var(--exec-border); border-radius:0; padding:8px 0 0; margin:2px 0 0; backdrop-filter:none; }
+.cvx-index button { border-radius:999px; padding:4px 13px; font-size:12px; font-weight:600; color:var(--text-2); background:var(--panel-2); border:1px solid var(--border); }
+.cvx-index button:hover { background:var(--teal-050); color:var(--teal-deep); border-color:#cfe5ee; }
+
+/* Seções */
+.cvx-sec { margin-top:0; padding-top:0; }
+.cvx-sec .xsec { margin-top:28px; }
+.cvx-sec:first-child .xsec { margin-top:6px; }
+
+/* Cartões premium */
+.cvx-card, .cvx-sec .cvx-card { background:var(--exec-card); border:1px solid var(--exec-border); border-radius:14px; box-shadow:var(--exec-shadow); padding:18px 22px; margin-bottom:14px; }
+.cvx-ch h2, .cvx-ch .cvx-h3, .cvx-h2s { font-size:14.5px; font-weight:650; color:var(--text); letter-spacing:-.1px; }
+.cvx-ch p { font-size:11.5px; color:var(--muted-2); font-weight:500; }
+.cvx-dh { color:var(--text); font-size:13px; }
+.cvx-total small { font-size:9.5px; font-weight:700; letter-spacing:.06em; color:var(--muted); }
+.cvx-total b { font-size:14.5px; font-weight:800; color:var(--text); }
+.cvx-note { color:var(--muted); }
+
+/* Controles */
+.cvx-seg-ctl { border:0; background:var(--panel-2); border-radius:9px; padding:3px; gap:2px; border:1px solid var(--border); }
+.cvx-seg-ctl button { border:0 !important; border-radius:7px; background:none; color:var(--text-2); padding:5px 12px; }
+.cvx-seg-ctl button.on { background:#fff; color:var(--teal-deep); box-shadow:var(--shadow-xs); }
+.cvx-fld select, .cvx-fld input { border:1px solid var(--border); background:var(--panel-2); border-radius:8px; }
+.cvx-insight { background:var(--panel-2); border:1px solid var(--exec-border); border-left:3px solid var(--teal); border-radius:10px; }
+.cvx-insight:hover { background:var(--teal-050); }
+.cvx-pills button.on { background:var(--teal-deep); border-color:var(--teal-deep); }
+
+/* Ranking de vendedores no padrão do ranking executivo */
+.cvx-vrow { padding:11px 8px; border-radius:10px; border-bottom:0; gap:14px; font-size:13.5px; }
+.cvx-vrow + .cvx-vrow { border-top:1px solid #eef2f7; }
+.cvx-vrow.head { padding:0 8px 9px; font-size:10.5px; font-weight:700; letter-spacing:.5px; color:var(--muted); border-top:0 !important; }
+.cvx-vrow:not(.head):hover { background:#f3f8fb; }
+.cvx-vrow.on { background:var(--teal-050); box-shadow:inset 3px 0 0 var(--teal); }
+.cvx-vrow .rk { width:24px; height:24px; border-radius:8px; display:grid; place-items:center; font-size:11.5px; font-weight:800; background:#e4eef4; color:var(--teal-deep); }
+.cvx-vrow.head + .cvx-vrow .rk { background:linear-gradient(135deg,#0b6c8c,#1aa5c4); color:#fff; box-shadow:0 2px 7px rgba(11,79,111,.32); }
+.cvx-vrow .nm { font-size:13.5px; font-weight:640; }
+.cvx-vrow .n { font-weight:650; font-variant-numeric:tabular-nums; }
+.cvx-vrow .n.g { color:var(--pos); } .cvx-vrow .n.p { color:#3f88b5; } .cvx-vrow .n.a { color:var(--teal); }
+.cvx-vrow .tr, .cvx-wr .tr { height:11px; background:#edf2f8; box-shadow:inset 0 1px 2px rgba(18,38,63,.05); border-radius:999px; }
+.cvx-vrow .tr i, .cvx-wr .tr i { border-radius:999px; min-width:4px; }
+.cvx-vrow .tr em { background:var(--text); opacity:.55; }
+.cvx-vrow .wr b { font-weight:750; }
+.cvx-wr b.pos { color:var(--pos); } .cvx-wr b.neg { color:var(--neg); }
+
+/* Tabelas, Pareto e barras */
+.cvx-tbl th, .cvx-mini-tbl th, .cvx-prow.head { font-size:10.5px; letter-spacing:.5px; color:var(--muted); }
+.cvx-tbl td, .cvx-mini-tbl td { border-bottom:1px solid #eef2f7; }
+.cvx-tbl tbody tr:hover td { background:#f3f8fb; }
+.cvx-prow, .cvx-bb { font-size:13px; }
+.cvx-prow { border-bottom:1px solid #eef2f7; }
+.cvx-prow .bar, .cvx-bb .bar { height:11px; background:#edf2f8; border-radius:999px; box-shadow:inset 0 1px 2px rgba(18,38,63,.05); }
+.cvx-stackbar { background:#edf2f8; border-radius:10px; }
+.cvx-alert { background:var(--warn-bg); border-color:#ecd9a8; }
+.cvx-drawer .cvx-dcmp { background:var(--panel-2); }
+.cvx-skel .skel { border-radius:14px; }
+
+/* Evolução: nota abaixo do gráfico */
+.cvx-trend .cvx-note { margin:8px 0 0; }
+
+/* Busca da base de propostas no padrão da Visão Executiva */
+.cvx-basebar.filterbar { position:static; border:1px solid var(--exec-border); border-radius:12px; padding:9px 12px; margin-bottom:12px; background:var(--panel); }
+.cvx-basebar .flt-search { min-width:260px; }
+.cvx-basebar .cv-cols { margin-left:auto; }
+
+/* Valor por unidade: valor sem quebrar de linha */
+.cvx-bb.v { grid-template-columns:minmax(110px,1fr) 2.2fr minmax(104px,auto); }
+.cvx-bb.v b { white-space:nowrap; }
+.cvx-bb .bar.stack { display:flex; overflow:hidden; }
+.cvx-bb .bar.stack i { display:block; height:100%; }
+
+/* Ranking de valor por unidade (padrão do ranking executivo) */
+.cvx-rk .rank-head, .cvx-rk .rank-row { cursor:default; }
+.cvx-rk .rank-head .r, .cvx-rk .rank-val, .cvx-rk .rank-share { text-align:right; }
+.cvx-rk .rank-row { padding:12px 8px; }
+.cvx-rk .rank-track { height:16px; background:#edf2f8; display:block; width:100%; }
+.cvx-rk .cvx-stk { display:flex; height:100%; min-width:6px; border-radius:999px; overflow:hidden; }
+.cvx-rk .cvx-stk i { display:block; height:100%; }
+.cvx-rk .rank-barwrap { display:block; }
+.cvx-rk + .cvx-leg { margin-top:12px; }
+
+/* Listas longas: 10 linhas visíveis, o restante na rolagem (cabeçalho fixo) */
+.cvx-scroll10 { max-height:520px; overflow-y:auto; padding-right:6px; }
+.cvx-scroll10::-webkit-scrollbar { width:8px; }
+.cvx-scroll10::-webkit-scrollbar-thumb { background:#d7dfea; border-radius:999px; }
+.cvx-scroll10::-webkit-scrollbar-track { background:transparent; }
+.cvx-vlist.cvx-scroll10 { max-height:560px; }
+.cvx-vlist.cvx-scroll10 .cvx-vrow.head { position:sticky; top:0; background:#fff; z-index:2; }
+.cv-tw.cvx-scroll10 { max-height:566px; overflow:auto; } /* cabeçalho + 10 linhas inteiras; a 11ª aparece só na rolagem */
+.cv-tw.cvx-scroll10 .cvx-tbl thead th { position:sticky; top:0; background:#fff; z-index:2; box-shadow:0 1px 0 var(--exec-border); }
+
+/* Âncoras: o cvIr mede a barra fixa real; esta margem é só o fallback (link direto #id, sem JS) */
+.cvx-sec { scroll-margin-top:calc(var(--topbar-h) + 120px); }
+
+/* Índice e chips compactos dentro da barra fixa: uma linha só, sem empurrar o conteúdo */
+.cvx-index { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-top:6px; }
+.cvx-index::-webkit-scrollbar { display:none; }
+.cvx-index button { flex:none; padding:3px 11px; }
+.cvx-chip { max-width:240px; white-space:nowrap; }
+.cvx-chip b, .cvx-chip button { flex:none; }
+.cvx-chip .t { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+@media (max-height: 820px) { .cvx-fb { padding:6px 16px; gap:6px; } }
+
+/* Chips ocupam só o espaço que sobra à direita dos filtros: encolhem (reticências) antes de quebrar a linha */
+.cvx-chips { flex:1 1 0; min-width:0; display:flex; flex-wrap:nowrap; align-items:center; justify-content:flex-end; gap:6px; }
+.cvx-chips .cvx-chip { flex:0 1 auto; overflow:hidden; }
+.cvx-chips .cvx-chip.seg { flex:none; }
+.cvx-chips .cvx-chip .t { flex:0 1 auto; }
+.cvx-chips .btn-link { flex:none; white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
+
+/* ===================== Conversão — padrão Visão Executiva (final) =====================
+   Bloco único que fecha o acabamento da aba: o que está aqui prevalece sobre as camadas anteriores. */
+
+/* Relatório e painel do vendedor ficam fora do .cvx: recebem os mesmos tokens (sem eles o cabeçalho e o
+   cartão da taxa do relatório ficavam sem fundo, com texto branco sobre branco) */
+.rpt, .cvx-drawer { --cx-navy:var(--primary); --cx-blue:var(--teal-deep); --cx-sky:var(--teal); --cx-bg:var(--panel-2); --cx-text:var(--text);
+       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--neg); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
+       color:var(--text); font-variant-numeric:tabular-nums; }
+
+/* Botões herdam a fonte da página (só família e algarismos: os tamanhos de cada botão continuam valendo) */
+.cvx button, .cvx-drawer button, .rpt button { font-family:inherit; font-variant-numeric:inherit; }
+
+/* Gráficos: SVG na largura toda e legenda abaixo (o .chart-body global é flex em linha) */
+.cvx .chart-body, .cvx-drawer .chart-body, .rpt .chart-body { display:block; min-height:0; }
+.cvx .chart-body > svg, .cvx-drawer .chart-body > svg, .rpt .chart-body > svg { display:block; width:100%; height:auto; }
+.chart-body > .cvx-leg { margin-top:10px; }
+
+/* Evolução anual: sem rolagem, largura total, legenda por ano acima do gráfico */
+.cvx-anual, .cvx-anual.chart-body { max-height:none; overflow:visible; padding:0; }
+.cvx-anual svg { min-width:0; }
+.cvx-anual .cvx-leg.top { display:flex; justify-content:flex-start; position:static; gap:6px 28px; font-size:14px; font-weight:600; color:var(--text-2); margin:2px 0 10px 4px; }
+.cvx-anual .cvx-leg.top b { color:var(--text); }
+.cvx-anual .cvx-leg.top .cvx-ln { width:30px; border-top-width:4px; border-top-style:solid; border-radius:2px; vertical-align:4px; margin-right:8px; }
+.cvx-anual .cvx-leg.top .cvx-ln.dash { border-top-style:dashed; border-radius:0; }
+.cvx-anual .cvx-leg.top .cvx-ln.dash.dot { border-top-style:dotted; }
+.cvx-leg-aviso { font-size:12px; font-weight:500; color:var(--muted); }
+/* Item "mês em andamento" da legenda: nota secundária, não compete com os anos */
+.cvx-anual .cvx-leg.top span:has(> .cvx-pt) { font-size:12.5px; font-weight:500; color:var(--muted); }
+.cvx-ln { border-top-color:var(--teal); }
+.cvx-ln.dash { border-top-style:dashed; border-top-color:var(--muted-2); }
+
+/* Resumo: grade 3×2 (Taxa em destaque + 5 indicadores), valores e rótulos sem corte */
+.cvx-kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px; margin-bottom:12px; }
+.cvx-kpi { position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-start; gap:3px; min-width:0; container-type:inline-size;
+           background:var(--exec-card); border:1px solid var(--exec-border); border-radius:14px; box-shadow:var(--exec-shadow); padding:16px 18px 14px;
+           transition:box-shadow .16s ease, transform .16s ease; }
+.cvx-kpi:hover { box-shadow:var(--exec-shadow-hover); transform:translateY(-2px); }
+.cvx-kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--kc,var(--teal)); opacity:.95; }
+.cvx-kpi.main { grid-column:auto; }
+.cvx-kpi.main .cvx-delta { margin-top:4px; }
+.cvx-kpi .cvx-lab { font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted); opacity:1; white-space:normal; line-height:1.25; }
+.cvx-num { font-size:clamp(19px, 12cqi, 26px); font-weight:800; letter-spacing:-.8px; line-height:1.1; margin:3px 0 1px; color:var(--text); white-space:nowrap; }
+.cvx-num.big { font-size:clamp(26px, 15cqi, 34px); }
+.cvx-ksub { font-size:12px; line-height:1.35; color:var(--muted); }
+.cvx-kdelta, .cvx-delta { font-size:12px; font-weight:650; }
+.cvx-kdelta { margin-top:5px; color:var(--muted); }
+.cvx-kdelta.pos, .cvx-delta.pos { color:var(--pos); }
+.cvx-kdelta.neg, .cvx-delta.neg { color:var(--neg); }
+.cvx-kdelta.neu, .cvx-delta.neu { color:var(--muted); }
+.cvx-second { display:flex; flex-wrap:wrap; gap:6px 26px; font-size:12px; color:var(--muted); margin:0 2px 12px; }
+.cvx-second b { color:var(--text); font-weight:700; margin-left:4px; }
+@media (max-width: 720px) {
+    .cvx-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .cvx-kpi.main, .cvx-kpi:last-child { grid-column:span 2; }
+}
+@media (max-width: 460px) {
+    .cvx-kpis { grid-template-columns:minmax(0,1fr); }
+    .cvx-kpi.main, .cvx-kpi:last-child { grid-column:auto; }
+}
+
+/* Composição das propostas: barra 100% chapada, rótulo de % e valor em cada segmento */
+.cvx-stackbar.tall { height:52px; gap:2px; border-radius:10px; overflow:hidden; background:#edf2f8; }
+.cvx-stackbar.tall .cvx-seg { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border-radius:0; box-shadow:none; line-height:1.15; transition:filter .14s ease, opacity .14s ease; }
+.cvx-stackbar.tall .cvx-seg:hover { transform:none; box-shadow:none; filter:brightness(1.06); }
+.cvx-stackbar.tall .cvx-seg.on { box-shadow:inset 0 0 0 2px #fff; }
+.cvx-stackbar.tall .cvx-seg .t { font-size:15px; font-weight:800; letter-spacing:-.2px; }
+.cvx-stackbar.tall .cvx-seg .v { font-size:11.5px; font-weight:600; opacity:.92; }
+/* Segmento estreito (tela pequena): o rótulo encolhe ou sai em vez de ser cortado; o detalhe segue no title e na legenda */
+.cvx-stackbar.tall .cvx-seg { container-type:inline-size; min-width:0; overflow:hidden; white-space:nowrap; }
+@container (max-width: 78px) { .cvx-stackbar.tall .cvx-seg .v { display:none; } }
+@container (max-width: 52px) { .cvx-stackbar.tall .cvx-seg .t { font-size:12px; letter-spacing:-.3px; } }
+@container (max-width: 40px) { .cvx-stackbar.tall .cvx-seg .t { display:none; } }
+.cvx-seg.g, .cvx-seg.a { color:#fff; }
+.cvx-seg.n { color:#172B43; }
+.cvx-seg.p { color:#fff; text-shadow:0 1px 2px rgba(11,42,69,.35); }
+/* Legenda em cartões: a cor do status fica só na faixa lateral */
+.cvx-lgd { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-top:16px; }
+.cvx-lg { position:relative; display:grid; grid-template-columns:auto 1fr; column-gap:10px; align-items:baseline; text-align:left; background:var(--panel-2); border:1px solid var(--exec-border); border-radius:12px; padding:12px 14px 12px 18px; cursor:pointer; overflow:hidden; font:inherit; color:inherit; transition:background .14s ease, box-shadow .14s ease; }
+.cvx-lg::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--lc); }
+.cvx-lg:hover { background:#fff; box-shadow:var(--exec-shadow); }
+.cvx-lg.on { background:var(--teal-050); border-color:#bcdde8; }
+.cvx-lg i { display:none; }
+.cvx-lg .n { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); grid-column:1; }
+.cvx-lg b { grid-column:2; justify-self:end; font-size:18px; font-weight:800; letter-spacing:-.4px; color:var(--text); }
+.cvx-lg .p { grid-column:1 / -1; font-size:12px; color:var(--muted); margin-top:2px; }
+.cvx-lg .m { grid-column:1 / -1; font-size:14px; font-weight:700; color:var(--text); margin-top:2px; }
+
+/* Barras de taxa (ranking e tabelas de unidade): cor chapada da taxa de conversão */
+.cvx-vrow .tr i, .cvx-wr .tr i { background:#12355B; }
+.cvx-vrow .tr em { box-shadow:0 0 0 1px rgba(255,255,255,.9); }
+/* "Não calculável" cabe na coluna sem estourar a grade */
+.cvx-wr { grid-template-columns:minmax(80px,1fr) minmax(56px,auto); }
+.cvx-vrow .wr { grid-template-columns:1fr minmax(56px,auto); }
+.cvx-wr b, .cvx-vrow .wr b { white-space:nowrap; }
+.cvx-na, .cvx-wr b.cvx-na { font-weight:500; font-size:11.5px; color:var(--muted); }
+
+/* Tabelas de unidade: linha clicável; a filtrada fica marcada e as demais esmaecidas (padrão .rank-row.xf-on da Visão Executiva) */
+.cvx .cvx-tbl tbody tr { cursor:pointer; }
+.cvx .cvx-tbl tbody tr.on td { background:var(--teal-050); }
+.cvx .cvx-tbl tbody tr.on td:first-child { box-shadow:inset 3px 0 0 var(--teal); }
+.cvx .cvx-tbl tbody tr.dim td { opacity:.55; }
+.cvx .cvx-tbl tbody tr.dim:hover td { opacity:.85; }
+
+/* Valor por unidade: barra com largura legível, nome com reticências, valor sem quebra */
+.cvx-rk .rank-head, .cvx-rk .rank-row { grid-template-columns:24px minmax(80px,150px) minmax(110px,1fr) 96px 46px; gap:10px; }
+.cvx-rk .rank-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cvx-rk .rank-val { white-space:nowrap; }
+.cvx-two { align-items:start; } /* lado a lado, o cartão com menos unidades não estica em branco */
+@media (max-width: 1500px) { .cvx-two { grid-template-columns:1fr; } }
+
+/* Base: os painéis dos filtros abrem por cima do cartão (a tabela rola no .table-wrap) */
+#base .cvx-card { overflow:visible; }
+
+/* Painel do vendedor: cartões no padrão KPI executivo */
+.cvx-dkpis > div { position:relative; overflow:hidden; display:flex; flex-direction:column; gap:3px; min-width:0; background:var(--exec-card); border:1px solid var(--exec-border); border-radius:14px; box-shadow:var(--exec-shadow); padding:14px 16px 12px 18px; }
+.cvx-dkpis > div::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--grad-teal); }
+.cvx-dkpis small { font-size:11px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); }
+.cvx-dkpis b { font-size:24px; font-weight:800; letter-spacing:-.6px; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cvx-dkpis span { font-size:12px; color:var(--muted); }
+
+/* Cores semânticas: ganho verde, perda laranja, aberto azul, neutro cinza */
+.cv-badge.g { background:var(--pos-bg); color:var(--pos); }
+.cv-badge.p { background:#e6f2fa; color:#2f6f99; }
+.cv-badge.a { background:var(--teal-050); color:var(--teal-deep); }
+.cv-badge.n { background:var(--panel-2); color:var(--muted); border:1px solid var(--border); }
+.cvx-insight.static { border-left-color:#6FB3DC; }
+
+/* Aviso de leitura falha: acima de tudo, com ação de tentar de novo */
+.cvx-alert.erro { background:var(--orange-bg); border-color:#f0c9a8; color:#8a4a10; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.cvx-alert.erro .btn-link { margin-left:auto; }
+
+/* Relatório: tabelas compactas, sem quebrar nome nem cortar colunas */
+.rpt .cvx-mini-tbl { font-size:10.5px; }
+.rpt .cvx-mini-tbl th { font-size:9.5px; }
+.rpt .cvx-mini-tbl th, .rpt .cvx-mini-tbl td { padding:4px 6px; }
+.rpt .cvx-mini-tbl td { white-space:nowrap; }
+.rpt .cvx-prow { grid-template-columns:146px minmax(32px,1fr) 60px 78px 64px; gap:6px; padding:5px 4px; font-size:11px; }
+.rpt .cvx-prow.head { font-size:8.5px; letter-spacing:0; }
+.rpt .cvx-prow .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Relatório: os mesmos 6 KPIs da tela, numa linha compacta (taxa em destaque) */
+.rpt .cvx-kpis { grid-template-columns:1.25fr repeat(5,minmax(0,1fr)); gap:8px; margin-bottom:6px; }
+.rpt .cvx-kpi.main, .rpt .cvx-kpi:last-child { grid-column:auto; }
+.rpt .cvx-kpi { padding:10px 11px; box-shadow:none; transform:none; }
+.rpt .cvx-num { font-size:20px; }
+.rpt .cvx-num.big { font-size:28px; }
+.rpt .cvx-second { margin:0; font-size:11px; }
+/* Cabeçalho claro, no estilo page-head */
+.rpt-head { background:#fff; color:var(--text); border:0; border-bottom:2px solid var(--primary); border-radius:0; padding:2px 0 8px; }
+.rpt-head.slim { padding:2px 0 6px; }
+.rpt-head .cvx-title { color:var(--primary); }
+.rpt-head .cvx-sub, .rpt-head .rpt-meta { color:var(--muted); }
+.rpt-head > div:first-child { flex:0 0 auto; white-space:nowrap; }
+.rpt .cvx-kpi .cvx-lab { font-size:9.5px; letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rpt .cvx-ksub { font-size:10.5px; }
+/* Barras do relatório: colunas fixas para a marca da taxa do recorte alinhar em todas as linhas */
+.rpt .cvx-bb { grid-template-columns:minmax(110px,1fr) 2fr 52px 96px; font-size:12px; }
+.rpt .cvx-seg { font-size:11px; padding:0 2px; letter-spacing:0; white-space:nowrap; overflow:hidden; }
+
+/* ===================== Conversão — polimento visual (rodada 1) ===================== */
+/* Tabelas de BU: duas linhas por unidade — em cima nome, taxa e valores; embaixo as barras, todas partindo do zero */
+.cvx-utbl th { white-space:nowrap; }
+.cvx-utbl td { vertical-align:top; line-height:18px; padding:9px 10px 10px; font-variant-numeric:tabular-nums; }
+.cvx-utbl td:first-child { min-width:220px; width:30%; }
+.cvx-un { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:7px; }
+.cvx-un .nm { font-weight:650; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cvx-un b { font-weight:750; color:var(--text); white-space:nowrap; }
+.cvx-un b.pos { color:var(--pos); } .cvx-un b.neg { color:var(--neg); }
+.cvx-un b.cvx-na { font-weight:500; font-size:11.5px; color:var(--muted); }
+.cvx-utbl .tr { position:relative; display:block; height:8px; background:#edf2f8; border-radius:999px; overflow:hidden; }
+.cvx-utbl .tr i { display:block; height:100%; min-width:4px; background:#12355B; border-radius:999px; }
+.cvx-utbl td.cvx-bc { min-width:116px; }
+.cvx-utbl td.cvx-bc span { display:block; white-space:nowrap; margin-bottom:7px; }
+.cvx-utbl td.cvx-bc::after { content:""; position:absolute; left:10px; right:10px; bottom:10px; height:8px; background:#edf2f8; border-radius:999px; z-index:0; }
+.cvx-utbl td.cvx-bc::before { left:10px; top:auto; bottom:10px; height:8px; transform:none; width:calc((100% - 20px) * var(--w,0) / 100); opacity:.9; border-radius:999px; z-index:1; }
+
+/* Vendedores: o campo do mínimo tem o tamanho de um número */
+.cvx-fld input[type=number] { width:68px; text-align:right; }
+
+/* Base: a busca cede espaço para o botão de exportar caber na mesma linha */
+.cvx-basebar .flt-search { min-width:180px; width:200px; }
+.cvx-basebar > .muted { white-space:nowrap; }
+
+/* Valor por unidade: um cartão por linha (lado a lado, o de BU ficava curto, com um vazio grande embaixo) */
+#valor-unidades .cvx-two { grid-template-columns:1fr; gap:0; }
+#valor-unidades .cvx-two .cvx-card { margin-bottom:14px; }
+
+/* Qualidade: aviso de leitura em âmbar (alerta), não no vermelho de erro */
+.cvx-checks .warn { color:#8a5a12; }
+
+/* Ranking de vendedores: barra, taxa, nome e números na mesma linha de base; "x de y" fica logo abaixo da barra */
+.cvx-vrow:not(.head) { padding:10px 8px 16px; }
+.cvx-vlist.cvx-scroll10 { max-height:550px; } /* cabeçalho + 10 linhas; a 11ª aparece só como deixa da rolagem */
+.cvx-vrow .wr { position:relative; }
+.cvx-vrow .wr small { position:absolute; left:0; top:calc(100% + 1px); margin:0; line-height:14px; white-space:nowrap; }
+
+/* Ranking de vendedores em tela larga: as colunas numéricas ganham respiro e a barra da taxa não domina a linha */
+@media (min-width: 1281px) {
+    .cvx-vrow { grid-template-columns:30px minmax(184px,1.2fr) minmax(220px,2.2fr) repeat(4,minmax(62px,.45fr)) minmax(108px,.6fr); }
+}
+.cvx-vrow:not(.head) .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ===== Conversão — barras horizontais no padrão da Visão Executiva (.ibar) =====
+   Vendedores, BU, BU Intercompany, valor por unidade, perdas e o ranking de BU do
+   relatório usam o mesmo componente da "Previsão por Mercado": nome e métricas em
+   cima, barra grossa em degradê azul-petróleo embaixo, trilho claro. */
+.cvx-ibar.scroll-y { max-height:736px; overflow-y:auto; padding-right:6px; }   /* ~10 linhas */
+.cvx-ibar.cvx-static .ibar-item { cursor:default; }
+.cvx-ibar .ibar-head { flex-wrap:nowrap; row-gap:6px; }
+.cvx-ibar .ibar-name { flex:0 1 auto; min-width:70px; }
+.cvx-ibar .ibar-metrics { flex:0 0 auto; }
+.cvx-ibar .cv-amostra { align-self:center; }
+.cvx-ib-track { position:relative; }
+.cvx-ib-mk { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:#0b2a45; opacity:.55; border-radius:1px; }
+.cvx-ibm { font-size:13px; font-weight:700; color:var(--text-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cvx-ibm small { font-size:11.5px; font-weight:500; color:var(--muted); margin-left:1px; }
+.cvx-ibm.g { color:var(--pos); } .cvx-ibm.p { color:#3f88b5; } .cvx-ibm.a { color:var(--teal); }
+.cvx-ibar .ibar-val.pos { color:var(--pos); } .cvx-ibar .ibar-val.neg { color:var(--neg); }
+.cvx-ibar .ibar-val.cvx-na { font-size:12.5px; font-weight:600; color:var(--muted); }
+.cvx-ib-sub { display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:8px; }
+@media (max-width: 1180px) {
+    .cvx-ibar .ibar-head { flex-wrap:wrap; }
+    .cvx-ibar .ibar-metrics { margin-left:0; padding-left:0; flex-wrap:wrap; gap:6px 12px; width:100%; flex:1 1 100%; }
+}
+.rpt .cvx-ibar .ibar-item { padding:5px 4px 6px; }
+.rpt .cvx-ibar { --bar-h:9px; gap:0; }
+.rpt .cvx-ibar .ibar-head { margin-bottom:4px; }
+.rpt .cvx-ibar .ibar-name { font-size:11.5px; }
+.rpt .cvx-ibar .ibar-val { font-size:12px; }
+.rpt .cvx-ibar .ibar-share { font-size:10.5px; }
+.rpt .cvx-ibar .ibar-num { width:18px; height:18px; font-size:10px; border-radius:6px; }
+.rpt .cvx-ibar .ibar-fill { animation:none; }
+/* Cabeçalho dos cartões de barras: ícone + título + total à direita (como na Visão Executiva) */
+.cvx-xh { display:flex; align-items:center; gap:12px; min-width:0; }
+.cvx-xh .xcard-ico { flex:none; }
+.cvx-ch > .xcard-total { margin-left:auto; align-self:center; }
+.cvx-ch > .cvx-xt-mid { margin-left:auto; margin-right:4px; }
+.cvx-ch > .cvx-xt-mid + .cvx-seg-ctl { margin-left:0; }
+/* Métricas um pouco mais compactas para o nome da unidade caber inteiro em 1366px */
+.cvx-ibar .ibar-metrics { gap:10px; padding-left:10px; }
+.cvx-ibar .cvx-ibm { font-size:12.5px; }
+.cvx-ibar .cvx-ibm small { font-size:11px; }

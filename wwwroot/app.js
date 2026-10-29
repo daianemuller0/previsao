@@ -1,6 +1,65 @@
 // Utilitários chamados pelo Blazor via JS interop.
 window.appPrint = () => window.print();
 
+// Rolagem suave até uma seção da página Conversão, descontando a altura REAL do topo
+// fixo e da barra de filtros (que muda com chips e com a largura da tela).
+window.cvIr = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const fb = document.querySelector('.cvx-fb');
+    const tb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 60;
+    // O "top" da barra fixa já inclui o topbar (e, no modo apresentação, o cabeçalho congelado).
+    const topo = fb ? (parseFloat(getComputedStyle(fb).top) || tb) : tb;
+    const off = topo + (fb ? fb.offsetHeight : 0) + 12;
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' });
+};
+
+// Largura útil (px CSS) dos cartões de gráfico da Conversão. O Blazor usa o valor como largura do
+// viewBox, para que o texto dos gráficos SVG saia no tamanho escrito em qualquer monitor (sem crescer
+// a 1920 px nem encolher a 1366 px). Observa o contêiner do layout, que sobrevive à troca para o relatório.
+window.cvLargura = (function () {
+    let ro = null, ref = null, t = 0, ult = 0;
+    function medir() {
+        const c = document.querySelector('.cvx .cvx-sec .cvx-card');
+        if (!c) return 0;
+        const cs = getComputedStyle(c);
+        return Math.round(c.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0));
+    }
+    function avisar() {
+        clearTimeout(t);
+        t = setTimeout(() => {
+            const w = medir();
+            if (w > 0 && ref && Math.abs(w - ult) >= 16) { ult = w; ref.invokeMethodAsync('CvLargura', w).catch(() => { }); }
+        }, 150);
+    }
+    return {
+        observar(dotnet) {
+            ref = dotnet;
+            const cvx = document.querySelector('.cvx');
+            if (!cvx) return 0;
+            if (!ro) {
+                ro = new ResizeObserver(avisar);
+                ro.observe(cvx.parentElement || cvx);
+            }
+            ult = medir();
+            return ult;
+        },
+        parar() { if (ro) ro.disconnect(); ro = null; ref = null; clearTimeout(t); }
+    };
+})();
+
+// Relatório executivo (Conversão): papel A4 horizontal só enquanto o relatório está aberto.
+window.cvRelatorio = (abrir) => {
+    const id = 'cvx-page-style';
+    const antigo = document.getElementById(id);
+    if (antigo) antigo.remove();
+    if (!abrir) return;
+    const st = document.createElement('style');
+    st.id = id;
+    st.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+    document.head.appendChild(st);
+};
+
 window.appDownload = (fileName, mime, base64) => {
     const a = document.createElement('a');
     a.href = `data:${mime};base64,${base64}`;

@@ -56,7 +56,7 @@
             <thead><tr><th>Papel</th><th>Abas</th><th>Escopo de dados</th></tr></thead>
             <tbody>
                 <tr><td class="col-strong">Vendedor</td><td>Oportunidades · Visão Executiva · Follow-up</td><td>Sua carteira (a dele + as autorizadas)</td></tr>
-                <tr><td class="col-strong">Diretor</td><td>Oportunidades · Visão Executiva · Follow-up</td><td>Todos os vendedores</td></tr>
+                <tr><td class="col-strong">Diretor</td><td>Oportunidades · Visão Executiva · Conversão · Follow-up</td><td>Todos os vendedores</td></tr>
                 <tr><td class="col-strong">Controle</td><td>Oportunidades · Visão Executiva · Controle</td><td>Todos os vendedores</td></tr>
                 <tr><td class="col-strong">Gestor Aftermarket</td><td>Visão Executiva · Oportunidades · Controle · Aplicação</td><td>Todos os vendedores, só o setor AFM (nada de NB)</td></tr>
                 <tr><td class="col-strong">Administrador</td><td>Todas as abas + configurações</td><td>Todos os vendedores</td></tr>
@@ -239,7 +239,7 @@
 
     private static string LabelAba(string key) => key switch
     {
-        "executivo" => "Visão Executiva", "oportunidades" => "Oportunidades", "followup" => "Follow-up",
+        "executivo" => "Visão Executiva", "conversao" => "Conversão", "oportunidades" => "Oportunidades", "followup" => "Follow-up",
         "controle" => "Controle", "aplicacao" => "Aplicação", "listas" => "Listas", "configuracoes" => "Configurações",
         "identidade" => "Identidade", "administracao" => "Administração", _ => key,
     };
