@@ -18,14 +18,13 @@ namespace HowdenSalesForecast.Data;
 //
 // Colunas pelo mapeamento combinado (letras do Excel, configuráveis em
 // Conversao:Colunas): K vendedor · P valor US$ · T status · V BU · AD data de
-// envio (AC) · AD aplicador · AE/AF BU intercompany (AF primeiro; vazia, AE).
+// envio (AC) · AE/AF BU intercompany (AF primeiro; vazia, AE).
 // ---------------------------------------------------------------------------
 public enum ClasseProposta { Ganha, Perdida, Aberta, NaoClassificada }
 
 public sealed record PropostaConv(
     int Linha,                  // número da linha na planilha (auditoria)
     string Vendedor,            // coluna K
-    string Aplicador,           // coluna AD
     double? ValorUsd,           // null = sem valor numérico válido
     string ValorTexto,          // como veio, para auditoria
     string StatusOriginal,
@@ -214,7 +213,7 @@ public sealed class ConversaoService
             return AplicacaoService.Idx(letra);
         }
         var iVend = Col("Vendedor", "K"); var iValor = Col("ValorUsd", "P"); var iStatus = Col("Status", "T");
-        var iBu = Col("Bu", "V"); var iData = Col("DataEnvio", "AC"); var iAplic = Col("Aplicador", "AD");
+        var iBu = Col("Bu", "V"); var iData = Col("DataEnvio", "AC");
         var iBuIcAlt = Col("BuIcAlternativa", "AE"); var iBuIcPrinc = Col("BuIcPrincipal", "AF");
 
         // Linha do cabeçalho: configurada (1 = primeira) ou a primeira linha "cheia".
@@ -236,7 +235,7 @@ public sealed class ConversaoService
 
         for (var i = 0; i < cab.Length; i++)
             if (Titulo(i) != "") d.Colunas.Add(new ColunaOrigem(i, AplicacaoService.Letra(i), Titulo(i)));
-        foreach (var (rot, i) in new[] { ("Vendedor", iVend), ("Aplicador", iAplic), ("Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
+        foreach (var (rot, i) in new[] { ("Vendedor", iVend), ("Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
                                          ("Data de envio", iData), ("BU Intercompany (alternativa)", iBuIcAlt), ("BU Intercompany (principal)", iBuIcPrinc) })
         {
             d.Mapeamento.Add($"{rot}: coluna {AplicacaoService.Letra(i)} · \"{(Titulo(i) == "" ? "sem título" : Titulo(i))}\"");
@@ -271,7 +270,7 @@ public sealed class ConversaoService
             else if (data is null) d.DatasInvalidas++;
 
             var status = Cel(row, iStatus);
-            var vend = Cel(row, iVend); var aplic = Cel(row, iAplic);
+            var vend = Cel(row, iVend);
             var bu = Cel(row, iBu);
             var buIc = Cel(row, iBuIcPrinc);                      // AF primeiro; vazia/nula/espaços → AE
             if (buIc == "") buIc = Cel(row, iBuIcAlt);
@@ -284,7 +283,7 @@ public sealed class ConversaoService
             var assinatura = string.Join("\u001F", cels);
             if ((chave != "" && !vistasChave.Add(chave)) || (chave == "" && !vistasLinha.Add(assinatura))) d.Duplicadas++;
 
-            d.Propostas.Add(new PropostaConv(n + 1, vend == "" ? NaoInformado : vend, aplic == "" ? NaoInformado : aplic, valor, valorTxt, status,
+            d.Propostas.Add(new PropostaConv(n + 1, vend == "" ? NaoInformado : vend, valor, valorTxt, status,
                 Classificar(status), bu == "" ? NaoInformado : bu, buIc, data, dataTxt, chave, cels));
         }
 
