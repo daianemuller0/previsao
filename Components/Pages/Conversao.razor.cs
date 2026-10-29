@@ -25,7 +25,7 @@ public partial class Conversao : IAsyncDisposable
     private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
 
     // Um conceito, uma cor, em todas as visualizações.
-    private const string CorG = "#1f9254", CorP = "#d98324", CorA = "#007A9E", CorN = "#93a1b5";
+    private const string CorG = "#1f9254", CorP = "#8EC5E6", CorA = "#007A9E", CorN = "#93a1b5";
     // Taxa de conversão tem cor própria (azul-marinho); #007A9E fica exclusivo de Abertas.
     private const string CorTx = "#12355B";
     private static readonly ClasseProposta[] Classes =
@@ -704,17 +704,15 @@ public partial class Conversao : IAsyncDisposable
         if (totQ == 0) return Vazio("Nenhuma proposta perdida no recorte.");
         var max = Math.Max(linhas.Max(x => qtd ? x.Qtd : x.Valor), 0.0000001);
         var total = qtd ? totQ : totV;
-        var sb = new StringBuilder("<div class='cvx-pareto'>");
-        sb.Append("<div class='cvx-prow head'><span>Status no CRM</span><span></span><span class='r'>" + (qtd ? "Propostas" : "Valor") + "</span><span class='r'>Participação</span><span class='r'>Acumulado</span></div>");
-        double acum = 0;
+        var sb = new StringBuilder("<div class='ibar cvx-ibar cvx-static'>");
+        double acum = 0; var pos = 0;
         foreach (var l in linhas.Where(x => x.Qtd > 0))
         {
-            var v = qtd ? l.Qtd : l.Valor; acum += v;
-            var valorTxt = qtd ? N0(l.Qtd) : Estado(l.ComUsd, l.Conv, l.Valor);
-            var tip = $"{l.Nome}\n{N0(l.Qtd)} proposta(s) · {EstadoTip(l.ComUsd, l.Conv, l.Valor)}";
-            sb.Append($"<div class='cvx-prow' title='{EscTip(tip)}'><span class='nm'>{Esc(l.Nome)}</span>");
-            sb.Append($"<span class='bar'><i style='width:{F(v / max * 100)}%;background:{CorP}'></i></span>");
-            sb.Append($"<span class='r'><b>{Esc(valorTxt)}</b></span><span class='r'>{Esc(PctDe(v, total))}</span><span class='r muted'>{Esc(PctDe(acum, total))}</span></div>");
+            var v = qtd ? l.Qtd : l.Valor; acum += v; pos++;
+            var valorTxt = qtd ? N0(l.Qtd) + " propostas" : Estado(l.ComUsd, l.Conv, l.Valor);
+            var tip = $"{l.Nome}\n{N0(l.Qtd)} proposta(s) · {EstadoTip(l.ComUsd, l.Conv, l.Valor)}\nAcumulado: {PctDe(acum, total)}";
+            sb.Append(IbarItem(pos, l.Nome, Esc(valorTxt), Esc(PctDe(v, total)), v / max * 100, tip,
+                extra: $"<span class='cvx-ibm' title='Participação acumulada (Pareto)'>{Esc(PctDe(acum, total))} <small>acumulado</small></span><span class='ibar-sep'></span>"));
         }
         sb.Append("</div>");
         var zeros = linhas.Where(x => x.Qtd == 0).Select(x => x.Nome).ToList();
@@ -758,15 +756,36 @@ public partial class Conversao : IAsyncDisposable
             .OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(max).ToList();
         var fora = grupos.Count - l.Count;
         if (l.Count == 0) return Vazio($"Nenhuma unidade com {minDec}+ propostas decididas.");
-        var media = F(_r.TaxaQtd ?? 0);
-        var sb = new StringBuilder("<div class='cvx-bubars'>");
+        var sb = new StringBuilder("<div class='ibar cvx-ibar cvx-static'>");
+        var pos = 0;
         foreach (var (nome, r) in l)
-            sb.Append($"<div class='cvx-bb' title='{EscTip($"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas")}'><span class='nm'>{Esc(nome)}</span>"
-                + $"<span class='bar' style='position:relative;overflow:visible'><i style='width:{F(r.TaxaQtd!.Value)}%;background:{CorTx}'></i>"
-                + $"<em style='position:absolute;left:{media}%;top:-3px;bottom:-3px;width:2px;background:#3b4a61'></em></span>"
-                + $"<b>{Esc(P1(r.TaxaQtd.Value))}</b><small>{N0(r.Decididas)} decididas</small></div>");
+        {
+            pos++;
+            sb.Append(IbarItem(pos, nome, Esc(P1(r.TaxaQtd!.Value)), $"{N0(r.Decididas)} decididas", r.TaxaQtd.Value,
+                $"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas", marca: _r.TaxaQtd));
+        }
         sb.Append("</div>");
         if (fora > 0) sb.Append($"<p class='rpt-small'>{fora} unidade(s) com menos de {minDec} decididas ou além das {max} primeiras não aparecem.</p>");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Uma linha de barra horizontal no padrão da Visão Executiva (.ibar): posição, nome e métricas
+    /// em cima, barra grossa embaixo. <paramref name="largura"/> em % (0–100); <paramref name="marca"/>
+    /// desenha a linha vertical de referência (média) sobre a barra.
+    /// </summary>
+    private static string IbarItem(int pos, string nome, string valorHtml, string shareHtml, double largura, string tip,
+                                   string extra = "", string sub = "", double? marca = null)
+    {
+        var w = double.IsFinite(largura) ? Math.Clamp(largura, 0, 100) : 0;
+        var sb = new StringBuilder($"<div class='ibar-item{(pos is >= 1 and <= 3 ? $" top{pos}" : "")}' title='{EscTip(tip)}'><div class='ibar-head'>");
+        if (pos > 0) sb.Append($"<span class='ibar-num'>{pos}</span>");
+        sb.Append($"<span class='ibar-name'>{Esc(nome)}</span><span class='ibar-metrics'>{extra}<span class='ibar-val'>{valorHtml}</span><span class='ibar-share'>{shareHtml}</span></span></div>");
+        sb.Append($"<div class='ibar-track cvx-ib-track'><span class='ibar-fill' style='width:{F(w)}%'></span>");
+        if (marca is { } m) sb.Append($"<em class='cvx-ib-mk' style='left:{F(Math.Clamp(m, 0, 100))}%'></em>");
+        sb.Append("</div>");
+        if (sub != "") sb.Append($"<div class='cvx-ib-sub'>{sub}</div>");
+        sb.Append("</div>");
         return sb.ToString();
     }
 
@@ -802,21 +821,17 @@ public partial class Conversao : IAsyncDisposable
         var semConv = grupos.Count(x => x.R.TotComUsd > 0 && x.R.TotConv == 0);
         if (l.Count == 0) return Vazio(semConv > 0 ? "Valores por unidade não convertidos: falta a taxa USD/BRL do ano." : "Sem valores convertidos por unidade no recorte.");
         var max = Math.Max(l.Max(x => x.R.VTotal), 0.0000001);
-        var sb = new StringBuilder("<div class='rank cvx-rk'>");
-        sb.Append("<div class='rank-head'><span></span><span>Unidade</span><span>Ganho · perdido · aberto</span><span class='r'>Valor total</span><span class='r'>Part.</span></div>");
+        var sb = new StringBuilder("<div class='ibar cvx-ibar cvx-static scroll-y'>");
         var pos = 0;
         foreach (var (nome, r) in l)
         {
             pos++;
             var tip = $"{nome}\nGanho: {Din(r, ClasseProposta.Ganha)}\nPerdido: {Din(r, ClasseProposta.Perdida)}\nAberto: {Din(r, ClasseProposta.Aberta)}";
-            sb.Append($"<div class='rank-row{(pos == 1 ? " top1" : pos == 2 ? " top2" : pos == 3 ? " top3" : "")}' title='{EscTip(tip)}'>");
-            sb.Append($"<span class='rank-num'>{pos}</span><span class='rank-name'>{Esc(nome)}</span>");
-            sb.Append($"<span class='rank-barwrap'><span class='rank-track'><span class='cvx-stk' style='width:{F(r.VTotal / max * 100)}%'>");
-            foreach (var cl in Classes) if (r.Val(cl) > 0) sb.Append($"<i style='flex:{F(r.Val(cl))};background:{Cor(cl)}'></i>");
-            sb.Append($"</span></span></span><span class='rank-val' title='{EscTip(DinTotalTip(r))}'>{Esc(DinTotal(r))}</span><span class='rank-share'>{Esc(PctDe(r.VTotal, soma))}</span></div>");
+            var det = $"<span class='cvx-ibm g' title='Valor ganho'>{Esc(Din(r, ClasseProposta.Ganha))} <small>ganho</small></span>"
+                    + $"<span class='cvx-ibm p' title='Valor perdido'>{Esc(Din(r, ClasseProposta.Perdida))} <small>perdido</small></span>"
+                    + $"<span class='cvx-ibm a' title='Valor em aberto'>{Esc(Din(r, ClasseProposta.Aberta))} <small>aberto</small></span>";
+            sb.Append(IbarItem(pos, nome, Esc(DinTotal(r)), Esc(PctDe(r.VTotal, soma)), r.VTotal / max * 100, tip, sub: det));
         }
-        sb.Append("</div><div class='cvx-leg'>");
-        foreach (var cl in Classes) if (cl != ClasseProposta.NaoClassificada || l.Any(x => x.R.VNC > 0)) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(cl)}'></i>{NomeEn(cl)}</span>");
         sb.Append("</div>");
         if (semConv > 0) sb.Append($"<p class='cvx-note'>{semConv} unidade(s) com valor em US$ sem taxa de câmbio não aparecem.</p>");
         if (todos.Count > 10) sb.Append($"<p class='cvx-note'>Top 10 de {todos.Count} unidades; participação sobre o total do recorte.</p>");

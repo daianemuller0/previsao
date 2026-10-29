@@ -2317,7 +2317,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 
 /* ===== Conversão — mesma linguagem visual da Visão Executiva ===== */
 .cvx { --cx-navy:var(--primary); --cx-blue:var(--teal-deep); --cx-sky:var(--teal); --cx-bg:var(--panel-2); --cx-text:var(--text);
-       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--orange); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
+       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--neg); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
        font-family:var(--font); max-width:none; margin:0; }
 .cvx .page-head h1 { color:var(--primary); }
 .cvx .page-head .subtitle { line-height:1.5; }
@@ -2362,12 +2362,12 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-vrow.head + .cvx-vrow .rk { background:linear-gradient(135deg,#0b6c8c,#1aa5c4); color:#fff; box-shadow:0 2px 7px rgba(11,79,111,.32); }
 .cvx-vrow .nm { font-size:13.5px; font-weight:640; }
 .cvx-vrow .n { font-weight:650; font-variant-numeric:tabular-nums; }
-.cvx-vrow .n.g { color:var(--pos); } .cvx-vrow .n.p { color:var(--orange); } .cvx-vrow .n.a { color:var(--teal); }
+.cvx-vrow .n.g { color:var(--pos); } .cvx-vrow .n.p { color:#3f88b5; } .cvx-vrow .n.a { color:var(--teal); }
 .cvx-vrow .tr, .cvx-wr .tr { height:11px; background:#edf2f8; box-shadow:inset 0 1px 2px rgba(18,38,63,.05); border-radius:999px; }
 .cvx-vrow .tr i, .cvx-wr .tr i { border-radius:999px; min-width:4px; }
 .cvx-vrow .tr em { background:var(--text); opacity:.55; }
 .cvx-vrow .wr b { font-weight:750; }
-.cvx-wr b.pos { color:var(--pos); } .cvx-wr b.neg { color:var(--orange); }
+.cvx-wr b.pos { color:var(--pos); } .cvx-wr b.neg { color:var(--neg); }
 
 /* Tabelas, Pareto e barras */
 .cvx-tbl th, .cvx-mini-tbl th, .cvx-prow.head { font-size:10.5px; letter-spacing:.5px; color:var(--muted); }
@@ -2440,7 +2440,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 /* Relatório e painel do vendedor ficam fora do .cvx: recebem os mesmos tokens (sem eles o cabeçalho e o
    cartão da taxa do relatório ficavam sem fundo, com texto branco sobre branco) */
 .rpt, .cvx-drawer { --cx-navy:var(--primary); --cx-blue:var(--teal-deep); --cx-sky:var(--teal); --cx-bg:var(--panel-2); --cx-text:var(--text);
-       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--orange); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
+       --cx-mut:var(--muted); --cx-line:var(--exec-border); --cx-pos:var(--pos); --cx-neg:var(--neg); --cx-warn:var(--warn); --cx-neu:var(--muted-2);
        color:var(--text); font-variant-numeric:tabular-nums; }
 
 /* Botões herdam a fonte da página (só família e algarismos: os tamanhos de cada botão continuam valendo) */
@@ -2481,7 +2481,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-kdelta, .cvx-delta { font-size:12px; font-weight:650; }
 .cvx-kdelta { margin-top:5px; color:var(--muted); }
 .cvx-kdelta.pos, .cvx-delta.pos { color:var(--pos); }
-.cvx-kdelta.neg, .cvx-delta.neg { color:var(--orange); }
+.cvx-kdelta.neg, .cvx-delta.neg { color:var(--neg); }
 .cvx-kdelta.neu, .cvx-delta.neu { color:var(--muted); }
 .cvx-second { display:flex; flex-wrap:wrap; gap:6px 26px; font-size:12px; color:var(--muted); margin:0 2px 12px; }
 .cvx-second b { color:var(--text); font-weight:700; margin-left:4px; }
@@ -2555,10 +2555,10 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 
 /* Cores semânticas: ganho verde, perda laranja, aberto azul, neutro cinza */
 .cv-badge.g { background:var(--pos-bg); color:var(--pos); }
-.cv-badge.p { background:var(--orange-bg); color:#a35f12; }
+.cv-badge.p { background:#e6f2fa; color:#2f6f99; }
 .cv-badge.a { background:var(--teal-050); color:var(--teal-deep); }
 .cv-badge.n { background:var(--panel-2); color:var(--muted); border:1px solid var(--border); }
-.cvx-insight.static { border-left-color:var(--orange); }
+.cvx-insight.static { border-left-color:#8EC5E6; }
 
 /* Aviso de leitura falha: acima de tudo, com ação de tentar de novo */
 .cvx-alert.erro { background:var(--orange-bg); border-color:#f0c9a8; color:#8a4a10; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
@@ -2600,7 +2600,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-un { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:7px; }
 .cvx-un .nm { font-weight:650; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cvx-un b { font-weight:750; color:var(--text); white-space:nowrap; }
-.cvx-un b.pos { color:var(--pos); } .cvx-un b.neg { color:var(--orange); }
+.cvx-un b.pos { color:var(--pos); } .cvx-un b.neg { color:var(--neg); }
 .cvx-un b.cvx-na { font-weight:500; font-size:11.5px; color:var(--muted); }
 .cvx-utbl .tr { position:relative; display:block; height:8px; background:#edf2f8; border-radius:999px; overflow:hidden; }
 .cvx-utbl .tr i { display:block; height:100%; min-width:4px; background:#12355B; border-radius:999px; }
@@ -2634,3 +2634,37 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
     .cvx-vrow { grid-template-columns:30px minmax(184px,1.2fr) minmax(220px,2.2fr) repeat(4,minmax(62px,.45fr)) minmax(108px,.6fr); }
 }
 .cvx-vrow:not(.head) .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ===== Conversão — barras horizontais no padrão da Visão Executiva (.ibar) =====
+   Vendedores, BU, BU Intercompany, valor por unidade, perdas e o ranking de BU do
+   relatório usam o mesmo componente da "Previsão por Mercado": nome e métricas em
+   cima, barra grossa em degradê azul-petróleo embaixo, trilho claro. */
+.cvx-ibar.scroll-y { max-height:736px; overflow-y:auto; padding-right:6px; }   /* ~10 linhas */
+.cvx-ibar.cvx-static .ibar-item { cursor:default; }
+.cvx-ibar .ibar-head { flex-wrap:wrap; row-gap:6px; }
+.cvx-ibar .cv-amostra { align-self:center; }
+.cvx-ib-track { position:relative; }
+.cvx-ib-mk { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:#0b2a45; opacity:.55; border-radius:1px; }
+.cvx-ibm { font-size:13px; font-weight:700; color:var(--text-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cvx-ibm small { font-size:11.5px; font-weight:500; color:var(--muted); margin-left:1px; }
+.cvx-ibm.g { color:var(--pos); } .cvx-ibm.p { color:#3f88b5; } .cvx-ibm.a { color:var(--teal); }
+.cvx-ibar .ibar-val.pos { color:var(--pos); } .cvx-ibar .ibar-val.neg { color:var(--neg); }
+.cvx-ibar .ibar-val.cvx-na { font-size:12.5px; font-weight:600; color:var(--muted); }
+.cvx-ib-sub { display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:8px; }
+@media (max-width: 1180px) {
+    .cvx-ibar .ibar-metrics { margin-left:0; padding-left:0; flex-wrap:wrap; gap:6px 12px; width:100%; }
+}
+.rpt .cvx-ibar .ibar-item { padding:5px 4px 6px; }
+.rpt .cvx-ibar { --bar-h:9px; gap:0; }
+.rpt .cvx-ibar .ibar-head { margin-bottom:4px; }
+.rpt .cvx-ibar .ibar-name { font-size:11.5px; }
+.rpt .cvx-ibar .ibar-val { font-size:12px; }
+.rpt .cvx-ibar .ibar-share { font-size:10.5px; }
+.rpt .cvx-ibar .ibar-num { width:18px; height:18px; font-size:10px; border-radius:6px; }
+.rpt .cvx-ibar .ibar-fill { animation:none; }
+/* Cabeçalho dos cartões de barras: ícone + título + total à direita (como na Visão Executiva) */
+.cvx-xh { display:flex; align-items:center; gap:12px; min-width:0; }
+.cvx-xh .xcard-ico { flex:none; }
+.cvx-ch > .xcard-total { margin-left:auto; align-self:center; }
+.cvx-ch > .cvx-xt-mid { margin-left:auto; margin-right:4px; }
+.cvx-ch > .cvx-xt-mid + .cvx-seg-ctl { margin-left:0; }

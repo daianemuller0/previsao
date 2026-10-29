@@ -321,10 +321,14 @@ else
     private RenderFragment Vendedores() => @<section class="cvx-card">
         @{ var lista = VendLista(out var ocultos); }
         <div class="cvx-ch">
-            <div>
-                <h2>@(_taxaOk ? "Taxa de conversão por vendedor" : "Propostas por vendedor no segmento selecionado")</h2>
-                <p>Ganhas ÷ decididas · 10 vendedores por vez, role para ver os demais · a marca vertical é a média do grupo</p>
+            <div class="cvx-xh">
+                <span class="xcard-ico">@Icons.Svg("users")</span>
+                <div>
+                    <h2>@(_taxaOk ? "Taxa de conversão por vendedor" : "Propostas por vendedor no segmento selecionado")</h2>
+                    <p>@lista.Count vendedores · ganhas ÷ decididas · role para ver todos · a marca vertical é a média do grupo</p>
+                </div>
             </div>
+            @if (_taxaOk) { <span class="xcard-total"><span>Média do grupo</span><b>@TxQtdGlobal(_rx)</b></span> }
             <div class="cvx-ctrl">
                 <label class="cvx-fld">Ordenar por
                     <select @bind="_ordVend">
@@ -346,22 +350,29 @@ else
         }
         else
         {
-            <div class="cvx-vlist cvx-scroll10">
-                <div class="cvx-vrow head"><span></span><span>Vendedor</span><span>Taxa de conversão (ganhas de decididas)</span><span class="r">Ganhas</span><span class="r">Perdidas</span><span class="r">Abertas</span><span class="r">Decididas</span><span class="r">Valor ganho</span></div>
+            <div class="ibar cvx-ibar scroll-y @(_vendSel is not null ? "has-active" : "")">
                 @for (var i = 0; i < lista.Count; i++)
                 {
                     var (nome, r) = lista[i];
                     var vn = nome;
-                    <button type="button" class="cvx-vrow @(_vendSel == nome ? "on" : "")" title="Clique para ver o detalhe de @nome" @onclick="() => AbrirVendedor(vn)">
-                        <span class="rk">@(i + 1)</span>
-                        <span class="nm">@nome</span>
-                        <span class="wr">
-                            <span class="tr"><i style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></i>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em style="left:@F(gm)%" title="Média do grupo: @P1(gm)"></em> }</span>
-                            <b>@TxQtd(r)</b><small>@N0(r.G) de @N0(r.Decididas)@if (_taxaOk && r.Decididas < AmostraMinima) { <span class="cv-amostra" title="Menos de @AmostraMinima decididas: a taxa oscila muito">amostra pequena</span> }</small>
-                        </span>
-                        <span class="n g">@N0(r.G)</span><span class="n p">@N0(r.P)</span><span class="n a">@N0(r.A)</span><span class="n">@N0(r.Decididas)</span>
-                        <span class="n v" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha)</span>
-                    </button>
+                    <div class="ibar-item @(i < 3 ? $"top{i + 1}" : "") @(_vendSel == nome ? "xf-on" : "")" title="Clique para ver o detalhe de @nome" @onclick="() => AbrirVendedor(vn)">
+                        <div class="ibar-head">
+                            <span class="ibar-num">@(i + 1)</span>
+                            <span class="ibar-name">@nome</span>
+                            @if (_taxaOk && r.Decididas < AmostraMinima) { <span class="cv-amostra" title="Menos de @AmostraMinima decididas: a taxa oscila muito">amostra pequena</span> }
+                            <span class="ibar-metrics">
+                                <span class="cvx-ibm g" title="Propostas ganhas">@N0(r.G) <small>ganhas</small></span>
+                                <span class="cvx-ibm p" title="Propostas perdidas">@N0(r.P) <small>perdidas</small></span>
+                                <span class="cvx-ibm a" title="Propostas abertas">@N0(r.A) <small>abertas</small></span>
+                                <span class="ibar-sep"></span>
+                                <span class="cvx-ibm" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
+                                <span class="ibar-sep"></span>
+                                <span class="ibar-val">@TxQtd(r)</span>
+                                <span class="ibar-share" title="Ganhas de decididas">@N0(r.G)/@N0(r.Decididas)</span>
+                            </span>
+                        </div>
+                        <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do grupo: @P1(gm)"></em> }</div>
+                    </div>
                 }
             </div>
             @if (ocultos > 0) { <p class="cvx-note">@ocultos vendedor(es) com menos de @_minDec propostas decididas estão ocultos do ranking (continuam nos totais).</p> }
@@ -442,40 +453,54 @@ else
     private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string exceto) => @<div class="cvx-card">
         @{
             var lista = UnidadesOrdenadas(sel, exceto);
-            var maxV = Math.Max(lista.Select(x => Math.Max(x.R.VG, Math.Max(x.R.VP, x.R.VA))).DefaultIfEmpty(0).Max(), 0.0000001);
         }
-        <h2 class="cvx-h2s">Unidades · @lista.Count</h2>
-        <div class="cv-tw cvx-scroll10">
-            <table class="cvx-tbl cvx-utbl">
-                <thead>
-                    <tr><th title="Taxa de conversão = ganhas ÷ decididas (ganhas + perdidas)">Unidade · taxa de conversão</th><th class="r">Decididas</th><th class="r">Propostas</th><th class="r">Valor ganho</th><th class="r">Valor perdido</th><th class="r">Valor aberto</th><th class="r" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Conversão (valor)</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var (nome, r) in lista)
-                    {
-                        var un = nome;
-                        <tr class="@(filtro.Count == 0 ? "" : filtro.Contains(nome) ? "on" : "dim")" title="Clique para filtrar por esta unidade" @onclick="() => Alternar(filtro, un)">
-                            <td>
-                                <div class="cvx-un"><span class="nm">@nome</span><b class="@RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</b></div>
-                                <span class="tr"><i style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></i></span>
-                            </td>
-                            <td class="r">@N0(r.Decididas)</td>
-                            <td class="r">@N0(r.Total)</td>
-                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Ganha] > 0 ? r.VG / maxV * 100 : 0);--bc:@CorG" title="@DinTip(r, ClasseProposta.Ganha)"><span>@Din(r, ClasseProposta.Ganha)</span></td>
-                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Perdida] > 0 ? r.VP / maxV * 100 : 0);--bc:@CorP" title="@DinTip(r, ClasseProposta.Perdida)"><span>@Din(r, ClasseProposta.Perdida)</span></td>
-                            <td class="r cvx-bc" style="--w:@F(r.Conv[(int)ClasseProposta.Aberta] > 0 ? r.VA / maxV * 100 : 0);--bc:@CorA" title="@DinTip(r, ClasseProposta.Aberta)"><span>@Din(r, ClasseProposta.Aberta)</span></td>
-                            <td class="r"><b>@TxValor(r)</b></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="cvx-ch">
+            <div class="cvx-xh">
+                <span class="xcard-ico">@Icons.Svg("bar-chart")</span>
+                <div><h2>Taxa de conversão por unidade</h2><p>@lista.Count unidades · ganhas ÷ decididas · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
+            </div>
+            @if (_taxaOk) { <span class="xcard-total"><span>Média do recorte</span><b>@TxQtdGlobal(_rx)</b></span> }
         </div>
-        <p class="cvx-note">Verde: taxa pelo menos 5 p.p. acima da média do recorte; laranja: 5 p.p. abaixo (só com @AmostraMinima+ decididas). Barras dos valores partem do zero, na mesma escala da tabela.</p>
+        <div class="ibar cvx-ibar scroll-y @(filtro.Count > 0 ? "has-active" : "")">
+            @{ var pos = 0; }
+            @foreach (var (nome, r) in lista)
+            {
+                pos++;
+                var un = nome;
+                <div class="ibar-item @(pos <= 3 ? $"top{pos}" : "") @(filtro.Contains(nome) ? "xf-on" : "")" title="Clique para filtrar por @nome" @onclick="() => Alternar(filtro, un)">
+                    <div class="ibar-head">
+                        <span class="ibar-num">@pos</span>
+                        <span class="ibar-name">@nome</span>
+                        <span class="ibar-metrics">
+                            <span class="cvx-ibm" title="Propostas enviadas">@N0(r.Total) <small>propostas</small></span>
+                            <span class="cvx-ibm" title="Ganhas + perdidas">@N0(r.Decididas) <small>decididas</small></span>
+                            <span class="ibar-sep"></span>
+                            <span class="cvx-ibm g" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
+                            <span class="cvx-ibm p" title="@DinTip(r, ClasseProposta.Perdida)">@Din(r, ClasseProposta.Perdida) <small>perdido</small></span>
+                            <span class="cvx-ibm a" title="@DinTip(r, ClasseProposta.Aberta)">@Din(r, ClasseProposta.Aberta) <small>aberto</small></span>
+                            <span class="ibar-sep"></span>
+                            <span class="cvx-ibm" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">@TxValor(r) <small>em valor</small></span>
+                            <span class="ibar-val @RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</span>
+                        </span>
+                    </div>
+                    <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do recorte: @P1(gm)"></em> }</div>
+                </div>
+            }
+        </div>
+        <p class="cvx-note">Taxa em verde: pelo menos 5 p.p. acima da média do recorte; em vermelho: 5 p.p. abaixo (só com @AmostraMinima+ decididas). As barras partem do zero e vão até 100%.</p>
     </div>;
 
     private RenderFragment ValorUnidades() => @<div class="cvx-two">
-        <div class="cvx-card"><h2 class="cvx-h2s">Valor por Business Unit (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))</div>
-        <div class="cvx-card"><h2 class="cvx-h2s">Valor por BU Intercompany (R$)</h2>@Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.BuIc)))</div>
+        <div class="cvx-card">
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por Business Unit</h2><p>Valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+                <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(_rx)">@DinTotal(_rx)</b></span></div>
+            @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))
+        </div>
+        <div class="cvx-card">
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+                <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(_rx)">@DinTotal(_rx)</b></span></div>
+            @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.BuIc)))
+        </div>
     </div>;
 
     private RenderFragment ValorMensal() => @<div>
@@ -500,7 +525,8 @@ else
     // ---- perdas ---------------------------------------------------------------
     private RenderFragment Perdas() => @<section class="cvx-card">
         <div class="cvx-ch">
-            <div><h2>Status das perdidas por impacto</h2><p>O status é a classificação no CRM, não a causa comercial · barras partem do zero</p></div>
+            <div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("pie")</span><div><h2>Status das perdidas por impacto</h2><p>O status é a classificação no CRM, não a causa comercial · barras partem do zero</p></div></div>
+            <span class="xcard-total cvx-xt-mid"><span>Perdidas</span><b>@(_metPerda == "qtd" ? N0(_rx.P) : Din(_rx, ClasseProposta.Perdida))</b></span>
             <div class="cvx-seg-ctl">
                 <button class="@(_metPerda == "qtd" ? "on" : "")" @onclick='() => _metPerda = "qtd"'>Quantidade</button>
                 <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>Valor financeiro</button>
