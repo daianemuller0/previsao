@@ -534,13 +534,13 @@ public partial class Conversao : IAsyncDisposable
         double? Val(int a, int m)
         {
             if (!por.TryGetValue((a, m), out var r)) return null;
-            return met == "winrate" ? (r.Decididas > 0 ? r.TaxaQtd : null) : met == "volume" ? r.Total : (r.TotConv > 0 ? r.VTotal : null);
+            return met == "winrate" ? (r.Total > 0 ? r.G * 100.0 / r.Total : null) : met == "volume" ? r.Total : (r.TotConv > 0 ? r.VTotal : null);
         }
         string Rot(double v) => met == "winrate" ? F(v) + "%" : met == "volume" ? N0((int)Math.Round(v)) : Mon(v);
         string Txt(int a, int m)
         {
             if (!por.TryGetValue((a, m), out var r)) return "sem propostas";
-            return met == "winrate" ? (r.Decididas > 0 ? $"{P1(r.TaxaQtd!.Value)} ({N0(r.G)} ganhas de {N0(r.Decididas)} decididas)" : "não calculável (sem propostas decididas)")
+            return met == "winrate" ? (r.Total > 0 ? $"{P1(r.G * 100.0 / r.Total)} ({N0(r.G)} ganhas de {N0(r.Total)} enviadas · {N0(r.P)} perdidas, {N0(r.A)} abertas)" : "sem propostas enviadas")
                  : met == "volume" ? $"{N0(r.Total)} propostas · {N0(r.G)} ganhas, {N0(r.P)} perdidas, {N0(r.A)} abertas"
                  : (r.TotConv > 0 ? $"{R(r.VTotal)} · ganho {Din(r, ClasseProposta.Ganha)}, perdido {Din(r, ClasseProposta.Perdida)}, aberto {Din(r, ClasseProposta.Aberta)}" : "valor não convertido (sem taxa de câmbio)");
         }
@@ -576,7 +576,7 @@ public partial class Conversao : IAsyncDisposable
             if (a == hoje.Year && m == hoje.Month) return true;
             if (met != "winrate") return false;
             por.TryGetValue((a, m), out var rr);
-            return rr is not null && (rr.Decididas < 5 || (rr.Total > 0 && (double)rr.A / rr.Total > .30));
+            return rr is not null && rr.Total > 0 && (double)rr.A / rr.Total > .30;
         }
         var temFraco = Enumerable.Range(1, 12).Any(m => Val(anos[0], m) is not null && Fraco(anos[0], m));
 
@@ -586,12 +586,12 @@ public partial class Conversao : IAsyncDisposable
         if (anos.Count > cores.Length)
             sb.Append($"<span class='cvx-leg-aviso'>{anos.Count} anos no recorte: de {anos[^1]} a {anos[cores.Length - 1]} na mesma cor cinza · filtre por Ano para comparar menos anos</span>");
         if (temFraco)
-            sb.Append($"<span><i class='cvx-pt' style='border-color:{cores[0]}'></i>{(met == "winrate" ? "Mês em andamento, poucas decididas ou mais de 30% abertas: o valor pode mudar" : "Mês em andamento: o valor pode mudar")}</span>");
+            sb.Append($"<span><i class='cvx-pt' style='border-color:{cores[0]}'></i>{(met == "winrate" ? "Mês em andamento ou mais de 30% das propostas ainda abertas: a taxa pode subir" : "Mês em andamento: o valor pode mudar")}</span>");
         sb.Append("</div>");
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano' preserveAspectRatio='xMidYMid meet'>");
         sb.Append($"<defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cores[0]}' stop-opacity='.18'/><stop offset='100%' stop-color='{cores[0]}' stop-opacity='0'/></linearGradient></defs>");
         // título do eixo: a unidade fica explícita (taxa, quantidade ou R$)
-        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? "Taxa de conversão (%)" : met == "volume" ? "Propostas enviadas" : "Valor (R$)")}</text>");
+        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? "Taxa de conversão (% das propostas enviadas no mês)" : met == "volume" ? "Propostas enviadas" : "Valor (R$)")}</text>");
         for (var g = 0; g <= nTicks; g++)
         {
             var v = met == "winrate" ? 25.0 * g : step * g;
