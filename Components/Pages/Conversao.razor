@@ -269,24 +269,24 @@ else
                     <h3 class="cvx-h3">Composição das propostas</h3>
                     <p>Participação de cada status no total · clique num segmento para destacá-lo no ranking, nas unidades, nos valores e nas perdas</p>
                 </div>
-                <div class="cvx-total"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
+                <div class="cvx-total" title="@(_r.NC > 0 ? $"Inclui {N0(_r.NC)} proposta(s) com status fora da lista (não classificadas), detalhadas em Qualidade dos dados." : "Ganhas + perdidas + abertas")"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
             </div>
+            @{ var baseBarra = Math.Max(_r.G + _r.P + _r.A, 1); }
             <div class="cvx-stackbar tall">
-                @foreach (var c in Classes)
+                @foreach (var c in ClassesBarra)
                 {
                     var n = _r.Qtd(c);
                     if (n == 0) { continue; }
                     var pct = Largura(n, _r.Total);
-                    <button type="button" class="cvx-seg @ClasseCss(c) @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(pct)%;background:@Cor(c)"
+                    <button type="button" class="cvx-seg @ClasseCss(c) @(_seg == c ? "on" : "") @(_seg is not null && _seg != c ? "dim" : "")" style="width:@F(n * 100.0 / baseBarra)%;background:@Cor(c)"
                             title="@($"{NomeEn(c)}: {N0(n)} ({PctDe(n, _r.Total)}) · {Din(_r, c)}\n{DefClasse(c)}")" @onclick="() => AlternarSeg(c)">
                         @if (pct >= 9) { <span class="t">@P1(pct)</span><span class="v">@Din(_r, c)</span> }
                     </button>
                 }
             </div>
             <div class="cvx-lgd">
-                @foreach (var c in Classes)
+                @foreach (var c in ClassesBarra)
                 {
-                    if (c == ClasseProposta.NaoClassificada && _r.NC == 0) { continue; }
                     <button type="button" class="cvx-lg @(_seg == c ? "on" : "")" style="--lc:@Cor(c)" title="@DinTip(_r, c)" @onclick="() => AlternarSeg(c)">
                         <i></i>
                         <span class="n">@NomeEn(c)</span>

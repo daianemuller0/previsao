@@ -30,7 +30,7 @@ public sealed record PropostaConv(
     string StatusOriginal,
     ClasseProposta Classe,
     string Bu,                  // coluna V
-    string BuIc,                // AG, senão AF, senão "Não informado"
+    string BuIc,                // AG, senão AF, senão "Não é Intercompany"
     DateTime? Data,             // coluna AD
     string DataTexto,
     string Chave,               // identificador, se a planilha tiver coluna de número da proposta
@@ -57,6 +57,8 @@ public sealed class DadosConversao
 public sealed class ConversaoService
 {
     public const string NaoInformado = "Não informado";
+    /// <summary>BU Intercompany vazia (AG e AF em branco): a proposta não é intercompany.</summary>
+    public const string NaoIntercompany = "Não é Intercompany";
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -231,7 +233,7 @@ public sealed class ConversaoService
             var bu = Cel(row, iBu);
             var buIc = Cel(row, iBuIcPrinc);                      // AG primeiro; vazia/nula/espaços → AF
             if (buIc == "") buIc = Cel(row, iBuIcAlt);
-            if (buIc == "") buIc = NaoInformado;
+            if (buIc == "") buIc = NaoIntercompany;
 
             var chave = iChave >= 0 ? Cel(row, iChave) : "";
             var cels = new string[largura];

@@ -25,7 +25,7 @@ public partial class Conversao : IAsyncDisposable
     private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
 
     // Um conceito, uma cor, em todas as visualizações.
-    private const string CorG = "#1f9254", CorP = "#8EC5E6", CorA = "#007A9E", CorN = "#93a1b5";
+    private const string CorG = "#1f9254", CorP = "#6FB3DC", CorA = "#007A9E", CorN = "#93a1b5";
     // Taxa de conversão tem cor própria (azul-marinho); #007A9E fica exclusivo de Abertas.
     private const string CorTx = "#12355B";
     private static readonly ClasseProposta[] Classes =
@@ -50,6 +50,8 @@ public partial class Conversao : IAsyncDisposable
         ClasseProposta.Aberta => "Abertas: status Open — ainda sem resultado.",
         _ => "Não classificadas: status fora da lista combinada, aguardando validação. Ficam fora de ganhas, perdidas e abertas.",
     };
+    /// <summary>Classes mostradas nas barras de composição; as não classificadas ficam só nos totais e em Qualidade dos dados.</summary>
+    private static readonly ClasseProposta[] ClassesBarra = { ClasseProposta.Ganha, ClasseProposta.Perdida, ClasseProposta.Aberta };
     private static string ClasseCss(ClasseProposta c) => c switch
     {
         ClasseProposta.Ganha => "g", ClasseProposta.Perdida => "p", ClasseProposta.Aberta => "a", _ => "n",
@@ -662,19 +664,17 @@ public partial class Conversao : IAsyncDisposable
     // ======================================================================
     private string HtmlComposicao(Resumo r)
     {
+        var baseBarra = Math.Max(r.G + r.P + r.A, 1);
         var sb = new StringBuilder("<div class='cvx-stackbar static'>");
-        foreach (var c in Classes)
+        foreach (var c in ClassesBarra)
         {
             var n = r.Qtd(c); if (n == 0) continue;
             var pct = Largura(n, r.Total);
-            sb.Append($"<span class='cvx-seg {ClasseCss(c)}' style='width:{F(pct)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {N0(n)} ({PctDe(n, r.Total)})\n{DefClasse(c)}")}'>{(pct >= 8 ? Esc(P1(pct)) : "")}</span>");
+            sb.Append($"<span class='cvx-seg {ClasseCss(c)}' style='width:{F(n * 100.0 / baseBarra)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {N0(n)} ({PctDe(n, r.Total)})\n{DefClasse(c)}")}'>{(pct >= 8 ? Esc(P1(pct)) : "")}</span>");
         }
         sb.Append("</div><div class='cvx-legend'>");
-        foreach (var c in Classes)
-        {
-            if (c == ClasseProposta.NaoClassificada && r.NC == 0) continue;
+        foreach (var c in ClassesBarra)
             sb.Append($"<span><i class='cvx-dot' style='background:{Cor(c)}'></i>{NomeEn(c)} <b>{N0(r.Qtd(c))}</b> · {PctDe(r.Qtd(c), r.Total)}</span>");
-        }
         sb.Append("</div>");
         return sb.ToString();
     }
@@ -794,17 +794,17 @@ public partial class Conversao : IAsyncDisposable
     {
         if (r.TotConv == 0) return Vazio(r.TotComUsd == 0 ? "Nenhuma proposta com valor em US$ informado." : "Valores não convertidos: falta a taxa de câmbio do ano das propostas.");
         var tot = Math.Max(r.VTotal, 0.0000001);
+        var baseBarra = Math.Max(r.VG + r.VP + r.VA, 0.0000001);
         var sb = new StringBuilder("<div class='cvx-stackbar static'>");
-        foreach (var c in Classes)
+        foreach (var c in ClassesBarra)
         {
             var v = r.Val(c); if (v <= 0) continue;
             var pct = v / tot * 100;
-            sb.Append($"<span class='cvx-seg {ClasseCss(c)}' style='width:{F(pct)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {DinTip(r, c)}")}'>{(pct >= 9 ? Esc(P1(pct)) : "")}</span>");
+            sb.Append($"<span class='cvx-seg {ClasseCss(c)}' style='width:{F(v / baseBarra * 100)}%;background:{Cor(c)}' title='{EscTip($"{NomeEn(c)}: {DinTip(r, c)}")}'>{(pct >= 9 ? Esc(P1(pct)) : "")}</span>");
         }
         sb.Append("</div><div class='cvx-legend'>");
-        foreach (var c in Classes)
+        foreach (var c in ClassesBarra)
         {
-            if (c == ClasseProposta.NaoClassificada && r.VNC <= 0) continue;
             sb.Append($"<span title='{EscTip(DinTip(r, c))}'><i class='cvx-dot' style='background:{Cor(c)}'></i>{NomeEn(c)} <b>{Esc(Din(r, c))}</b> · {PctDe(r.Val(c), r.VTotal)}</span>");
         }
         sb.Append("</div>");

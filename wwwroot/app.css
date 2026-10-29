@@ -2507,7 +2507,8 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 @container (max-width: 52px) { .cvx-stackbar.tall .cvx-seg .t { font-size:12px; letter-spacing:-.3px; } }
 @container (max-width: 40px) { .cvx-stackbar.tall .cvx-seg .t { display:none; } }
 .cvx-seg.g, .cvx-seg.a { color:#fff; }
-.cvx-seg.p, .cvx-seg.n { color:#172B43; }
+.cvx-seg.n { color:#172B43; }
+.cvx-seg.p { color:#fff; text-shadow:0 1px 2px rgba(11,42,69,.35); }
 /* Legenda em cartões: a cor do status fica só na faixa lateral */
 .cvx-lgd { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-top:16px; }
 .cvx-lg { position:relative; display:grid; grid-template-columns:auto 1fr; column-gap:10px; align-items:baseline; text-align:left; background:var(--panel-2); border:1px solid var(--exec-border); border-radius:12px; padding:12px 14px 12px 18px; cursor:pointer; overflow:hidden; font:inherit; color:inherit; transition:background .14s ease, box-shadow .14s ease; }
@@ -2558,7 +2559,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cv-badge.p { background:#e6f2fa; color:#2f6f99; }
 .cv-badge.a { background:var(--teal-050); color:var(--teal-deep); }
 .cv-badge.n { background:var(--panel-2); color:var(--muted); border:1px solid var(--border); }
-.cvx-insight.static { border-left-color:#8EC5E6; }
+.cvx-insight.static { border-left-color:#6FB3DC; }
 
 /* Aviso de leitura falha: acima de tudo, com ação de tentar de novo */
 .cvx-alert.erro { background:var(--orange-bg); border-color:#f0c9a8; color:#8a4a10; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
@@ -2641,7 +2642,9 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
    cima, barra grossa em degradê azul-petróleo embaixo, trilho claro. */
 .cvx-ibar.scroll-y { max-height:736px; overflow-y:auto; padding-right:6px; }   /* ~10 linhas */
 .cvx-ibar.cvx-static .ibar-item { cursor:default; }
-.cvx-ibar .ibar-head { flex-wrap:wrap; row-gap:6px; }
+.cvx-ibar .ibar-head { flex-wrap:nowrap; row-gap:6px; }
+.cvx-ibar .ibar-name { flex:0 1 auto; min-width:70px; }
+.cvx-ibar .ibar-metrics { flex:0 0 auto; }
 .cvx-ibar .cv-amostra { align-self:center; }
 .cvx-ib-track { position:relative; }
 .cvx-ib-mk { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:#0b2a45; opacity:.55; border-radius:1px; }
@@ -2652,7 +2655,8 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-ibar .ibar-val.cvx-na { font-size:12.5px; font-weight:600; color:var(--muted); }
 .cvx-ib-sub { display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:8px; }
 @media (max-width: 1180px) {
-    .cvx-ibar .ibar-metrics { margin-left:0; padding-left:0; flex-wrap:wrap; gap:6px 12px; width:100%; }
+    .cvx-ibar .ibar-head { flex-wrap:wrap; }
+    .cvx-ibar .ibar-metrics { margin-left:0; padding-left:0; flex-wrap:wrap; gap:6px 12px; width:100%; flex:1 1 100%; }
 }
 .rpt .cvx-ibar .ibar-item { padding:5px 4px 6px; }
 .rpt .cvx-ibar { --bar-h:9px; gap:0; }
@@ -2668,3 +2672,7 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-ch > .xcard-total { margin-left:auto; align-self:center; }
 .cvx-ch > .cvx-xt-mid { margin-left:auto; margin-right:4px; }
 .cvx-ch > .cvx-xt-mid + .cvx-seg-ctl { margin-left:0; }
+/* Métricas um pouco mais compactas para o nome da unidade caber inteiro em 1366px */
+.cvx-ibar .ibar-metrics { gap:10px; padding-left:10px; }
+.cvx-ibar .cvx-ibm { font-size:12.5px; }
+.cvx-ibar .cvx-ibm small { font-size:11px; }
