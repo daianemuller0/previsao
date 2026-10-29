@@ -71,6 +71,7 @@ else
             <MultiFilter Label="Ano" AllText="Todos" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
             <MultiFilter Label="Mês" AllText="Todos" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
             <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
+            <MultiFilter Label="Aplicador" AllText="Todos" Searchable="true" Options="OpAplicadores" Selected="_aplic" OnChanged="StateHasChanged" />
             <MultiFilter Label="BU" AllText="Todas" Options="OpBus" Selected="_bus" OnChanged="StateHasChanged" />
             <MultiFilter Label="BU Intercompany" AllText="Todas" Options="OpBuIcs" Selected="_buIcs" OnChanged="StateHasChanged" />
             <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
@@ -205,7 +206,7 @@ else
 
     private static readonly (string Id, string Titulo)[] Ancoras =
     {
-        ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "BU"),
+        ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("aplicadores", "Aplicadores"), ("unidades", "BU"),
         ("unidades-ic", "BU Intercompany"), ("valor-unidades", "Valor por unidade"), ("valor-mensal", "Valor mensal"),
         ("perdas", "Perdas"), ("base", "Base"), ("qualidade", "Qualidade"),
     };
@@ -222,6 +223,7 @@ else
         @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", ResumoGeral())
         @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio, um ano contra o outro", Evolucao())
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
+        @Secao("aplicadores", "Desempenho dos aplicadores", "Ranking por taxa de conversão · coluna Aplicador da planilha", Aplicadores())
         @Secao("unidades", "Conversão por Business Unit", "Taxa e valores por unidade de negócio · clique numa linha para filtrar", BlocoUnidades(i => i.P.Bu, _bus, "bu"))
         @Secao("unidades-ic", "Conversão por BU Intercompany", "Taxa e valores por unidade intercompany · independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "buic"))
         @Secao("valor-unidades", "Valor por unidade", "Ganho, perdido e aberto em R$, por BU e por BU Intercompany", ValorUnidades())
@@ -376,6 +378,54 @@ else
                 }
             </div>
             @if (ocultos > 0) { <p class="cvx-note">@ocultos vendedor(es) com menos de @_minDec propostas decididas estão ocultos do ranking (continuam nos totais).</p> }
+        }
+    </section>;
+
+    // ---- aplicadores: mesmo ranking, mesma ordenação e mesmo mínimo; o clique filtra o painel
+    private RenderFragment Aplicadores() => @<section class="cvx-card">
+        @{ var lista = RankLista(i => i.P.Aplicador, out var ocultos); }
+        <div class="cvx-ch">
+            <div class="cvx-xh">
+                <span class="xcard-ico">@Icons.Svg("users")</span>
+                <div>
+                    <h2>@(_taxaOk ? "Taxa de conversão por aplicador" : "Propostas por aplicador no segmento selecionado")</h2>
+                    <p>@lista.Count aplicadores · ganhas ÷ decididas · clique para filtrar o painel · ordenação e mínimo iguais aos dos vendedores</p>
+                </div>
+            </div>
+            @if (_taxaOk) { <span class="xcard-total"><span>Média do grupo</span><b>@TxQtdGlobal(_rx)</b></span> }
+        </div>
+        @if (lista.Count == 0)
+        {
+            <div class="empty" style="padding:24px">Nenhum aplicador com @_minDec ou mais propostas decididas. Reduza o mínimo no ranking de vendedores.</div>
+        }
+        else
+        {
+            <div class="ibar cvx-ibar scroll-y @(_aplic.Count > 0 ? "has-active" : "")">
+                @for (var i = 0; i < lista.Count; i++)
+                {
+                    var (nome, r) = lista[i];
+                    var an = nome;
+                    <div class="ibar-item @(i < 3 ? $"top{i + 1}" : "") @(_aplic.Contains(nome) ? "xf-on" : "")" title="Clique para filtrar por @nome" @onclick="() => Alternar(_aplic, an)">
+                        <div class="ibar-head">
+                            <span class="ibar-num">@(i + 1)</span>
+                            <span class="ibar-name">@nome</span>
+                            @if (_taxaOk && r.Decididas < AmostraMinima) { <span class="cv-amostra" title="Menos de @AmostraMinima decididas: a taxa oscila muito">amostra pequena</span> }
+                            <span class="ibar-metrics">
+                                <span class="cvx-ibm g" title="Propostas ganhas">@N0(r.G) <small>ganhas</small></span>
+                                <span class="cvx-ibm p" title="Propostas perdidas">@N0(r.P) <small>perdidas</small></span>
+                                <span class="cvx-ibm a" title="Propostas abertas">@N0(r.A) <small>abertas</small></span>
+                                <span class="ibar-sep"></span>
+                                <span class="cvx-ibm" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
+                                <span class="ibar-sep"></span>
+                                <span class="ibar-val">@TxQtd(r)</span>
+                                <span class="ibar-share" title="Ganhas de decididas">@N0(r.G)/@N0(r.Decididas)</span>
+                            </span>
+                        </div>
+                        <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do grupo: @P1(gm)"></em> }</div>
+                    </div>
+                }
+            </div>
+            @if (ocultos > 0) { <p class="cvx-note">@ocultos aplicador(es) com menos de @_minDec propostas decididas estão ocultos do ranking (continuam nos totais).</p> }
         }
     </section>;
 

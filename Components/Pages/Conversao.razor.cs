@@ -65,12 +65,12 @@ public partial class Conversao : IAsyncDisposable
 
     // ---- filtros globais --------------------------------------------------------
     private static HashSet<string> Novo() => new(StringComparer.OrdinalIgnoreCase);
-    private HashSet<string> _anos = Novo(), _meses = Novo(), _vend = Novo(), _bus = Novo(), _buIcs = Novo();
+    private HashSet<string> _anos = Novo(), _meses = Novo(), _vend = Novo(), _aplic = Novo(), _bus = Novo(), _buIcs = Novo();
     private ClasseProposta? _seg;                              // cross-filter da barra de composição
     private bool _taxaOk => _seg is null;                      // taxa de ganho só vale sem segmento
-    private int Ativos => new[] { _anos, _meses, _vend, _bus, _buIcs }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
+    private int Ativos => new[] { _anos, _meses, _vend, _aplic, _bus, _buIcs }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
     private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
-        new[] { ("Ano", _anos), ("Mês", _meses), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs) }.Where(x => x.Item2.Count > 0);
+        new[] { ("Ano", _anos), ("Mês", _meses), ("Vendedor", _vend), ("Aplicador", _aplic), ("BU", _bus), ("BU Intercompany", _buIcs) }.Where(x => x.Item2.Count > 0);
     // Largura mínima de cada chip (rótulo + "…" + ✕) e da faixa de chips: abaixo disso a faixa
     // desce para a linha de baixo, em vez de os chips se sobreporem aos filtros.
     private static string ChipTxt(HashSet<string> set) => string.Join(", ", set.Take(2)) + (set.Count > 2 ? $" +{set.Count - 2}" : "");
@@ -80,7 +80,7 @@ public partial class Conversao : IAsyncDisposable
     private static string ChipStyle(string rot, HashSet<string> set) =>
         ChipTxt(set).Length <= 4 ? "flex:none" : $"min-width:{ChipMin(rot, set)}px";
     private int ChipsMin() => ConjuntosAtivos().Sum(x => ChipMin(x.Item1, x.Item2) + 6) + (_seg is { } sg ? 64 + 8 * ("Segmento".Length + NomeEn(sg).Length) : 0) + 112;
-    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++; }
+    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _aplic.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++; }
     private int _limpezas;
     private void AlternarSeg(ClasseProposta c) => _seg = _seg == c ? null : c;
 
@@ -155,6 +155,7 @@ public partial class Conversao : IAsyncDisposable
         if (exceto != "ano" && _anos.Count > 0) q = q.Where(i => _anos.Contains(AnoTxt(i)));
         if (exceto != "mes" && _meses.Count > 0) q = q.Where(i => i.Mes is { } m && _meses.Contains(Fmt.MonthLong(m)));
         if (exceto != "vend" && _vend.Count > 0) q = q.Where(i => _vend.Contains(i.P.Vendedor));
+        if (exceto != "aplic" && _aplic.Count > 0) q = q.Where(i => _aplic.Contains(i.P.Aplicador));
         if (exceto != "bu" && _bus.Count > 0) q = q.Where(i => _bus.Contains(i.P.Bu));
         if (exceto != "buic" && _buIcs.Count > 0) q = q.Where(i => _buIcs.Contains(i.P.BuIc));
         return q;
@@ -198,6 +199,7 @@ public partial class Conversao : IAsyncDisposable
     private IEnumerable<string> OpAnos => Aplicar("ano").Select(AnoTxt).Distinct().OrderByDescending(x => x == "Sem data" ? "0" : x);
     private IEnumerable<string> OpMeses => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private IEnumerable<string> OpVendedores => Aplicar("vend").Select(i => i.P.Vendedor).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> OpAplicadores => Aplicar("aplic").Select(i => i.P.Aplicador).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBus => Aplicar("bu").Select(i => i.P.Bu).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBuIcs => Aplicar("buic").Select(i => i.P.BuIc).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
 
@@ -845,9 +847,12 @@ public partial class Conversao : IAsyncDisposable
     private int _minDec = 5;
     private string? _vendSel;
 
-    private List<(string Nome, Resumo R)> VendLista(out int ocultos)
+    private List<(string Nome, Resumo R)> VendLista(out int ocultos) => RankLista(i => i.P.Vendedor, out ocultos);
+
+    /// <summary>Ranking por pessoa (vendedor ou aplicador): mesma ordenação e mesmo mínimo de decididas.</summary>
+    private List<(string Nome, Resumo R)> RankLista(Func<Item, string> sel, out int ocultos)
     {
-        var tudo = Grupos(_fx, i => i.P.Vendedor);
+        var tudo = Grupos(_fx, sel);
         var vis = tudo.Where(x => x.R.Decididas >= _minDec || !_taxaOk).ToList();
         ocultos = tudo.Count - vis.Count;
         IEnumerable<(string Nome, Resumo R)> ord = _ordVend switch
@@ -899,6 +904,7 @@ public partial class Conversao : IAsyncDisposable
             new("ano", "Ano", "center", i => i.Ano?.ToString() ?? "—", i => i.Ano),
             new("mes", "Mês", "center", i => i.Mes is { } m ? Fmt.MonthLong(m) : "—", i => i.Mes),
             new("vend", "Vendedor", "", i => i.P.Vendedor, i => i.P.Vendedor),
+            new("aplic", "Aplicador", "", i => i.P.Aplicador, i => i.P.Aplicador),
             new("bu", "BU", "", i => i.P.Bu, i => i.P.Bu),
             new("buic", "BU Intercompany", "", i => i.P.BuIc, i => i.P.BuIc),
             new("status", "Status original", "", i => i.P.StatusOriginal == "" ? "—" : i.P.StatusOriginal, i => i.P.StatusOriginal),

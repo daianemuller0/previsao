@@ -18,20 +18,21 @@ namespace HowdenSalesForecast.Data;
 //
 // Colunas pelo mapeamento combinado (letras do Excel, configuráveis em
 // Conversao:Colunas): K vendedor · P valor US$ · T status · V BU · AD data de
-// envio · AF/AG BU intercompany (AG primeiro; vazia, AF).
+// envio (AC) · AD aplicador · AE/AF BU intercompany (AF primeiro; vazia, AE).
 // ---------------------------------------------------------------------------
 public enum ClasseProposta { Ganha, Perdida, Aberta, NaoClassificada }
 
 public sealed record PropostaConv(
     int Linha,                  // número da linha na planilha (auditoria)
-    string Vendedor,
+    string Vendedor,            // coluna K
+    string Aplicador,           // coluna AD
     double? ValorUsd,           // null = sem valor numérico válido
     string ValorTexto,          // como veio, para auditoria
     string StatusOriginal,
     ClasseProposta Classe,
     string Bu,                  // coluna V
-    string BuIc,                // AG, senão AF, senão "Não é Intercompany"
-    DateTime? Data,             // coluna AD
+    string BuIc,                // AF, senão AE, senão "Não é Intercompany"
+    DateTime? Data,             // coluna AC
     string DataTexto,
     string Chave,               // identificador, se a planilha tiver coluna de número da proposta
     string[] Celulas);          // linha original completa
@@ -57,7 +58,7 @@ public sealed class DadosConversao
 public sealed class ConversaoService
 {
     public const string NaoInformado = "Não informado";
-    /// <summary>BU Intercompany vazia (AG e AF em branco): a proposta não é intercompany.</summary>
+    /// <summary>BU Intercompany vazia (AF e AE em branco): a proposta não é intercompany.</summary>
     public const string NaoIntercompany = "Não é Intercompany";
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -213,8 +214,8 @@ public sealed class ConversaoService
             return AplicacaoService.Idx(letra);
         }
         var iVend = Col("Vendedor", "K"); var iValor = Col("ValorUsd", "P"); var iStatus = Col("Status", "T");
-        var iBu = Col("Bu", "V"); var iData = Col("DataEnvio", "AD");
-        var iBuIcAlt = Col("BuIcAlternativa", "AF"); var iBuIcPrinc = Col("BuIcPrincipal", "AG");
+        var iBu = Col("Bu", "V"); var iData = Col("DataEnvio", "AC"); var iAplic = Col("Aplicador", "AD");
+        var iBuIcAlt = Col("BuIcAlternativa", "AE"); var iBuIcPrinc = Col("BuIcPrincipal", "AF");
 
         // Linha do cabeçalho: configurada (1 = primeira) ou a primeira linha "cheia".
         static int Cheias(OpportunityImporter.Cel[] r) => r.Count(c => !string.IsNullOrWhiteSpace(c.Text));
@@ -235,7 +236,7 @@ public sealed class ConversaoService
 
         for (var i = 0; i < cab.Length; i++)
             if (Titulo(i) != "") d.Colunas.Add(new ColunaOrigem(i, AplicacaoService.Letra(i), Titulo(i)));
-        foreach (var (rot, i) in new[] { ("Vendedor", iVend), ("Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
+        foreach (var (rot, i) in new[] { ("Vendedor", iVend), ("Aplicador", iAplic), ("Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
                                          ("Data de envio", iData), ("BU Intercompany (alternativa)", iBuIcAlt), ("BU Intercompany (principal)", iBuIcPrinc) })
         {
             d.Mapeamento.Add($"{rot}: coluna {AplicacaoService.Letra(i)} · \"{(Titulo(i) == "" ? "sem título" : Titulo(i))}\"");
@@ -270,9 +271,9 @@ public sealed class ConversaoService
             else if (data is null) d.DatasInvalidas++;
 
             var status = Cel(row, iStatus);
-            var vend = Cel(row, iVend);
+            var vend = Cel(row, iVend); var aplic = Cel(row, iAplic);
             var bu = Cel(row, iBu);
-            var buIc = Cel(row, iBuIcPrinc);                      // AG primeiro; vazia/nula/espaços → AF
+            var buIc = Cel(row, iBuIcPrinc);                      // AF primeiro; vazia/nula/espaços → AE
             if (buIc == "") buIc = Cel(row, iBuIcAlt);
             if (buIc == "") buIc = NaoIntercompany;
 
@@ -283,7 +284,7 @@ public sealed class ConversaoService
             var assinatura = string.Join("\u001F", cels);
             if ((chave != "" && !vistasChave.Add(chave)) || (chave == "" && !vistasLinha.Add(assinatura))) d.Duplicadas++;
 
-            d.Propostas.Add(new PropostaConv(n + 1, vend == "" ? NaoInformado : vend, valor, valorTxt, status,
+            d.Propostas.Add(new PropostaConv(n + 1, vend == "" ? NaoInformado : vend, aplic == "" ? NaoInformado : aplic, valor, valorTxt, status,
                 Classificar(status), bu == "" ? NaoInformado : bu, buIc, data, dataTxt, chave, cels));
         }
 
