@@ -65,12 +65,13 @@ public partial class Conversao : IAsyncDisposable
 
     // ---- filtros globais --------------------------------------------------------
     private static HashSet<string> Novo() => new(StringComparer.OrdinalIgnoreCase);
-    private HashSet<string> _anos = Novo(), _meses = Novo(), _vend = Novo(), _bus = Novo(), _buIcs = Novo();
+    private HashSet<string> _anos = Novo(), _meses = Novo(), _vend = Novo(), _bus = Novo(), _buIcs = Novo(),
+        _origens = Novo(), _mercados = Novo(), _paises = Novo(), _produtos = Novo();
     private ClasseProposta? _seg;                              // cross-filter da barra de composição
     private bool _taxaOk => _seg is null;                      // taxa de ganho só vale sem segmento
-    private int Ativos => new[] { _anos, _meses, _vend, _bus, _buIcs }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
+    private int Ativos => new[] { _anos, _meses, _origens, _vend, _bus, _buIcs, _mercados, _paises, _produtos }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
     private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
-        new[] { ("Ano", _anos), ("Mês", _meses), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs) }.Where(x => x.Item2.Count > 0);
+        new[] { ("Ano", _anos), ("Mês", _meses), ("Origem", _origens), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs), ("Mercado", _mercados), ("País", _paises), ("Produto", _produtos) }.Where(x => x.Item2.Count > 0);
     // Largura mínima de cada chip (rótulo + "…" + ✕) e da faixa de chips: abaixo disso a faixa
     // desce para a linha de baixo, em vez de os chips se sobreporem aos filtros.
     private static string ChipTxt(HashSet<string> set) => string.Join(", ", set.Take(2)) + (set.Count > 2 ? $" +{set.Count - 2}" : "");
@@ -80,7 +81,7 @@ public partial class Conversao : IAsyncDisposable
     private static string ChipStyle(string rot, HashSet<string> set) =>
         ChipTxt(set).Length <= 4 ? "flex:none" : $"min-width:{ChipMin(rot, set)}px";
     private int ChipsMin() => ConjuntosAtivos().Sum(x => ChipMin(x.Item1, x.Item2) + 6) + (_seg is { } sg ? 64 + 8 * ("Segmento".Length + NomeEn(sg).Length) : 0) + 112;
-    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++; }
+    private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _origens.Clear(); _mercados.Clear(); _paises.Clear(); _produtos.Clear(); _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++; }
     private int _limpezas;
     private void AlternarSeg(ClasseProposta c) => _seg = _seg == c ? null : c;
 
@@ -141,8 +142,9 @@ public partial class Conversao : IAsyncDisposable
         _itens = Conv.Atual.Propostas.Select(p =>
         {
             int? ano = p.Data?.Year, mes = p.Data?.Month;
-            double? tx = ano is { } y && taxas.TryGetValue(y, out var t) ? t : null;
-            double? brl = p.ValorUsd is { } v && tx is { } t2 ? v * t2 : null;
+            // NB: o valor já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
+            double? tx = p.ValorBrl is null && ano is { } y && taxas.TryGetValue(y, out var t) ? t : null;
+            double? brl = p.ValorBrl ?? (p.ValorUsd is { } v && tx is { } t2 ? v * t2 : null);
             return new Item(p, ano, mes, tx, brl);
         }).ToList();
     }
@@ -157,6 +159,10 @@ public partial class Conversao : IAsyncDisposable
         if (exceto != "vend" && _vend.Count > 0) q = q.Where(i => _vend.Contains(i.P.Vendedor));
         if (exceto != "bu" && _bus.Count > 0) q = q.Where(i => _bus.Contains(i.P.Bu));
         if (exceto != "buic" && _buIcs.Count > 0) q = q.Where(i => _buIcs.Contains(i.P.BuIc));
+        if (exceto != "orig" && _origens.Count > 0) q = q.Where(i => _origens.Contains(i.P.Origem));
+        if (exceto != "merc" && _mercados.Count > 0) q = q.Where(i => _mercados.Contains(i.P.Mercado));
+        if (exceto != "pais" && _paises.Count > 0) q = q.Where(i => _paises.Contains(i.P.Pais));
+        if (exceto != "prod" && _produtos.Count > 0) q = q.Where(i => _produtos.Contains(i.P.Produto));
         return q;
     }
 
@@ -175,11 +181,12 @@ public partial class Conversao : IAsyncDisposable
                 case ClasseProposta.Aberta: r.A++; if (tem) r.VA += b; break;
                 default: r.NC++; if (tem) r.VNC += b; break;
             }
-            if (i.P.ValorUsd is null) r.SemValor++;
+            if (!i.P.TemValor) r.SemValor++;
+            else if (i.P.ValorBrl is not null) { r.ComUsd[k]++; r.Conv[k]++; }   // NB: já em R$
             else
             {
                 r.ComUsd[k]++;
-                var usd = i.P.ValorUsd.Value;
+                var usd = i.P.ValorUsd ?? 0;
                 // sem data de envio não há ano, logo não há taxa: são problemas distintos
                 if (i.Ano is null) { r.SemData++; r.UsdSemData += usd; }
                 else if (i.Brl is null) { r.SemTaxa++; r.UsdSemTaxa += usd; }
@@ -199,6 +206,10 @@ public partial class Conversao : IAsyncDisposable
     private IEnumerable<string> OpMeses => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private IEnumerable<string> OpVendedores => Aplicar("vend").Select(i => i.P.Vendedor).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBus => Aplicar("bu").Select(i => i.P.Bu).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> OpOrigens => Aplicar("orig").Select(i => i.P.Origem).Distinct().OrderBy(x => x);
+    private IEnumerable<string> OpMercados => Aplicar("merc").Select(i => i.P.Mercado).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> OpPaises => Aplicar("pais").Select(i => i.P.Pais).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> OpProdutos => Aplicar("prod").Select(i => i.P.Produto).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBuIcs => Aplicar("buic").Select(i => i.P.BuIc).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
 
     private IEnumerable<string> AnosSemTaxa() =>
@@ -690,7 +701,7 @@ public partial class Conversao : IAsyncDisposable
             var chave = ConversaoService.NormalizarStatus(s);
             var its = perdidas.Where(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal) == chave).ToList();
             return (Nome: s, Qtd: its.Count, Valor: its.Sum(i => i.Brl ?? 0),
-                    ComUsd: its.Count(i => i.P.ValorUsd is not null), Conv: its.Count(i => i.Brl is not null));
+                    ComUsd: its.Count(i => i.P.TemValor), Conv: its.Count(i => i.Brl is not null));
         });
         return (qtd ? l.OrderByDescending(x => x.Qtd).ThenByDescending(x => x.Valor) : l.OrderByDescending(x => x.Valor).ThenByDescending(x => x.Qtd)).ToList();
     }
@@ -896,45 +907,76 @@ public partial class Conversao : IAsyncDisposable
 
     private sealed record Col(string Key, string Titulo, string Align, Func<Item, string> Texto, Func<Item, object?> Chave);
 
+    private List<Col> ColunasPadrao() => new()
+    {
+        new("origem", "Origem", "center", i => i.P.Origem, i => i.P.Origem),
+        new("data", "Data de envio", "nowrap", i => i.P.Data?.ToString("dd/MM/yyyy") ?? (i.P.DataTexto == "" ? "—" : i.P.DataTexto + " (inválida)"), i => i.P.Data),
+        new("ano", "Ano", "center", i => i.Ano?.ToString() ?? "—", i => i.Ano),
+        new("mes", "Mês", "center", i => i.Mes is { } m ? Fmt.MonthLong(m) : "—", i => i.Mes),
+        new("vend", "Vendedor", "", i => i.P.Vendedor, i => i.P.Vendedor),
+        new("cliente", "Cliente", "", i => i.P.Cliente, i => i.P.Cliente),
+        new("mercado", "Mercado", "", i => i.P.Mercado, i => i.P.Mercado),
+        new("pais", "País", "", i => i.P.Pais, i => i.P.Pais),
+        new("produto", "Produto", "", i => i.P.Produto, i => i.P.Produto),
+        new("bu", "BU", "", i => i.P.Bu, i => i.P.Bu),
+        new("buic", "BU Intercompany", "", i => i.P.BuIc, i => i.P.BuIc),
+        new("status", "Status original", "", i => i.P.StatusOriginal == "" ? "—" : i.P.StatusOriginal, i => i.P.StatusOriginal),
+        new("classe", "Classificação", "center", i => NomeClasse(i.P.Classe), i => (int)i.P.Classe),
+        new("usd", "Valor original (US$)", "right", i => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", _pt) : i.P.ValorBrl is not null ? "—" : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)"), i => i.P.ValorUsd),
+        new("taxa", "Taxa aplicada", "right", i => i.P.ValorBrl is not null ? "já em R$" : i.Taxa is { } t ? t.ToString("0.0000", _pt) : "sem taxa", i => i.Taxa),
+        new("brl", "Valor convertido (R$)", "right", i => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (!i.P.TemValor ? (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)") : "Não convertido"), i => i.Brl),
+        new("linha", "Linha na planilha", "center", i => i.P.Linha.ToString(), i => i.P.Linha),
+    };
+
+    // ---- ordem das colunas: arrasta o cabeçalho; a ordem fica guardada por usuário
+    private const string TabelaOrdemPref = "conversao_base_ordem";
+    private string[]? _ordemColunas;
+    private string[] OrdemColunas => _ordemColunas ??= ColPrefs.Get(_login, TabelaOrdemPref)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>Colunas na ordem do usuário; as que não estão na ordem gravada (coluna nova) ficam no fim.</summary>
     private List<Col> Colunas()
     {
-        var cols = new List<Col>
-        {
-            new("data", "Data de envio", "nowrap", i => i.P.Data?.ToString("dd/MM/yyyy") ?? (i.P.DataTexto == "" ? "—" : i.P.DataTexto + " (inválida)"), i => i.P.Data),
-            new("ano", "Ano", "center", i => i.Ano?.ToString() ?? "—", i => i.Ano),
-            new("mes", "Mês", "center", i => i.Mes is { } m ? Fmt.MonthLong(m) : "—", i => i.Mes),
-            new("vend", "Vendedor", "", i => i.P.Vendedor, i => i.P.Vendedor),
-            new("bu", "BU", "", i => i.P.Bu, i => i.P.Bu),
-            new("buic", "BU Intercompany", "", i => i.P.BuIc, i => i.P.BuIc),
-            new("status", "Status original", "", i => i.P.StatusOriginal == "" ? "—" : i.P.StatusOriginal, i => i.P.StatusOriginal),
-            new("classe", "Classificação", "center", i => NomeClasse(i.P.Classe), i => (int)i.P.Classe),
-            new("usd", "Valor original (US$)", "right", i => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", _pt) : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)"), i => i.P.ValorUsd),
-            new("taxa", "Taxa aplicada", "right", i => i.Taxa is { } t ? t.ToString("0.0000", _pt) : "sem taxa", i => i.Taxa),
-            new("brl", "Valor convertido (R$)", "right", i => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (i.P.ValorUsd is null ? "—" : "Não convertido"), i => i.Brl),
-            new("linha", "Linha na planilha", "center", i => i.P.Linha.ToString(), i => i.P.Linha),
-        };
-        foreach (var c in Conv.Atual.Colunas)
-        {
-            var idx = c.Indice;
-            cols.Add(new Col("o" + idx, $"{c.Letra} · {c.Titulo}", "", i => idx < i.P.Celulas.Length && i.P.Celulas[idx] != "" ? i.P.Celulas[idx] : "—",
-                i => idx < i.P.Celulas.Length ? i.P.Celulas[idx] : ""));
-        }
-        return cols;
+        var cols = ColunasPadrao();
+        var ordem = OrdemColunas;
+        if (ordem.Length == 0) return cols;
+        var pos = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < ordem.Length; i++) pos.TryAdd(ordem[i], i);
+        return cols.Select((c, i) => (c, k: pos.TryGetValue(c.Key, out var p) ? p : ordem.Length + i))
+                   .OrderBy(x => x.k).Select(x => x.c).ToList();
     }
 
-    // colunas originais da planilha começam ocultas; a escolha do usuário fica guardada
+    /// <summary>Nova ordem depois de arrastar um cabeçalho (chamado pelo JS).</summary>
+    [JSInvokable]
+    public Task SaveColumnOrder(string tabela, string[] ordem) => InvokeAsync(() =>
+    {
+        // a ordem que chega tem só as colunas visíveis; as ocultas mantêm o lugar relativo no fim
+        var vis = (ordem ?? Array.Empty<string>()).ToList();
+        var resto = Colunas().Select(c => c.Key).Where(k => !vis.Contains(k));
+        _ordemColunas = vis.Concat(resto).ToArray();
+        ColPrefs.Save(_login, TabelaOrdemPref, string.Join(",", _ordemColunas));
+        StateHasChanged();
+    });
+
+    private void RestaurarOrdem()
+    {
+        ColPrefs.Reset(_login, TabelaOrdemPref);
+        _ordemColunas = Array.Empty<string>();
+    }
+
+    // a escolha das colunas visíveis fica guardada por usuário (v2: colunas fixas, sem as originais da planilha)
     private void CarregarOcultas()
     {
         var pref = ColPrefs.Get(_login, TabelaPref);
-        _ocultas = pref.StartsWith("v1:", StringComparison.Ordinal)
+        _ocultas = pref.StartsWith("v2:", StringComparison.Ordinal)
             ? new HashSet<string>(pref[3..].Split(',', StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal)
-            : new HashSet<string>(Conv.Atual.Colunas.Select(c => "o" + c.Indice), StringComparer.Ordinal);
+            : new HashSet<string>(new[] { "usd", "taxa", "linha" }, StringComparer.Ordinal);
     }
     private void AlternarColuna(string key)
     {
         _ocultas ??= new HashSet<string>(StringComparer.Ordinal);
         if (!_ocultas.Remove(key)) _ocultas.Add(key);
-        ColPrefs.Save(_login, TabelaPref, "v1:" + string.Join(",", _ocultas));
+        ColPrefs.Save(_login, TabelaPref, "v2:" + string.Join(",", _ocultas));
     }
 
     private static int Cmp(object? a, object? b)
@@ -990,9 +1032,9 @@ public partial class Conversao : IAsyncDisposable
                     switch (todas[c].Key)
                     {
                         // sinais de qualidade do dado (ilegível / inválida) não somem no Excel
-                        case "usd": if (i.P.ValorUsd is { } u) { cel.Value = u; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.ValorTexto != "") cel.Value = i.P.ValorTexto + " (ilegível)"; break;
-                        case "taxa": if (i.Taxa is { } t) { cel.Value = t; cel.Style.NumberFormat.Format = "0.0000"; } else cel.Value = "sem taxa"; break;
-                        case "brl": if (i.Brl is { } b) { cel.Value = b; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.ValorUsd is not null) cel.Value = "Não convertido"; break;
+                        case "usd": if (i.P.ValorUsd is { } u) { cel.Value = u; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.ValorBrl is null && i.P.ValorTexto != "") cel.Value = i.P.ValorTexto + " (ilegível)"; break;
+                        case "taxa": if (i.P.ValorBrl is not null) cel.Value = "já em R$"; else if (i.Taxa is { } t) { cel.Value = t; cel.Style.NumberFormat.Format = "0.0000"; } else cel.Value = "sem taxa"; break;
+                        case "brl": if (i.Brl is { } b) { cel.Value = b; cel.Style.NumberFormat.Format = "#,##0.00"; } else if (i.P.TemValor) cel.Value = "Não convertido"; else if (i.P.ValorTexto != "") cel.Value = i.P.ValorTexto + " (ilegível)"; break;
                         case "ano": if (i.Ano is { } a) cel.Value = a; break;
                         case "linha": cel.Value = i.P.Linha; break;
                         case "data": if (i.P.Data is { } d) { cel.Value = d; cel.Style.DateFormat.Format = "dd/MM/yyyy"; } else if (i.P.DataTexto != "") cel.Value = i.P.DataTexto + " (inválida)"; break;
@@ -1056,15 +1098,88 @@ public partial class Conversao : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_largObs || !_temDados || _relatorio) return;
+        if (!_temDados || _relatorio) return;
+        _ref ??= DotNetObjectReference.Create(this);
+        // cabeçalho arrastável da Base e mapa de países (cada chamada só liga o que ainda não está ligado)
+        try { await JS.InvokeVoidAsync("colOrder.init", "cv-th-base", _ref, TabelaOrdemPref); } catch { }
+        try { await JS.InvokeVoidAsync("worldMap.init", MapaId, _ref); } catch { }
+        if (_largObs) return;
         try
         {
-            _ref ??= DotNetObjectReference.Create(this);
             var w = await JS.InvokeAsync<double>("cvLargura.observar", _ref);
             if (w > 0) { _largObs = true; CvLargura(w); }
         }
         catch { }
     }
+
+    // ---- mapa de países (mesmo componente da Visão Executiva) ----------------------
+    private const string MapaId = "cv-worldmap";
+
+    // faixa de taxas do recorte, para o mapa ter contraste mesmo quando os países ficam perto uns dos outros
+    private double _txMin, _txMax = 100;
+
+    /// <summary>
+    /// Cor pela taxa de conversão: claro → azul-petróleo, como o mapa da Visão Executiva. A escala vai da
+    /// menor à maior taxa entre os países do recorte (a lista ao lado mostra o número exato).
+    /// </summary>
+    private string CorTaxa(Resumo r)
+    {
+        if (!_taxaOk || r.TaxaQtd is not { } t) return "#c9d3de";
+        var faixa = _txMax - _txMin;
+        var k = faixa < 0.5 ? 0.75 : 0.22 + 0.78 * Math.Clamp((t - _txMin) / faixa, 0, 1);
+        int R = (int)(226 + (11 - 226) * k), G = (int)(238 + (79 - 238) * k), B = (int)(245 + (111 - 245) * k);
+        return $"rgb({R},{G},{B})";
+    }
+
+    /// <summary>Mapa-múndi (mesmos contornos da Visão Executiva) pintado pela taxa de conversão de cada país.</summary>
+    private string SvgMapaPaises(List<(string Nome, Resumo R)> lista)
+    {
+        // mais de um rótulo da planilha pode cair no mesmo país do mapa ("Brasil" e "Brazil"): soma
+        var porChave = new Dictionary<string, (Resumo R, List<string> Nomes)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (nome, _) in lista)
+        {
+            if (WorldMap.Chave(nome) is not { } k) continue;
+            if (!porChave.TryGetValue(k, out var e)) porChave[k] = e = (new Resumo(), new List<string>());
+            e.Nomes.Add(nome);
+        }
+        var resumos = porChave.ToDictionary(kv => kv.Key, kv => (R: Somar(_fx.Where(i => kv.Value.Nomes.Contains(i.P.Pais))), kv.Value.Nomes));
+        var taxas = lista.Select(x => x.R.TaxaQtd).Where(x => x is not null).Select(x => x!.Value).ToList();
+        (_txMin, _txMax) = taxas.Count == 0 ? (0d, 100d) : (taxas.Min(), taxas.Max());
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Taxa de conversão por país'>");
+        sb.Append($"<rect x='0' y='0' width='{F(WorldMap.ViewW)}' height='{F(WorldMap.ViewH)}' fill='#f7fafc'/>");
+        foreach (var (pais, d) in WorldMap.Paths)
+        {
+            var tem = resumos.TryGetValue(pais, out var e);
+            var ativo = tem && e.Nomes.Any(_paises.Contains);
+            var fill = tem ? CorTaxa(e.R) : "#e7edf3";
+            var dados = tem
+                ? $" data-xf-val='{Esc(e.Nomes[0])}' data-value='{Esc("Taxa de conversão " + TxQtd(e.R))}' data-pct='{Esc($"{N0(e.R.G)} ganhas de {N0(e.R.Decididas)} decididas")}' data-metric='{Esc($"{N0(e.R.Total)} propostas")}'/>"
+                : "/>";
+            sb.Append($"<path d='{d}' fill='{fill}' stroke='{(ativo ? "#0b4f6f" : "#cdd8e4")}' stroke-width='{(ativo ? "1.2" : "0.4")}' class='wm-path{(ativo ? " wm-active" : "")}' data-country='{Esc(pais)}'{dados}");
+        }
+        foreach (var (pais, e) in resumos)
+        {
+            if (!WorldMap.Centroids.TryGetValue(pais, out var pos) || !_taxaOk || e.R.TaxaQtd is not { } t) continue;
+            var escuro = t >= 50;
+            sb.Append($"<text x='{F(pos.X)}' y='{F(pos.Y + 3)}' text-anchor='middle' font-size='9' font-weight='700' fill='{(escuro ? "#fff" : "#1e2836")}' pointer-events='none'>{Esc(Math.Round(t).ToString(Inv))}%</text>");
+        }
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+
+    /// <summary>Clique num país do mapa (JS): filtra o painel por ele.</summary>
+    [JSInvokable]
+    public Task ApplyCrossFilter(string dim, string val) => InvokeAsync(() =>
+    {
+        if (dim == "country" && !string.IsNullOrWhiteSpace(val)) Alternar(_paises, val);
+        StateHasChanged();
+    });
+
+    /// <summary>Duplo clique no oceano: tira o filtro de país.</summary>
+    [JSInvokable]
+    public Task ClearAllFilters() => InvokeAsync(() => { _paises.Clear(); StateHasChanged(); });
 
     [JSInvokable]
     public void CvLargura(double w)
@@ -1146,7 +1261,7 @@ public partial class Conversao : IAsyncDisposable
 
     /// <summary>Por ano: taxa aplicada, propostas, US$ e R$ — a conversão rastreável.</summary>
     private List<(string Ano, double? Taxa, int Propostas, double Usd, double Brl, int SemTaxa)> RastroCambio() =>
-        _f.GroupBy(AnoTxt).OrderBy(g => g.Key)
+        _f.Where(i => i.P.ValorBrl is null).GroupBy(AnoTxt).OrderBy(g => g.Key)   // só AFM: o NB já vem em R$
           .Select(g => (Ano: g.Key,
                         Taxa: g.Select(i => i.Taxa).FirstOrDefault(t => t is not null),
                         Propostas: g.Count(),

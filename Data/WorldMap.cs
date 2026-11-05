@@ -7,6 +7,38 @@ public static class WorldMap
     public const double ViewW = 1000;
     public const double ViewH = 399;
 
+    /// <summary>
+    /// Nome do país como vem das planilhas (português, inglês ou espanhol) → chave do mapa (inglês,
+    /// como em <see cref="Paths"/>). Null se o país não estiver no mapa.
+    /// </summary>
+    public static string? Chave(string? nome)
+    {
+        var n = (nome ?? "").Trim();
+        if (n == "") return null;
+        if (Paths.ContainsKey(n)) return Paths.Keys.First(k => string.Equals(k, n, System.StringComparison.OrdinalIgnoreCase));
+        return Apelidos.TryGetValue(n, out var en) && Paths.ContainsKey(en) ? en : null;
+    }
+
+    private static readonly IReadOnlyDictionary<string, string> Apelidos = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+    {
+        ["Brasil"] = "Brazil", ["Perú"] = "Peru", ["Colômbia"] = "Colombia", ["Bolívia"] = "Bolivia",
+        ["Equador"] = "Ecuador", ["Paraguai"] = "Paraguay", ["Uruguai"] = "Uruguay", ["Guiana"] = "Guyana",
+        ["México"] = "Mexico", ["Estados Unidos"] = "United States of America", ["EUA"] = "United States of America",
+        ["USA"] = "United States of America", ["United States"] = "United States of America", ["US"] = "United States of America",
+        ["Estados Unidos de América"] = "United States of America", ["EEUU"] = "United States of America",
+        ["Espanha"] = "Spain", ["España"] = "Spain", ["Alemanha"] = "Germany", ["Alemania"] = "Germany",
+        ["França"] = "France", ["Francia"] = "France", ["Itália"] = "Italy", ["Italia"] = "Italy",
+        ["Reino Unido"] = "United Kingdom", ["UK"] = "United Kingdom", ["Inglaterra"] = "United Kingdom",
+        ["Índia"] = "India", ["Japão"] = "Japan", ["África do Sul"] = "South Africa", ["Sudáfrica"] = "South Africa",
+        ["Austrália"] = "Australia", ["Canadá"] = "Canada", ["Holanda"] = "Netherlands", ["Países Baixos"] = "Netherlands",
+        ["Suécia"] = "Sweden", ["Noruega"] = "Norway", ["Dinamarca"] = "Denmark", ["Polônia"] = "Poland",
+        ["Panamá"] = "Panama", ["República Dominicana"] = "Dominican Republic", ["Rep. Dominicana"] = "Dominican Republic",
+        ["Guatemala"] = "Guatemala", ["Honduras"] = "Honduras", ["Costa Rica"] = "Costa Rica", ["El Salvador"] = "El Salvador",
+        ["Nicarágua"] = "Nicaragua", ["Arábia Saudita"] = "Saudi Arabia", ["Emirados Árabes Unidos"] = "United Arab Emirates",
+        ["Coreia do Sul"] = "South Korea", ["Korea"] = "South Korea", ["Rússia"] = "Russia", ["Turquia"] = "Turkey",
+        ["Egito"] = "Egypt", ["Marrocos"] = "Morocco", ["Argélia"] = "Algeria", ["Nigéria"] = "Nigeria",
+    };
+
     public static readonly IReadOnlyDictionary<string, string> Paths = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
     {
         ["Afghanistan"] = "M668.7,137.2 671.5,138.3 673.6,137.9 674.1,136.7 676.3,136.2 677.9,135.4 678.4,133.2 680.7,132.7 681.2,131.7 682.5,132.4 683.3,132.5 684.8,132.5 686.9,133.1 687.8,133.4 689.7,132.6 690.7,133.1 691.6,131.8 693.2,131.9 693.6,131.5 693.9,130.4 695.1,129.4 696.6,130.0 696.3,130.9 697.1,131.0 696.9,133.3 698.0,134.2 698.9,133.7 700.2,133.4 701.9,132.1 703.8,132.3 706.6,132.4 707.1,133.1 705.5,133.5 704.1,134.0 700.9,134.3 698.0,134.9 696.4,136.1 697.0,137.2 697.3,138.6 696.0,139.8 696.1,140.8 695.3,141.8 692.7,141.7 693.8,143.5 692.0,144.2 690.9,145.9 691.0,147.6 689.9,148.3 688.9,148.1 686.8,148.4 686.5,149.2 684.5,149.2 682.9,150.8 682.8,153.1 679.2,154.3 677.3,154.0 676.8,154.6 675.1,154.3 672.4,154.7 667.7,153.3 670.2,150.8 670.0,149.0 667.9,148.5 667.7,146.8 666.8,144.6 668.0,143.1 666.8,142.7 667.5,140.7 668.7,137.2Z",
