@@ -70,9 +70,13 @@ else
         <div class="filterbar filterbar-sticky cvx-fb">
             <MultiFilter Label="Ano" AllText="Todos" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
             <MultiFilter Label="Mês" AllText="Todos" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
+            <MultiFilter Label="Setor" AllText="Ambos" Options="OpOrigens" Selected="_origens" OnChanged="StateHasChanged" />
             <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
             <MultiFilter Label="BU" AllText="Todas" Options="OpBus" Selected="_bus" OnChanged="StateHasChanged" />
             <MultiFilter Label="BU Intercompany" AllText="Todas" Options="OpBuIcs" Selected="_buIcs" OnChanged="StateHasChanged" />
+            <MultiFilter Label="Mercado" AllText="Todos" Searchable="true" Options="OpMercados" Selected="_mercados" OnChanged="StateHasChanged" />
+            <MultiFilter Label="País" AllText="Todos" Searchable="true" Options="OpPaises" Selected="_paises" OnChanged="StateHasChanged" />
+            <MultiFilter Label="Produto" AllText="Todos" Searchable="true" Options="OpProdutos" Selected="_produtos" OnChanged="StateHasChanged" />
             <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
             @if (Ativos > 0)
             {
@@ -206,7 +210,7 @@ else
     private static readonly (string Id, string Titulo)[] Ancoras =
     {
         ("resumo", "Resumo"), ("evolucao", "Evolução"), ("vendedores", "Vendedores"), ("unidades", "BU"),
-        ("unidades-ic", "BU Intercompany"), ("valor-unidades", "Valor por unidade"), ("valor-mensal", "Valor mensal"),
+        ("unidades-ic", "BU Intercompany"), ("mercado", "Mercado"), ("produto", "Produto"), ("pais", "País"), ("valor-unidades", "Valor por unidade"), ("valor-mensal", "Valor mensal"),
         ("perdas", "Perdas"), ("base", "Base"), ("qualidade", "Qualidade"),
     };
 
@@ -223,7 +227,10 @@ else
         @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio, um ano contra o outro", Evolucao())
         @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
         @Secao("unidades", "Conversão por Business Unit", "Taxa e valores por unidade de negócio · clique numa linha para filtrar", BlocoUnidades(i => i.P.Bu, _bus, "bu"))
-        @Secao("unidades-ic", "Conversão por BU Intercompany", "Taxa e valores por unidade intercompany · independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "buic"))
+        @Secao("unidades-ic", "Conversão por BU Intercompany", "Só AFM · taxa e valores por unidade intercompany · independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "buic"))
+        @Secao("mercado", "Conversão por mercado", "Taxa de conversão e valores por mercado · clique numa linha para filtrar", BlocoUnidades(i => i.P.Mercado, _mercados, "merc", "mercado", "mercados"))
+        @Secao("produto", "Conversão por produto", "Taxa de conversão e valores por produto · clique numa linha para filtrar", BlocoUnidades(i => i.P.Produto, _produtos, "prod", "produto", "produtos"))
+        @Secao("pais", "Conversão por país", "Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", Paises())
         @Secao("valor-unidades", "Valor por unidade", "Ganho, perdido e aberto em R$, por BU e por BU Intercompany", ValorUnidades())
         @Secao("valor-mensal", "Valor mensal das propostas", "Janeiro a dezembro · por status · R$", ValorMensal())
         @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
@@ -453,14 +460,14 @@ else
     private string RelCss(Resumo r) =>
         !_taxaOk || r.Decididas < AmostraMinima || r.TaxaQtd is not { } t || _rx.TaxaQtd is not { } m ? "" : t >= m + 5 ? "pos" : t <= m - 5 ? "neg" : "";
 
-    private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string exceto) => @<div class="cvx-card">
+    private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string exceto, string singular = "unidade", string plural = "unidades") => @<div class="cvx-card">
         @{
             var lista = UnidadesOrdenadas(sel, exceto);
         }
         <div class="cvx-ch">
             <div class="cvx-xh">
                 <span class="xcard-ico">@Icons.Svg("bar-chart")</span>
-                <div><h2>Taxa de conversão por unidade</h2><p>@lista.Count unidades · ganhas ÷ decididas · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
+                <div><h2>Taxa de conversão por @singular</h2><p>@lista.Count @plural · ganhas ÷ decididas · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
             </div>
             @if (_taxaOk) { <span class="xcard-total"><span>Média do recorte</span><b>@TxQtdGlobal(_rx)</b></span> }
         </div>
@@ -491,6 +498,46 @@ else
             }
         </div>
         <p class="cvx-note">Taxa em verde: pelo menos 5 p.p. acima da média do recorte; em vermelho: 5 p.p. abaixo (só com @AmostraMinima+ decididas). As barras partem do zero e vão até 100%.</p>
+    </div>;
+
+    // ---- países: mapa (cor = taxa de conversão) + lista; clique filtra o painel
+    private RenderFragment Paises() => @<div class="cvx-card">
+        @{
+            var lista = UnidadesOrdenadas(i => i.P.Pais, "pais");
+            var noMapa = lista.Count(x => WorldMap.Chave(x.Nome) is not null);
+            var txs = lista.Select(x => x.R.TaxaQtd).Where(x => x is not null).Select(x => x!.Value).ToList();
+            (_txMin, _txMax) = txs.Count == 0 ? (0d, 100d) : (txs.Min(), txs.Max());
+        }
+        <div class="cvx-ch">
+            <div class="cvx-xh">
+                <span class="xcard-ico">@Icons.Svg("target")</span>
+                <div><h2>Taxa de conversão por país</h2><p>@lista.Count países · ganhas ÷ decididas · cor mais escura = taxa maior (escala de @P1(_txMin) a @P1(_txMax))@(noMapa < lista.Count ? $" · {lista.Count - noMapa} sem posição no mapa (aparecem só na lista)" : "")</p></div>
+            </div>
+            <div class="map-zoom">
+                <button class="icon-btn" title="Diminuir" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1/1.3)'>@Icons.Svg("down")</button>
+                <button class="icon-btn" title="Aumentar" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1.3)'>@Icons.Svg("up")</button>
+                <button class="icon-btn" title="Redefinir" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapaId)'>@Icons.Svg("target")</button>
+            </div>
+        </div>
+        @if (lista.Count == 0)
+        {
+            <div class="empty">Sem dados no recorte.</div>
+        }
+        else
+        {
+            <div class="worldmap" id="@MapaId">
+                <div class="worldmap-inner">@Html(SvgMapaPaises(lista))</div>
+            </div>
+            <div class="map-legend cols cvx-maplist">
+                @foreach (var (nome, r) in lista)
+                {
+                    var pn = nome;
+                    <div class="ml-row @(_paises.Contains(nome) ? "xf-on" : "")" @onclick="() => Alternar(_paises, pn)" title="@nome: @N0(r.G) ganhas de @N0(r.Decididas) decididas · @N0(r.Total) propostas · clique para filtrar">
+                        <span class="ml-dot" style="background:@CorTaxa(r)"></span><span class="ml-name">@nome</span><span class="ml-val">@TxQtd(r)</span><span class="ml-pct">@N0(r.G)/@N0(r.Decididas)</span>
+                    </div>
+                }
+            </div>
+        }
     </div>;
 
     private RenderFragment ValorUnidades() => @<div class="cvx-two">
@@ -574,10 +621,10 @@ else
             {
                 <li class="bad">✖ Propostas com valor mas sem data de envio: @N0(geral.SemData) (US$ @geral.UsdSemData.ToString("N0", _pt) fora dos valores em R$)</li>
             }
-            <li class="info">ℹ Propostas sem valor em US$ na planilha: @N0(geral.SemValor) — contam nas quantidades, não nos valores</li>
+            <li class="info">ℹ Propostas sem valor na planilha (US$ no AFM, R$ no NB): @N0(geral.SemValor) — contam nas quantidades, não nos valores</li>
         </ul>
 
-        <h2 class="cvx-h2s" style="margin-top:18px">Conversão cambial rastreável (recorte atual)</h2>
+        <h2 class="cvx-h2s" style="margin-top:18px">Conversão cambial rastreável (recorte atual · só AFM, o NB já vem em R$)</h2>
         <table class="cvx-mini-tbl">
             <thead><tr><th>Ano de envio</th><th class="r">Taxa USD/BRL</th><th class="r">Propostas</th><th class="r">Valor original (US$)</th><th class="r">Valor convertido (R$)</th><th class="r">Sem taxa</th></tr></thead>
             <tbody>
@@ -638,6 +685,7 @@ else
             <details class="cv-cols">
                 <summary class="btn-ghost sm">@Icons.Svg("layers")Colunas</summary>
                 <div class="cv-cols-panel">
+                    <button type="button" class="btn-link" style="margin:2px 8px 6px" @onclick="RestaurarOrdem">Restaurar a ordem original</button>
                     @foreach (var c in todas)
                     {
                         var k = c.Key;
@@ -652,11 +700,11 @@ else
         <div class="table-wrap tbl-compact" style="max-height:62vh;overflow:auto">
             <table class="grid-tbl">
                 <thead>
-                    <tr>
+                    <tr id="cv-th-base" class="th-drag">
                         @foreach (var c in visiveis)
                         {
                             var k = c.Key;
-                            <th class="@c.Align cv-sort" title="Ordenar" @onclick="() => Ordenar(k)">@c.Titulo@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
+                            <th class="@c.Align cv-sort" draggable="true" data-key="@k" title="Clique para ordenar · arraste para mudar a coluna de lugar" @onclick="() => Ordenar(k)">@c.Titulo@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
                         }
                     </tr>
                 </thead>
