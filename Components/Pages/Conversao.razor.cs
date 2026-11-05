@@ -71,7 +71,7 @@ public partial class Conversao : IAsyncDisposable
     private bool _taxaOk => _seg is null;                      // taxa de ganho só vale sem segmento
     private int Ativos => new[] { _anos, _meses, _origens, _vend, _bus, _buIcs, _mercados, _paises, _produtos }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
     private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
-        new[] { ("Ano", _anos), ("Mês", _meses), ("Origem", _origens), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs), ("Mercado", _mercados), ("País", _paises), ("Produto", _produtos) }.Where(x => x.Item2.Count > 0);
+        new[] { ("Ano", _anos), ("Mês", _meses), ("Setor", _origens), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs), ("Mercado", _mercados), ("País", _paises), ("Produto", _produtos) }.Where(x => x.Item2.Count > 0);
     // Largura mínima de cada chip (rótulo + "…" + ✕) e da faixa de chips: abaixo disso a faixa
     // desce para a linha de baixo, em vez de os chips se sobreporem aos filtros.
     private static string ChipTxt(HashSet<string> set) => string.Join(", ", set.Take(2)) + (set.Count > 2 ? $" +{set.Count - 2}" : "");
@@ -206,7 +206,8 @@ public partial class Conversao : IAsyncDisposable
     private IEnumerable<string> OpMeses => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private IEnumerable<string> OpVendedores => Aplicar("vend").Select(i => i.P.Vendedor).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBus => Aplicar("bu").Select(i => i.P.Bu).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
-    private IEnumerable<string> OpOrigens => Aplicar("orig").Select(i => i.P.Origem).Distinct().OrderBy(x => x);
+    // Setor = de qual planilha veio a proposta (AFM ou NB); sempre lista os dois, mesmo se um estiver vazio no recorte
+    private IEnumerable<string> OpOrigens => ConversaoService.Origens;
     private IEnumerable<string> OpMercados => Aplicar("merc").Select(i => i.P.Mercado).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpPaises => Aplicar("pais").Select(i => i.P.Pais).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpProdutos => Aplicar("prod").Select(i => i.P.Produto).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
@@ -909,7 +910,7 @@ public partial class Conversao : IAsyncDisposable
 
     private List<Col> ColunasPadrao() => new()
     {
-        new("origem", "Origem", "center", i => i.P.Origem, i => i.P.Origem),
+        new("origem", "Setor", "center", i => i.P.Origem, i => i.P.Origem),
         new("data", "Data de envio", "nowrap", i => i.P.Data?.ToString("dd/MM/yyyy") ?? (i.P.DataTexto == "" ? "—" : i.P.DataTexto + " (inválida)"), i => i.P.Data),
         new("ano", "Ano", "center", i => i.Ano?.ToString() ?? "—", i => i.Ano),
         new("mes", "Mês", "center", i => i.Mes is { } m ? Fmt.MonthLong(m) : "—", i => i.Mes),
