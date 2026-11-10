@@ -56,6 +56,8 @@ public sealed class AplicacaoService
         public string Chave { get; init; } = "";   // primeira coluna preenchida: identifica a proposta nas listas
         /// <summary>Estágio no CRM: FunnelStage (AFM) ou Stage (NB), como veio.</summary>
         public string Estagio { get; init; } = "";
+        /// <summary>Referência da cotação no AFM (QuoteReference, ex.: "HSAJOM.AFM.000040/B"): base + revisão.</summary>
+        public string Referencia { get; init; } = "";
         /// <summary>BU de origem intercompany (AFM: BU_IC_FR, senão BU_RFQ_IC). Vazia = sem origem IC.</summary>
         public string BuOrigem { get; init; } = "";
         /// <summary>Proposta fechada no CRM (Closed, Closed Won, Closed Lost, Closed
@@ -134,7 +136,7 @@ public sealed class AplicacaoService
     /// <summary>Posições dos campos dos gráficos numa planilha.</summary>
     private sealed class Posicoes
     {
-        public int Actual = -1, Due = -1, Eng = -1, Sales = -1, Ind = -1, Bu = -1, Gm = -1, Pais = -1, Cat = -1, Est = -1;
+        public int Actual = -1, Due = -1, Eng = -1, Sales = -1, Ind = -1, Bu = -1, Gm = -1, Pais = -1, Cat = -1, Est = -1, Ref = -1;
     }
 
     private Posicoes Resolver(Planilha p, string origem, Dados d)
@@ -153,6 +155,8 @@ public sealed class AplicacaoService
             Actual = Pos("Actual"), Due = Pos("Due"), Eng = Pos("ProposalEngineer"), Sales = Pos("Salesperson"),
             Ind = Pos("Industry"), Bu = Pos("BU"), Gm = Pos("GM"), Pais = Pos("Country"), Cat = Pos("Category"), Est = Pos("Stage"),
         };
+        // Referência da cotação (só AFM): usada para desconsiderar revisões. Sem aviso se faltar.
+        if (!nb) r.Ref = AcharCampo(p, new[] { "quotereference", "quote reference", "quote ref" }, _cfg["Aplicadores:Colunas:QuoteReference:Afm"]);
         // Vendedor e aplicador têm a letra combinada como reserva, se o título não casar.
         if (r.Eng < 0) r.Eng = Idx(nb ? ColAplicadorNb : ColAplicadorAfm);
         if (r.Sales < 0) r.Sales = Idx(nb ? ColVendedorNb : ColVendedorAfm);
@@ -330,9 +334,11 @@ public sealed class AplicacaoService
         {
             var gm = Percentual(p.Texto(row, c.Gm));
             if (gm is { } g && nb) gm = g * 100;     // o NB traz decimal (0,25 = 25%)
-            var apl = p.Texto(row, c.Eng);
-            var vend = p.Texto(row, c.Sales);
+            var apl = NomeDireto(p.Texto(row, c.Eng));
+            var vend = NomeDireto(p.Texto(row, c.Sales));
             if (!nb) { apl = Equivalente(apl, AplicadorNb); vend = Equivalente(vend, VendedorNb); }
+            var chave = iChave >= 0 && !string.IsNullOrWhiteSpace(l.Valores[iChave]) ? l.Valores[iChave].Trim()
+                        : l.Valores.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
             return l with
             {
                 Actual = Data(p.Texto(row, c.Actual)),
@@ -341,8 +347,8 @@ public sealed class AplicacaoService
                 Country = p.Texto(row, c.Pais), Category = p.Texto(row, c.Cat),
                 Estagio = p.Texto(row, c.Est),
                 BuOrigem = iBuOrigem >= 0 ? (l.Valores[iBuOrigem] ?? "").Trim() : "",
-                Chave = iChave >= 0 && !string.IsNullOrWhiteSpace(l.Valores[iChave]) ? l.Valores[iChave].Trim()
-                        : l.Valores.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "",
+                Chave = chave,
+                Referencia = nb ? "" : (c.Ref >= 0 && p.Texto(row, c.Ref) is { Length: > 0 } rf ? rf.Trim() : chave),
                 Aplicador = apl != "" ? apl : l.Aplicador,
                 Vendedor = vend != "" ? vend : l.Vendedor,
             };
@@ -356,6 +362,8 @@ public sealed class AplicacaoService
                 var v = new string[d.Colunas.Count];
                 foreach (var c in d.Colunas) v[c.Indice] = planNb.Texto(row, c.Letra);
                 if (v.All(string.IsNullOrWhiteSpace)) continue;
+                if (iVend >= 0) v[iVend] = NomeDireto(v[iVend]);
+                if (iApl >= 0) v[iApl] = NomeDireto(v[iApl]);
                 var valor = planNb.Numero(row, ColValorNb);
                 if (d.IndiceValor >= 0) v[d.IndiceValor] = valor.ToString("0.##", Inv);
                 d.Linhas.Add(Completar(new Linha("NB", v, valor,
@@ -377,8 +385,8 @@ public sealed class AplicacaoService
                 foreach (var (idx, col) in extras) v[idx] = planAfm.Texto(row, col);
                 if (iBuOrigem >= 0 && string.IsNullOrWhiteSpace(v[iBuOrigem])) v[iBuOrigem] = planAfm.Texto(row, iBuRfq);
 
-                if (iVend >= 0) v[iVend] = Equivalente(v[iVend], VendedorNb);
-                if (iApl >= 0) v[iApl] = Equivalente(v[iApl], AplicadorNb);
+                if (iVend >= 0) v[iVend] = Equivalente(NomeDireto(v[iVend]), VendedorNb);
+                if (iApl >= 0) v[iApl] = Equivalente(NomeDireto(v[iApl]), AplicadorNb);
 
                 var usd = planAfm.Numero(row, ColValorAfm);
                 var brl = d.TaxaUsd > 0 ? usd * d.TaxaUsd : 0;
@@ -500,6 +508,30 @@ public sealed class AplicacaoService
         var ultVirg = s.LastIndexOf(','); var ultPonto = s.LastIndexOf('.');
         s = ultVirg > ultPonto ? s.Replace(".", "").Replace(',', '.') : s.Replace(",", "");
         return double.TryParse(s, NumberStyles.Any, Inv, out var v) ? v : null;
+    }
+
+    /// <summary>
+    /// Nome no formato do CRM "Sobrenome, Nome" ("Martins, Thales") vira "Nome Sobrenome"
+    /// ("Thales Martins"), para a mesma pessoa não aparecer duas vezes.
+    /// </summary>
+    public static string NomeDireto(string? nome)
+    {
+        var n = (nome ?? "").Trim();
+        var i = n.IndexOf(',');
+        if (i <= 0 || i != n.LastIndexOf(',') || i == n.Length - 1) return n;
+        var sobrenome = n[..i].Trim(); var primeiro = n[(i + 1)..].Trim();
+        return sobrenome == "" || primeiro == "" ? n : $"{primeiro} {sobrenome}";
+    }
+
+    /// <summary>
+    /// Separa "HSAJOM.AFM.000040/B" em base ("HSAJOM.AFM.000040") e revisão ("B").
+    /// Sem "/LETRAS" no fim, a proposta não tem revisão (base = referência inteira).
+    /// </summary>
+    public static (string Base, string Revisao) Revisao(string? referencia)
+    {
+        var r = (referencia ?? "").Trim();
+        var m = System.Text.RegularExpressions.Regex.Match(r, @"^(.+?)\s*/\s*([A-Za-z]+)$");
+        return m.Success ? (m.Groups[1].Value.Trim(), m.Groups[2].Value.ToUpperInvariant()) : (r, "");
     }
 
     private static string Equivalente(string nome, Dictionary<string, string> tabela)
