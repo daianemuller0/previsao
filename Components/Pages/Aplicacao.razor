@@ -91,6 +91,7 @@ else if (_dados is { } d)
         <label class="flt-toggle @(_soAtrasadas ? "on" : "")" title="Só as propostas atrasadas: sem data de envio (Actual em branco), prazo do cliente (Due) já passado e não fechadas no CRM"><input type="checkbox" @bind="_soAtrasadas" />@Icons.Svg("alert")<span>Atrasadas</span></label>
         <label class="flt-toggle @(_soPendentes ? "on" : "")" title="Só as propostas pendentes de envio (Actual em branco) e não fechadas no CRM"><input type="checkbox" @bind="_soPendentes" />@Icons.Svg("clock")<span>Pendentes</span></label>
         <label class="flt-toggle @(_soIc ? "on" : "")" title="Só as propostas com origem intercompany: BU de origem preenchida (AFM, BU_IC_FR ou BU_RFQ_IC)"><input type="checkbox" @bind="_soIc" />@Icons.Svg("layers")<span>Origem IC</span></label>
+        <label class="flt-toggle @(_semRevisoes ? "on" : "")" title="AFM: das propostas com o mesmo número (QuoteReference, ex.: HSAJOM.AFM.000040/A, /B, /C), conta só a última revisão — a maior letra depois da barra"><input type="checkbox" @bind="_semRevisoes" />@Icons.Svg("history")<span>Desconsiderar revisões</span></label>
         @* Janela de tempo: sempre pela data de envio (Actual). *@
         <div class="flt" title="Ano da data de envio (Actual); para proposta ainda não enviada, do prazo do cliente (Due)"><span class="flt-label">Ano</span>
             <select @bind="_ano">
@@ -109,7 +110,7 @@ else if (_dados is { } d)
                 <div class="fb-sum"><span class="fb-sum-k">Valor TOTAL</span><span class="fb-sum-v pos">@Fmt.Brl(Linhas.Sum(l => l.ValorBrl))</span></div>
             }
         </div>
-        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _soPendentes || _soIc || _ano != "" || _meses.Count > 0 || _de is not null || _ate is not null)
+        @if (_busca != "" || _origem != "" || _vendedores.Count > 0 || _aplicadores.Count > 0 || _soAtrasadas || _soPendentes || _soIc || _semRevisoes || _ano != "" || _meses.Count > 0 || _de is not null || _ate is not null)
         {
             <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
         }
@@ -328,6 +329,7 @@ else if (_dados is { } d)
     private bool _soAtrasadas;   // sem Actual e com o Due já vencido
     private bool _soPendentes;   // sem Actual (ainda não enviada)
     private bool _soIc;          // só com BU de origem intercompany
+    private bool _semRevisoes;   // AFM: só a última revisão de cada QuoteReference (…/A, …/B, …/C → …/C)
     // Pendente: ainda não enviada (Actual em branco) e não fechada no CRM
     // (FunnelStage/Stage começando com "Closed" fica fora).
     private static bool Pendente(AplicacaoService.Linha l) => l.Actual is null && !l.Fechada;
@@ -431,6 +433,7 @@ else if (_dados is { } d)
             if (_soAtrasadas) q = q.Where(Atrasada);
             if (_soPendentes) q = q.Where(Pendente);
             if (_soIc) q = q.Where(l => l.BuOrigem != "");
+            if (_semRevisoes) q = q.Where(l => !RevisaoAntiga.Contains(l));
             // Ano, meses e janela De/Até pela data de envio (Actual); sem ela, pelo
             // prazo (Due). Sem nenhuma das duas, a proposta fica fora do recorte.
             int? ano = _ano != "" && int.TryParse(_ano, out var a) ? a : null;
@@ -449,9 +452,37 @@ else if (_dados is { } d)
         }
     }
 
+    // Linhas do AFM que são revisões antigas: para cada base de QuoteReference, só a maior
+    // revisão fica ("Z" < "AA": mais letras = revisão mais nova). Calculado sobre a base
+    // inteira, para o resultado não depender dos outros filtros.
+    private HashSet<AplicacaoService.Linha> _revAntigas = new();
+    private AplicacaoService.Dados? _revDe;
+    private HashSet<AplicacaoService.Linha> RevisaoAntiga
+    {
+        get
+        {
+            if (_dados is null) return _revAntigas;
+            if (!ReferenceEquals(_revDe, _dados))
+            {
+                _revDe = _dados;
+                _revAntigas = new HashSet<AplicacaoService.Linha>(ReferenceEqualityComparer.Instance);
+                foreach (var g in _dados.Linhas.Where(l => l.Origem == "AFM")
+                             .Select(l => (L: l, R: AplicacaoService.Revisao(l.Referencia)))
+                             .Where(x => x.R.Revisao != "" && x.R.Base != "")
+                             .GroupBy(x => x.R.Base, StringComparer.OrdinalIgnoreCase))
+                {
+                    // todas as linhas da última revisão ficam (uma cotação pode ter mais de uma linha)
+                    var ultima = g.OrderByDescending(x => x.R.Revisao.Length).ThenByDescending(x => x.R.Revisao, StringComparer.Ordinal).First().R.Revisao;
+                    foreach (var x in g) if (x.R.Revisao != ultima) _revAntigas.Add(x.L);
+                }
+            }
+            return _revAntigas;
+        }
+    }
+
     private void Limpar()
     {
-        _busca = ""; _origem = ""; _soAtrasadas = false; _soPendentes = false; _soIc = false;
+        _busca = ""; _origem = ""; _soAtrasadas = false; _soPendentes = false; _soIc = false; _semRevisoes = false;
         _de = _ate = null; _ano = ""; _meses.Clear();
         _vendedores.Clear(); _aplicadores.Clear();
     }
