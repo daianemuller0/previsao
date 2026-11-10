@@ -12,6 +12,19 @@ public static class Fmt
     public static string Usd(double v) => "US$ " + v.ToString("#,##0", Br);
     public static string Brl(double v) => "R$ " + v.ToString("#,##0", Br);
 
+    /// <summary>Valor na moeda do pedido (BRL → R$, USD → US$, EUR → €…; outras pelo código).</summary>
+    public static string Moeda(double v, string? codigo)
+    {
+        var c = (codigo ?? "").Trim().ToUpperInvariant();
+        var simbolo = c switch
+        {
+            "" or "BRL" => "R$", "USD" => "US$", "EUR" => "€", "GBP" => "£", "CLP" => "CLP$",
+            "PEN" => "S/", "ARS" => "AR$", "COP" => "COL$", "MXN" => "MX$", "CAD" => "C$", "AUD" => "A$",
+            _ => c,
+        };
+        return simbolo + " " + v.ToString("#,##0", Br);
+    }
+
     // Compacto para cards executivos: US$ 1,2M / US$ 940k.
     public static string UsdShort(double v)
     {

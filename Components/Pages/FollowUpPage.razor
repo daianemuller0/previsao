@@ -103,7 +103,7 @@
                                 </td>
                                 break;
                             case "vendedor":   <td>@Vendedor(r.Opp)</td> break;
-                            case "valor":      <td class="right num">@Fmt.Brl(r.Opp.AmountBrl)</td> break;
+                            case "valor":      <td class="right num" title="@(string.Equals(r.Opp.CurrencyCode, "BRL", StringComparison.OrdinalIgnoreCase) ? "" : "Equivale a " + Fmt.Brl(r.Opp.AmountBrl))">@Fmt.Moeda(r.Opp.AmountOriginalValue, r.Opp.CurrencyCode)</td> break;
                             case "fechamento": <td class="nowrap">@Fmt.Date(r.Opp.ExpectedDate)</td> break;
                             case "ultimo":     <td class="nowrap">@(r.Fu.LastContactValue is { } lc ? lc.ToString("dd/MM/yy") : "—")</td> break;
                             case "status":     <td><span class="badge @StatusCss(r.Fu.Status)">@r.Fu.Status</span></td> break;
@@ -576,7 +576,7 @@
     private FollowUpRoutine.EmailCtx CtxFor(Row r)
     {
         var o = r.Opp;
-        return new FollowUpRoutine.EmailCtx(Cat.CustomerName(o.CustomerId), Proposta(o), Fmt.Brl(o.AmountBrl), Fmt.Date(o.ExpectedDate), Vendedor(o));
+        return new FollowUpRoutine.EmailCtx(Cat.CustomerName(o.CustomerId), Proposta(o), Fmt.Moeda(o.AmountOriginalValue, o.CurrencyCode), Fmt.Date(o.ExpectedDate), Vendedor(o));
     }
 
     private string MassEmailPreview(Row r) => FollowUpRoutine.Email(r.Cur?.Num ?? 1, _massLang, CtxFor(r));
@@ -698,7 +698,7 @@
     {
         if (_editOpp is null || _editRow is null) return "";
         var o = _editOpp;
-        var ctx = new FollowUpRoutine.EmailCtx(Cat.CustomerName(o.CustomerId), Proposta(o), Fmt.Brl(o.AmountBrl), Fmt.Date(o.ExpectedDate), Vendedor(o));
+        var ctx = new FollowUpRoutine.EmailCtx(Cat.CustomerName(o.CustomerId), Proposta(o), Fmt.Moeda(o.AmountOriginalValue, o.CurrencyCode), Fmt.Date(o.ExpectedDate), Vendedor(o));
         return FollowUpRoutine.Email(_editRow.Cur?.Num ?? 1, _lang, ctx);
     }
 
