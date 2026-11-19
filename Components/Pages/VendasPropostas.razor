@@ -1142,6 +1142,57 @@
     };
 
     /// <summary>
+    /// Botão "Cores" de cada modo do mês a mês ("u" um ano, "c" comparar, "t" todos os anos): a cor das colunas de
+    /// vendas e de propostas de cada ano, das linhas (valor enviado e conversão) e da venda negativa. Cada modo
+    /// guarda as suas; sem escolha, vale o padrão (as cores dos anos). Mesma regra de gravação das outras cores.
+    /// </summary>
+    private RenderFragment PaletaMm(string modo, List<int> anos) => __builder =>
+    {
+        var aberto = _mmPaleta == modo;
+        var porAno = modo != "t";   // nos mini-gráficos as linhas ligam os anos de um mês: uma cor para cada linha
+        var nomeModo = modo switch { "u" => "Um ano", "c" => "Comparar dois anos", _ => "Todos os anos" };
+        var prefixo = "m" + modo;
+        <div class="vp-cores-wrap vpm-pal-wrap">
+            <button class="btn-ghost vp-btn-cores" aria-expanded="@(aberto ? "true" : "false")" @onclick="() => _mmPaleta = aberto ? null : modo">🎨 Cores</button>
+            @if (aberto)
+            {
+                <div class="flt-multi-backdrop" @onclick="() => _mmPaleta = null"></div>
+                <div class="vp-cores-pop vpm-pal" role="dialog" aria-label="Cores do gráfico · @nomeModo">
+                    <div class="vp-cores-tit">Cores · @nomeModo</div>
+                    <table class="vpm-pal-t">
+                        <thead><tr><th></th><th>Vendas</th><th>Propostas</th>@if (porAno) { <th>Valor enviado</th><th>Conversão</th> }</tr></thead>
+                        <tbody>
+                            @foreach (var a in anos.OrderByDescending(x => x))
+                            {
+                                var ano = a;
+                                <tr>
+                                    <th>@ano</th>
+                                    @foreach (var el in porAno ? new[] { 'v', 'p', 'e', 'x' } : new[] { 'v', 'p' })
+                                    {
+                                        var chave = ChaveMm(modo, el, ano);
+                                        <td><input type="color" value="@CorMm(modo, el, ano)" title="@($"{ano} · {NomeElMm(el)}")" @onchange="e => MudarCor(chave, e.Value?.ToString())" /></td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (!porAno)
+                    {
+                        <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'e', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'e', 0), e.Value?.ToString())" /><span>Linha do valor enviado</span></label>
+                        <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'x', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'x', 0), e.Value?.ToString())" /><span>Linha da conversão</span></label>
+                    }
+                    <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'n', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'n', 0), e.Value?.ToString())" /><span>Venda negativa</span></label>
+                    <div class="vp-cores-pe">
+                        <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => k.StartsWith(prefixo)))" @onclick="() => RestaurarCores(Editaveis.Keys.Where(k => k.StartsWith(prefixo)).ToList())">Restaurar padrão</button>
+                        <button class="btn-primary" @onclick="() => _mmPaleta = null">Concluir</button>
+                    </div>
+                    <div class="vp-cores-nota">Só para "@nomeModo". Sem escolha, vale a cor do ano (botão de cores do gráfico de linhas). @NotaCores</div>
+                </div>
+            }
+        </div>
+    };
+
+    /// <summary>
     /// "Um ano" e "Comparar dois anos": um gráfico só, com a mesma estrutura dos mini-gráficos de "Todos os anos",
     /// de cima para baixo: linha do valor enviado em propostas (R$) → colunas de vendas subindo da linha de base
     /// ("R$ 31,4 mi") → colunas de propostas descendo, espelhadas (quantidade) → linha tracejada da conversão do
@@ -1152,6 +1203,7 @@
     {
         var dois = anos.Count == 2;
         var comp = dois ? anos[1] : 0;
+        var modo = dois ? "c" : "u";
         var cv = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => CelVenda(a, m)).ToArray());
         var cp = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => CelProp(a, m)).ToArray());
         var escV = EscalaMmDe(cv.Values.SelectMany(x => x).Where(x => x.Tem).Select(x => (double)x.Valor), dois ? 0.3 : 0.2);
@@ -1162,7 +1214,8 @@
             <div class="vpm-gtit">
                 <b>Vendas, propostas e conversão, mês a mês</b>
                 <span>@(dois ? $"{principal} × {comp}" : principal.ToString())@(_setor != "" ? " · propostas e conversão: " + _setor : "")</span>
-                <span class="vpm-gleg">@foreach (var a in anos) { <span><i style="background:@CorDoAno(a)"></i>@a</span> }</span>
+                <span class="vpm-gleg">@foreach (var a in anos) { <span><i style="background:@CorMm(modo, 'v', a)"></i>@a</span> }</span>
+                @PaletaMm(modo, anos)
             </div>
             <div class="vpm-sm-leg sub vpm-combo-leg">
                 <span><i class="sw cheia"></i>colunas para cima: vendas (R$, empresa toda)</span>
@@ -1200,7 +1253,7 @@
                                 @if (x.Tem)
                                 {
                                     var v = (double)x.Valor; var neg = v < 0;
-                                    <i class="vpm-bar" style="bottom:@F(escV.Base(v))%;height:@F(Math.Max(escV.Alt(v), 0.5))%;--c:@(neg ? CorNegPri : CorDoAno(a))"></i>
+                                    <i class="vpm-bar" style="bottom:@F(escV.Base(v))%;height:@F(Math.Max(escV.Alt(v), 0.5))%;--c:@(neg ? CorMm(modo, 'n', 0) : CorMm(modo, 'v', a))"></i>
                                     <b class="vpm-val vpm-rot @(a == principal ? "pri" : "cmp") @(neg ? "neg" : "")" style="bottom:calc(@F(neg ? escV.Base(v) : escV.Topo(v))% @(neg ? "- 20px" : "+ 3px"))">@ReaisMi(x.Valor)</b>
                                 }
                                 else if (x.Sit == SitMes.AApurar)
@@ -1228,7 +1281,7 @@
                                 @if (x.Tem)
                                 {
                                     var h = Math.Min(100, Math.Max((double)x.Valor / maxP * 70, 0.6));
-                                    <i class="vpm-bar @(x.Parcial ? "parcial" : "")" style="height:@F(h)%;--c:@CorDoAno(a)"></i>
+                                    <i class="vpm-bar @(x.Parcial ? "parcial" : "")" style="height:@F(h)%;--c:@CorMm(modo, 'p', a)"></i>
                                     <b class="vpm-lp @(a == principal ? "pri" : "cmp")" style="top:calc(@F(h)% + 3px)">@N0((int)x.Valor)@(x.Parcial ? "*" : "")</b>
                                 }
                                 else if (x.Sit == SitMes.AApurar)
@@ -1263,6 +1316,8 @@
     private RenderFragment BandaMm(string tipo, List<int> anos, int principal) => __builder =>
     {
         var env = tipo == "env";
+        var modo = anos.Count == 2 ? "c" : "u";
+        var el = env ? 'e' : 'x';
         double? Val(int a, int m) => env
             ? (Prop(a, m)?.Valor is decimal v && v > 0 ? (double)v : null)
             : (CelProp(a, m).Tem ? TaxaMes(a, m).Taxa : null);
@@ -1286,7 +1341,7 @@
                                 @if (p.v is double v)
                                 {
                                     var y = Y(v);
-                                    <i class="vpm-pt @(p.parc ? "parc" : "")" style="bottom:@F(y)%;--c:@CorDoAno(a)" data-ano="@a" data-m="@mes" data-cor="@CorDoAno(a)" data-pri="@(a == principal ? "1" : "")"
+                                    <i class="vpm-pt @(p.parc ? "parc" : "")" style="bottom:@F(y)%;--c:@CorMm(modo, el, a)" data-ano="@a" data-m="@mes" data-cor="@CorMm(modo, el, a)" data-pri="@(a == principal ? "1" : "")"
                                        title="@($"{NomeDoMes(mes)} {a} · {(env ? "valor enviado " + Mi((decimal)v) : "conversão " + P1(v))}{(p.parc ? " (parcial)" : "")}")"></i>
                                     <b class="vpm-blab vpm-rot @(a == principal ? "pri" : "cmp")" style="bottom:calc(@F(y)% + 6px)">@(env ? ReaisMi((decimal)v) : P1(v))@(p.parc ? "*" : "")</b>
                                 }
@@ -1313,7 +1368,7 @@
             <div class="vpm-anos2">
                 @foreach (var L in new[] { A, B })
                 {
-                    <div class="vpm-ano @(L.Ano == a1 ? "pri" : "")" style="--ac:@CorDoAno(L.Ano)">
+                    <div class="vpm-ano @(L.Ano == a1 ? "pri" : "")" style="--ac:@CorMm("c", 'v', L.Ano)">
                         <div class="vpm-ano-t">@L.Ano</div>
                         <div class="vpm-ano-l"><span>Vendas</span><b title="@(L.MesesV > 0 ? Reais(L.Vendas) : "")">@(L.MesesV > 0 ? Mi(L.Vendas) : "n/d")</b></div>
                         <div class="vpm-ano-l"><span>Propostas</span><b>@(L.MesesP > 0 ? N0(L.Propostas) : "n/d")</b></div>
@@ -1353,30 +1408,8 @@
         var semVenda = anos.Where(a => Enumerable.Range(1, 12).All(m => CelVenda(a, m).Sit == SitMes.SemDado)).ToList();
         string Curto(int a) => "'" + (a % 100).ToString("00");
         <div class="vpm-sm-leg">
-            @foreach (var a in anos) { <span class="ano"><i style="background:@CorDoAno(a)"></i>@a</span> }
-            <div class="vp-cores-wrap">
-                <button class="btn-ghost vp-btn-cores" aria-expanded="@(_mmCores ? "true" : "false")" @onclick="() => _mmCores = !_mmCores">🎨 Cores dos anos</button>
-                @if (_mmCores)
-                {
-                    <div class="flt-multi-backdrop" @onclick="() => _mmCores = false"></div>
-                    <div class="vp-cores-pop" role="dialog" aria-label="Cores dos anos">
-                        <div class="vp-cores-tit">Cor de cada ano</div>
-                        @foreach (var a in anos.OrderByDescending(x => x))
-                        {
-                            var ano = a;
-                            <label class="vp-cor-lin" title="Cor de @ano">
-                                <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano.ToString(), e.Value?.ToString())" />
-                                <span>@ano</span>
-                            </label>
-                        }
-                        <div class="vp-cores-pe">
-                            <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
-                            <button class="btn-primary" @onclick="() => _mmCores = false">Concluir</button>
-                        </div>
-                        <div class="vp-cores-nota">@NotaCores As mesmas cores do gráfico de linhas.</div>
-                    </div>
-                }
-            </div>
+            @foreach (var a in anos) { <span class="ano"><i style="background:@CorMm("t", 'v', a)"></i>@a</span> }
+            @PaletaMm("t", anos)
         </div>
         <div class="vpm-sm-leg sub">
             <span><i class="sw linha"></i>linha: valor enviado em propostas (R$)</span>
@@ -1387,7 +1420,7 @@
             <span><i class="sw neg"></i>venda negativa</span>
             <span class="txt">— = a apurar · n/d = sem dado registrado</span>
         </div>
-        <div class="vpm-sm-grid">
+        <div class="vpm-sm-grid" style="--cn:@CorMm("t", 'n', 0);--le:@CorMm("t", 'e', 0);--lx:@CorMm("t", 'x', 0)">
             @for (var m = 1; m <= 12; m++)
             {
                 var mes = m;
@@ -1464,12 +1497,12 @@
                         {
                             var v = cv.First(x => x.a == a).c; var p = cp.First(x => x.a == a).c;
                             var pm = Prop(a, mes);
-                            var cor = CorDoAno(a);
+                            var cor = CorMm("t", 'v', a);
                             var txtV = v.Tem ? (v.Valor < 0 ? "−" : "") + "R$ " + (Math.Abs(v.Valor) / 1_000_000m).ToString("#,##0.0", Br) + " mi" : v.Sit == SitMes.AApurar ? "a apurar" : "n/d";
                             var txtP = p.Tem ? N0((int)p.Valor) + (p.Parcial ? " (parcial)" : "") : p.Sit == SitMes.AApurar ? "a apurar" : "n/d";
                             var txtE = pm?.Valor is decimal ve && ve > 0 ? Mi(ve) + (pm.SemTaxa > 0 ? $" (parcial: {pm.SemTaxa} sem câmbio)" : "") : "—";
                             var porProp = v.Tem && p.Tem && !p.Parcial && p.Valor > 0 ? $"\n{(v.Valor < 0 ? "−" : "")}R$ {(Math.Abs(v.Valor) / p.Valor / 1000m).ToString("#,##0", Br)} mil por proposta" : "";
-                            <div class="vpm-sm-c" style="--c:@cor" title="@($"{NomeDoMes(mes)} {a}\nVendas: {txtV}\nPropostas: {txtP}\nValor enviado: {txtE}\nConversão: {(conv.FirstOrDefault(x => x.a == a).t is double tcv ? P1(tcv) : "—")}{porProp}")">
+                            <div class="vpm-sm-c" style="--c:@cor;--cp:@CorMm("t", 'p', a)" title="@($"{NomeDoMes(mes)} {a}\nVendas: {txtV}\nPropostas: {txtP}\nValor enviado: {txtE}\nConversão: {(conv.FirstOrDefault(x => x.a == a).t is double tcv ? P1(tcv) : "—")}{porProp}")">
                                 <div class="vpm-sm-l"></div>
                                 <div class="vpm-sm-v">
                                     @if (v.Tem)

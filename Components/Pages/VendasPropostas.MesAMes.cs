@@ -18,8 +18,41 @@ public partial class VendasPropostas
     private string _mmModo = "comparar";
     private int? _mmComp;
     private bool _mmDetalhe;
-    /// <summary>Popover "Cores dos anos" aberto (mini-gráficos).</summary>
-    private bool _mmCores;
+    /// <summary>Qual paleta de cores está aberta: "u", "c", "t" (o modo) ou nenhuma.</summary>
+    private string? _mmPaleta;
+
+    // ---- cores do mês a mês: cada modo tem as suas ----
+    // Chave gravada: "m" + modo (u/c/t) + elemento + ano. Elementos: v = colunas de vendas, p = colunas de
+    // propostas, e = linha do valor enviado, x = linha da conversão, n = venda negativa (sem ano).
+
+    private static string ChaveMm(string modo, char el, int ano) => $"m{modo}{el}{(ano > 0 ? ano.ToString() : "")}";
+
+    private static string NomeElMm(char el) => el switch
+    {
+        'v' => "colunas de vendas", 'p' => "colunas de propostas", 'e' => "linha do valor enviado", 'x' => "linha da conversão", _ => "venda negativa",
+    };
+
+    /// <summary>A cor do elemento no modo: a escolhida; senão o padrão (derivado da cor do ano).</summary>
+    private string CorMm(string modo, char el, int ano)
+    {
+        if (CorSalva(ChaveMm(modo, el, ano)) is { } c) return c;
+        return el switch
+        {
+            'v' => CorDoAno(ano),
+            'p' => Clarear(CorMm(modo, 'v', ano), 0.5),
+            'e' => modo == "t" ? "#64748b" : CorMm(modo, 'v', ano),
+            'x' => modo == "t" ? "#b45309" : CorMm(modo, 'v', ano),
+            _ => "#c0392b",
+        };
+    }
+
+    /// <summary>Mistura a cor com branco (f = quanto da cor fica): "#12355b", 0,5 → um tom mais claro.</summary>
+    private static string Clarear(string hex, double f)
+    {
+        if (hex.Length != 7 || hex[0] != '#') return hex;
+        int C(int i) => (int)Math.Round(Convert.ToInt32(hex.Substring(i, 2), 16) * f + 255 * (1 - f));
+        return $"#{C(1):x2}{C(3):x2}{C(5):x2}";
+    }
 
     /// <summary>Primeiro mês (ano × 100 + mês) com propostas nas planilhas, sem filtros: antes dele, "n/d".</summary>
     private int _mmIniPropostas = int.MaxValue;
