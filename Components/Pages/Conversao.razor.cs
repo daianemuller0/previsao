@@ -143,7 +143,8 @@ public partial class Conversao : IAsyncDisposable
     private void Reconstruir()
     {
         var taxas = Cambio.Todas();
-        _itens = Conv.Atual.Propostas.Select(p =>
+        // embutida na Performance Comercial: só os anos da página (2022 em diante), sem as propostas sem data
+        _itens = Conv.Atual.Propostas.Where(p => Filtros?.NoPeriodo(p.Data) ?? true).Select(p =>
         {
             int? ano = p.Data?.Year, mes = p.Data?.Month;
             // NB: o valor já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
@@ -206,7 +207,10 @@ public partial class Conversao : IAsyncDisposable
            .OrderByDescending(x => x.R.VTotal).ThenByDescending(x => x.R.Total).ToList();
 
     // opções em cascata: cada filtro mostra só o que existe com os OUTROS filtros aplicados
-    private IEnumerable<string> OpAnos => Aplicar("ano").Select(AnoTxt).Distinct().OrderByDescending(x => x == "Sem data" ? "0" : x);
+    // embutida na Performance Comercial: o Ano escolhe os anos da página, então lista todos (2022 até hoje)
+    private IEnumerable<string> OpAnos => Filtros?.AnoMinimo is int min
+        ? Enumerable.Range(min, Math.Max(0, DateTime.Today.Year - min + 1)).Reverse().Select(a => a.ToString())
+        : Aplicar("ano").Select(AnoTxt).Distinct().OrderByDescending(x => x == "Sem data" ? "0" : x);
     private IEnumerable<string> OpMeses => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private IEnumerable<string> OpVendedores => Aplicar("vend").Select(i => i.P.Vendedor).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBus => Aplicar("bu").Select(i => i.P.Bu).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
@@ -1135,7 +1139,7 @@ public partial class Conversao : IAsyncDisposable
     /// <summary>Embutido: os atalhos do índice apontam para as seções da guia Performance Comercial.</summary>
     private static readonly (string Id, string Titulo)[] AncorasEmbutido =
     {
-        ("propostas", "Resumo"), ("mensal", "Propostas por mês"), ("metas", "Vendas × metas"), ("unidades", "BU"),
+        ("propostas", "Resumo"), ("mes-a-mes", "Mês a mês"), ("mensal", "Ano × ano"), ("setores", "AFM × NB"), ("metas", "Vendas × metas"), ("unidades", "BU"),
         ("mercado", "Mercado"), ("produto", "Produto"), ("vendedores", "Vendedores"), ("pais", "País"),
         ("perdas", "Perdas"), ("base", "Base"), ("budget", "Acumulado"), ("mes-ano", "Mês × ano"),
     };

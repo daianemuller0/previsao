@@ -105,11 +105,13 @@ window.vpPptx = (function () {
         const ff = d.filtros;
         const itens = [
             ['kpis', 'Indicadores de ' + d.foco, 'Comparações com o mesmo período do ano anterior · ' + ff],
+            ['mes-a-mes', 'Vendas e propostas, mês a mês · ' + d.foco, 'Em cima, quanto foi vendido no mês (R$, empresa toda); embaixo, quantas propostas foram enviadas · ' + ff],
             ['mensal-qtd', 'Propostas enviadas por mês, comparando os anos', 'Uma linha por ano · mês de envio da proposta · ' + ff],
             ['mensal-valor', 'Valor das propostas enviadas por mês (R$)', 'Uma linha por ano · mês de envio da proposta · ' + ff],
             ['mensal-vendas', 'Vendas por mês (R$), comparando os anos', 'Uma linha por ano · vendas da empresa no mês (não seguem os filtros)'],
             ['mensal-taxa', 'Taxa de conversão por mês, comparando os anos', 'Uma linha por ano · taxa sobre ' + d.baseCurta + ' · ' + ff],
             ['anos', 'Taxa de conversão e resultados, ano a ano', d.regra],
+            ['setores', 'AFM × NB e valores, ano a ano', 'AFM = Aftermarket · NB = New Business · barra: divisão das propostas enviadas · ' + ff],
             ['metas', 'Vendas totais × metas, ano a ano', 'Vendas da empresa × Meta Grupo e Meta HSA · R$'],
             ['bu', 'Conversão por Business Unit', 'Taxa sobre ' + d.baseCurta + ' · ' + ff],
             ['mercado', 'Conversão por mercado', 'Os 8 primeiros, da maior taxa para a menor · taxa sobre ' + d.baseCurta + ' · ' + ff],

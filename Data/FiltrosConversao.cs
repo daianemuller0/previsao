@@ -27,6 +27,16 @@ public sealed class FiltrosConversao
     /// </summary>
     public bool BaseTodas { get; set; }
 
+    /// <summary>
+    /// Primeiro ano considerado (null = todos). Na guia Performance Comercial é 2022: propostas
+    /// mais antigas, do futuro ou sem data de envio ficam fora da barra de filtros e das seções.
+    /// </summary>
+    public int? AnoMinimo { get; init; }
+
+    /// <summary>A data está dentro dos anos considerados (sempre true sem ano mínimo).</summary>
+    public bool NoPeriodo(DateTime? data) =>
+        AnoMinimo is not int min || data is DateTime d && d.Year >= min && d.Year <= DateTime.Today.Year;
+
     private IEnumerable<HashSet<string>> Todos => new[] { Anos, Meses, Vendedores, Bus, BuIcs, Origens, Mercados, Paises, Produtos };
 
     /// <summary>Quantos filtros estão ligados.</summary>
@@ -36,10 +46,16 @@ public sealed class FiltrosConversao
     public string Assinatura() =>
         (BaseTodas ? "T|" : "D|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
 
-    /// <summary>A proposta passa pelos filtros? (as mesmas regras da guia Conversão)</summary>
-    public bool Passa(PropostaConv p)
+    /// <summary>
+    /// A proposta passa pelos filtros? (as mesmas regras da guia Conversão)
+    /// ignorarAno = true: aplica todos menos o de Ano (para comparar com o ano anterior, que pode não estar escolhido).
+    /// </summary>
+    public bool Passa(PropostaConv p) => Passa(p, false);
+
+    public bool Passa(PropostaConv p, bool ignorarAno)
     {
-        if (Anos.Count > 0 && !Anos.Contains(p.Data?.Year.ToString() ?? "Sem data")) return false;
+        if (!NoPeriodo(p.Data)) return false;
+        if (!ignorarAno && Anos.Count > 0 && !Anos.Contains(p.Data?.Year.ToString() ?? "Sem data")) return false;
         if (Meses.Count > 0 && !(p.Data is DateTime d && Meses.Contains(Fmt.MonthLong(d.Month)))) return false;
         if (Vendedores.Count > 0 && !Vendedores.Contains(p.Vendedor)) return false;
         if (Bus.Count > 0 && !Bus.Contains(p.Bu)) return false;

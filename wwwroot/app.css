@@ -2996,3 +2996,23 @@ body.vp-capturando .cvx-embed .cvx-lado-a-lado { grid-template-columns: 1fr; }
 .vp-page .panel-head { align-items: flex-start; }
 .vp-page .panel-head .panel-title { min-width: 0; flex: 1 1 auto; }
 .vp-page .rep-attain-group { flex-wrap: nowrap; flex-shrink: 0; }
+
+/* ---- Performance Comercial: AFM × NB e valores (quadro próprio) e o mês de relance ---- */
+.vp-setores .vp-cc-setor { border-top: 0; padding-top: 2px; gap: 8px; }
+.vp-page .vp-setores .vp-cs-barra { height: 12px; }
+.vp-page .vp-setores .vp-cs-grade { font-size: 15px; row-gap: 5px; column-gap: 14px; }
+.vp-page .vp-setores .vp-cs-grade > b.cab { font-size: 13px; }
+.vp-page .vp-setores .vp-cs-grade > b.cab i { width: 10px; height: 10px; }
+.vp-page .vp-setores .vp-cs-grade > b.tx { font-size: 19px; }
+.vp-page .vp-setores .vp-cs-grade > b small { font-size: 12px; }
+#mes-a-mes .chart-body { padding: 4px 0 2px; }
+#mes-a-mes .cvx-note { display: block; margin-top: 6px; }
+body.vp-capturando #setores .vp-conv-grid { width: 1880px; max-width: none; }
+body.vp-capturando #mes-a-mes .chart-body { width: 1500px; max-width: none; }
+.vp-cs-barra.grossa { height: 20px !important; }
+.vp-cs-barra.grossa i { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 800; font-style: normal; overflow: hidden; white-space: nowrap; }
+.vp-setores .vp-cs-grade { grid-template-columns: minmax(0, 1fr) auto auto; }
+.vp-page .vp-setores .vp-cs-grade { font-size: 14px; column-gap: 10px; }
+.vp-page .vp-setores .vp-cs-grade > b.tx { font-size: 17px; }
+/* o "Ano em foco" fica abaixo da barra de filtros congelada (a lista do filtro abre por cima dele) */
+.cvx .vp-foco { z-index: 1; }
