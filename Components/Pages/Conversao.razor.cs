@@ -1093,6 +1093,34 @@ public partial class Conversao : IAsyncDisposable
     // ======================================================================
     // O viewBox dos gráficos de evolução e de valor mensal segue a largura real do cartão:
     // o texto sai com o tamanho escrito (12,5 px) a 1366 e a 1920 px, como nos gráficos do Power BI.
+    // ---- modo embutido (guia Performance Comercial) ---------------------------------
+    /// <summary>true = só as seções de BU, mercado, produto, país, perdas e base, sem cabeçalho nem barra de filtros.</summary>
+    [Parameter] public bool Embutido { get; set; }
+    /// <summary>Embutido: ano a filtrar ("" = todos os anos).</summary>
+    [Parameter] public string? AnoFiltro { get; set; }
+    /// <summary>Embutido: setor a filtrar ("" = AFM e NB).</summary>
+    [Parameter] public string? SetorFiltro { get; set; }
+    /// <summary>Embutido: quantas linhas ficam visíveis nas listas de mercado e produto (o resto rola).</summary>
+    [Parameter] public int LinhasVisiveis { get; set; } = 7;
+    private string? _anoEmb, _setorEmb;
+
+    protected override void OnParametersSet()
+    {
+        if (!Embutido) return;
+        var ano = AnoFiltro ?? ""; var setor = SetorFiltro ?? "";
+        if (ano != _anoEmb) { _anoEmb = ano; _anos.Clear(); if (ano != "") _anos.Add(ano); _pag = 0; }
+        if (setor != _setorEmb) { _setorEmb = setor; _origens.Clear(); if (setor != "") _origens.Add(setor); _pag = 0; }
+    }
+
+    /// <summary>Embutido: os filtros que a pessoa ligou clicando nas listas (ano e setor vêm da guia de fora).</summary>
+    private IEnumerable<(string, HashSet<string>)> FiltrosDoEmbutido() =>
+        ConjuntosAtivos().Where(x => x.Item1 is not ("Ano" or "Setor"));
+    private void LimparEmbutido()
+    {
+        _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _mercados.Clear(); _paises.Clear(); _produtos.Clear();
+        _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++;
+    }
+
     private double _chartW = 1200;
     private bool _largObs;
     private DotNetObjectReference<Conversao>? _ref;
@@ -1104,6 +1132,7 @@ public partial class Conversao : IAsyncDisposable
         // cabeçalho arrastável da Base e mapa de países (cada chamada só liga o que ainda não está ligado)
         try { await JS.InvokeVoidAsync("colOrder.init", "cv-th-base", _ref, TabelaOrdemPref); } catch { }
         try { await JS.InvokeVoidAsync("worldMap.init", MapaId, _ref); } catch { }
+        if (Embutido) { try { await JS.InvokeVoidAsync("vpLinhas", LinhasVisiveis); } catch { } }
         if (_largObs) return;
         try
         {

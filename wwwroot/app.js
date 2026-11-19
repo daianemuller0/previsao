@@ -840,3 +840,15 @@ addEventListener('pagehide', function (e) {
     });
     raiz.observe(document.body, { childList: true, subtree: true });
 })();
+
+// Performance Comercial: nas listas de mercado e produto (lado a lado), deixa visíveis
+// só as primeiras n linhas; o resto fica na barra de rolagem da própria lista.
+window.vpLinhas = (n) => {
+    document.querySelectorAll('.cvx-embed .cvx-lado-a-lado .cvx-ibar').forEach(el => {
+        const itens = el.querySelectorAll('.ibar-item');
+        if (itens.length > n) {
+            const a = itens[0].getBoundingClientRect().top, b = itens[n].getBoundingClientRect().top;
+            el.style.maxHeight = Math.ceil(b - a) + 'px';
+        } else el.style.maxHeight = 'none';
+    });
+};

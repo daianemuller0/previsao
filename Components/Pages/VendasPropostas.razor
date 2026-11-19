@@ -279,6 +279,17 @@
 
         </section>
 
+        @* ================= conversão: BU, mercado | produto, país, perdas e base (componente da guia Conversão) ================= *@
+        <div class="vp-conv-periodo">
+            <span class="flt-label">Período das seções de conversão abaixo</span>
+            <div class="cvx-seg-ctl">
+                <button class="@(!_convAnoFoco ? "on" : "")" @onclick="() => _convAnoFoco = false">Todos os anos</button>
+                <button class="@(_convAnoFoco ? "on" : "")" @onclick="() => _convAnoFoco = true">Só @foco.Ano</button>
+            </div>
+            <span class="cvx-note">Mesmo cálculo da guia Conversão · segue o filtro de Setor</span>
+        </div>
+        <Conversao Embutido="true" AnoFiltro="@(_convAnoFoco ? foco.Ano.ToString() : "")" SetorFiltro="@_setor" LinhasVisiveis="7" />
+
         @* ================= 3 · VENDAS × BUDGET ================= *@
         <section id="budget" class="cvx-sec">
             <div class="xsec"><span class="xsec-t">Vendas × budget</span><span class="xsec-s">O ritmo de @foco.Ano contra os anos anteriores e os budgets HSA e Grupo</span><span class="xsec-line"></span></div>
@@ -526,6 +537,8 @@
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private string _login = "";
     private bool _editCores, _editCoresMetas;
+    /// <summary>Seções de conversão (BU, mercado, produto, país, perdas, base): false = todos os anos; true = só o ano em foco.</summary>
+    private bool _convAnoFoco;
     /// <summary>Cores escolhidas pela pessoa para cada ano (as que faltam seguem o padrão).</summary>
     private Dictionary<string, string> _cores = new();
     /// <summary>Cores-padrão de todos: as que o administrador escolheu (valem para quem não mudou as suas).</summary>

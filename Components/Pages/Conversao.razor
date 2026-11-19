@@ -15,7 +15,11 @@
 
 @{ Recalcular(); }
 
-@if (_relatorio)
+@if (Embutido)
+{
+    <div class="cvx cvx-embed">@Embutida()</div>
+}
+else if (_relatorio)
 {
     @Relatorio()
 }
@@ -129,7 +133,7 @@ else
 }
 
 @* ---- painel lateral do vendedor ---- *@
-@if (_vendSel is not null && !_relatorio)
+@if (_vendSel is not null && !_relatorio && !Embutido)
 {
     @PainelVendedor(_vendSel)
 }
@@ -184,6 +188,46 @@ else
         var l = RastroCambio().Where(x => x.Taxa is not null).Select(x => "(" + x.Ano + ": " + x.Taxa!.Value.ToString("0.0000", _pt) + ")").ToList();
         return l.Count == 0 ? "(nenhuma taxa cadastrada)" : string.Join(" ", l);
     }
+
+    // =====================================================================
+    //  MODO EMBUTIDO · seções usadas na guia Performance Comercial
+    // =====================================================================
+    private RenderFragment Embutida() => __builder =>
+    {
+        if (_carregando && !_temDados)
+        {
+            <div class="cvx-skel"><div class="skel" style="height:190px"></div><div class="skel" style="height:300px"></div></div>
+            return;
+        }
+        if (!_temDados) { <div class="cvx-card"><div class="empty" style="padding:34px 12px">@Conv.Mensagem</div></div> return; }
+        var filtros = FiltrosDoEmbutido().ToList();
+        if (filtros.Count > 0 || _seg is not null)
+        {
+            <div class="cvx-embed-filtros">
+                <span class="cvx-embed-rot">Filtrado por</span>
+                @foreach (var (rot, set) in filtros)
+                {
+                    <span class="cvx-chip" title="@rot: @string.Join(", ", set)"><b>@ChipRot(rot)</b><span class="t">@ChipTxt(set)</span><button title="Remover filtro @rot" @onclick="() => { set.Clear(); _pag = 0; }">✕</button></span>
+                }
+                <button class="btn-link" @onclick="LimparEmbutido">@Icons.Svg("x")Limpar</button>
+            </div>
+        }
+        if (_f.Count == 0)
+        {
+            <div class="cvx-card"><div class="empty" style="padding:34px 12px">Nenhuma proposta no recorte. <button class="btn-link" @onclick="LimparEmbutido">Limpar filtros</button></div></div>
+            return;
+        }
+        <div class="cvx-page">
+            @Secao("unidades", "Conversão por Business Unit", "Taxa e valores por unidade de negócio · clique numa linha para filtrar as seções abaixo", BlocoUnidades(i => i.P.Bu, _bus, "bu"))
+            <div class="cvx-lado-a-lado">
+                @Secao("mercado", "Conversão por mercado", "Clique numa linha para filtrar", BlocoUnidades(i => i.P.Mercado, _mercados, "merc", "mercado", "mercados"))
+                @Secao("produto", "Conversão por produto", "Clique numa linha para filtrar", BlocoUnidades(i => i.P.Produto, _produtos, "prod", "produto", "produtos"))
+            </div>
+            @Secao("pais", "Conversão por país", "Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", Paises())
+            @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
+            @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
+        </div>
+    };
 
     // =====================================================================
     //  NÍVEL 1 · EXECUTIVE OVERVIEW
