@@ -18,6 +18,8 @@ public partial class VendasPropostas
     private string _mmModo = "comparar";
     private int? _mmComp;
     private bool _mmDetalhe;
+    /// <summary>Popover "Cores dos anos" aberto (mini-gráficos).</summary>
+    private bool _mmCores;
 
     /// <summary>Primeiro mês (ano × 100 + mês) com propostas nas planilhas, sem filtros: antes dele, "n/d".</summary>
     private int _mmIniPropostas = int.MaxValue;
