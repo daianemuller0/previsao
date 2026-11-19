@@ -3188,15 +3188,15 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-grid { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 12px; }
 @container (max-width: 1240px) { .vpm-sm-grid { grid-template-columns: repeat(3, minmax(250px, 1fr)); } }
 @container (max-width: 860px) { .vpm-sm-grid { grid-template-columns: repeat(2, minmax(240px, 1fr)); } }
-.vpm-sm { --hv: 128px; --hp: 118px; border: 1px solid var(--cx-line); border-radius: 4px; background: #fff; padding: 8px 10px 6px; }
+.vpm-sm { --hl: 76px; --hv: 128px; --hp: 118px; border: 1px solid var(--cx-line); border-radius: 4px; background: #fff; padding: 8px 10px 6px; }
 .vpm-sm-t { font-size: 15px; font-weight: 800; color: #172B43; margin-bottom: 2px; }
-.vpm-sm-g { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); column-gap: 4px; }
-.vpm-sm-base { position: absolute; left: 0; right: 0; top: var(--hv); border-top: 1px solid #9aa8b8; z-index: 2; }
+.vpm-sm-g { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); column-gap: 0; }
+.vpm-sm-base { position: absolute; left: 0; right: 0; top: calc(var(--hl) + var(--hv)); border-top: 1px solid #9aa8b8; z-index: 2; }
 .vpm-sm-zero { position: absolute; left: 0; right: 0; border-top: 1px dashed #c0392b; opacity: .6; z-index: 2; }
 .vpm-sm-c { display: flex; flex-direction: column; min-width: 0; cursor: default; }
 .vpm-sm-v { position: relative; height: var(--hv); }
 .vpm-sm-p { position: relative; height: var(--hp); }
-.vpm-sm-bar { position: absolute; left: 16%; right: 16%; display: block; }
+.vpm-sm-bar { position: absolute; left: 18%; right: 18%; display: block; }
 .vpm-sm-bar.v { background: var(--c); border-radius: 4px 4px 0 0; }
 .vpm-sm-bar.neg { background: #c0392b; border-radius: 0 0 4px 4px; }
 .vpm-sm-bar.p { top: 0; background: color-mix(in srgb, var(--c) 45%, #fff); border-radius: 0 0 4px 4px; }
@@ -3208,9 +3208,21 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-lp { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; line-height: 1.15; white-space: nowrap; z-index: 3; font-variant-numeric: tabular-nums; }
 .vpm-sm-lp b { font-size: 12.5px; font-weight: 800; color: #172B43; letter-spacing: -.2px; }
 .vpm-sm-lp small { font-size: 11px; font-weight: 600; color: #5b6b7d; letter-spacing: -.2px; }
-.vpm-sm-ano { text-align: center; font-size: 12px; font-weight: 800; color: var(--c); margin-top: 3px; }
+.vpm-sm-ano { text-align: center; font-size: 12px; font-weight: 800; color: #172B43; margin-top: 3px; }
 .vpm-sm-tot { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; color: #3b4a61; font-variant-numeric: tabular-nums; }
 .vpm-sm-tot b { color: #172B43; }
 .vpm-sm-tot .nd { font-size: 12.5px; color: var(--cx-mut); }
-.vpm:fullscreen .vpm-sm, .vpm.tela-cheia .vpm-sm { --hv: 11.5vh; --hp: 10vh; }
+.vpm:fullscreen .vpm-sm, .vpm.tela-cheia .vpm-sm { --hl: 5vh; --hv: 7.5vh; --hp: 7vh; }
+.vpm:fullscreen .vpm-sm-leg.sub, .vpm.tela-cheia .vpm-sm-leg.sub { margin-bottom: 6px; }
+.vpm:fullscreen .vpm-sm-grid, .vpm.tela-cheia .vpm-sm-grid { gap: 8px; }
 .vpm-sm-leg .vp-cores-pop { left: auto; right: 0; }
+
+/* mini-gráficos: linha do valor enviado em propostas (R$), em cima das colunas */
+.vpm-sm-l { height: var(--hl); }
+.vpm-sm-linha { position: absolute; left: 0; right: 0; top: 0; height: var(--hl); z-index: 3; pointer-events: none; }
+.vpm-sm-linha svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.vpm-sm-linha polyline { fill: none; stroke: #172B43; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.vpm-sm-pt { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #172B43; border: 2px solid #fff; transform: translate(-50%, 50%); box-sizing: content-box; }
+.vpm-sm-pt.parc { background: #fff; border-color: #172B43; }
+.vpm-sm-le { position: absolute; transform: translateX(-50%); font-size: 12px; font-weight: 800; color: #172B43; white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.2px; background: rgba(255,255,255,.85); padding: 0 2px; border-radius: 3px; line-height: 15px; }
+.vpm-sm-leg .sw.linha { height: 3px; border-radius: 2px; background: #172B43; width: 18px; }
