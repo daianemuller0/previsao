@@ -7,6 +7,7 @@
 @inject ConversaoService Conv
 @inject CambioAnualRepository Cambio
 @inject IJSRuntime JS
+@inject ChartPrefsRepository ChartPrefs
 
 @* ===========================================================================
    Vendas × Propostas · mesmo padrão visual da guia Conversão (cvx).
@@ -16,15 +17,15 @@
    as vendas e os budgets, do histórico da equipe (editável aqui).
    =========================================================================== *@
 
-<PageTitle>Vendas × Propostas</PageTitle>
+<PageTitle>Performance Comercial · Howden South America</PageTitle>
 
 <div class="cvx">
-    <div class="breadcrumbs"><span>Executivo</span><span class="sep">/</span><span>Vendas × Propostas</span></div>
+    <div class="breadcrumbs"><span>Executivo</span><span class="sep">/</span><span>Performance Comercial</span></div>
     <div class="page-head">
         <div>
-            <h1>Vendas × Propostas</h1>
+            <h1>Performance Comercial | Howden South America</h1>
             <p class="subtitle">
-                @AnoIni → @AnoFim · Howden Brasil · valores em R$<br />
+                Resultados, indicadores e oportunidades de crescimento · @AnoIni → @AnoFim · valores em R$<br />
                 Propostas: planilhas da guia Conversão (AFM e NB), pela data de envio@(Conv.AtualizadoEm is { } quando ? $" · atualizadas em {quando:dd/MM/yyyy 'às' HH:mm}" : "") · Vendas e budgets: histórico da equipe
             </p>
         </div>
@@ -115,11 +116,11 @@
                     <div class="rep-attain-group">
                         <div class="rep-attain-box">
                             <span class="ra-label">Propostas enviadas (@foco.Ano)</span>
-                            <span class="ra-value" style="color:@CorFocoLinha">@(linhaFoco.Qtd is int qh ? N0(qh) : "—")</span>
+                            <span class="ra-value" style="color:@CorDoAno(foco.Ano)">@(linhaFoco.Qtd is int qh ? N0(qh) : "—")</span>
                         </div>
                         <div class="rep-attain-box">
                             <span class="ra-label">Valor enviado (@foco.Ano)</span>
-                            <span class="ra-value" style="color:@CorFocoLinha">@(linhaFoco.Valor is decimal vh ? Mi(vh) : "—")</span>
+                            <span class="ra-value" style="color:@CorDoAno(foco.Ano)">@(linhaFoco.Valor is decimal vh ? Mi(vh) : "—")</span>
                         </div>
                         <div class="rep-attain-box">
                             <span class="ra-label">Vendas (@foco.Ano)</span>
@@ -133,8 +134,24 @@
                         <button class="@(_met == "valor" ? "on" : "")" @onclick='() => _met = "valor"'>Valor enviado (R$)</button>
                         <button class="@(_met == "vendas" ? "on" : "")" @onclick='() => _met = "vendas"'>Vendas (R$)</button>
                     </div>
+                    <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCores ? "true" : "false")" @onclick="() => _editCores = !_editCores">🎨 Cores das linhas</button>
                     <span class="cvx-note">Ano em foco (@foco.Ano) com área e valores; troque o ano no filtro acima. Passe o mouse num mês para ver todos os anos.</span>
                 </div>
+                @if (_editCores)
+                {
+                    <div class="vp-cores">
+                        @foreach (var a in AnosDoPainel.OrderByDescending(x => x))
+                        {
+                            var ano = a;
+                            <label class="vp-cor" title="Cor da linha de @ano">
+                                <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano, e.Value?.ToString())" />
+                                <span>@ano</span>
+                            </label>
+                        }
+                        <button class="btn-link" disabled="@(_cores.Count == 0)" @onclick="RestaurarCores">Restaurar cores padrão</button>
+                        <span class="cvx-note">As cores ficam guardadas para o seu login.</span>
+                    </div>
+                }
                 <div class="chart-body">@((MarkupString)SvgAnos(_met, foco.Ano))</div>
             </div>
 
@@ -500,6 +517,12 @@
     private string? _msg;
     private string _aba = "vendas", _setor = "", _met = "qtd";
     private List<int> _anosEditor = new();
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private string _login = "";
+    private bool _editCores;
+    /// <summary>Cores escolhidas pela pessoa para cada ano (as que faltam seguem o padrão).</summary>
+    private Dictionary<int, string> _cores = new();
+    private const string ChaveCores = "vendas_propostas_cores";
 
     /// <summary>As propostas de um mês: quantidade, valor (null = sem valor), quantas sem taxa de câmbio e quantas com valor.</summary>
     private sealed record PropMes(int Qtd, decimal? Valor, int SemTaxa, int ComValor);
@@ -509,6 +532,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (AuthState is not null)
+        {
+            var u = (await AuthState).User;
+            _login = u.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? u.Identity?.Name ?? "";
+        }
+        _cores = LerCores(ChartPrefs.Get(_login, ChaveCores).Ordem);
         Carregar();
         _foco = AnosDoPainel.DefaultIfEmpty(AnoFim).Max();
         // as propostas vêm das planilhas da guia Conversão (leitura da rede): em segundo plano
@@ -661,6 +690,45 @@
         ("#007A9E", ""), ("#b7791f", "5 3"), ("#1f9254", "2 3"), ("#64748b", "6 3 2 3"), ("#c2410c", "1 3"),
     };
 
+    /// <summary>"2026=#8b5cf6;2025=#007a9e" → ano → cor (só cores #rrggbb válidas).</summary>
+    private static Dictionary<int, string> LerCores(string? texto)
+    {
+        var d = new Dictionary<int, string>();
+        foreach (var par in (texto ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var kv = par.Split('=');
+            if (kv.Length == 2 && int.TryParse(kv[0], out var a) && System.Text.RegularExpressions.Regex.IsMatch(kv[1].Trim(), "^#[0-9a-fA-F]{6}$"))
+                d[a] = kv[1].Trim().ToLowerInvariant();
+        }
+        return d;
+    }
+
+    private void GravarCores() =>
+        ChartPrefs.Save(_login, ChaveCores, string.Join(";", _cores.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}")), ChartPrefsRepository.BarraPadrao);
+
+    private void MudarCor(int ano, string? cor)
+    {
+        if (cor is null || !System.Text.RegularExpressions.Regex.IsMatch(cor, "^#[0-9a-fA-F]{6}$")) return;
+        _cores[ano] = cor.ToLowerInvariant();
+        GravarCores();
+    }
+
+    private void RestaurarCores()
+    {
+        _cores.Clear();
+        ChartPrefs.Reset(_login, ChaveCores);
+    }
+
+    /// <summary>A cor do ano: a escolhida pela pessoa; senão, roxo para o ano em foco e a paleta para os outros (mais recente primeiro).</summary>
+    private string CorDoAno(int ano)
+    {
+        if (_cores.TryGetValue(ano, out var c)) return c;
+        if (ano == _foco) return CorFocoLinha;
+        var outros = AnosDoPainel.Where(a => a != _foco).OrderByDescending(a => a).ToList();
+        var i = outros.IndexOf(ano);
+        return EstilosAnos[Math.Clamp(i, 0, EstilosAnos.Length - 1)].Cor;
+    }
+
     private string SvgAnos(string met, int focoAno)
     {
         var anos = AnosDoPainel.OrderBy(a => a).ToList();
@@ -698,11 +766,12 @@
 
         // estilo de cada ano: o ano em foco é o roxo; os outros pegam a paleta na ordem (mais recente primeiro)
         var outros = anos.Where(a => a != focoAno).OrderByDescending(a => a).ToList();
-        (string Cor, string Traco) Estilo(int a) => a == focoAno ? (CorFocoLinha, "") : EstilosAnos[Math.Min(outros.IndexOf(a), EstilosAnos.Length - 1)];
+        (string Cor, string Traco) Estilo(int a) => (CorDoAno(a), a == focoAno ? "" : EstilosAnos[Math.Min(outros.IndexOf(a), EstilosAnos.Length - 1)].Traco);
+        var cf = CorDoAno(focoAno);
 
         var sb = new StringBuilder();
         sb.Append($"<svg viewBox='0 0 {N(Wd)} {N(H)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{Esc(TituloGrafico())}'>");
-        sb.Append($"<defs><linearGradient id='vparea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{CorFocoLinha}' stop-opacity='0.24'/><stop offset='100%' stop-color='{CorFocoLinha}' stop-opacity='0.02'/></linearGradient></defs>");
+        sb.Append($"<defs><linearGradient id='vparea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cf}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cf}' stop-opacity='0.02'/></linearGradient></defs>");
 
         // legenda: o ano em foco primeiro, depois os outros do mais recente ao mais antigo
         var dx = 0.0;
@@ -728,7 +797,7 @@
         var hoje = DateTime.Today;
         var mesAtual = focoAno == hoje.Year ? hoje.Month : 0;
         if (mesAtual > 0)
-            sb.Append($"<line x1='{N(X(mesAtual))}' y1='{N(top)}' x2='{N(X(mesAtual))}' y2='{N(bot)}' stroke='{CorFocoLinha}' stroke-width='1' stroke-dasharray='3 3' opacity='0.3'/>");
+            sb.Append($"<line x1='{N(X(mesAtual))}' y1='{N(top)}' x2='{N(X(mesAtual))}' y2='{N(bot)}' stroke='{cf}' stroke-width='1' stroke-dasharray='3 3' opacity='0.3'/>");
 
         List<List<(double X, double Y)>> Trechos(int a)
         {
@@ -761,7 +830,7 @@
             if (s.Count > 1)
             {
                 sb.Append($"<polygon points='{N(s[0].X)},{N(Y(Math.Max(0, min)))} {Pts(s)} {N(s[^1].X)},{N(Y(Math.Max(0, min)))}' fill='url(#vparea)'/>");
-                sb.Append($"<polyline points='{Pts(s)}' fill='none' stroke='{CorFocoLinha}' stroke-width='2.8' stroke-linejoin='round' stroke-linecap='round'/>");
+                sb.Append($"<polyline points='{Pts(s)}' fill='none' stroke='{cf}' stroke-width='2.8' stroke-linejoin='round' stroke-linecap='round'/>");
             }
         }
         for (var m = 1; m <= 12; m++)
@@ -770,10 +839,10 @@
             if (Val(focoAno, m) is double v)
             {
                 var y = Y(v);
-                sb.Append($"<circle cx='{N(X(m))}' cy='{N(y)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{CorFocoLinha}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc($"{focoAno} · {NomeDoMes(m).ToLowerInvariant()}: {Txt(focoAno, m)}")}</title></circle>");
+                sb.Append($"<circle cx='{N(X(m))}' cy='{N(y)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cf}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc($"{focoAno} · {NomeDoMes(m).ToLowerInvariant()}: {Txt(focoAno, m)}")}</title></circle>");
                 sb.Append($"<text x='{N(X(m))}' y='{N(y - 9)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "600")}' fill='{(cur ? "#5b21b6" : "#5b6b82")}' paint-order='stroke' stroke='#fff' stroke-width='3' stroke-linejoin='round'>{Esc(Rot(v))}</text>");
             }
-            sb.Append($"<text x='{N(X(m))}' y='{N(H - 10)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? CorFocoLinha : "#93a1b5")}'>{MesCurto(m).ToUpperInvariant()}</text>");
+            sb.Append($"<text x='{N(X(m))}' y='{N(H - 10)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? cf : "#93a1b5")}'>{MesCurto(m).ToUpperInvariant()}</text>");
         }
 
         // faixa invisível por mês: dica com todos os anos
