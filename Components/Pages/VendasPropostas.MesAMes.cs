@@ -18,6 +18,21 @@ public partial class VendasPropostas
     private string _mmModo = "comparar";
     private int? _mmComp;
     private bool _mmDetalhe;
+    /// <summary>Conversão do quadro: false = por quantidade (ganhas ÷ base); true = por valor (R$ ganho ÷ R$ da base).</summary>
+    private bool _mmConvValor;
+
+    /// <summary>Taxa de conversão do mês no quadro, por quantidade ou por valor (base de "Taxa sobre").</summary>
+    private double? TaxaMm(int ano, int mes) => _mmConvValor ? TaxaValorMes(ano, mes) : TaxaMes(ano, mes).Taxa;
+
+    /// <summary>Por valor: valor ganho ÷ (ganho + perdido), ou ÷ valor de todas as enviadas (mesma regra da guia Conversão).</summary>
+    private double? TaxaValorMes(int ano, int mes)
+    {
+        var l = _convSetor.Where(x => x.Ano == ano && x.Mes == mes).ToList();
+        double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0);
+        double vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
+        var vb = BaseTodas ? l.Sum(x => x.Brl ?? 0) : vg + vp;
+        return vb > 0 ? vg / vb * 100 : null;
+    }
     /// <summary>Qual paleta de cores está aberta: "u", "c", "t" (o modo) ou nenhuma.</summary>
     private string? _mmPaleta;
 
@@ -144,7 +159,7 @@ public partial class VendasPropostas
             var (v, nv) = SomaMm(true, a, mv);
             var (p, np) = SomaMm(false, a, mp);
             var t = mp > 0 ? Taxa(a, mp) : default;
-            return new LadoMm(a, v, nv, (int)p, np, mp > 0 ? t.Taxa : null, t.G, t.Base);
+            return new LadoMm(a, v, nv, (int)p, np, mp > 0 ? (_mmConvValor ? t.TaxaValor : t.Taxa) : null, t.G, t.Base);
         }
         return (mv, mp, Lado(a1), Lado(a2));
     }

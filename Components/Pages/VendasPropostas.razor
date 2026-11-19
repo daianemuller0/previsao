@@ -1081,6 +1081,12 @@
                 <button class="@(modo == "comparar" ? "on" : "")" disabled="@(anosDisp.Count < 2)" @onclick='() => _mmModo = "comparar"'>Comparar dois anos</button>
                 <button class="@(modo == "historico" ? "on" : "")" @onclick='() => _mmModo = "historico"'>Todos os anos</button>
             </div>
+            <div class="vpm-sel vpm-convpor" title="Como a taxa de conversão é calculada neste quadro"><span>Conversão por</span>
+                <div class="cvx-seg-ctl">
+                    <button class="@(!_mmConvValor ? "on" : "")" @onclick="() => _mmConvValor = false">Quantidade</button>
+                    <button class="@(_mmConvValor ? "on" : "")" @onclick="() => _mmConvValor = true">Valor (R$)</button>
+                </div>
+            </div>
             <button type="button" class="btn-ghost vpm-tela" onclick="vpTelaCheia('mes-a-mes')" title="Mostrar este quadro na tela inteira (Esc para sair)">
                 <span class="vpm-tela-on">⛶ Tela cheia</span><span class="vpm-tela-off">✕ Sair da tela cheia</span>
             </button>
@@ -1320,7 +1326,7 @@
         var el = env ? 'e' : 'x';
         double? Val(int a, int m) => env
             ? (Prop(a, m)?.Valor is decimal v && v > 0 ? (double)v : null)
-            : (CelProp(a, m).Tem ? TaxaMes(a, m).Taxa : null);
+            : (CelProp(a, m).Tem ? TaxaMm(a, m) : null);
         var pts = anos.SelectMany(a => Enumerable.Range(1, 12).Select(m => (a, m, v: Val(a, m), parc: CelProp(a, m).Parcial))).ToList();
         var base0 = pts.Where(p => p.v is not null && !p.parc).Select(p => p.v!.Value).ToList();
         if (base0.Count == 0) base0 = pts.Where(p => p.v is not null).Select(p => p.v!.Value).ToList();
@@ -1372,7 +1378,7 @@
                         <div class="vpm-ano-t">@L.Ano</div>
                         <div class="vpm-ano-l"><span>Vendas</span><b title="@(L.MesesV > 0 ? Reais(L.Vendas) : "")">@(L.MesesV > 0 ? Mi(L.Vendas) : "n/d")</b></div>
                         <div class="vpm-ano-l"><span>Propostas</span><b>@(L.MesesP > 0 ? N0(L.Propostas) : "n/d")</b></div>
-                        <div class="vpm-ano-l"><span>Conversão</span><b title="@($"{N0(L.G)} ganhas de {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
+                        <div class="vpm-ano-l"><span>Conversão@(_mmConvValor ? " (valor)" : "")</span><b title="@(_mmConvValor ? RegraMm : $"{N0(L.G)} ganhas de {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
                     </div>
                 }
             </div>
@@ -1390,7 +1396,7 @@
             </div>
             <p class="vpm-rnota">
                 Mesmos meses nos dois anos@(mp < 12 && a1 == DateTime.Today.Year || a2 == DateTime.Today.Year ? $"; {NomeDoMes(DateTime.Today.Month).ToLowerInvariant()} (em andamento) fica fora" : "").
-                Conversão: @RegraTxt.
+                Conversão: @RegraMm.
                 Mais ou menos propostas não é, por si, melhora ou piora.
             </p>
         </aside>
@@ -1446,7 +1452,7 @@
                 }
                 if (trecho.Count > 0) trechos.Add(trecho);
                 // linha da taxa de conversão do mês (regra de "Taxa sobre"): escala entre a menor e a maior taxa do mês
-                var conv = anos.Select((a, i) => (a, i, t: CelProp(a, mes).Tem ? TaxaMes(a, mes).Taxa : null, parc: CelProp(a, mes).Parcial)).ToList();
+                var conv = anos.Select((a, i) => (a, i, t: CelProp(a, mes).Tem ? TaxaMm(a, mes) : null, parc: CelProp(a, mes).Parcial)).ToList();
                 var tcs = conv.Where(x => x.t is not null).Select(x => x.t!.Value).ToList();
                 double tMin = tcs.DefaultIfEmpty(0).Min(), tMax = tcs.DefaultIfEmpty(0).Max();
                 double Yc(double t) => tMax - tMin < 0.5 ? 45 : 14 + (t - tMin) / (tMax - tMin) * 52;
@@ -1577,7 +1583,13 @@
         </div>
     };
 
-    private string RegraCurtaMm => BaseTodas ? "ganhas ÷ todas as enviadas no mês" : "ganhas ÷ decididas no mês";
+    private string RegraCurtaMm => _mmConvValor
+        ? (BaseTodas ? "por valor: R$ ganho ÷ R$ de todas as enviadas no mês" : "por valor: R$ ganho ÷ R$ (ganho + perdido) no mês")
+        : (BaseTodas ? "por quantidade: ganhas ÷ todas as enviadas no mês" : "por quantidade: ganhas ÷ decididas no mês");
+    /// <summary>A regra da conversão do quadro mês a mês, por extenso (quantidade ou valor; decididas ou todas).</summary>
+    private string RegraMm => _mmConvValor
+        ? (BaseTodas ? "Valor ganho ÷ valor de todas as propostas enviadas × 100" : "Valor ganho ÷ (valor ganho + valor perdido) × 100")
+        : RegraTxt;
 
     /// <summary>Valor em reais, curto: R$ 39.000.000 → "R$ 39 mi"; R$ 54.400.000 → "R$ 54,4 mi"; "R$ 1,2 bi".</summary>
     private static string ReaisMi(decimal v)
@@ -1605,6 +1617,7 @@
         var propsM = Enumerable.Range(1, mp).Select(m => (m, c: CelProp(a, m))).Where(x => x.c.Tem && !x.c.Parcial).ToList();
         var parcial = a == DateTime.Today.Year ? CelProp(a, DateTime.Today.Month) : default;
         var tx = Taxa(a);
+        var txMm = _mmConvValor ? tx.TaxaValor : tx.Taxa;
         <aside class="vpm-resumo um">
             <div class="vpm-rtit">Resumo de @a</div>
             <div class="vpm-blk">
@@ -1630,8 +1643,8 @@
             </div>
             <div class="vpm-blk">
                 <span class="vpm-blk-t">Conversão · @(a == DateTime.Today.Year ? $"jan–{MesCurto(DateTime.Today.Month).ToLowerInvariant()}" : "jan–dez")</span>
-                <b class="vpm-blk-v">@(tx.Taxa is double t ? P1(t) : "—")</b>
-                <span>@N0(tx.G) ganhas de @N0(tx.Base) @DenRot · @RegraTxt</span>
+                <b class="vpm-blk-v">@(txMm is double t ? P1(t) : "—")</b>
+                <span>@(_mmConvValor ? "por valor · " + RegraMm : $"{N0(tx.G)} ganhas de {N0(tx.Base)} {DenRot} · {RegraTxt}")</span>
             </div>
         </aside>
     };
@@ -1713,7 +1726,7 @@
                             var va = CelVenda(principal, m); var vb = CelVenda(b, m);
                             var pa = CelProp(principal, m); var pb = CelProp(b, m);
                             var okV = va.Tem && vb.Tem; var okP = pa.Tem && pb.Tem && !pa.Parcial && !pb.Parcial;
-                            var tA = TaxaMes(principal, m).Taxa; var tB = TaxaMes(b, m).Taxa;
+                            var tA = TaxaMm(principal, m); var tB = TaxaMm(b, m);
                             <tr>
                                 <th>@NomeDoMes(m)</th>
                                 <td class="@(va.Tem && va.Valor < 0 ? "neg" : "")">@CelTxt(true, va, true)</td><td class="@(vb.Tem && vb.Valor < 0 ? "neg" : "")">@CelTxt(true, vb, true)</td>
@@ -1776,13 +1789,13 @@
                 var mv = FechadoV(a); var mp = FechadoP(a);
                 var (sv, nv) = SomaMm(true, a, mv); var (sp, np) = SomaMm(false, a, mp);
                 var envF = Enumerable.Range(1, mp).Select(m => Prop(a, m)).Where(p => p is not null).ToList();
-                var txF = mp > 0 ? Taxa(a, mp).Taxa : null;
+                var txF = mp > 0 ? (_mmConvValor ? Taxa(a, mp).TaxaValor : Taxa(a, mp).Taxa) : null;
                 <table class="vpm-det">
                     <thead><tr><th>Mês @a</th><th>Situação</th><th>Vendas (R$)</th><th>Propostas enviadas</th><th>Valor enviado (R$)</th><th>Conversão do mês</th></tr></thead>
                     <tbody>
                         @for (var m = 1; m <= 12; m++)
                         {
-                            var v = CelVenda(a, m); var p = CelProp(a, m); var pm = Prop(a, m); var tm = TaxaMes(a, m).Taxa;
+                            var v = CelVenda(a, m); var p = CelProp(a, m); var pm = Prop(a, m); var tm = TaxaMm(a, m);
                             var sit = p.Parcial ? "parcial (em andamento)" : v.Sit == SitMes.AApurar && p.Sit == SitMes.AApurar ? "a apurar" : v.Tem || p.Tem ? "fechado" : "sem dado";
                             <tr>
                                 <th>@NomeDoMes(m)</th><td class="sit">@sit</td>
