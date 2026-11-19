@@ -2741,3 +2741,19 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .vp-cor input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
 .vp-cor input[type=color]::-webkit-color-swatch { border: 1px solid rgba(0,0,0,.12); border-radius: 50%; }
 .vp-btn-cores { padding: 5px 12px; font-size: 12px; }
+/* Ano a ano em cartões, no mesmo quadro do gráfico principal */
+.vp-anos-tit { font-size: 13px; font-weight: 800; color: var(--cx-navy); margin: 14px 2px 8px; border-top: 1px solid var(--cx-line); padding-top: 14px; }
+.vp-anos-tit span { font-size: 11.5px; font-weight: 500; color: var(--cx-mut); margin-left: 8px; }
+.vp-anos-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.vp-ano-tile { text-align: left; font: inherit; color: inherit; cursor: pointer; background: #fff; border: 1px solid var(--cx-line); border-top: 4px solid var(--ac); border-radius: 10px; padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 5px; transition: box-shadow .12s, transform .12s; }
+.vp-ano-tile:hover { box-shadow: 0 6px 16px rgba(18,38,63,.10); transform: translateY(-1px); }
+.vp-ano-tile.foco { background: color-mix(in srgb, var(--ac) 7%, #fff); border-color: color-mix(in srgb, var(--ac) 45%, var(--cx-line)); border-top-color: var(--ac); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ac) 35%, transparent); }
+.vp-at-ano { font-size: 18px; font-weight: 800; color: var(--ac); letter-spacing: -.3px; display: flex; align-items: baseline; gap: 6px; }
+.vp-at-ano small { font-size: 11px; font-weight: 600; color: var(--cx-mut); }
+.vp-at-l { display: grid; grid-template-columns: 1fr auto; align-items: baseline; column-gap: 6px; }
+.vp-at-l span { grid-column: 1 / -1; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--cx-mut); }
+.vp-at-l b { font-size: 16px; font-weight: 800; color: var(--cx-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vp-at-l em { font-style: normal; font-size: 11.5px; font-weight: 700; white-space: nowrap; color: var(--cx-mut); }
+.vp-at-l em.pos { color: var(--pos, #1f9254); } .vp-at-l em.neg { color: var(--neg, #b42318); }
+.vp-at-l em.vp-parcial { margin: 0; }
+.vp-at-l.vendas { border-top: 1px dashed var(--cx-line); padding-top: 5px; margin-top: 1px; }

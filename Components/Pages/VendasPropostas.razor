@@ -153,6 +153,32 @@
                     </div>
                 }
                 <div class="chart-body">@((MarkupString)SvgAnos(_met, foco.Ano))</div>
+
+                @* ano a ano, no mesmo quadro do gráfico: um cartão por ano, na cor da linha do ano *@
+                <div class="vp-anos-tit">Ano a ano <span>clique num ano para colocá-lo em foco · variação contra o mesmo período do ano anterior</span></div>
+                <div class="vp-anos-tiles">
+                    @foreach (var a in AnosDoPainel)
+                    {
+                        var ano = a;
+                        var l = Linha(a);
+                        var r = _anos.FirstOrDefault(x => x.Ano == a);
+                        var lim = MesLimite(a);
+                        var temAnt = a - 1 >= AnoIni;
+                        var dQtd = temAnt && l.Qtd is int ql ? DeltaCurto(QtdAte(a, lim), QtdAte(a - 1, lim)) : null;
+                        var dVal = temAnt && l.SemTaxa == 0 ? DeltaCurto(ValorAte(a, lim), ValorAte(a - 1, lim)) : null;
+                        var dVen = temAnt && r is { MesesComVendas: > 0 } ? DeltaCurto(r.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, r.UltimoMes)) : null;
+                        <button type="button" class="vp-ano-tile @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
+                            <div class="vp-at-ano">@a@if (a == DateTime.Today.Year) { <small>até @MesCurto(lim).ToLowerInvariant()</small> }</div>
+                            <div class="vp-at-l"><span>Propostas</span><b>@(l.Qtd is int qq ? N0(qq) : "—")</b>@if (dQtd is not null) { <em class="@DeltaCls(dQtd)">@Seta(dQtd)</em> }</div>
+                            <div class="vp-at-l"><span>Valor enviado</span><b>@(l.Valor is decimal vv ? Mi(vv) : "—")</b>
+                                @if (l.SemTaxa > 0) { <em class="vp-parcial" title="@N0(l.SemTaxa) proposta(s) do AFM sem taxa de câmbio do ano: fora do valor">parcial</em> }
+                                else if (dVal is not null) { <em class="@DeltaCls(dVal)">@Seta(dVal)</em> }</div>
+                            <div class="vp-at-l"><span>Valor médio</span><b>@(l.Valor is decimal vm2 && l.ComValor > 0 ? Mi(vm2 / l.ComValor) : "—")</b></div>
+                            <div class="vp-at-l vendas"><span>Vendas@(r is { UltimoMes: > 0 and < 12 } ? $" (até {MesCurto(r.UltimoMes).ToLowerInvariant()})" : "")</span><b>@(r is { MesesComVendas: > 0 } ? Mi(r.Vendas) : "—")</b>@if (dVen is not null) { <em class="@DeltaCls(dVen)">@Seta(dVen)</em> }</div>
+                        </button>
+                    }
+                </div>
+                <p class="cvx-note" style="margin-top:8px">Propostas: @_fonte. Cada número de proposta conta uma vez, no mês da data de envio.</p>
             </div>
 
             @{
@@ -193,41 +219,6 @@
                 <div class="chart-body">@((MarkupString)SvgMetas(foco.Ano))</div>
             </div>
 
-            <div class="cvx-card">
-                <div class="cvx-ch">
-                    <div>
-                        <h3 class="cvx-h3">Ano a ano</h3>
-                        <p>Propostas enviadas, valor enviado e vendas anuais · o ano em andamento vai até o último mês com dado</p>
-                    </div>
-                </div>
-                <table class="cvx-tbl vp-anos">
-                    <thead>
-                        <tr>
-                            <th>Ano</th><th class="r">Propostas enviadas</th><th class="r">Valor enviado</th><th class="r">Valor médio</th>
-                            <th class="r">Vendas</th><th class="r">% do budget HSA</th><th class="r" title="Vendas ÷ propostas, nos meses com as duas coisas">Venda por proposta</th>
-                            <th class="r" title="Vendas ÷ valor enviado, nos meses com as duas coisas">Vendas ÷ valor enviado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var a in AnosDoPainel)
-                        {
-                            var l = Linha(a);
-                            var r = _anos.FirstOrDefault(x => x.Ano == a);
-                            <tr class="@(a == foco.Ano ? "foco" : "")">
-                                <td><b>@a</b>@if (r is { UltimoMes: > 0 and < 12 }) { <span class="vp-mut"> · vendas jan–@MesCurto(r.UltimoMes).ToLowerInvariant()</span> }</td>
-                                <td class="r">@(l.Qtd is int qq ? N0(qq) : "—")</td>
-                                <td class="r">@(l.Valor is decimal vv ? Mi(vv) : "—")@if (l.SemTaxa > 0) { <span class="vp-parcial" title="@N0(l.SemTaxa) proposta(s) do AFM sem taxa de câmbio do ano">parcial</span> }</td>
-                                <td class="r">@(l.Valor is decimal vm2 && l.ComValor > 0 ? Mi(vm2 / l.ComValor) : "—")</td>
-                                <td class="r">@(r is { MesesComVendas: > 0 } ? Mi(r.Vendas) : "—")</td>
-                                <td class="r">@MedidorFino(r?.PctHsa)</td>
-                                <td class="r">@(l.VendaPorProposta is decimal vp2 ? Mi(vp2) : "—")</td>
-                                <td class="r">@(l.Conversao is decimal c2 ? Pct(c2) : l.SemTaxa > 0 ? "parcial" : "—")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <p class="cvx-note" style="margin-top:8px">Propostas: @_fonte. Cada número de proposta conta uma vez, no mês da data de envio.</p>
-            </div>
         </section>
 
         @* ================= 2 · POR VENDEDOR ================= *@
@@ -658,6 +649,10 @@
     private static string? Delta(decimal? atual, decimal? anterior, int anoAnt) =>
         atual is decimal a && anterior is decimal b && b > 0 ? $"{(a - b) / b * 100:+0;-0;0}% vs mesmo período de {anoAnt}" : null;
     private static string? Delta(int atual, int? anterior, int anoAnt) => Delta((decimal)atual, anterior, anoAnt);
+
+    /// <summary>Variação curta para os cartões dos anos ("+12%").</summary>
+    private static string? DeltaCurto(decimal? atual, decimal? anterior) =>
+        atual is decimal x && anterior is decimal y && y > 0 ? $"{(x - y) / y * 100:+0;-0;0}%" : null;
 
     private static string DeltaCls(string? d) => d is null || d.StartsWith("+0") || d.StartsWith("0") ? "neu" : d.StartsWith("+") ? "pos" : "neg";
     private static string Seta(string d) => d.StartsWith("+0") || d.StartsWith("0") ? d : (d.StartsWith("+") ? "▲ " : d.StartsWith("-") ? "▼ " : "") + d;
