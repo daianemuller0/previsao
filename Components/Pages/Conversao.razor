@@ -178,6 +178,13 @@ else
                     <button type="button" class="@(_baseTodas ? "on" : "")" @onclick="() => _baseTodas = true">Todas as propostas</button>
                 </div>
             </div>
+            <div class="cvx-base-taxa" title="Como a taxa de conversão é calculada. Quantidade: número de propostas ganhas ÷ base. Valor (R$): valor ganho ÷ valor da base. A base é a do botão &quot;Taxa sobre&quot;.">
+                <span class="flt-label">Conversão por</span>
+                <div class="cvx-seg-ctl">
+                    <button type="button" class="@(!_porValor ? "on" : "")" @onclick="() => _porValor = false">Quantidade</button>
+                    <button type="button" class="@(_porValor ? "on" : "")" @onclick="() => _porValor = true">Valor (R$)</button>
+                </div>
+            </div>
             <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
             @if (Ativos > 0)
             {
@@ -298,7 +305,7 @@ else
                 <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Base) @DenRot</div>
                 @{ var dw = DeltaWin(); }
                 @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
-                <div class="cvx-ksub" title="@TituloValor">Por valor: <b>@TxValorGlobal(_r)</b></div>
+                <div class="cvx-ksub" title="@TituloValor">@(_porValor ? "Por quantidade" : "Por valor"): <b>@TxOutraGlobal(_r)</b></div>
             </article>
             @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
                  "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
@@ -453,7 +460,7 @@ else
             @if (_seg is { } sgv) { <div class="cvx-note">Segmento @NomeEn(sgv) ignorado neste detalhamento: a taxa de conversão considera todas as classes.</div> }
             <div class="cvx-dkpis">
                 <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Base) @DenRot</span></div>
-                <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão por valor @TxValorGlobal(rv)</span></div>
+                <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão @(_porValor ? "por quantidade" : "por valor") @TxOutraGlobal(rv)</span></div>
             </div>
             <div class="cvx-dcmp">
                 @if (cmp is { } c && rv.Decididas < AmostraMinima)
@@ -537,7 +544,7 @@ else
                             <span class="cvx-ibm p" title="@DinTip(r, ClasseProposta.Perdida)">@Din(r, ClasseProposta.Perdida) <small>perdido</small></span>
                             <span class="cvx-ibm a" title="@DinTip(r, ClasseProposta.Aberta)">@Din(r, ClasseProposta.Aberta) <small>aberto</small></span>
                             <span class="ibar-sep"></span>
-                            <span class="cvx-ibm" title="@TituloValor">@TxValor(r) <small>em valor</small></span>
+                            <span class="cvx-ibm" title="@TituloValor">@TxOutra(r) <small>@OutraRot</small></span>
                             <span class="ibar-val @RelCss(r) @(r.Base == 0 ? "cvx-na" : "")">@TxQtd(r)</span>
                         </span>
                     </div>

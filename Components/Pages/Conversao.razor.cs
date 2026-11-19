@@ -101,9 +101,14 @@ public partial class Conversao : IAsyncDisposable
         public double VTotal => VG + VP + VA + VNC;
         /// <summary>Base da taxa: false = decididas (padrão); true = todas as propostas enviadas.</summary>
         public bool Todas;
+        /// <summary>Conversão por valor (botão "Conversão por" da barra de filtros): a taxa principal passa a ser a por valor.</summary>
+        public bool PorValor;
+        /// <summary>Taxa por quantidade de propostas: ganhas ÷ base.</summary>
+        public double? TaxaContagem => Base > 0 ? (double)G / Base * 100 : null;
         /// <summary>Denominador da taxa: decididas, ou todas as propostas.</summary>
         public int Base => Todas ? Total : Decididas;
-        public double? TaxaQtd => Base > 0 ? (double)G / Base * 100 : null;
+        /// <summary>A taxa de conversão principal: por quantidade ou por valor, conforme "Conversão por".</summary>
+        public double? TaxaQtd => PorValor ? TaxaValor : TaxaContagem;
         public double? TaxaValor => Todas ? (VTotal > 0 ? VG / VTotal * 100 : null) : (VG + VP) > 0 ? VG / (VG + VP) * 100 : null;
         public int Qtd(ClasseProposta c) => c switch { ClasseProposta.Ganha => G, ClasseProposta.Perdida => P, ClasseProposta.Aberta => A, _ => NC };
         public double Val(ClasseProposta c) => c switch { ClasseProposta.Ganha => VG, ClasseProposta.Perdida => VP, ClasseProposta.Aberta => VA, _ => VNC };
@@ -173,7 +178,7 @@ public partial class Conversao : IAsyncDisposable
 
     private Resumo Somar(IEnumerable<Item> itens)
     {
-        var r = new Resumo { Todas = _baseTodas };
+        var r = new Resumo { Todas = _baseTodas, PorValor = _porValor };
         foreach (var i in itens)
         {
             r.Total++;
@@ -280,8 +285,14 @@ public partial class Conversao : IAsyncDisposable
     private static string DinTotal(Resumo r) => Estado(r.TotComUsd, r.TotConv, r.VTotal);
     private static string DinTotalTip(Resumo r) => EstadoTip(r.TotComUsd, r.TotConv, r.VTotal);
 
-    private string TxQtd(Resumo r) => !_taxaOk ? "—" : r.Base == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
-    private static string TxQtdGlobal(Resumo r) => r.Base == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
+    /// <summary>A taxa principal (quantidade ou valor, conforme "Conversão por").</summary>
+    private string TxQtd(Resumo r) => !_taxaOk ? "—" : TxQtdGlobal(r);
+    private static string TxQtdGlobal(Resumo r) => r.PorValor ? TxValorGlobal(r) : TxContagemGlobal(r);
+    private static string TxContagemGlobal(Resumo r) => r.Base == 0 ? "Não calculável" : P1(r.TaxaContagem!.Value);
+    /// <summary>A outra medida, mostrada ao lado da principal: por valor (se a principal é por quantidade) ou o contrário.</summary>
+    private string TxOutra(Resumo r) => !_taxaOk ? "—" : TxOutraGlobal(r);
+    private static string TxOutraGlobal(Resumo r) => r.PorValor ? TxContagemGlobal(r) : TxValorGlobal(r);
+    private string OutraRot => _porValor ? "em quantidade" : "em valor";
     private string TxValor(Resumo r) => !_taxaOk ? "—" : TxValorGlobal(r);
     private static string TxValorGlobal(Resumo r)
     {
@@ -1122,9 +1133,21 @@ public partial class Conversao : IAsyncDisposable
         get => Filtros?.BaseTodas ?? _baseTodasLocal;
         set { if (Filtros is not null) Filtros.BaseTodas = value; else _baseTodasLocal = value; }
     }
+    // ---- conversão por quantidade ou por valor (segundo botão da barra de filtros) ----
+    private bool _porValorLocal;
+    private bool _porValor
+    {
+        get => Filtros?.PorValor ?? _porValorLocal;
+        set { if (Filtros is not null) Filtros.PorValor = value; else _porValorLocal = value; }
+    }
     private string DenRot => _baseTodas ? "enviadas" : "decididas";
-    private string RegraCurta => _baseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ decididas";
-    private string TituloRegra => _baseTodas
+    private string RegraCurta => _porValor
+        ? (_baseTodas ? "R$ ganho ÷ R$ de todas as enviadas" : "R$ ganho ÷ R$ (ganho + perdido)")
+        : (_baseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ decididas");
+    private string TituloRegra => _porValor
+        ? (_baseTodas ? "Taxa de Conversão por valor = valor ganho ÷ valor de todas as propostas enviadas × 100."
+                      : "Taxa de Conversão por valor = valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas e não classificadas fora.")
+        : _baseTodas
         ? "Taxa de Conversão = Ganhas ÷ todas as propostas enviadas × 100 (ganhas, perdidas, abertas e não classificadas)."
         : "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.";
     private string TituloValor => _baseTodas ? "Valor ganho ÷ valor total cotado (todas as propostas), em R$" : "Valor ganho ÷ (valor ganho + valor perdido), em R$";
@@ -1199,7 +1222,7 @@ public partial class Conversao : IAsyncDisposable
         foreach (var (nome, _) in lista)
         {
             if (WorldMap.Chave(nome) is not { } k) continue;
-            if (!porChave.TryGetValue(k, out var e)) porChave[k] = e = (new Resumo(), new List<string>());
+            if (!porChave.TryGetValue(k, out var e)) porChave[k] = e = (new Resumo { Todas = _baseTodas, PorValor = _porValor }, new List<string>());
             e.Nomes.Add(nome);
         }
         var resumos = porChave.ToDictionary(kv => kv.Key, kv => (R: Somar(_fx.Where(i => kv.Value.Nomes.Contains(i.P.Pais))), kv.Value.Nomes));

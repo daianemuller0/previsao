@@ -28,6 +28,12 @@ public sealed class FiltrosConversao
     public bool BaseTodas { get; set; }
 
     /// <summary>
+    /// Como a taxa de conversão é calculada: false = por quantidade de propostas (o padrão);
+    /// true = por valor (R$ ganho ÷ R$ da base escolhida em "Taxa sobre").
+    /// </summary>
+    public bool PorValor { get; set; }
+
+    /// <summary>
     /// Primeiro ano considerado (null = todos). Na guia Performance Comercial é 2022: propostas
     /// mais antigas, do futuro ou sem data de envio ficam fora da barra de filtros e das seções.
     /// </summary>
@@ -44,7 +50,7 @@ public sealed class FiltrosConversao
 
     /// <summary>Retrato dos filtros: muda sempre que algum muda.</summary>
     public string Assinatura() =>
-        (BaseTodas ? "T|" : "D|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
+        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
 
     /// <summary>
     /// A proposta passa pelos filtros? (as mesmas regras da guia Conversão)
