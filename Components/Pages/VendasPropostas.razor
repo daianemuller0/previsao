@@ -189,6 +189,17 @@
                                 <span><i style="background:#6FB3DC"></i>Perdidas</span><b>@N0(c.P)</b>
                                 <span><i style="background:#007A9E"></i>Abertas</span><b>@N0(c.A)</b>
                             </div>
+                            @{ var sa = PorSetor(a, ConversaoService.Afm); var sn = PorSetor(a, ConversaoService.Nb); var totSet = Math.Max(1, sa.Total + sn.Total); }
+                            <div class="vp-cc-setor" title="AFM = planilha de Aftermarket · NB = planilha de New Business">
+                                <div class="vp-cs-barra"><i style="width:@F(sa.Total * 100.0 / totSet)%;background:@CorAfm" title="AFM: @N0(sa.Total) propostas"></i><i style="width:@F(sn.Total * 100.0 / totSet)%;background:@CorNb" title="NB: @N0(sn.Total) propostas"></i></div>
+                                <div class="vp-cs-grade">
+                                    <span></span><b class="cab"><i style="background:@CorAfm"></i>AFM</b><b class="cab"><i style="background:@CorNb"></i>NB</b>
+                                    <span>Taxa</span><b class="tx">@(sa.Taxa is double ta ? P1(ta) : "—")</b><b class="tx">@(sn.Taxa is double tn ? P1(tn) : "—")</b>
+                                    <span>Propostas</span><b>@N0(sa.Total) <small>@(sa.Total + sn.Total > 0 ? Math.Round(sa.Total * 100.0 / totSet) + "%" : "")</small></b><b>@N0(sn.Total) <small>@(sa.Total + sn.Total > 0 ? Math.Round(sn.Total * 100.0 / totSet) + "%" : "")</small></b>
+                                    <span>Ganhas</span><b>@N0(sa.G)</b><b>@N0(sn.G)</b>
+                                    <span>Valor enviado</span><b>@(sa.Valor > 0 ? Mi(sa.Valor) : "—")@if (sa.SemTaxa > 0) { <em class="vp-parcial" title="@N0(sa.SemTaxa) proposta(s) sem taxa de câmbio do ano">parcial</em> }</b><b>@(sn.Valor > 0 ? Mi(sn.Valor) : "—")</b>
+                                </div>
+                            </div>
                             <div class="vp-cc-valor">
                                 <span>Valor ganho</span><b>@(c.VG > 0 ? Mi((decimal)c.VG) : "—")</b>
                                 <span>Por valor</span><b>@(c.TaxaValor is double tvc ? P1(tvc) : "—")</b>
@@ -651,6 +662,21 @@
         double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
         return (l.Count, g, p, a, nc, b, b > 0 ? g * 100.0 / b : null, vg, vb > 0 ? vg / vb * 100 : null);
+    }
+
+    private const string CorAfm = "#12355B", CorNb = "#2BA59A";
+
+    /// <summary>
+    /// O ano dividido por setor (AFM ou NB): propostas, ganhas e a taxa (pela base de "Taxa sobre"),
+    /// das linhas da guia Conversão; e o valor enviado, das propostas enviadas (cada número uma vez).
+    /// </summary>
+    private (int Total, int G, double? Taxa, decimal Valor, int SemTaxa) PorSetor(int ano, string origem)
+    {
+        var l = _convSetor.Where(x => x.Ano == ano && x.Origem == origem).ToList();
+        int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida);
+        var b = BaseTodas ? l.Count : g + p;
+        var env = _enviadasSetor.Where(x => x.Data.Year == ano && x.Fonte == origem).ToList();
+        return (l.Count, g, b > 0 ? g * 100.0 / b : null, env.Sum(x => x.ValorReais), env.Count(x => x.SemTaxa));
     }
 
     /// <summary>Taxa do mês no gráfico, pela base escolhida em "Taxa sobre": ganhas ÷ decididas do mês, ou ganhas ÷ todas as enviadas no mês.</summary>
