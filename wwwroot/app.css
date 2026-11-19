@@ -2927,3 +2927,11 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .vp-page .cvx-embed .xcard-total b { font-size: 18px; }
 .vp-page .cvx-embed .cvx-tbl, .vp-page .cvx-embed table { font-size: 14.5px; }
 .cvx-lado-a-lado > .cvx-sec .xsec { margin-top: 28px; }
+.vp-cc-valor b em { font-style: normal; font-size: 12px; font-weight: 700; margin-left: 6px; color: var(--cx-mut); }
+.vp-cc-valor b em.pos { color: var(--pos, #1f9254); } .vp-cc-valor b em.neg { color: var(--neg, #b42318); }
+.vp-cc-valor b em.vp-parcial { color: #8a5a00; }
+.vp-page .vp-cc-valor b em { font-size: 13px; }
+.vp-principal .vp-conv-grid { margin-top: 2px; }
+.vp-cc-valor b { white-space: nowrap; }
+.vp-cc-valor b em { display: block; margin: 1px 0 0; line-height: 1.1; }
+.vp-cc-valor span { white-space: normal !important; }
