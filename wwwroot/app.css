@@ -2935,3 +2935,19 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .vp-cc-valor b { white-space: nowrap; }
 .vp-cc-valor b em { display: block; margin: 1px 0 0; line-height: 1.1; }
 .vp-cc-valor span { white-space: normal !important; }
+/* mercado | produto: listas alinhadas linha a linha (mesma altura de cabeçalho e de linha) */
+.cvx-lado-a-lado { align-items: stretch; }
+.cvx-lado-a-lado > .cvx-sec { display: flex; flex-direction: column; }
+.cvx-lado-a-lado > .cvx-sec > .cvx-card { flex: 1; }
+.cvx-lado-a-lado .cvx-ch { flex-wrap: nowrap; align-items: flex-start; min-height: 74px; }
+.cvx-lado-a-lado .cvx-ch .cvx-xh { flex: 1 1 auto; min-width: 0; }
+.cvx-lado-a-lado .cvx-ch .cvx-xh p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.9em; }
+.cvx-lado-a-lado .xcard-total { flex: 0 0 auto; white-space: nowrap; }
+.cvx-lado-a-lado .xsec-s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* cada linha: nome · números (1ª linha) · "em valor" e taxa (2ª linha), sempre no mesmo desenho */
+.cvx-lado-a-lado .cvx-ibar .ibar-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cvx-lado-a-lado .cvx-ibar .ibar-metrics { flex-wrap: wrap; }
+.cvx-lado-a-lado .cvx-ibar .ibar-metrics > .ibar-sep:last-of-type { flex-basis: 100%; width: 100%; height: 0; border: 0; margin: 0; padding: 0; }
+.cvx-lado-a-lado .cvx-ibar .ibar-metrics > .cvx-ibm { white-space: nowrap; }
+.cvx-lado-a-lado > .cvx-sec { margin-top: 0 !important; padding-top: 0 !important; }
+.cvx-lado-a-lado > .cvx-sec > .xsec { margin-top: 28px !important; }
