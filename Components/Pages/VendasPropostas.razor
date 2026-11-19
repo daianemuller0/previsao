@@ -111,11 +111,18 @@
             <div class="panel vp-principal" id="mes-a-mes">
                 <div class="panel-head">
                     <div class="panel-title">Vendas e propostas, mês a mês · @foco.Ano
-                        <span class="hint">em cima, quanto foi vendido no mês (R$, empresa toda); embaixo, quantas propostas foram enviadas no mês@(_setor != "" ? " (" + _setor + ")" : "") · troque o ano em “Ano em foco”</span>
+                        <span class="hint">em cima, quanto foi vendido no mês (R$, empresa toda); embaixo, quantas propostas foram enviadas no mês@(_setor != "" ? " (" + _setor + ")" : "") · troque o ano em destaque em “Ano em foco”</span>
                     </div>
                 </div>
+                <div class="vp-met">
+                    <div class="cvx-seg-ctl">
+                        <button class="@(_mesComparar ? "on" : "")" @onclick="() => _mesComparar = true">Comparar os anos</button>
+                        <button class="@(!_mesComparar ? "on" : "")" @onclick="() => _mesComparar = false">Só @foco.Ano</button>
+                    </div>
+                    <span class="cvx-note">@(_mesComparar ? $"Uma barra por ano em cada mês, nas cores do gráfico de linhas; {foco.Ano} em destaque, com os números." : $"Só {foco.Ano}: vendas em verde, propostas em azul.")</span>
+                </div>
                 <div class="chart-body">@((MarkupString)SvgMesAMes(foco.Ano))</div>
-                <span class="cvx-note">Passe o mouse num mês para ver o mesmo mês de @anoAnt e o valor enviado.@(foco.Ano == DateTime.Today.Year ? $" {NomeDoMes(DateTime.Today.Month)} ainda está em andamento (barra mais clara)." : "")</span>
+                <span class="cvx-note">Passe o mouse num mês para ver @(_mesComparar ? "os números de todos os anos" : $"o mesmo mês de {anoAnt}") e o valor enviado.@(foco.Ano == DateTime.Today.Year ? $" {NomeDoMes(DateTime.Today.Month)} ainda está em andamento (barra tracejada)." : "")</span>
             </div>
 
             <div class="panel vp-principal" id="mensal">
@@ -1046,6 +1053,8 @@
     // ================= o mês de relance: vendas (em cima) e propostas (embaixo) =================
 
     private const string CorVendasMes = "#1f9254", CorPropostasMes = "#12355B";
+    /// <summary>Mês a mês: true = os anos lado a lado em cada mês; false = só o ano em foco.</summary>
+    private bool _mesComparar = true;
 
     /// <summary>
     /// O ano em foco, um mês por coluna: em cima, a barra do que foi vendido no mês (R$);
@@ -1059,41 +1068,70 @@
         var mesAtual = ano == hoje.Year ? hoje.Month : 0;
         var fimDoAno = ano == hoje.Year ? hoje.Month : 12;   // depois disso o mês ainda não aconteceu
         var r = _anos.FirstOrDefault(x => x.Ano == ano);
+        // anos lado a lado em cada mês (do mais antigo ao mais recente), ou só o ano em foco
+        var anos = _mesComparar ? AnosDoPainel.OrderBy(a => a).ToList() : new List<int>();
+        if (!anos.Contains(ano)) anos.Add(ano);
+        anos.Sort();
+        var varios = anos.Count > 1;
 
-        double W = 1200, H = 372, L = 196, R = 12, baseV = 170, baseP = 206, alt = 128;
+        // comparando: os números do ano em foco ficam numa linha fixa (acima das vendas, abaixo das propostas)
+        double W = 1200, H = 410, L = 214, R = 12, topoLeg = varios ? 34 : 0, faixaNum = varios ? 26 : 0,
+            baseV = 170 + topoLeg + faixaNum, baseP = baseV + 36, alt = 128;
+        H = baseP + alt + 44 + faixaNum;
         var colW = (W - L - R) / 12.0;
-        var barW = colW * 0.56;
+        var grupoW = colW * (varios ? 0.84 : 0.56);
+        // cada faixa só abre espaço para os anos que têm dados nela
+        var anosV = anos.Where(a => a == ano || Enumerable.Range(1, 12).Any(m => Venda(a, m) is not null)).ToList();
+        var anosP = anos.Where(a => a == ano || Enumerable.Range(1, 12).Any(m => Prop(a, m) is not null)).ToList();
         double Xc(int m) => L + colW * (m - 0.5);
+        double BarW(bool v) => grupoW / (v ? anosV : anosP).Count;
+        double Xb(int m, int a, bool v) => Xc(m) - grupoW / 2 + BarW(v) * (v ? anosV : anosP).IndexOf(a);
         string N(double v) => v.ToString("0.#", Inv);
+        // um só ano: verde (vendas) e azul-marinho (propostas); vários: a cor de cada ano, a mesma do gráfico de linhas
+        string Cor(int a, bool vendas) => !varios ? (vendas ? CorVendasMes : CorPropostasMes) : CorDoAno(a);
 
+        var maxV = (double)anos.SelectMany(a => Enumerable.Range(1, 12).Select(m => Venda(a, m))).Where(v => v is > 0).Select(v => v!.Value).DefaultIfEmpty(1m).Max();
+        var maxP = (double)anos.SelectMany(a => Enumerable.Range(1, 12).Select(m => Prop(a, m))).Where(p => p is { Qtd: > 0 }).Select(p => p!.Qtd).DefaultIfEmpty(1).Max();
         var vendas = Enumerable.Range(1, 12).Select(m => Venda(ano, m)).ToArray();
         var props = Enumerable.Range(1, 12).Select(m => Prop(ano, m)).ToArray();
-        var maxV = (double)vendas.Where(v => v is > 0).Select(v => v!.Value).DefaultIfEmpty(1m).Max();
-        var maxP = (double)props.Where(p => p is { Qtd: > 0 }).Select(p => p!.Qtd).DefaultIfEmpty(1).Max();
 
         var sb = new StringBuilder();
         sb.Append($"<svg viewBox='0 0 {N(W)} {N(H)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{Esc($"Vendas e propostas enviadas por mês em {ano}")}'>");
 
-        // coluna da esquerda: o que é cada faixa, o total do ano e a média por mês
+        // legenda dos anos (só comparando)
+        if (varios)
+        {
+            var dx = L;
+            foreach (var a in anos.AsEnumerable().Reverse())
+            {
+                sb.Append($"<rect x='{N(dx)}' y='8' width='16' height='16' rx='3' fill='{CorDoAno(a)}'{(a == ano ? "" : " fill-opacity='0.5'")}/>");
+                sb.Append($"<text x='{N(dx + 23)}' y='22' font-size='15' font-weight='{(a == ano ? 800 : 600)}' fill='#3b4a61'>{a}{(a == ano ? " (em foco)" : "")}</text>");
+                dx += a == ano ? 150 : 82;
+            }
+            sb.Append($"<text x='{N(W - R)}' y='22' text-anchor='end' font-size='13' fill='#64748b'>números escritos: {ano}</text>");
+        }
+
+        // coluna da esquerda: o que é cada faixa, o total do ano em foco e a média por mês
         var mesesV = vendas.Count(v => v is not null);
         var totV = vendas.Sum(v => v ?? 0m);
         var mesesP = props.Take(fimDoAno).Count(p => p is not null);
         var totP = props.Sum(p => p?.Qtd ?? 0);
         void Lado(double y0, string cor, string titulo, string total, string sub, string? sub2)
         {
-            sb.Append($"<text x='0' y='{N(y0)}' font-size='17' font-weight='800' fill='{cor}'>{Esc(titulo)}</text>");
+            sb.Append($"<text x='0' y='{N(y0)}' font-size='{(titulo.Length > 20 ? "15" : "17")}' font-weight='800' fill='{cor}'>{Esc(titulo)}</text>");
             sb.Append($"<text x='0' y='{N(y0 + 30)}' font-size='25' font-weight='800' fill='#172B43'>{Esc(total)}</text>");
             sb.Append($"<text x='0' y='{N(y0 + 52)}' font-size='13.5' fill='#64748b'>{Esc(sub)}</text>");
             if (sub2 is not null) sb.Append($"<text x='0' y='{N(y0 + 71)}' font-size='13.5' fill='#64748b'>{Esc(sub2)}</text>");
         }
         var ateV = r is { UltimoMes: > 0 and < 12 } ? $"jan–{MesCurto(r.UltimoMes).ToLowerInvariant()}" : "no ano";
-        Lado(64, CorVendasMes, "Vendas", mesesV > 0 ? Mi(totV) : "—", mesesV > 0 ? $"{ateV} · empresa toda" : "sem vendas registradas",
+        var rotAno = varios ? $" {ano}" : "";
+        Lado(baseV - 106 - faixaNum / 2, CorVendasMes, "Vendas" + rotAno, mesesV > 0 ? Mi(totV) : "—", mesesV > 0 ? $"{ateV} · empresa toda" : "sem vendas registradas",
             mesesV > 0 ? $"média {Mi(totV / mesesV)} por mês" : null);
         var ultP = Enumerable.Range(1, 12).LastOrDefault(m => props[m - 1] is { Qtd: > 0 });
-        Lado(baseP + 46, CorPropostasMes, "Propostas enviadas", mesesP > 0 ? N0(totP) : "—",
+        Lado(baseP + 46, CorPropostasMes, "Propostas enviadas" + rotAno, mesesP > 0 ? N0(totP) : "—",
             mesesP > 0 ? (ultP is > 0 and < 12 ? $"jan–{MesCurto(ultP).ToLowerInvariant()}" : "no ano") + (_setor != "" ? " · " + _setor : "") : "sem propostas",
             mesesP > 0 ? $"média {N0((int)Math.Round((double)totP / mesesP))} por mês" : null);
-        sb.Append($"<line x1='{N(L - 14)}' y1='22' x2='{N(L - 14)}' y2='{N(H - 10)}' stroke='#e4e9f0'/>");
+        sb.Append($"<line x1='{N(L - 14)}' y1='{N(topoLeg + 22)}' x2='{N(L - 14)}' y2='{N(H - 10)}' stroke='#e4e9f0'/>");
 
         // eixos: a linha de base de cada faixa e os meses no meio
         sb.Append($"<line x1='{N(L)}' y1='{N(baseV)}' x2='{N(W - R)}' y2='{N(baseV)}' stroke='#c9d3de'/>");
@@ -1104,43 +1142,58 @@
             var x = Xc(m);
             var cur = m == mesAtual;
             var futuro = m > fimDoAno;
-            sb.Append($"<text x='{N(x)}' y='{N((baseV + baseP) / 2 + 6)}' text-anchor='middle' font-size='16' font-weight='{(cur ? "800" : "700")}' fill='{(futuro ? "#b3bfcc" : cur ? "#3b0764" : "#3b4a61")}'>{MesCurto(m).ToUpperInvariant()}</text>");
+            sb.Append($"<text x='{N(x)}' y='{N((baseV + baseP) / 2 + 6)}' text-anchor='middle' font-size='16' font-weight='{(cur ? "800" : "700")}' fill='{(futuro && !varios ? "#b3bfcc" : cur ? "#3b0764" : "#3b4a61")}'>{MesCurto(m).ToUpperInvariant()}</text>");
 
-            // vendas: barra para cima, valor em cima da barra
-            if (vendas[m - 1] is decimal v)
+            // as barras de cada ano; o número escrito é o do ano em foco, acima do grupo
+            double topoV = 0, topoP = 0;
+            foreach (var a in anos)
             {
-                if (v > 0)
+                var foc = a == ano;
+                var op = foc || !varios ? "" : " fill-opacity='0.45'";
+                var tit = $"<title>{Esc($"{NomeDoMes(m)} {a}")}</title>";
+                if (Venda(a, m) is decimal v && v > 0)
                 {
                     var h = Math.Max(2, (double)v / maxV * alt);
-                    sb.Append($"<rect x='{N(x - barW / 2)}' y='{N(baseV - h)}' width='{N(barW)}' height='{N(h)}' rx='3' fill='{CorVendasMes}'/>");
-                    sb.Append($"<text x='{N(x)}' y='{N(baseV - h - 8)}' text-anchor='middle' font-size='15' font-weight='800' fill='#14532d'>{Esc(MiEixo(v))}</text>");
+                    topoV = Math.Max(topoV, h);
+                    sb.Append($"<rect x='{N(Xb(m, a, true) + 0.5)}' y='{N(baseV - h)}' width='{N(Math.Max(1, BarW(true) - 1))}' height='{N(h)}' rx='{(varios ? 2 : 3)}' fill='{Cor(a, true)}'{op}/>");
                 }
-                else
-                    sb.Append($"<text x='{N(x)}' y='{N(baseV - 8)}' text-anchor='middle' font-size='15' font-weight='800' fill='#b42318'>{Esc((v < 0 ? "▼ " : "") + MiEixo(v))}</text>");
+                if (Prop(a, m) is { Qtd: > 0 } p)
+                {
+                    var h = Math.Max(2, p.Qtd / maxP * alt);
+                    topoP = Math.Max(topoP, h);
+                    var parcial = a == hoje.Year && m == hoje.Month;
+                    var estilo = parcial ? $" fill-opacity='{(foc || !varios ? "0.45" : "0.25")}' stroke='{Cor(a, false)}' stroke-dasharray='4 3'" : op;
+                    sb.Append($"<rect x='{N(Xb(m, a, false) + 0.5)}' y='{N(baseP)}' width='{N(Math.Max(1, BarW(false) - 1))}' height='{N(h)}' rx='{(varios ? 2 : 3)}' fill='{Cor(a, false)}'{estilo}/>");
+                }
+            }
+            var corNum = varios ? CorDoAno(ano) : "#14532d";
+            if (varios) { topoV = alt + 4; topoP = alt + 4; }   // linha fixa de números
+            if (vendas[m - 1] is decimal vf)
+            {
+                if (vf > 0) sb.Append($"<text x='{N(x)}' y='{N(baseV - topoV - 8)}' text-anchor='middle' font-size='15' font-weight='800' fill='{corNum}'>{Esc(MiEixo(vf))}</text>");
+                else sb.Append($"<text x='{N(x)}' y='{N(baseV - topoV - 8)}' text-anchor='middle' font-size='15' font-weight='800' fill='#b42318'>{Esc((vf < 0 ? "▼ " : "") + MiEixo(vf))}</text>");
             }
             else if (!futuro && !(r is { UltimoMes: > 0 } && ano == hoje.Year && m > r.UltimoMes))
-                sb.Append($"<text x='{N(x)}' y='{N(baseV - 8)}' text-anchor='middle' font-size='15' fill='#b3bfcc'>—</text>");
-
-            // propostas: barra para baixo, quantidade embaixo da barra
-            if (props[m - 1] is { } p && p.Qtd > 0)
+                sb.Append($"<text x='{N(x)}' y='{N(baseV - topoV - 8)}' text-anchor='middle' font-size='15' fill='#b3bfcc'>—</text>");
+            if (props[m - 1] is { Qtd: > 0 } pf)
             {
-                var h = Math.Max(2, p.Qtd / maxP * alt);
-                sb.Append($"<rect x='{N(x - barW / 2)}' y='{N(baseP)}' width='{N(barW)}' height='{N(h)}' rx='3' fill='{CorPropostasMes}'{(cur ? " fill-opacity='0.45' stroke='" + CorPropostasMes + "' stroke-dasharray='4 3'" : "")}/>");
-                sb.Append($"<text x='{N(x)}' y='{N(baseP + h + 19)}' text-anchor='middle' font-size='15' font-weight='800' fill='#172B43'>{Esc(N0(p.Qtd))}</text>");
-                if (cur) sb.Append($"<text x='{N(x)}' y='{N(baseP + h + 35)}' text-anchor='middle' font-size='11.5' font-weight='600' fill='#64748b'>parcial</text>");
+                sb.Append($"<text x='{N(x)}' y='{N(baseP + topoP + 19)}' text-anchor='middle' font-size='15' font-weight='800' fill='{(varios ? corNum : "#172B43")}'>{Esc(N0(pf.Qtd))}</text>");
+                if (cur) sb.Append($"<text x='{N(x)}' y='{N(baseP + topoP + 35)}' text-anchor='middle' font-size='11.5' font-weight='600' fill='#64748b'>parcial</text>");
             }
             else if (!futuro)
-                sb.Append($"<text x='{N(x)}' y='{N(baseP + 20)}' text-anchor='middle' font-size='15' fill='#b3bfcc'>—</text>");
+                sb.Append($"<text x='{N(x)}' y='{N(baseP + topoP + 20)}' text-anchor='middle' font-size='15' fill='#b3bfcc'>—</text>");
 
-            // dica do mês: o mesmo mês do ano anterior e o valor enviado
-            var vAnt = Venda(ano - 1, m); var pAnt = Prop(ano - 1, m);
-            var dica = new StringBuilder($"{NomeDoMes(m)} {ano}");
-            dica.Append($"\nVendas: {(vendas[m - 1] is decimal vd ? Cheio(vd) : "sem venda registrada")}");
-            if (ano - 1 >= AnoIni) dica.Append($"  ({ano - 1}: {(vAnt is decimal va ? Cheio(va) : "—")})");
-            dica.Append($"\nPropostas enviadas: {(props[m - 1] is { } pd ? N0(pd.Qtd) : "0")}{(cur ? " (mês em andamento)" : "")}");
-            if (ano - 1 >= AnoIni) dica.Append($"  ({ano - 1}: {(pAnt is { } pa ? N0(pa.Qtd) : "0")})");
-            if (props[m - 1] is { Valor: decimal vEnv } pv && vEnv > 0) dica.Append($"\nValor enviado: {Mi(vEnv)}{(pv.SemTaxa > 0 ? $" (parcial: {pv.SemTaxa} sem taxa de câmbio)" : "")}");
-            sb.Append($"<rect x='{N(x - colW / 2)}' y='14' width='{N(colW)}' height='{N(H - 20)}' fill='transparent'><title>{Esc(dica.ToString())}</title></rect>");
+            // dica do mês: todos os anos (ou o ano anterior, vendo um só) e o valor enviado
+            var dica = new StringBuilder(NomeDoMes(m));
+            var anosDica = varios ? anos.AsEnumerable().Reverse().ToList() : new List<int> { ano }.Concat(ano - 1 >= AnoIni ? new[] { ano - 1 } : Array.Empty<int>()).ToList();
+            foreach (var a in anosDica)
+            {
+                var pa = Prop(a, m);
+                dica.Append($"\n{a}: vendas {(Venda(a, m) is decimal va ? Mi(va) : "—")} · {(pa is { } pp ? N0(pp.Qtd) : "0")} propostas");
+                if (pa is { Valor: decimal ve } && ve > 0) dica.Append($" ({Mi(ve)} enviados)");
+                if (a == hoje.Year && m == hoje.Month) dica.Append(" · mês em andamento");
+            }
+            sb.Append($"<rect x='{N(x - colW / 2)}' y='{N(topoLeg + 14)}' width='{N(colW)}' height='{N(H - topoLeg - 20)}' fill='transparent'><title>{Esc(dica.ToString())}</title></rect>");
         }
         sb.Append("</svg>");
         return sb.ToString();
