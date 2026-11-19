@@ -32,6 +32,7 @@
         <div class="page-actions">
             <button class="btn-ghost" title="Reler as planilhas de propostas" disabled="@_carregando" @onclick="Reler">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
             <button class="btn-ghost" @onclick="Exportar">@Icons.Svg("download")Exportar Excel</button>
+            <button class="btn-ghost" disabled="@_gerandoPpt" title="Gera uma apresentação com os gráficos e os dados desta tela (com os filtros atuais)" @onclick="ExportarPowerPoint">@Icons.Svg("download")@(_gerandoPpt ? "Gerando…" : "Apresentação (PowerPoint)")</button>
             <button class="btn-primary" @onclick="() => { _editando = !_editando; _msg = null; }">@(_editando ? "✕ Fechar edição" : "✎ Atualizar dados")</button>
         </div>
     </div>
@@ -504,6 +505,9 @@
     /// <summary>As linhas das planilhas da guia Conversão (sem juntar números repetidos, como na própria guia), para a taxa de conversão.</summary>
     private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl);
     private List<LinhaConv> _conv = new(), _convSetor = new();
+    /// <summary>Todas as propostas que passam nos filtros, com qualquer data (como nas seções da guia Conversão): base das listas da apresentação.</summary>
+    private List<(PropostaConv P, double? Brl)> _convTudo = new();
+    private bool _gerandoPpt;
     private string _fonte = "";
     private int _foco;
     private bool _editando, _msgOk, _carregando;
@@ -592,6 +596,9 @@
                 .Where(p => p.Data is DateTime d && d.Year >= AnoIni && d.Year <= AnoFim)
                 .Select(p => new LinhaConv(p.Data!.Value.Year, p.Data.Value.Month, p.Origem, p.Classe,
                     p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null)))
+                .ToList();
+            _convTudo = !Conv.Ok ? new() : Conv.Atual.Propostas.Where(_fil.Passa)
+                .Select(p => (p, p.ValorBrl ?? (p.ValorUsd is double u && p.Data is DateTime d && taxas.TryGetValue(d.Year, out var t) ? u * t : (double?)null)))
                 .ToList();
         }
         catch { _conv = new(); }
@@ -1176,6 +1183,170 @@
                 : $"Nada importado de {e.File.Name}. {string.Join(" ", avisos.Take(3))}";
         }
         catch (Exception ex) { _msgOk = false; _msg = "Não deu para ler a planilha: " + ex.Message; }
+    }
+
+    // ================= apresentação (PowerPoint) =================
+
+    private static double? Mi1(decimal? v) => v is decimal x ? Math.Round((double)(x / 1_000_000m), 1) : null;
+    private static double? Mi1(double? v) => v is double x ? Math.Round(x / 1_000_000d, 1) : null;
+    private static double? R1(double? v) => v is double x ? Math.Round(x, 1) : null;
+    private static string Hex(string cor) => cor.TrimStart('#').ToUpperInvariant();
+
+    /// <summary>Agrupa as propostas filtradas (regra da guia Conversão, pela base de "Taxa sobre"), da maior taxa para a menor.</summary>
+    private List<object> GruposPpt(Func<PropostaConv, string> chave, int minDecididas = 0, int max = int.MaxValue)
+    {
+        return _convTudo.GroupBy(x => chave(x.P), StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                int t = g.Count(), ga = g.Count(x => x.P.Classe == ClasseProposta.Ganha), pe = g.Count(x => x.P.Classe == ClasseProposta.Perdida);
+                double vg = g.Where(x => x.P.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = g.Where(x => x.P.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0), vt = g.Sum(x => x.Brl ?? 0);
+                int b = BaseTodas ? t : ga + pe; double vb = BaseTodas ? vt : vg + vp;
+                return (Nome: g.Key, Total: t, Dec: ga + pe, G: ga, P: pe, Base: b, Taxa: b > 0 ? ga * 100.0 / b : (double?)null, VG: vg, PorValor: vb > 0 ? vg / vb * 100 : (double?)null);
+            })
+            .Where(x => x.Dec >= minDecididas)
+            .OrderByDescending(x => x.Taxa ?? -1).ThenByDescending(x => x.Dec).ThenByDescending(x => x.Total)
+            .Take(max)
+            .Select(x => (object)new { nome = x.Nome, total = x.Total, decididas = x.Dec, ganhas = x.G, perdidas = x.P, @base = x.Base, taxa = R1(x.Taxa), valorGanho = Mi(x.VG > 0 ? (decimal)x.VG : 0m), porValor = R1(x.PorValor) })
+            .ToList();
+    }
+
+    private string FiltrosTxt()
+    {
+        var partes = new List<string>();
+        void Add(string rot, HashSet<string> set) { if (set.Count > 0) partes.Add($"{rot}: {string.Join(", ", set.Take(4))}{(set.Count > 4 ? $" +{set.Count - 4}" : "")}"); }
+        Add("Ano", _fil.Anos); Add("Mês", _fil.Meses); Add("Setor", _fil.Origens); Add("Vendedor", _fil.Vendedores); Add("BU", _fil.Bus);
+        Add("BU Intercompany", _fil.BuIcs); Add("Mercado", _fil.Mercados); Add("País", _fil.Paises); Add("Produto", _fil.Produtos);
+        return partes.Count == 0 ? "Sem filtros (todas as propostas)" : string.Join(" · ", partes);
+    }
+
+    private object DadosApresentacao()
+    {
+        var foco = AnoDoFoco;
+        var anos = AnosDoPainel;
+        var lf = Linha(foco.Ano);
+        var mesLim = MesLimite(foco.Ano);
+        var anoAnt = foco.Ano - 1;
+        var txF = Taxa(foco.Ano); var txAte = Taxa(foco.Ano, mesLim); var txAnt = Taxa(anoAnt, mesLim);
+        var periodo = mesLim < 12 ? $"jan–{MesCurto(mesLim).ToLowerInvariant()}" : "ano inteiro";
+        var periodoVendas = foco.UltimoMes is > 0 and < 12 ? $"jan–{MesCurto(foco.UltimoMes).ToLowerInvariant()}" : "ano inteiro";
+        var vendAnt = AnoIni <= anoAnt && foco.UltimoMes > 0 ? ConversaoDeVendas.AteOMes(_meses, anoAnt, foco.UltimoMes) : 0m;
+
+        var kpis = new List<object>
+        {
+            new { rot = $"Propostas enviadas · {foco.Ano}", valor = lf.Qtd is int q ? N0(q) : "—", sub = periodo, delta = AnoIni <= anoAnt ? Delta(QtdAte(foco.Ano, mesLim), QtdAte(anoAnt, mesLim), anoAnt) : null, cor = Hex(CorTx) },
+            new { rot = $"Valor enviado · {foco.Ano}", valor = lf.Valor is decimal v ? Mi(v) : "—", sub = lf.SemTaxa > 0 ? $"{periodo} · parcial" : periodo, delta = AnoIni <= anoAnt ? Delta(ValorAte(foco.Ano, mesLim), ValorAte(anoAnt, mesLim), anoAnt) : null, cor = "155A96" },
+            new { rot = $"Vendas · {foco.Ano}", valor = foco.MesesComVendas > 0 ? Mi(foco.Vendas) : "—", sub = periodoVendas + (foco.BudgetHsa is > 0 ? $" · {Pct(foco.Vendas / foco.BudgetHsa!.Value)} do budget HSA" : ""), delta = Delta(foco.Vendas, vendAnt, anoAnt), cor = "1F9254" },
+            new { rot = "Valor médio por proposta", valor = lf.Valor is decimal vm && lf.ComValor > 0 ? Mi(vm / lf.ComValor) : "—", sub = "valor enviado ÷ propostas com valor", delta = (string?)null, cor = "2478B8" },
+            new { rot = "Venda por proposta", valor = lf.VendaPorProposta is decimal vpp ? Mi(vpp) : "—", sub = "vendas ÷ propostas, nos mesmos meses", delta = (string?)null, cor = "007A9E" },
+            new { rot = $"Taxa de conversão · {foco.Ano}", valor = txF.Taxa is double tq ? P1(tq) : "—", sub = $"{N0(txF.G)} ganhas / {N0(txF.Base)} {DenRot}" + (txF.TaxaValor is double tv ? $" · por valor {P1(tv)}" : ""), delta = DeltaPp(txAte.Taxa, txAnt.Taxa, anoAnt), cor = Hex(CorTx) },
+        };
+
+        Dictionary<string, double?[]> Serie(Func<int, int, double?> f) => anos.ToDictionary(a => a.ToString(), a => Enumerable.Range(1, 12).Select(m => f(a, m)).ToArray());
+        var mensal = new
+        {
+            meses = Enumerable.Range(1, 12).Select(m => MesCurto(m)).ToArray(),
+            qtd = Serie((a, m) => Prop(a, m)?.Qtd),
+            valor = Serie((a, m) => Prop(a, m)?.Valor is decimal v && v > 0 ? Mi1(v) : null),
+            vendas = Serie((a, m) => _meses.FirstOrDefault(x => x.Ano == a && x.Mes == m)?.Vendas is decimal vd ? Mi1(vd) : null),
+            taxa = Serie((a, m) => R1(TaxaMes(a, m).Taxa)),
+        };
+
+        var anoAno = anos.Select(a =>
+        {
+            var c = Composicao(a); var l = Linha(a); var r = _anos.FirstOrDefault(x => x.Ano == a);
+            var sa = PorSetor(a, ConversaoService.Afm); var sn = PorSetor(a, ConversaoService.Nb);
+            var lim = MesLimite(a);
+            return (object)new
+            {
+                ano = a, periodo = a == DateTime.Today.Year ? $"até {MesCurto(lim).ToLowerInvariant()}" : "",
+                taxa = R1(c.Taxa), ganhas = c.G, @base = c.Base, total = c.Total, perdidas = c.P, abertas = c.A, nc = c.NC,
+                delta = a - 1 >= AnoIni ? DeltaPp(Taxa(a, lim).Taxa, Taxa(a - 1, lim).Taxa, null) : null,
+                valorGanho = c.VG > 0 ? Mi((decimal)c.VG) : "—", porValor = c.TaxaValor is double tv ? P1(tv) : "—",
+                valorEnviado = l.Valor is decimal vv ? Mi(vv) : "—", parcial = l.SemTaxa > 0,
+                valorMedio = l.Valor is decimal vm && l.ComValor > 0 ? Mi(vm / l.ComValor) : "—",
+                vendas = r is { MesesComVendas: > 0 } ? Mi(r.Vendas) : "—",
+                vendasRot = r is { UltimoMes: > 0 and < 12 } ? $"Vendas (até {MesCurto(r.UltimoMes).ToLowerInvariant()})" : "Vendas",
+                afm = new { total = sa.Total, ganhas = sa.G, taxa = R1(sa.Taxa), valor = sa.Valor > 0 ? Mi(sa.Valor) : "—" },
+                nb = new { total = sn.Total, ganhas = sn.G, taxa = R1(sn.Taxa), valor = sn.Valor > 0 ? Mi(sn.Valor) : "—" },
+            };
+        }).ToList();
+
+        var metas = _anos.Where(a => a.Ano >= AnoIni && (a.MesesComVendas > 0 || a.BudgetHsa is not null || a.BudgetGrupo is not null)).OrderBy(a => a.Ano)
+            .Select(a => (object)new
+            {
+                ano = a.Ano, periodo = a.UltimoMes is > 0 and < 12 ? $"jan–{MesCurto(a.UltimoMes).ToLowerInvariant()}" : "",
+                vendas = a.MesesComVendas > 0 ? Mi1(a.Vendas) : null, grupo = Mi1(a.BudgetGrupo), hsa = Mi1(a.BudgetHsa),
+                vendasTxt = a.MesesComVendas > 0 ? Mi(a.Vendas) : "—", grupoTxt = a.BudgetGrupo is decimal g ? Mi(g) : "—", hsaTxt = a.BudgetHsa is decimal h ? Mi(h) : "—",
+                pctGrupo = a.PctGrupo is decimal pg ? Pct(pg) : "—", pctHsa = a.PctHsa is decimal ph ? Pct(ph) : "—",
+            }).ToList();
+
+        var perdidas = _convTudo.Where(x => x.P.Classe == ClasseProposta.Perdida).ToList();
+        var totPerd = Math.Max(1, perdidas.Count); var acum = 0;
+        var perdas = perdidas.GroupBy(x => string.IsNullOrWhiteSpace(x.P.StatusOriginal) ? "(sem status)" : x.P.StatusOriginal.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Status: g.Key, Qtd: g.Count(), Valor: g.Sum(x => x.Brl ?? 0)))
+            .OrderByDescending(x => x.Qtd).ToList()
+            .Select(x => { acum += x.Qtd; return (object)new { status = x.Status, qtd = x.Qtd, valor = x.Valor > 0 ? Mi((decimal)x.Valor) : "—", pct = P1(x.Qtd * 100.0 / totPerd), acum = P1(acum * 100.0 / totPerd) }; })
+            .ToList();
+
+        var ac = _anos.Where(a => a.MesesComVendas > 0).ToDictionary(a => a.Ano.ToString(), a =>
+        {
+            var soma = 0m;
+            return Enumerable.Range(1, 12).Select(m => { soma += _meses.FirstOrDefault(x => x.Ano == a.Ano && x.Mes == m)?.Vendas ?? 0m; return m <= a.UltimoMes ? Mi1(soma) : null; }).ToArray();
+        });
+
+        var anosTabela = _anos.Where(a => a.MesesComVendas > 0 || a.BudgetHsa is not null).Select(a => a.Ano).ToList();
+        var mesAno = new
+        {
+            anos = anosTabela,
+            linhas = Enumerable.Range(1, 12).Select(m => new { mes = NomeDoMes(m), valores = anosTabela.Select(a => _meses.FirstOrDefault(x => x.Ano == a && x.Mes == m)?.Vendas is decimal v ? MiEixo(v) : "—").ToArray() }).ToList(),
+            total = anosTabela.Select(a => MiEixo(_anos.First(x => x.Ano == a).Vendas)).ToArray(),
+            budgetHsa = anosTabela.Select(a => _anos.First(x => x.Ano == a).BudgetHsa is decimal b ? MiEixo(b) : "—").ToArray(),
+            pctHsa = anosTabela.Select(a => _anos.First(x => x.Ano == a).PctHsa is decimal p ? Pct(p) : "—").ToArray(),
+            budgetGrupo = anosTabela.Select(a => _anos.First(x => x.Ano == a).BudgetGrupo is decimal b ? MiEixo(b) : "—").ToArray(),
+            pctGrupo = anosTabela.Select(a => _anos.First(x => x.Ano == a).PctGrupo is decimal p ? Pct(p) : "—").ToArray(),
+        };
+
+        return new
+        {
+            arquivo = $"Performance_Comercial_{DateTime.Now:yyyy-MM-dd}.pptx",
+            titulo = "Performance Comercial | Howden South America",
+            subtitulo = "Resultados, indicadores e oportunidades de crescimento",
+            periodo = $"{AnoIni} → {AnoFim} · valores em R$ · ano em foco: {foco.Ano}",
+            geradoEm = DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm"),
+            filtros = FiltrosTxt(),
+            regra = BaseTodas ? "Taxa de conversão = ganhas ÷ todas as propostas enviadas × 100 (ganhas, perdidas, abertas e não classificadas). Por valor: valor ganho ÷ valor total cotado."
+                              : "Taxa de conversão = ganhas ÷ (ganhas + perdidas) × 100 (abertas e não classificadas fora do denominador). Por valor: valor ganho ÷ (ganho + perdido).",
+            baseCurta = BaseTodas ? "todas as propostas" : "decididas",
+            denRot = DenRot,
+            fonte = $"Propostas: {_fonte}. Vendas e budgets: histórico da equipe (empresa toda, não seguem os filtros).",
+            foco = foco.Ano,
+            anos,
+            coresAnos = anos.ToDictionary(a => a.ToString(), a => Hex(CorDoAno(a))),
+            cores = new { vendas = Hex(CorMeta("vendas")), grupo = Hex(CorMeta("grupo")), hsa = Hex(CorMeta("hsa")), afm = Hex(CorAfm), nb = Hex(CorNb), navy = "12355B" },
+            kpis, mensal, anoAno, metas,
+            atingGrupo = foco.PctGrupo is decimal apg ? Pct(apg) : "—", atingHsa = foco.PctHsa is decimal aph ? Pct(aph) : "—",
+            bu = GruposPpt(x => x.Bu),
+            mercado = GruposPpt(x => x.Mercado, 0, 15),
+            produto = GruposPpt(x => x.Produto, 0, 15),
+            vendedores = GruposPpt(x => x.Vendedor, 5, 20),
+            paises = GruposPpt(x => x.Pais, 0, 15),
+            perdas, totalPerdidas = perdidas.Count,
+            acumulado = new { anos = ac, budgetHsa = Mi1(foco.BudgetHsa), budgetGrupo = Mi1(foco.BudgetGrupo), foco = foco.Ano.ToString() },
+            mesAno,
+        };
+    }
+
+    private async Task ExportarPowerPoint()
+    {
+        _gerandoPpt = true; _msg = null;
+        StateHasChanged();
+        try
+        {
+            await JS.InvokeVoidAsync("vpPptx.gerar", DadosApresentacao());
+            _msgOk = true; _msg = "Apresentação gerada: veja o arquivo .pptx nos downloads do navegador.";
+        }
+        catch (Exception ex) { _msgOk = false; _msg = "Não deu para gerar a apresentação: " + ex.Message; }
+        finally { _gerandoPpt = false; }
     }
 
     private async Task Exportar()
