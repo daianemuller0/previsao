@@ -1310,7 +1310,7 @@
             </div>
         </div>
         <div class="vpm-sm-leg sub">
-            <span><i class="sw linha"></i>linha: valor enviado em propostas (R$ mi)</span>
+            <span><i class="sw linha"></i>linha: valor enviado em propostas (R$)</span>
             <span><i class="sw cheia"></i>colunas de cima: vendas (R$ mi)</span>
             <span><i class="sw clara"></i>embaixo: propostas enviadas (qtd) e, menor, o valor enviado (R$ mi)</span>
             <span><i class="sw parcial"></i>mês em andamento (parcial)</span>
@@ -1361,7 +1361,7 @@
                             {
                                 var y = Ye(e.v!.Value);
                                 <i class="vpm-sm-pt @(e.parc ? "parc" : "")" style="left:@F(Xe(e.i))%;bottom:@F(y)%"></i>
-                                <b class="vpm-sm-le" style="left:@F(Xe(e.i))%;bottom:calc(@F(y)% + 6px)">@MiRot(e.v!.Value)@(e.parc ? "*" : "")</b>
+                                <b class="vpm-sm-le" style="left:@F(Xe(e.i))%;bottom:calc(@F(y)% + 5px)">@ReaisMi(e.v!.Value)@(e.parc ? "*" : "")</b>
                             }
                         </div>
                         @foreach (var a in anos)
@@ -1447,6 +1447,14 @@
             }
         </div>
     };
+
+    /// <summary>Valor em reais, curto: R$ 39.000.000 → "R$ 39 mi"; R$ 54.400.000 → "R$ 54,4 mi"; "R$ 1,2 bi".</summary>
+    private static string ReaisMi(decimal v)
+    {
+        var mi = Math.Abs(v) / 1_000_000m;
+        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.#", Br) + " bi" : mi >= 100 ? mi.ToString("#,##0", Br) + " mi" : mi.ToString("#,##0.#", Br) + " mi";
+        return (v < 0 ? "−" : "") + "R$ " + t;
+    }
 
     /// <summary>R$ em milhões, curto para caber na coluna: "45,2", "421", "1,2 bi".</summary>
     private static string MiRot(decimal v)

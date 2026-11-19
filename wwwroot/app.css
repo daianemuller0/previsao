@@ -3226,3 +3226,9 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-pt.parc { background: #fff; border-color: #172B43; }
 .vpm-sm-le { position: absolute; transform: translateX(-50%); font-size: 12px; font-weight: 800; color: #172B43; white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.2px; background: rgba(255,255,255,.85); padding: 0 2px; border-radius: 3px; line-height: 15px; }
 .vpm-sm-leg .sw.linha { height: 3px; border-radius: 2px; background: #172B43; width: 18px; }
+/* linha do valor enviado: fina e discreta */
+.vpm-sm-linha polyline { stroke: #64748b; stroke-width: 1.25; }
+.vpm-sm-pt { width: 5px; height: 5px; background: #475569; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #64748b; }
+.vpm-sm-pt.parc { background: #fff; border-color: #fff; }
+.vpm-sm-le { font-size: 11px; font-weight: 700; color: #334155; background: transparent; padding: 0; letter-spacing: -.1px; }
+.vpm-sm-leg .sw.linha { height: 1.5px; background: #64748b; }
