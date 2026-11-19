@@ -209,12 +209,12 @@
                 </div>
                 <div class="vp-met">
                     <div class="vp-cores-wrap">
-                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 Cores das linhas</button>
+                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 Cores das barras</button>
                         @if (_editCoresMetas)
                         {
                             <div class="flt-multi-backdrop" @onclick="() => _editCoresMetas = false"></div>
-                            <div class="vp-cores-pop" role="dialog" aria-label="Cores das linhas">
-                                <div class="vp-cores-tit">Cor de cada linha</div>
+                            <div class="vp-cores-pop" role="dialog" aria-label="Cores das barras">
+                                <div class="vp-cores-tit">Cor de cada barra</div>
                                 @foreach (var sm in SeriesMetas)
                                 {
                                     var chave = sm.Chave;
@@ -228,7 +228,7 @@
                             </div>
                         }
                     </div>
-                    <span class="cvx-note">@(foco.UltimoMes is > 0 and < 12 ? $"{foco.Ano} vai até {NomeDoMes(foco.UltimoMes).ToLowerInvariant()} (o ponto vazado tracejado é a projeção no ritmo do ano). " : "")Passe o mouse num ano para ver os valores e o atingimento.</span>
+                    <span class="cvx-note">@(foco.UltimoMes is > 0 and < 12 ? $"{foco.Ano} até {NomeDoMes(foco.UltimoMes).ToLowerInvariant()} · o tracejado é a projeção até dezembro. " : "")Embaixo de cada ano, o % atingido de cada meta.</span>
                 </div>
                 <div class="chart-body">@((MarkupString)SvgMetas(foco.Ano))</div>
             </div>
@@ -891,106 +891,119 @@
         string cV = CorMeta("vendas"), cG = CorMeta("grupo"), cH = CorMeta("hsa");
         decimal? Projecao(ResumoDoAno a) => a.MesesComVendas is > 0 and < 12 && a.Ano == DateTime.Today.Year ? a.Vendas / a.MesesComVendas * 12m : null;
 
-        double Wd = 760, H = 290, top = 50, bot = 246, left = 56, right = 18;
+        // barras verticais agrupadas: em cada ano, Vendas (cheia) · Meta Grupo · Meta HSA (claras, com contorno)
+        double W = 1000, H = 380, top = 64, bot = 300, left = 62, right = 16;
         var n = anos.Count;
-        var pad = 46.0;
-        double X(int i) => n == 1 ? (left + Wd - right) / 2 : left + pad + i * (Wd - left - right - 2 * pad) / (n - 1);
+        var slot = (W - left - right) / n;
+        var bw = Math.Min(46, slot * 0.24); var gap = Math.Min(8, slot * 0.04);
+        var grupoW = bw * 3 + gap * 2;
         double max = 1;
         foreach (var a in anos) max = Math.Max(max, (double)new[] { a.Vendas, a.BudgetGrupo ?? 0m, a.BudgetHsa ?? 0m, Projecao(a) ?? 0m }.Max());
-        max *= 1.18;
-        double Y(decimal v) => bot - (double)v / max * (bot - top);
+        // eixo em passos redondos (100 mi, 200 mi…)
+        var passo = (double)Passo((decimal)max);
+        var topoV = Math.Ceiling(max * 1.12 / passo) * passo;
+        double Y(decimal v) => bot - (double)Math.Max(0m, v) / topoV * (bot - top);
         string N(double v) => v.ToString("0.#", Inv);
+        string Topo(double x, double y, double w, double h)
+        {
+            var r = Math.Min(5, Math.Min(w / 2, h));
+            return $"M{N(x)},{N(y + h)} V{N(y + r)} Q{N(x)},{N(y)} {N(x + r)},{N(y)} H{N(x + w - r)} Q{N(x + w)},{N(y)} {N(x + w)},{N(y + r)} V{N(y + h)} Z";
+        }
 
         var sb = new StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {N(Wd)} {N(H)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas totais por ano contra a Meta Grupo e a Meta HSA'>");
-        sb.Append($"<defs><linearGradient id='vpmeta' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cV}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cV}' stop-opacity='0.02'/></linearGradient></defs>");
+        sb.Append($"<svg viewBox='0 0 {N(W)} {N(H)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas totais por ano contra a Meta Grupo e a Meta HSA'>");
 
         // legenda
-        var dx = 0.0;
-        void Legenda(string cor, string traco, string texto, double larg)
+        var dx = left;
+        void Leg(string texto, string fill, string stroke, string traco = "")
         {
             var risco = traco == "" ? "" : $" stroke-dasharray='{traco}'";
-            sb.Append($"<line x1='{N(left + dx)}' y1='20' x2='{N(left + dx + 22)}' y2='20' stroke='{cor}' stroke-width='3'{risco} stroke-linecap='round'/>");
-            sb.Append($"<text x='{N(left + dx + 28)}' y='24' font-size='11.5' font-weight='600' fill='#3b4a61'>{Esc(texto)}</text>");
-            dx += larg;
+            sb.Append($"<rect x='{N(dx)}' y='14' width='16' height='16' rx='4' fill='{fill}' stroke='{stroke}' stroke-width='1.6'{risco}/>");
+            sb.Append($"<text x='{N(dx + 24)}' y='27' font-size='14' font-weight='600' fill='#3b4a61'>{Esc(texto)}</text>");
+            dx += 24 + texto.Length * 7.6 + 30;
         }
-        Legenda(cV, "", "Vendas totais", 140);
-        Legenda(cG, "5 3", "Meta Grupo", 130);
-        Legenda(cH, "2 3", "Meta HSA", 120);
-        if (anos.Any(a => Projecao(a) is not null))
-        {
-            sb.Append($"<circle cx='{N(left + dx + 11)}' cy='20' r='4' fill='#fff' stroke='{cV}' stroke-width='2' stroke-dasharray='2 2'/>");
-            sb.Append($"<text x='{N(left + dx + 22)}' y='24' font-size='11.5' font-weight='600' fill='#3b4a61'>Projeção (ritmo do ano)</text>");
-        }
+        Leg("Vendas totais", cV, cV);
+        Leg("Meta Grupo", Claro(cG), cG);
+        Leg("Meta HSA", Claro(cH), cH);
+        if (anos.Any(a => Projecao(a) is not null)) Leg("Projeção até dezembro", "#fff", cV, "4 3");
 
-        // grade + eixo Y
-        for (var g = 0; g <= 4; g++)
+        // grade + eixo
+        for (var v = 0.0; v <= topoV + 1; v += passo)
         {
-            double gy = top + (bot - top) * g / 4.0, gv = max * (4 - g) / 4.0;
-            sb.Append($"<line x1='{N(left)}' y1='{N(gy)}' x2='{N(Wd - right)}' y2='{N(gy)}' stroke='#eef2f7'/>");
-            sb.Append($"<text x='{N(left - 6)}' y='{N(gy + 3)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(MiEixo((decimal)gv))}</text>");
+            sb.Append($"<line x1='{N(left)}' y1='{N(Y((decimal)v))}' x2='{N(W - right)}' y2='{N(Y((decimal)v))}' stroke='{(v == 0 ? "#cfd8e3" : "#eef2f7")}'/>");
+            sb.Append($"<text x='{N(left - 8)}' y='{N(Y((decimal)v) + 4)}' text-anchor='end' font-size='11.5' fill='#93a1b5'>{Esc(Eixo((decimal)v))}</text>");
         }
-
-        string Pts(IEnumerable<(int I, decimal V)> pts) => string.Join(" ", pts.Select(p => $"{N(X(p.I))},{N(Y(p.V))}"));
-        var vend = anos.Select((a, i) => (I: i, A: a)).Where(x => x.A.MesesComVendas > 0).Select(x => (x.I, V: x.A.Vendas)).ToList();
-        var grupo = anos.Select((a, i) => (I: i, V: a.BudgetGrupo)).Where(x => x.V is not null).Select(x => (x.I, V: x.V!.Value)).ToList();
-        var hsa = anos.Select((a, i) => (I: i, V: a.BudgetHsa)).Where(x => x.V is not null).Select(x => (x.I, V: x.V!.Value)).ToList();
-
-        // vendas: área + traço grosso
-        if (vend.Count > 1)
-        {
-            sb.Append($"<polygon points='{N(X(vend[0].I))},{N(bot)} {Pts(vend)} {N(X(vend[^1].I))},{N(bot)}' fill='url(#vpmeta)'/>");
-            sb.Append($"<polyline points='{Pts(vend)}' fill='none' stroke='{cV}' stroke-width='2.8' stroke-linejoin='round' stroke-linecap='round'/>");
-        }
-        // metas
-        if (grupo.Count > 1) sb.Append($"<polyline points='{Pts(grupo)}' fill='none' stroke='{cG}' stroke-width='2' stroke-dasharray='5 3' stroke-linejoin='round' stroke-linecap='round'/>");
-        if (hsa.Count > 1) sb.Append($"<polyline points='{Pts(hsa)}' fill='none' stroke='{cH}' stroke-width='2' stroke-dasharray='2 3' stroke-linejoin='round' stroke-linecap='round'/>");
 
         for (var i = 0; i < n; i++)
         {
             var a = anos[i];
-            var cx = X(i);
             var foco = a.Ano == focoAno;
-            var periodo = a.UltimoMes is > 0 and < 12 ? $" (jan–{MesCurto(a.UltimoMes).ToLowerInvariant()})" : "";
-            var tip = $"{a.Ano}{periodo}\nVendas: {(a.MesesComVendas > 0 ? Cheio(a.Vendas) : "—")}"
-                + (a.BudgetGrupo is decimal g ? $"\nMeta Grupo: {Cheio(g)} · {(a.MesesComVendas > 0 ? Pct(a.Vendas / g) : "—")}" : "\nMeta Grupo: —")
-                + (a.BudgetHsa is decimal h ? $"\nMeta HSA: {Cheio(h)} · {(a.MesesComVendas > 0 ? Pct(a.Vendas / h) : "—")}" : "\nMeta HSA: —")
-                + (Projecao(a) is decimal pj ? $"\nProjeção até dezembro: {Cheio(pj)}" : "");
-            // metas: valor à direita do ponto; se as duas ficarem quase na mesma altura, afasta uma da outra
-            double? yg = a.BudgetGrupo is decimal bg0 ? Y(bg0) + 3 : null, yh = a.BudgetHsa is decimal bh0 ? Y(bh0) + 3 : null;
-            if (yg is double g1 && yh is double h1 && Math.Abs(g1 - h1) < 12)
-            {
-                var meio = (g1 + h1) / 2; var hsaEmCima = h1 <= g1;
-                yh = hsaEmCima ? meio - 6 : meio + 6; yg = hsaEmCima ? meio + 6 : meio - 6;
-            }
-            if (a.BudgetGrupo is decimal bg)
-            {
-                sb.Append($"<circle cx='{N(cx)}' cy='{N(Y(bg))}' r='3' fill='{cG}'><title>{Esc(tip)}</title></circle>");
-                sb.Append($"<text x='{N(cx + 7)}' y='{N(yg!.Value)}' font-size='8.5' fill='{cG}' font-weight='600' paint-order='stroke' stroke='#fff' stroke-width='3'>{Esc(MiEixo(bg))}</text>");
-            }
-            if (a.BudgetHsa is decimal bh)
-            {
-                sb.Append($"<circle cx='{N(cx)}' cy='{N(Y(bh))}' r='3' fill='{cH}'><title>{Esc(tip)}</title></circle>");
-                sb.Append($"<text x='{N(cx + 7)}' y='{N(yh!.Value)}' font-size='8.5' fill='{cH}' font-weight='600' paint-order='stroke' stroke='#fff' stroke-width='3'>{Esc(MiEixo(bh))}</text>");
-            }
-            if (Projecao(a) is decimal pjv && a.MesesComVendas > 0)
-            {
-                sb.Append($"<line x1='{N(cx)}' y1='{N(Y(a.Vendas))}' x2='{N(cx)}' y2='{N(Y(pjv))}' stroke='{cV}' stroke-width='1.6' stroke-dasharray='3 3' opacity='.7'/>");
-                sb.Append($"<circle cx='{N(cx)}' cy='{N(Y(pjv))}' r='4.5' fill='#fff' stroke='{cV}' stroke-width='2' stroke-dasharray='2 2'><title>{Esc(tip)}</title></circle>");
-                sb.Append($"<text x='{N(cx)}' y='{N(Y(pjv) - 9)}' text-anchor='middle' font-size='8.5' font-weight='600' fill='{cV}' paint-order='stroke' stroke='#fff' stroke-width='3'>projeção {Esc(MiEixo(pjv))}</text>");
-            }
+            var x0 = left + slot * i + (slot - grupoW) / 2;
+            var cx = left + slot * i + slot / 2;
+            var periodo = a.UltimoMes is > 0 and < 12 ? $"jan–{MesCurto(a.UltimoMes).ToLowerInvariant()}" : "";
+            var pj = Projecao(a);
+            var tip = $"{a.Ano}{(periodo != "" ? $" ({periodo})" : "")}\nVendas: {(a.MesesComVendas > 0 ? Cheio(a.Vendas) : "—")}"
+                + (pj is decimal p0 ? $"\nProjeção até dezembro: {Cheio(p0)}" : "")
+                + (a.BudgetGrupo is decimal g0 ? $"\nMeta Grupo: {Cheio(g0)} · atingido {(a.MesesComVendas > 0 ? Pct(a.Vendas / g0) : "—")}" : "\nMeta Grupo: —")
+                + (a.BudgetHsa is decimal h0 ? $"\nMeta HSA: {Cheio(h0)} · atingido {(a.MesesComVendas > 0 ? Pct(a.Vendas / h0) : "—")}" : "\nMeta HSA: —");
+
+            // fundo do ano em foco
+            if (foco) sb.Append($"<rect x='{N(left + slot * i + 6)}' y='{N(top - 22)}' width='{N(slot - 12)}' height='{N(bot - top + 70)}' rx='10' fill='{cV}' opacity='.06'/>");
+
+            // 1 · vendas (+ projeção tracejada por cima)
+            var xv = x0;
             if (a.MesesComVendas > 0)
             {
-                var y = Y(a.Vendas);
-                sb.Append($"<circle cx='{N(cx)}' cy='{N(y)}' r='{(foco ? "5" : "3.5")}' fill='#fff' stroke='{cV}' stroke-width='{(foco ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
-                sb.Append($"<text x='{N(cx - 9)}' y='{N(y + 3.5)}' text-anchor='end' font-size='9.5' font-weight='{(foco ? "800" : "700")}' fill='{(foco ? "#3b0764" : "#3b4a61")}' paint-order='stroke' stroke='#fff' stroke-width='3'>{Esc(MiEixo(a.Vendas))}</text>");
+                if (pj is decimal pjv && pjv > a.Vendas)
+                    sb.Append($"<rect x='{N(xv + 0.8)}' y='{N(Y(pjv))}' width='{N(bw - 1.6)}' height='{N(Y(a.Vendas) - Y(pjv))}' rx='4' fill='{Claro(cV)}' stroke='{cV}' stroke-width='1.6' stroke-dasharray='4 3'/>");
+                var hv = bot - Y(a.Vendas);
+                if (hv > 0) sb.Append($"<path d='{Topo(xv, Y(a.Vendas), bw, hv)}' fill='{cV}'/>");
+                var temProj = pj is decimal pjl && pjl > a.Vendas;
+                var yl = temProj ? Y(pj!.Value) : Y(a.Vendas);
+                sb.Append($"<text x='{N(xv + bw / 2)}' y='{N(yl - 7)}' text-anchor='middle' font-size='12' font-weight='800' fill='#1e1b4b'>{Esc(MiEixo(a.Vendas))}</text>");
+                if (pj is decimal pjt && pjt > a.Vendas)
+                {
+                    // dentro do tracejado, o valor projetado; dentro da barra cheia, "real"
+                    var alt = Y(a.Vendas) - Y(pjt);
+                    sb.Append($"<text x='{N(xv + bw / 2)}' y='{N(Y(a.Vendas) + 15)}' text-anchor='middle' font-size='10' font-weight='700' fill='#fff'>real</text>");
+                    if (alt >= 13)
+                        sb.Append($"<text x='{N(xv + bw / 2)}' y='{N(Y(pjt) + alt / 2 + 3.5)}' text-anchor='middle' font-size='8.6' font-weight='800' fill='{Escuro(cV)}'>{Esc(MiEixo(pjt))}</text>");
+                }
             }
-            sb.Append($"<text x='{N(cx)}' y='{N(H - 18)}' text-anchor='middle' font-size='10.5' font-weight='{(foco ? "800" : "600")}' fill='{(foco ? cV : "#93a1b5")}'>{a.Ano}</text>");
-            if (periodo != "") sb.Append($"<text x='{N(cx)}' y='{N(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(periodo.Trim(' ', '(', ')'))}</text>");
-            sb.Append($"<rect x='{N(cx - 40)}' y='{N(top)}' width='80' height='{N(bot - top)}' fill='transparent'><title>{Esc(tip)}</title></rect>");
+            // 2 · meta grupo · 3 · meta HSA
+            void Meta(decimal? v, double x, string cor)
+            {
+                if (v is not decimal mv) return;
+                var h = bot - Y(mv);
+                sb.Append($"<path d='{Topo(x + 0.8, Y(mv) + 0.8, bw - 1.6, Math.Max(0, h - 0.8))}' fill='{Claro(cor)}' stroke='{cor}' stroke-width='1.6'/>");
+                sb.Append($"<text x='{N(x + bw / 2)}' y='{N(Y(mv) - 7)}' text-anchor='middle' font-size='11' font-weight='700' fill='{Escuro(cor)}'>{Esc(MiEixo(mv))}</text>");
+            }
+            Meta(a.BudgetGrupo, x0 + bw + gap, cG);
+            Meta(a.BudgetHsa, x0 + (bw + gap) * 2, cH);
+
+            // ano + atingimento das duas metas
+            sb.Append($"<text x='{N(cx)}' y='{N(bot + 22)}' text-anchor='middle' font-size='15' font-weight='800' fill='{(foco ? Escuro(cV) : "#3b4a61")}'>{a.Ano}{(periodo != "" ? $"<tspan font-size='11' font-weight='600' fill='#93a1b5'> {Esc(periodo)}</tspan>" : "")}</text>");
+            string Ating(decimal? meta) => meta is decimal m && m > 0 && a.MesesComVendas > 0 ? Pct(a.Vendas / m) : "—";
+            string CorAt(decimal? meta) => meta is decimal m && m > 0 && a.MesesComVendas > 0 ? CorAtend(a.Vendas / m) : "#93a1b5";
+            sb.Append($"<text x='{N(cx)}' y='{N(bot + 42)}' text-anchor='middle' font-size='11.5' font-weight='600' fill='#64748b'>Grupo <tspan font-weight='800' fill='{CorAt(a.BudgetGrupo)}'>{Ating(a.BudgetGrupo)}</tspan> · HSA <tspan font-weight='800' fill='{CorAt(a.BudgetHsa)}'>{Ating(a.BudgetHsa)}</tspan></text>");
+
+            // área de dica (o ano inteiro)
+            sb.Append($"<rect x='{N(left + slot * i)}' y='{N(top - 20)}' width='{N(slot)}' height='{N(bot - top + 70)}' fill='transparent'><title>{Esc(tip)}</title></rect>");
         }
         sb.Append("</svg>");
         return sb.ToString();
+    }
+
+    /// <summary>A cor clareada (para as barras de meta): mistura com branco.</summary>
+    private static string Claro(string hex, double t = 0.78) => Misturar(hex, 255, t);
+    /// <summary>A cor escurecida (para os rótulos das metas ficarem legíveis).</summary>
+    private static string Escuro(string hex, double t = 0.35) => Misturar(hex, 0, t);
+    private static string Misturar(string hex, int alvo, double t)
+    {
+        if (hex.Length != 7 || hex[0] != '#') return hex;
+        int C(int i) => Convert.ToInt32(hex.Substring(i, 2), 16);
+        int M(int c) => (int)Math.Round(c + (alvo - c) * t);
+        return $"#{M(C(1)):x2}{M(C(3)):x2}{M(C(5)):x2}";
     }
 
     // ================= gráficos de vendas × budget =================
