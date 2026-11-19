@@ -1096,30 +1096,30 @@ public partial class Conversao : IAsyncDisposable
     // ---- modo embutido (guia Performance Comercial) ---------------------------------
     /// <summary>true = só as seções de BU, mercado, produto, país, perdas e base, sem cabeçalho nem barra de filtros.</summary>
     [Parameter] public bool Embutido { get; set; }
-    /// <summary>Embutido: ano a filtrar ("" = todos os anos).</summary>
-    [Parameter] public string? AnoFiltro { get; set; }
-    /// <summary>Embutido: setor a filtrar ("" = AFM e NB).</summary>
-    [Parameter] public string? SetorFiltro { get; set; }
-    /// <summary>Embutido: quantas linhas ficam visíveis nas listas de mercado e produto (o resto rola).</summary>
+    /// <summary>Embutido: filtros compartilhados com a página de fora (a barra e as seções usam os mesmos).</summary>
+    [Parameter] public FiltrosConversao? Filtros { get; set; }
+    /// <summary>Embutido: "filtros" = só a barra de filtros (congelada); "secoes" = só as seções.</summary>
+    [Parameter] public string Parte { get; set; } = "secoes";
+    /// <summary>Embutido: avisa a página de fora quando algum filtro muda (para ela recalcular o que é dela).</summary>
+    [Parameter] public EventCallback FiltrosMudaram { get; set; }
+    /// <summary>Embutido: quantas linhas ficam visíveis nas listas (o resto rola).</summary>
     [Parameter] public int LinhasVisiveis { get; set; } = 7;
-    private string? _anoEmb, _setorEmb;
+    private string? _assinNotif;
 
     protected override void OnParametersSet()
     {
-        if (!Embutido) return;
-        var ano = AnoFiltro ?? ""; var setor = SetorFiltro ?? "";
-        if (ano != _anoEmb) { _anoEmb = ano; _anos.Clear(); if (ano != "") _anos.Add(ano); _pag = 0; }
-        if (setor != _setorEmb) { _setorEmb = setor; _origens.Clear(); if (setor != "") _origens.Add(setor); _pag = 0; }
+        if (Filtros is not { } f || ReferenceEquals(_anos, f.Anos)) return;
+        _anos = f.Anos; _meses = f.Meses; _vend = f.Vendedores; _bus = f.Bus; _buIcs = f.BuIcs;
+        _origens = f.Origens; _mercados = f.Mercados; _paises = f.Paises; _produtos = f.Produtos;
     }
 
-    /// <summary>Embutido: os filtros que a pessoa ligou clicando nas listas (ano e setor vêm da guia de fora).</summary>
-    private IEnumerable<(string, HashSet<string>)> FiltrosDoEmbutido() =>
-        ConjuntosAtivos().Where(x => x.Item1 is not ("Ano" or "Setor"));
-    private void LimparEmbutido()
+    /// <summary>Embutido: os atalhos do índice apontam para as seções da guia Performance Comercial.</summary>
+    private static readonly (string Id, string Titulo)[] AncorasEmbutido =
     {
-        _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _mercados.Clear(); _paises.Clear(); _produtos.Clear();
-        _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++;
-    }
+        ("propostas", "Resumo"), ("mensal", "Propostas por mês"), ("metas", "Vendas × metas"), ("unidades", "BU"),
+        ("mercado", "Mercado"), ("produto", "Produto"), ("vendedores", "Vendedores"), ("pais", "País"),
+        ("perdas", "Perdas"), ("base", "Base"), ("budget", "Acumulado"), ("mes-ano", "Mês × ano"),
+    };
 
     private double _chartW = 1200;
     private bool _largObs;
@@ -1133,6 +1133,13 @@ public partial class Conversao : IAsyncDisposable
         try { await JS.InvokeVoidAsync("colOrder.init", "cv-th-base", _ref, TabelaOrdemPref); } catch { }
         try { await JS.InvokeVoidAsync("worldMap.init", MapaId, _ref); } catch { }
         if (Embutido) { try { await JS.InvokeVoidAsync("vpLinhas", LinhasVisiveis); } catch { } }
+        if (Embutido && Filtros is not null)
+        {
+            // filtro mudou aqui dentro (barra, clique numa lista, mapa): a página de fora recalcula
+            var assin = Filtros.Assinatura();
+            if (_assinNotif is null) _assinNotif = assin;
+            else if (assin != _assinNotif) { _assinNotif = assin; await FiltrosMudaram.InvokeAsync(); }
+        }
         if (_largObs) return;
         try
         {

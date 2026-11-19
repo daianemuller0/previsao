@@ -2951,3 +2951,6 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .cvx-lado-a-lado .cvx-ibar .ibar-metrics > .cvx-ibm { white-space: nowrap; }
 .cvx-lado-a-lado > .cvx-sec { margin-top: 0 !important; padding-top: 0 !important; }
 .cvx-lado-a-lado > .cvx-sec > .xsec { margin-top: 28px !important; }
+/* barra de filtros embutida: o invólucro não conta, para a barra grudar no topo da página inteira */
+.cvx-embed.cvx-embed-barra { display: contents; }
+.vp-page .cvx-fb { margin-bottom: 14px; }

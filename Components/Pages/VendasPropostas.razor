@@ -38,6 +38,9 @@
 
     @if (_msg is not null) { <div class="cvx-alert @(_msgOk ? "vp-ok" : "erro")">@_msg</div> }
 
+    @* filtros da guia Conversão (mesma barra, congelada no topo): valem para as propostas e as seções de conversão *@
+    <Conversao Embutido="true" Parte="filtros" Filtros="_fil" FiltrosMudaram="AoMudarFiltros" />
+
     @if (_anos.Count == 0)
     {
         <div class="cvx-card"><div class="empty" style="padding:34px 12px">Sem dados de vendas nem de propostas.</div></div>
@@ -64,16 +67,7 @@
                     }
                 </div>
             </div>
-            <div class="flt"><span class="flt-label">Setor</span>
-                <div class="cvx-seg-ctl">
-                    @foreach (var (cod, nome) in new[] { ("", "Ambos"), (ConversaoService.Afm, "AFM"), (ConversaoService.Nb, "NB") })
-                    {
-                        var c = cod;
-                        <button class="@(_setor == c ? "on" : "")" @onclick="() => MudarSetor(c)">@nome</button>
-                    }
-                </div>
-            </div>
-            <span class="cvx-note">Setor vale para as propostas; as vendas são da empresa toda. Comparações com o mesmo período de @anoAnt.</span>
+            <span class="cvx-note">Os filtros acima valem para as propostas e as taxas; vendas e metas são da empresa toda. Comparações com o mesmo período de @anoAnt.</span>
         </div>
 
         @if (_carregando && _enviadas.Count == 0) { <div class="cvx-alert">Lendo as planilhas de propostas…</div> }
@@ -110,7 +104,7 @@
                     CorTx, DeltaPp(txFocoAte.Taxa, txFocoAnt.Taxa, anoAnt))
             </div>
 
-            <div class="panel vp-principal">
+            <div class="panel vp-principal" id="mensal">
                 <div class="panel-head">
                     <div class="panel-title">@TituloGrafico()
                         <span class="hint">uma linha por ano · jan a dez · @(_met switch { "vendas" => "vendas da empresa no mês · R$", "valor" => "mês de envio da proposta · R$", "taxa" => "ganhas ÷ todas as propostas enviadas no mês (regra da guia Conversão)", _ => "mês de envio da proposta" })@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
@@ -213,7 +207,7 @@
             @{
                 var pctGrupo = foco.PctGrupo; var pctHsa = foco.PctHsa;
             }
-            <div class="panel vp-principal">
+            <div class="panel vp-principal" id="metas">
                 <div class="panel-head">
                     <div class="panel-title">Vendas totais × metas, ano a ano
                         <span class="hint">vendas da empresa × Meta Grupo e Meta HSA · R$ · @AnoIni → @AnoFim</span>
@@ -258,15 +252,7 @@
         </section>
 
         @* ================= conversão: BU, mercado | produto, país, perdas e base (componente da guia Conversão) ================= *@
-        <div class="vp-conv-periodo">
-            <span class="flt-label">Período das seções de conversão abaixo</span>
-            <div class="cvx-seg-ctl">
-                <button class="@(!_convAnoFoco ? "on" : "")" @onclick="() => _convAnoFoco = false">Todos os anos</button>
-                <button class="@(_convAnoFoco ? "on" : "")" @onclick="() => _convAnoFoco = true">Só @foco.Ano</button>
-            </div>
-            <span class="cvx-note">Mesmo cálculo da guia Conversão · segue o filtro de Setor</span>
-        </div>
-        <Conversao Embutido="true" AnoFiltro="@(_convAnoFoco ? foco.Ano.ToString() : "")" SetorFiltro="@_setor" LinhasVisiveis="5" />
+        <Conversao Embutido="true" Parte="secoes" Filtros="_fil" FiltrosMudaram="AoMudarFiltros" LinhasVisiveis="5" />
 
         @* ================= 3 · VENDAS × BUDGET ================= *@
         <section id="budget" class="cvx-sec">
@@ -510,13 +496,16 @@
     private int _foco;
     private bool _editando, _msgOk, _carregando;
     private string? _msg;
-    private string _aba = "vendas", _setor = "", _met = "qtd";
+    private string _aba = "vendas", _met = "qtd";
+    /// <summary>Filtros da guia Conversão, compartilhados com a barra e as seções embutidas.</summary>
+    private readonly FiltrosConversao _fil = new();
+    /// <summary>"" sem filtro; senão um rótulo curto (as vendas não seguem os filtros, então as relações com elas só valem sem filtro).</summary>
+    private string _setor => _fil.Ativos > 0 ? "filtrado" : "";
     private List<int> _anosEditor = new();
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private string _login = "";
     private bool _editCores, _editCoresMetas;
-    /// <summary>Seções de conversão (BU, mercado, produto, país, perdas, base): false = todos os anos; true = só o ano em foco.</summary>
-    private bool _convAnoFoco;
+
     /// <summary>Cores escolhidas pela pessoa para cada ano (as que faltam seguem o padrão).</summary>
     private Dictionary<string, string> _cores = new();
     /// <summary>Cores-padrão de todos: as que o administrador escolheu (valem para quem não mudou as suas).</summary>
@@ -579,7 +568,7 @@
         var enviadas = new List<ConversaoDeVendas.PropostaEnviada>();
         try
         {
-            if (Conv.Ok) enviadas = ConversaoDeVendas.PropostasEnviadas(Conv.Atual.Propostas, Cambio.Todas())
+            if (Conv.Ok) enviadas = ConversaoDeVendas.PropostasEnviadas(Conv.Atual.Propostas.Where(_fil.Passa), Cambio.Todas())
                 .Where(p => p.Data.Year >= AnoIni && p.Data.Year <= AnoFim).ToList();
         }
         catch (Exception) { /* sem as propostas, o painel mostra só as vendas */ }
@@ -587,7 +576,7 @@
         try
         {
             var taxas = Cambio.Todas();
-            _conv = !Conv.Ok ? new() : Conv.Atual.Propostas
+            _conv = !Conv.Ok ? new() : Conv.Atual.Propostas.Where(_fil.Passa)
                 .Where(p => p.Data is DateTime d && d.Year >= AnoIni && d.Year <= AnoFim)
                 .Select(p => new LinhaConv(p.Data!.Value.Year, p.Data.Value.Month, p.Origem, p.Classe,
                     p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null)))
@@ -608,13 +597,13 @@
         Montar();
     }
 
-    private void MudarSetor(string setor) { _setor = setor; _dica = null; Montar(); }
+    private void AoMudarFiltros() { _dica = null; Carregar(); StateHasChanged(); }
 
     /// <summary>As propostas por mês com o filtro de setor. Em "Ambos", os meses informados à mão valem mais que as planilhas.</summary>
     private void Montar()
     {
-        _enviadasSetor = _setor == "" ? _enviadas : _enviadas.Where(p => p.Fonte == _setor).ToList();
-        _convSetor = _setor == "" ? _conv : _conv.Where(p => p.Origem == _setor).ToList();
+        _enviadasSetor = _enviadas;   // já filtradas em Carregar
+        _convSetor = _conv;
         var d = _enviadasSetor.GroupBy(p => (p.Data.Year, p.Data.Month))
             .ToDictionary(g => g.Key, g => new PropMes(g.Count(), g.Sum(p => p.ValorReais), g.Count(p => p.SemTaxa), g.Count(p => p.ValorReais > 0)));
         if (_setor == "")
