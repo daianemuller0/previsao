@@ -2822,3 +2822,83 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .vp-bul-escala em { position: absolute; transform: translateX(-50%); font-style: normal; font-size: 10.5px; color: #93a1b5; white-space: nowrap; }
 .vp-bul-escala em:last-child { transform: translateX(-100%); }
 .vp-bul-escala em:first-child { transform: none; }
+/* ===== Performance Comercial: letras maiores (leitura confortável) ===== */
+.vp-page .breadcrumbs { font-size: 13.5px; }
+.vp-page .page-head h1 { font-size: 26px; }
+.vp-page .page-head .subtitle { font-size: 14.5px; line-height: 1.5; }
+.vp-page .cvx-note { font-size: 14px; line-height: 1.5; color: #556274; }
+.vp-page .cvx-alert { font-size: 14.5px; }
+.vp-page .btn-ghost, .vp-page .btn-primary { font-size: 14px; }
+.vp-page .cvx-filters .flt-label { font-size: 12.5px; }
+.vp-page .cvx-seg-ctl button { font-size: 14px; padding: 7px 14px; }
+.vp-page .xsec-t { font-size: 20px; }
+.vp-page .xsec-s { font-size: 14px; }
+.vp-page .panel-title { font-size: 17px; }
+.vp-page .panel-title .hint { font-size: 13.5px; }
+.vp-page .rep-attain-box .ra-label { font-size: 12.5px; }
+.vp-page .rep-attain-box .ra-value { font-size: 27px; }
+.vp-page .cvx-kpi .cvx-lab { font-size: 13px; }
+.vp-page .cvx-num { font-size: clamp(24px, 13cqi, 32px); }
+.vp-page .cvx-ksub { font-size: 14px; }
+.vp-page .cvx-kdelta { font-size: 14px; }
+.vp-page .vp-btn-cores { font-size: 14px; padding: 7px 14px; }
+.vp-page .vp-cores-tit { font-size: 12px; }
+.vp-page .vp-cor-lin { font-size: 15px; }
+.vp-page .vp-cores-nota, .vp-page .vp-cores-pe .btn-link { font-size: 13px; }
+/* taxa de conversão */
+.vp-page .vp-cc-ano { font-size: 19px; }
+.vp-page .vp-cc-ano small { font-size: 13px; }
+.vp-page .vp-cc-taxa b { font-size: 40px; }
+.vp-page .vp-cc-taxa em { font-size: 14px; }
+.vp-page .vp-cc-sub { font-size: 14.5px; }
+.vp-page .vp-cc-barra { height: 12px; }
+.vp-page .vp-cc-linhas, .vp-page .vp-cc-valor { font-size: 15px; row-gap: 5px; }
+.vp-page .vp-cc-linhas span i { width: 10px; height: 10px; }
+.vp-page .vp-cc-leg { font-size: 13.5px; }
+.vp-page .vp-cc-leg i { width: 12px; height: 12px; }
+.vp-page .vp-conv-grid { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }
+/* cartões do ano a ano */
+.vp-page .vp-anos-tit { font-size: 16px; }
+.vp-page .vp-anos-tit span { font-size: 13.5px; }
+.vp-page .vp-anos-tiles { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.vp-page .vp-at-ano { font-size: 22px; }
+.vp-page .vp-at-ano small { font-size: 13px; }
+.vp-page .vp-at-l span { font-size: 12.5px; }
+.vp-page .vp-at-l b { font-size: 19px; }
+.vp-page .vp-at-l em { font-size: 13.5px; }
+.vp-page .vp-parcial { font-size: 12px; }
+/* vendas × metas */
+.vp-page .vp-bul { --bul-cols: 104px minmax(220px, 1fr) 124px 124px 88px 124px 88px; }
+.vp-page .vp-bul-leg { font-size: 14.5px; gap: 22px; }
+.vp-page .vp-bul-leg i.vp-b { width: 22px; height: 12px; }
+.vp-page .vp-bul-leg i.vp-m { height: 16px; }
+.vp-page .vp-bul-cab { font-size: 12.5px; }
+.vp-page .vp-bul-lin { padding: 12px 10px; }
+.vp-page .vp-bul-ano { font-size: 17px; }
+.vp-page .vp-bul-ano small { font-size: 12.5px; }
+.vp-page .vp-bul-trilho { height: 30px; }
+.vp-page .vp-bul-trilho i.vp-b { top: 8px; height: 14px; }
+.vp-page .vp-bul-trilho i.vp-m { height: 26px; }
+.vp-page .vp-bul-v { font-size: 17px; }
+.vp-page .vp-bul-m { font-size: 15px; color: #556274; }
+.vp-page .vp-bul-p { font-size: 17px; }
+.vp-page .vp-bul-escala { height: 20px; }
+.vp-page .vp-bul-escala em { font-size: 13px; color: #7b8798; }
+/* acumulado (SVG com classes) e dicas */
+.vp-page .vp-eixo { font-size: 13.5px; fill: #7b8798; }
+.vp-page .vp-rotulo { font-size: 14.5px; }
+.vp-page .vp-meta-rot { font-size: 13.5px; }
+.vp-page .cvx-leg { font-size: 14px; }
+.vp-page .cvx-ch h3, .vp-page .cvx-h3 { font-size: 17px; }
+.vp-page .cvx-ch p { font-size: 14px; }
+.vp-page .vp-dica-tit { font-size: 13.5px; }
+.vp-page .vp-dica-lin { font-size: 15px; }
+/* mês × ano e edição */
+.vp-page .vp-tabela { font-size: 15px; }
+.vp-page .vp-tabela thead th { font-size: 12.5px; }
+.vp-page .vp-escala { font-size: 13.5px; }
+.vp-page .cvx-tbl { font-size: 15px; }
+.vp-page .cvx-tbl th { font-size: 12.5px; }
+.vp-page .vp-drop { font-size: 14.5px; }
+.vp-page .vp-cc-taxa { flex-wrap: wrap; row-gap: 2px; }
+.vp-page .vp-cc-linhas span, .vp-page .vp-cc-valor span { white-space: nowrap; }
