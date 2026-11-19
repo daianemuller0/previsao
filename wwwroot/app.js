@@ -868,3 +868,68 @@ window.vpTelaCheia = function (id) {
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') document.querySelectorAll('.tela-cheia').forEach(x => { x.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia'); });
 });
+
+// Performance Comercial, "Vendas e propostas, mês a mês": depois de cada render,
+// (1) desenha a linha de cada ano nas faixas de valor enviado e de conversão, ligando
+// os pontos pela posição real deles na tela; (2) sobe os rótulos que se encostariam,
+// para nenhum número ficar por cima de outro.
+window.vpmAjustar = function () {
+    const raiz = document.getElementById('mes-a-mes');
+    if (!raiz) return;
+    raiz.querySelectorAll('.vpm-banda').forEach(b => {
+        const svg = b.querySelector('svg.vpm-banda-svg');
+        if (!svg) return;
+        const br = b.getBoundingClientRect();
+        if (!br.width) return;
+        svg.setAttribute('viewBox', `0 0 ${br.width.toFixed(1)} ${br.height.toFixed(1)}`);
+        const grupos = new Map();
+        b.querySelectorAll('.vpm-pt').forEach(p => {
+            const a = p.dataset.ano;
+            if (!grupos.has(a)) grupos.set(a, []);
+            grupos.get(a).push(p);
+        });
+        const tracejada = b.classList.contains('conv') ? ' stroke-dasharray="5 3"' : '';
+        let html = '';
+        grupos.forEach(pts => {
+            const cor = pts[0].dataset.cor, larg = pts[0].dataset.pri ? 1.7 : 1.3;
+            let seg = [], ant = null;
+            const fecha = () => {
+                if (seg.length > 1) html += `<polyline points="${seg.join(' ')}" fill="none" stroke="${cor}" stroke-width="${larg}"${tracejada} stroke-linejoin="round" stroke-linecap="round" opacity="${pts[0].dataset.pri ? 1 : .8}"/>`;
+                seg = [];
+            };
+            pts.forEach(p => {
+                const m = +p.dataset.m;
+                if (ant !== null && m !== ant + 1) fecha();
+                const r = p.getBoundingClientRect();
+                seg.push(`${(r.left + r.width / 2 - br.left).toFixed(1)},${(r.top + r.height / 2 - br.top).toFixed(1)}`);
+                ant = m;
+            });
+            fecha();
+        });
+        svg.innerHTML = html;
+    });
+    raiz.querySelectorAll('.vpm-dc').forEach(c => {
+        const rot = [...c.querySelectorAll('.vpm-rot:not(.neg)')];
+        rot.forEach(l => l.style.setProperty('--dy', '0px'));
+        const itens = rot.map(l => ({ l, r: l.getBoundingClientRect() })).filter(x => x.r.width > 0)
+            .sort((x, y) => (y.r.bottom - x.r.bottom) || (x.r.left - y.r.left));
+        const postos = [];
+        itens.forEach(it => {
+            let r = { left: it.r.left, right: it.r.right, top: it.r.top, bottom: it.r.bottom }, dy = 0;
+            for (let k = 0; k < 10; k++) {
+                const h = postos.find(p => r.left < p.right + 2 && p.left < r.right + 2 && r.top < p.bottom && p.top < r.bottom);
+                if (!h) break;
+                const d = r.bottom - h.top + 1;
+                dy += d; r = { left: r.left, right: r.right, top: r.top - d, bottom: r.bottom - d };
+            }
+            if (dy) it.l.style.setProperty('--dy', dy.toFixed(1) + 'px');
+            postos.push(r);
+        });
+    });
+};
+(function () {
+    let t;
+    const de = () => { clearTimeout(t); t = setTimeout(() => window.vpmAjustar && window.vpmAjustar(), 120); };
+    window.addEventListener('resize', de);
+    document.addEventListener('fullscreenchange', de);
+})();

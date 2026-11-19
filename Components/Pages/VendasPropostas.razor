@@ -618,6 +618,11 @@
         if (!AnosDoPainel.Contains(_foco)) _foco = AnosDoPainel.DefaultIfEmpty(AnoFim).Max();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try { await JS.InvokeVoidAsync("vpmAjustar"); } catch { /* página saindo */ }
+    }
+
     private async Task Reler()
     {
         _carregando = true;
@@ -1056,11 +1061,8 @@
 
     // ================= seção "Vendas e propostas, mês a mês" (cálculos em VendasPropostas.MesAMes.cs) =================
 
-    // "todos os anos": do mais antigo (claro) ao mais recente (escuro)
-    private static readonly string[] RampaVendas = { "#c9e7d3", "#97d0aa", "#5fb37f", "#2f9258", "#16683a" };
-    private static readonly string[] RampaProp = { "#cddcf1", "#9cbbe4", "#6a96d0", "#3a6fb3", "#173f7a" };
-    private static readonly string[] RampaNeg = { "#f3c6c1", "#eba49b", "#de7a6f", "#cc5547", "#a8261b" };
-    private const string CorVendaPri = "#1f8a4c", CorVendaCmp = "#a9d8b8", CorPropPri = "#1d4f91", CorPropCmp = "#b3cbea", CorNegPri = "#c0392b", CorNegCmp = "#eeb4ad";
+    /// <summary>Venda negativa: sempre em vermelho, qualquer que seja a cor do ano.</summary>
+    private const string CorNegPri = "#c0392b";
 
     private RenderFragment SecaoMesAMes(int principal) => __builder =>
     {
@@ -1140,35 +1142,26 @@
         }
     };
 
-    /// <summary>Um gráfico de barras por mês (vendas ou propostas), com 1 ou 2 anos; os números ficam escritos nas barras.</summary>
+    /// <summary>
+    /// Gráfico de barras por mês (vendas ou propostas) de 1 ou 2 anos, cada ano na sua cor (as de "Cores dos anos").
+    /// Vendas com o valor em reais ("R$ 31,4 mi") em cada coluna. No de propostas, duas linhas por ano, como nos
+    /// mini-gráficos: em cima, o valor enviado em propostas (R$); embaixo, tracejada, a taxa de conversão do mês.
+    /// Os rótulos que se encostariam sobem sozinhos (vpmAjustar, em app.js), que também desenha as linhas.
+    /// </summary>
     private RenderFragment GraficoMm(bool vendas, List<int> anos, int principal) => __builder =>
     {
-        var muitos = anos.Count > 2;   // todos os anos: um tom por ano (claro = mais antigo), números na vertical
-        // todos os anos: um ano sem nenhum dado nessa faixa sai das barras (fica escrito ao lado do título)
-        var semDados = muitos ? anos.Where(a => Enumerable.Range(1, 12).All(m => Cel(vendas, a, m).Sit == SitMes.SemDado)).ToList() : new List<int>();
-        if (semDados.Count > 0) anos = anos.Except(semDados).ToList();
         var dois = anos.Count == 2;
         var comp = dois ? anos[1] : 0;
         var cel = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => Cel(vendas, a, m)).ToArray());
-        var esc = EscalaMmDe(cel.Values.SelectMany(x => x).Where(x => x.Tem).Select(x => (double)x.Valor), muitos ? 0.34 : 0.17);
-        var ordemTom = anos.OrderBy(a => a).ToList();
-        string Cor(int a, bool neg)
-        {
-            if (muitos)
-            {
-                var rampa = neg ? RampaNeg : vendas ? RampaVendas : RampaProp;
-                var i = ordemTom.IndexOf(a) + (rampa.Length - ordemTom.Count);
-                return rampa[Math.Clamp(i, 0, rampa.Length - 1)];
-            }
-            return vendas ? (neg ? (a == principal ? CorNegPri : CorNegCmp) : a == principal ? CorVendaPri : CorVendaCmp) : a == principal ? CorPropPri : CorPropCmp;
-        }
-        string Rot(decimal v) => vendas ? (dois || muitos ? MiCurto(v) : MiCurto(v) + " mi") : N0((int)v);
-        <div class="vpm-graf @(vendas ? "v" : "p") @(muitos ? "muitos" : dois ? "dois" : "um")">
+        var esc = EscalaMmDe(cel.Values.SelectMany(x => x).Where(x => x.Tem).Select(x => (double)x.Valor), dois ? 0.3 : 0.2);
+        string Cor(int a, bool neg) => neg ? CorNegPri : CorDoAno(a);
+        string Rot(decimal v) => vendas ? ReaisMi(v) : N0((int)v);
+        <div class="vpm-graf @(vendas ? "v" : "p") @(dois ? "dois" : "um")">
             <div class="vpm-gtit">
                 <b>@(vendas ? "Vendas por mês" : "Propostas enviadas por mês")</b>
-                <span>@(vendas ? (dois || muitos ? "R$ milhões" : "R$") : "quantidade")@(muitos ? " · uma barra por ano, do mais antigo (claro) ao mais recente (escuro)" : "")@(semDados.Count > 0 ? $" · {string.Join(" e ", semDados.OrderBy(a => a))}: sem {(vendas ? "vendas registradas" : "propostas registradas")} (n/d)" : "")</span>
+                <span>@(vendas ? "em reais (R$ mi) · empresa toda" : "quantidade" + (_setor != "" ? " · " + _setor : ""))</span>
                 <span class="vpm-gleg">
-                    @foreach (var a in anos) { <span><i style="background:@Cor(a, false)"></i>@a</span> }
+                    @foreach (var a in anos) { <span><i style="background:@CorDoAno(a)"></i>@a</span> }
                     @if (dois) { <span class="vpm-gleg-var">variação @principal × @comp</span> }
                 </span>
             </div>
@@ -1188,7 +1181,8 @@
                     }
                 </div>
             }
-            <div class="vpm-plot">
+            @if (!vendas) { @BandaMm("env", anos, principal) }
+            <div class="vpm-plot vpm-dc">
                 <div class="vpm-zero" style="bottom:@F(esc.Zero)%"></div>
                 @for (var m = 1; m <= 12; m++)
                 {
@@ -1204,7 +1198,7 @@
                                 {
                                     var v = (double)x.Valor; var neg = v < 0;
                                     <i class="vpm-bar @(x.Parcial ? "parcial" : "")" style="bottom:@F(esc.Base(v))%;height:@F(Math.Max(esc.Alt(v), 0.5))%;--c:@Cor(a, neg)"></i>
-                                    <b class="vpm-val @(muitos ? "vert" : pri ? "pri" : "cmp") @(neg ? "neg" : "")" style="bottom:calc(@F(neg ? esc.Base(v) : esc.Topo(v))% @(neg ? (muitos ? "- 44px" : "- 20px") : "+ 3px"))">@Rot(x.Valor)@(x.Parcial ? "*" : "")</b>
+                                    <b class="vpm-val vpm-rot @(pri ? "pri" : "cmp") @(neg ? "neg" : "")" style="bottom:calc(@F(neg ? esc.Base(v) : esc.Topo(v))% @(neg ? "- 20px" : "+ 3px"))">@Rot(x.Valor)@(x.Parcial ? "*" : "")</b>
                                 }
                                 else if (x.Sit == SitMes.AApurar)
                                 {
@@ -1212,18 +1206,62 @@
                                 }
                                 else
                                 {
-                                    <b class="vpm-val nd @(muitos ? "vert" : "")" style="bottom:calc(@F(esc.Zero)% + 3px)">n/d</b>
+                                    <b class="vpm-val nd" style="bottom:calc(@F(esc.Zero)% + 3px)">n/d</b>
                                 }
                             </div>
                         }
                     </div>
                 }
             </div>
+            @if (!vendas) { @BandaMm("conv", anos, principal) }
             <div class="vpm-meses">
                 @for (var m = 1; m <= 12; m++)
                 {
-                    var x = cel[muitos ? ordemTom[^1] : principal][m - 1];
+                    var x = cel[principal][m - 1];
                     <div><b>@MesCurto(m).ToUpperInvariant()</b>@if (x.Parcial) { <small>parcial</small> } else if (x.Sit == SitMes.AApurar) { <small>a apurar</small> }</div>
+                }
+            </div>
+        </div>
+    };
+
+    /// <summary>
+    /// Faixa de linha por ano, alinhada às colunas do gráfico de propostas: "env" = valor enviado em propostas (R$);
+    /// "conv" = taxa de conversão do mês (regra de "Taxa sobre"). Os pontos e números ficam aqui; a linha que liga
+    /// os pontos de cada ano é desenhada em app.js (vpmAjustar), a partir da posição real de cada ponto.
+    /// </summary>
+    private RenderFragment BandaMm(string tipo, List<int> anos, int principal) => __builder =>
+    {
+        var env = tipo == "env";
+        double? Val(int a, int m) => env
+            ? (Prop(a, m)?.Valor is decimal v && v > 0 ? (double)v : null)
+            : (CelProp(a, m).Tem ? TaxaMes(a, m).Taxa : null);
+        var pts = anos.SelectMany(a => Enumerable.Range(1, 12).Select(m => (a, m, v: Val(a, m), parc: CelProp(a, m).Parcial))).ToList();
+        var base0 = pts.Where(p => p.v is not null && !p.parc).Select(p => p.v!.Value).ToList();
+        if (base0.Count == 0) base0 = pts.Where(p => p.v is not null).Select(p => p.v!.Value).ToList();
+        double min = env ? 0 : base0.DefaultIfEmpty(0).Min(), max = base0.DefaultIfEmpty(1).Max();
+        double Y(double v) => max - min < 1e-9 ? 36 : 9 + Math.Clamp((v - min) / (max - min), 0, 1.05) * 50;   // folga em cima para os números
+        <div class="vpm-banda-cap @tipo"><i></i>@(env ? "Valor enviado em propostas (R$)" : $"Taxa de conversão do mês ({RegraCurtaMm})")</div>
+        <div class="vpm-banda @tipo vpm-dc">
+            <svg class="vpm-banda-svg" aria-hidden="true"></svg>
+            <div class="vpm-banda-g">
+                @for (var m = 1; m <= 12; m++)
+                {
+                    var mes = m;
+                    <div class="vpm-col">
+                        @foreach (var a in anos)
+                        {
+                            var p = pts.First(x => x.a == a && x.m == mes);
+                            <div class="vpm-slot">
+                                @if (p.v is double v)
+                                {
+                                    var y = Y(v);
+                                    <i class="vpm-pt @(p.parc ? "parc" : "")" style="bottom:@F(y)%;--c:@CorDoAno(a)" data-ano="@a" data-m="@mes" data-cor="@CorDoAno(a)" data-pri="@(a == principal ? "1" : "")"
+                                       title="@($"{NomeDoMes(mes)} {a} · {(env ? "valor enviado " + Mi((decimal)v) : "conversão " + P1(v))}{(p.parc ? " (parcial)" : "")}")"></i>
+                                    <b class="vpm-blab vpm-rot @(a == principal ? "pri" : "cmp")" style="bottom:calc(@F(y)% + 6px)">@(env ? ReaisMi((decimal)v) : P1(v))@(p.parc ? "*" : "")</b>
+                                }
+                            </div>
+                        }
+                    </div>
                 }
             </div>
         </div>
@@ -1244,7 +1282,7 @@
             <div class="vpm-anos2">
                 @foreach (var L in new[] { A, B })
                 {
-                    <div class="vpm-ano @(L.Ano == a1 ? "pri" : "")">
+                    <div class="vpm-ano @(L.Ano == a1 ? "pri" : "")" style="--ac:@CorDoAno(L.Ano)">
                         <div class="vpm-ano-t">@L.Ano</div>
                         <div class="vpm-ano-l"><span>Vendas</span><b title="@(L.MesesV > 0 ? Reais(L.Vendas) : "")">@(L.MesesV > 0 ? Mi(L.Vendas) : "n/d")</b></div>
                         <div class="vpm-ano-l"><span>Propostas</span><b>@(L.MesesP > 0 ? N0(L.Propostas) : "n/d")</b></div>
@@ -1539,7 +1577,7 @@
     {
         var cel = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => Cel(vendas, a, m)).ToArray());
         var max = cel.Values.SelectMany(x => x).Where(x => x.Tem && x.Valor > 0).Select(x => x.Valor).DefaultIfEmpty(1m).Max();
-        var corForte = vendas ? CorVendaPri : CorPropPri;
+        var corForte = vendas ? "#1f8a4c" : "#1d4f91";   // tabela de apoio: verde = vendas, azul = propostas
         var corFraca = vendas ? "#f3faf5" : "#f2f6fc";
         <div class="vpm-mat-card">
             <div class="vpm-gtit">

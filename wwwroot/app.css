@@ -3245,3 +3245,46 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-num { font-size: 11px; letter-spacing: -.3px; }
 .vpm:fullscreen .vpm-sm-num, .vpm.tela-cheia .vpm-sm-num { font-size: 12px; }
 @container (min-width: 1400px) { .vpm-sm-num { font-size: 12px; } }
+
+/* ---- mês a mês, "Um ano" e "Comparar dois anos": cores dos anos, R$ e linhas ---- */
+.vpm-rot { translate: 0 calc(-1 * var(--dy, 0px)); }
+.vpm-graf .vpm-val { font-size: 11.5px; letter-spacing: -.25px; }
+.vpm-graf.um .vpm-val { font-size: 13px; letter-spacing: -.2px; }
+.vpm-graf .vpm-val.cmp { color: #475569; }
+.vpm-graf.p .vpm-plot { height: 165px; }
+.vpm-var, .vpm-plot, .vpm-meses, .vpm-banda-g { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 6px; }
+.vpm-banda-cap { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #475569; margin: 6px 0 0; }
+.vpm-banda-cap i { width: 20px; height: 0; border-top: 1.6px solid #475569; display: inline-block; }
+.vpm-banda-cap.conv i { border-top-style: dashed; }
+.vpm-banda { position: relative; height: 86px; }
+.vpm-banda.conv { height: 78px; }
+.vpm-banda-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
+.vpm-banda-g { position: absolute; inset: 0; }
+.vpm-banda-g .vpm-col { height: 100%; }
+.vpm-pt { position: absolute; left: 50%; width: 6px; height: 6px; border-radius: 50%; background: var(--c); border: 1.5px solid #fff; box-shadow: 0 0 0 1px var(--c); transform: translate(-50%, 50%); z-index: 2; box-sizing: content-box; }
+.vpm-pt.parc { background: #fff; }
+.vpm-blab { position: absolute; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; z-index: 3; line-height: 14px; font-variant-numeric: tabular-nums; letter-spacing: -.25px; }
+.vpm-blab.cmp { color: #64748b; font-weight: 600; }
+.vpm-graf.um .vpm-blab { font-size: 12px; }
+.vpm-ano.pri { border-color: color-mix(in srgb, var(--ac) 45%, var(--cx-line)); box-shadow: inset 0 3px 0 var(--ac); }
+.vpm:fullscreen .vpm-graf.p .vpm-plot, .vpm.tela-cheia .vpm-graf.p .vpm-plot { height: 15vh; }
+.vpm:fullscreen .vpm-graf.v .vpm-plot, .vpm.tela-cheia .vpm-graf.v .vpm-plot { height: 22vh; }
+.vpm:fullscreen .vpm-banda, .vpm.tela-cheia .vpm-banda { height: 7.5vh; }
+.vpm:fullscreen .vpm-banda.conv, .vpm.tela-cheia .vpm-banda.conv { height: 6.5vh; }
+/* números sempre por cima das colunas (com contorno branco) e gráficos com a largura toda */
+.vpm-graf .vpm-col { z-index: auto; }
+.vpm-graf .vpm-bar { z-index: 1; }
+.vpm-graf .vpm-val, .vpm-blab { z-index: 4; text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff; }
+.vpm-corpo { grid-template-columns: minmax(0, 1fr); }
+.vpm-corpo > .vpm-resumo.cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; row-gap: 8px; align-items: start; }
+.vpm-corpo > .vpm-resumo.cmp > .vpm-rtit, .vpm-corpo > .vpm-resumo.cmp > .vpm-rper, .vpm-corpo > .vpm-resumo.cmp > .vpm-anos2 { grid-column: 1; }
+.vpm-corpo > .vpm-resumo.cmp > .vpm-rtit2 { grid-column: 2; grid-row: 1; border-top: 0; padding-top: 0; font-size: 15px; }
+.vpm-corpo > .vpm-resumo.cmp > .vpm-varl { grid-column: 2; grid-row: 2 / span 2; align-self: start; font-size: 15px; row-gap: 10px; }
+.vpm-corpo > .vpm-resumo.cmp > .vpm-rnota { grid-column: 1 / -1; }
+.vpm-corpo > .vpm-resumo.um { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
+.vpm-corpo > .vpm-resumo.um > .vpm-rtit { grid-column: 1 / -1; }
+.vpm-corpo > .vpm-resumo.um > .vpm-blk { border-top: 0; padding-top: 0; }
+@container (max-width: 1150px) { .vpm-graf.dois .vpm-val, .vpm-graf.dois .vpm-blab { font-size: 10.5px; letter-spacing: -.35px; } }
+.vpm:fullscreen .vpm-corpo, .vpm.tela-cheia .vpm-corpo { grid-template-columns: minmax(0, 1fr); }
+.vpm:fullscreen .vpm-banda, .vpm.tela-cheia .vpm-banda { height: max(7.5vh, 82px); }
+.vpm:fullscreen .vpm-banda.conv, .vpm.tela-cheia .vpm-banda.conv { height: max(6.5vh, 74px); }
