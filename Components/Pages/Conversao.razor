@@ -171,6 +171,13 @@ else
             <MultiFilter Label="Mercado" AllText="Todos" Searchable="true" Options="OpMercados" Selected="_mercados" OnChanged="StateHasChanged" />
             <MultiFilter Label="País" AllText="Todos" Searchable="true" Options="OpPaises" Selected="_paises" OnChanged="StateHasChanged" />
             <MultiFilter Label="Produto" AllText="Todos" Searchable="true" Options="OpProdutos" Selected="_produtos" OnChanged="StateHasChanged" />
+            <div class="cvx-base-taxa" title="Base da taxa de conversão. Decididas: ganhas ÷ (ganhas + perdidas). Todas as propostas: ganhas ÷ tudo o que foi enviado, abertas inclusive.">
+                <span class="flt-label">Taxa sobre</span>
+                <div class="cvx-seg-ctl">
+                    <button type="button" class="@(!_baseTodas ? "on" : "")" @onclick="() => _baseTodas = false">Decididas</button>
+                    <button type="button" class="@(_baseTodas ? "on" : "")" @onclick="() => _baseTodas = true">Todas as propostas</button>
+                </div>
+            </div>
             <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
             @if (Ativos > 0)
             {
@@ -285,13 +292,13 @@ else
     /// <summary>Os 6 indicadores e a faixa secundária do Resumo — usados na tela e no relatório (mesmos números).</summary>
     private RenderFragment KpisResumo() => @<div>
         <div class="cvx-kpis">
-            <article class="cvx-kpi main" style="--kc:@CorTx" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.">
+            <article class="cvx-kpi main" style="--kc:@CorTx" title="@TituloRegra">
                 <div class="cvx-lab">Taxa de Conversão</div>
                 <div class="cvx-num big">@TxQtdGlobal(_r)</div>
-                <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Decididas) decididas</div>
+                <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Base) @DenRot</div>
                 @{ var dw = DeltaWin(); }
                 @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
-                <div class="cvx-ksub" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">Por valor: <b>@TxValorGlobal(_r)</b></div>
+                <div class="cvx-ksub" title="@TituloValor">Por valor: <b>@TxValorGlobal(_r)</b></div>
             </article>
             @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
                  "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
@@ -376,7 +383,7 @@ else
                 <span class="xcard-ico">@Icons.Svg("users")</span>
                 <div>
                     <h2>@(_taxaOk ? "Taxa de conversão por vendedor" : "Propostas por vendedor no segmento selecionado")</h2>
-                    <p>@lista.Count vendedores · ganhas ÷ decididas · role para ver todos · a marca vertical é a média do grupo</p>
+                    <p>@lista.Count vendedores · @RegraCurta · role para ver todos · a marca vertical é a média do grupo</p>
                 </div>
             </div>
             @if (_taxaOk) { <span class="xcard-total"><span>Média do grupo</span><b>@TxQtdGlobal(_rx)</b></span> }
@@ -445,7 +452,7 @@ else
             </div>
             @if (_seg is { } sgv) { <div class="cvx-note">Segmento @NomeEn(sgv) ignorado neste detalhamento: a taxa de conversão considera todas as classes.</div> }
             <div class="cvx-dkpis">
-                <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Decididas) decididas</span></div>
+                <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Base) @DenRot</span></div>
                 <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão por valor @TxValorGlobal(rv)</span></div>
             </div>
             <div class="cvx-dcmp">
@@ -508,7 +515,7 @@ else
         <div class="cvx-ch">
             <div class="cvx-xh">
                 <span class="xcard-ico">@Icons.Svg("bar-chart")</span>
-                <div><h2>Taxa de conversão por @singular</h2><p>@lista.Count @plural · ganhas ÷ decididas · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
+                <div><h2>Taxa de conversão por @singular</h2><p>@lista.Count @plural · @RegraCurta · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
             </div>
             @if (_taxaOk) { <span class="xcard-total"><span>Média do recorte</span><b>@TxQtdGlobal(_rx)</b></span> }
         </div>
@@ -530,8 +537,8 @@ else
                             <span class="cvx-ibm p" title="@DinTip(r, ClasseProposta.Perdida)">@Din(r, ClasseProposta.Perdida) <small>perdido</small></span>
                             <span class="cvx-ibm a" title="@DinTip(r, ClasseProposta.Aberta)">@Din(r, ClasseProposta.Aberta) <small>aberto</small></span>
                             <span class="ibar-sep"></span>
-                            <span class="cvx-ibm" title="Valor ganho ÷ (valor ganho + valor perdido), em R$">@TxValor(r) <small>em valor</small></span>
-                            <span class="ibar-val @RelCss(r) @(r.Decididas == 0 ? "cvx-na" : "")">@TxQtd(r)</span>
+                            <span class="cvx-ibm" title="@TituloValor">@TxValor(r) <small>em valor</small></span>
+                            <span class="ibar-val @RelCss(r) @(r.Base == 0 ? "cvx-na" : "")">@TxQtd(r)</span>
                         </span>
                     </div>
                     <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do recorte: @P1(gm)"></em> }</div>
@@ -552,7 +559,7 @@ else
         <div class="cvx-ch">
             <div class="cvx-xh">
                 <span class="xcard-ico">@Icons.Svg("target")</span>
-                <div><h2>Taxa de conversão por país</h2><p>@lista.Count países · ganhas ÷ decididas · cor mais escura = taxa maior (escala de @P1(_txMin) a @P1(_txMax))@(noMapa < lista.Count ? $" · {lista.Count - noMapa} sem posição no mapa (aparecem só na lista)" : "")</p></div>
+                <div><h2>Taxa de conversão por país</h2><p>@lista.Count países · @RegraCurta · cor mais escura = taxa maior (escala de @P1(_txMin) a @P1(_txMax))@(noMapa < lista.Count ? $" · {lista.Count - noMapa} sem posição no mapa (aparecem só na lista)" : "")</p></div>
             </div>
             <div class="map-zoom">
                 <button class="icon-btn" title="Diminuir" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1/1.3)'>@Icons.Svg("down")</button>
@@ -573,7 +580,7 @@ else
                 @foreach (var (nome, r) in lista)
                 {
                     var pn = nome;
-                    <div class="ml-row @(_paises.Contains(nome) ? "xf-on" : "")" @onclick="() => Alternar(_paises, pn)" title="@nome: @N0(r.G) ganhas de @N0(r.Decididas) decididas · @N0(r.Total) propostas · clique para filtrar">
+                    <div class="ml-row @(_paises.Contains(nome) ? "xf-on" : "")" @onclick="() => Alternar(_paises, pn)" title="@nome: @N0(r.G) ganhas de @N0(r.Base) @DenRot · @N0(r.Total) propostas · clique para filtrar">
                         <span class="ml-dot" style="background:@CorTaxa(r)"></span><span class="ml-name">@nome</span><span class="ml-val">@TxQtd(r)</span><span class="ml-pct">@N0(r.G)/@N0(r.Decididas)</span>
                     </div>
                 }
@@ -840,7 +847,7 @@ else
             <div class="rpt-box">
                 <h3>Definições e notas metodológicas</h3>
                 <ul class="rpt-notes">
-                    <li><b>Taxa de conversão</b> = ganhas ÷ (ganhas + perdidas). Abertas e não classificadas não entram no denominador. <b>Conversão por valor</b> = valor ganho ÷ (valor ganho + valor perdido), em R$.</li>
+                    <li>@if (_baseTodas) { <span><b>Taxa de conversão</b> = ganhas ÷ todas as propostas enviadas (ganhas, perdidas, abertas e não classificadas). <b>Conversão por valor</b> = valor ganho ÷ valor total cotado, em R$.</span> } else { <span><b>Taxa de conversão</b> = ganhas ÷ (ganhas + perdidas). Abertas e não classificadas não entram no denominador. <b>Conversão por valor</b> = valor ganho ÷ (valor ganho + valor perdido), em R$.</span> }</li>
                     <li><b>Classificação</b> pelo status do CRM — Ganhas: Closed - Won, OTP · Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid, Closed - Unknown · Abertas: Open · demais: não classificadas, fora das três categorias.</li>
                     <li><b>Coorte de envio</b>: o eixo de tempo é o mês de envio da proposta e mostra o status atual dela — não a data de fechamento. Meses recentes têm mais propostas abertas, e a taxa deles pode mudar.</li>
                     <li><b>Valores</b> em R$ = valor em US$ × taxa USD/BRL do ano da data de envio @TaxasTexto(). Propostas sem taxa ficam fora dos valores e são sinalizadas.</li>

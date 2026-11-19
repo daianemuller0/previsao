@@ -21,6 +21,12 @@ public sealed class FiltrosConversao
     public HashSet<string> Paises { get; } = Novo();
     public HashSet<string> Produtos { get; } = Novo();
 
+    /// <summary>
+    /// Base da taxa de conversão: false = decididas (Ganhas ÷ (Ganhas + Perdidas), o padrão);
+    /// true = todas as propostas enviadas (Ganhas ÷ tudo, abertas e não classificadas inclusive).
+    /// </summary>
+    public bool BaseTodas { get; set; }
+
     private IEnumerable<HashSet<string>> Todos => new[] { Anos, Meses, Vendedores, Bus, BuIcs, Origens, Mercados, Paises, Produtos };
 
     /// <summary>Quantos filtros estão ligados.</summary>
@@ -28,7 +34,7 @@ public sealed class FiltrosConversao
 
     /// <summary>Retrato dos filtros: muda sempre que algum muda.</summary>
     public string Assinatura() =>
-        string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
+        (BaseTodas ? "T|" : "D|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
 
     /// <summary>A proposta passa pelos filtros? (as mesmas regras da guia Conversão)</summary>
     public bool Passa(PropostaConv p)

@@ -99,8 +99,12 @@ public partial class Conversao : IAsyncDisposable
         public readonly int[] Conv = new int[4];
         public int Decididas => G + P;
         public double VTotal => VG + VP + VA + VNC;
-        public double? TaxaQtd => Decididas > 0 ? (double)G / Decididas * 100 : null;
-        public double? TaxaValor => (VG + VP) > 0 ? VG / (VG + VP) * 100 : null;
+        /// <summary>Base da taxa: false = decididas (padrão); true = todas as propostas enviadas.</summary>
+        public bool Todas;
+        /// <summary>Denominador da taxa: decididas, ou todas as propostas.</summary>
+        public int Base => Todas ? Total : Decididas;
+        public double? TaxaQtd => Base > 0 ? (double)G / Base * 100 : null;
+        public double? TaxaValor => Todas ? (VTotal > 0 ? VG / VTotal * 100 : null) : (VG + VP) > 0 ? VG / (VG + VP) * 100 : null;
         public int Qtd(ClasseProposta c) => c switch { ClasseProposta.Ganha => G, ClasseProposta.Perdida => P, ClasseProposta.Aberta => A, _ => NC };
         public double Val(ClasseProposta c) => c switch { ClasseProposta.Ganha => VG, ClasseProposta.Perdida => VP, ClasseProposta.Aberta => VA, _ => VNC };
         public int TotComUsd => ComUsd.Sum();
@@ -166,9 +170,9 @@ public partial class Conversao : IAsyncDisposable
         return q;
     }
 
-    private static Resumo Somar(IEnumerable<Item> itens)
+    private Resumo Somar(IEnumerable<Item> itens)
     {
-        var r = new Resumo();
+        var r = new Resumo { Todas = _baseTodas };
         foreach (var i in itens)
         {
             r.Total++;
@@ -196,7 +200,7 @@ public partial class Conversao : IAsyncDisposable
         return r;
     }
 
-    private static List<(string Nome, Resumo R)> Grupos(IEnumerable<Item> src, Func<Item, string> chave) =>
+    private List<(string Nome, Resumo R)> Grupos(IEnumerable<Item> src, Func<Item, string> chave) =>
         src.GroupBy(chave, StringComparer.OrdinalIgnoreCase)
            .Select(g => (Nome: g.Key, R: Somar(g)))
            .OrderByDescending(x => x.R.VTotal).ThenByDescending(x => x.R.Total).ToList();
@@ -272,8 +276,8 @@ public partial class Conversao : IAsyncDisposable
     private static string DinTotal(Resumo r) => Estado(r.TotComUsd, r.TotConv, r.VTotal);
     private static string DinTotalTip(Resumo r) => EstadoTip(r.TotComUsd, r.TotConv, r.VTotal);
 
-    private string TxQtd(Resumo r) => !_taxaOk ? "—" : r.Decididas == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
-    private static string TxQtdGlobal(Resumo r) => r.Decididas == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
+    private string TxQtd(Resumo r) => !_taxaOk ? "—" : r.Base == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
+    private static string TxQtdGlobal(Resumo r) => r.Base == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
     private string TxValor(Resumo r) => !_taxaOk ? "—" : TxValorGlobal(r);
     private static string TxValorGlobal(Resumo r)
     {
@@ -281,7 +285,7 @@ public partial class Conversao : IAsyncDisposable
         var conv = r.Conv[(int)ClasseProposta.Ganha] + r.Conv[(int)ClasseProposta.Perdida];
         if (usd == 0) return "—";
         if (conv == 0) return "Não convertido";
-        if (r.VG + r.VP <= 0) return "Não calculável";
+        if ((r.Todas ? r.VTotal : r.VG + r.VP) <= 0) return "Não calculável";
         return P1(r.TaxaValor!.Value) + (conv < usd ? "*" : "");
     }
 
@@ -1105,6 +1109,21 @@ public partial class Conversao : IAsyncDisposable
     /// <summary>Embutido: quantas linhas ficam visíveis nas listas (o resto rola).</summary>
     [Parameter] public int LinhasVisiveis { get; set; } = 7;
     private string? _assinNotif;
+
+    // ---- base da taxa de conversão (botão na barra de filtros) --------------------------
+    private bool _baseTodasLocal;
+    /// <summary>false = Ganhas ÷ decididas (padrão); true = Ganhas ÷ todas as propostas enviadas. Embutido: vem dos filtros compartilhados.</summary>
+    private bool _baseTodas
+    {
+        get => Filtros?.BaseTodas ?? _baseTodasLocal;
+        set { if (Filtros is not null) Filtros.BaseTodas = value; else _baseTodasLocal = value; }
+    }
+    private string DenRot => _baseTodas ? "enviadas" : "decididas";
+    private string RegraCurta => _baseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ decididas";
+    private string TituloRegra => _baseTodas
+        ? "Taxa de Conversão = Ganhas ÷ todas as propostas enviadas × 100 (ganhas, perdidas, abertas e não classificadas)."
+        : "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.";
+    private string TituloValor => _baseTodas ? "Valor ganho ÷ valor total cotado (todas as propostas), em R$" : "Valor ganho ÷ (valor ganho + valor perdido), em R$";
 
     protected override void OnParametersSet()
     {

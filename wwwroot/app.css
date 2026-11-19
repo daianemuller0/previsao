@@ -2954,3 +2954,11 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 /* barra de filtros embutida: o invólucro não conta, para a barra grudar no topo da página inteira */
 .cvx-embed.cvx-embed-barra { display: contents; }
 .vp-page .cvx-fb { margin-bottom: 14px; }
+/* botão "Taxa sobre" na barra de filtros */
+.cvx-base-taxa { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.cvx-base-taxa .flt-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--cx-mut); }
+.vp-page .cvx-base-taxa .flt-label { font-size: 12px; }
+.cvx-base-taxa .cvx-seg-ctl { background: #fff; border: 1px solid var(--cx-line); border-radius: 8px; padding: 0; overflow: hidden; display: inline-flex; }
+.cvx-base-taxa .cvx-seg-ctl button { background: #fff !important; color: var(--cx-mut) !important; border: 0; border-radius: 0; box-shadow: none !important; font-weight: 700; padding: 6px 14px; }
+.cvx-base-taxa .cvx-seg-ctl button + button { border-left: 1px solid var(--cx-line); }
+.cvx-base-taxa .cvx-seg-ctl button.on { background: var(--cx-navy, #122E50) !important; color: #fff !important; }

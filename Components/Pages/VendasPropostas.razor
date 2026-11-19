@@ -99,15 +99,16 @@
                     "Quanto foi vendido para cada proposta enviada (meses com venda e propostas)", "#007A9E")
                 @{ var txFoco = Taxa(foco.Ano); var txFocoAnt = Taxa(anoAnt, mesLim); var txFocoAte = Taxa(foco.Ano, mesLim); }
                 @Kpi($"Taxa de conversão · {foco.Ano}", txFoco.Taxa is double tq ? P1(tq) : "Não calculável",
-                    $"{N0(txFoco.G)} ganhas / {N0(txFoco.G + txFoco.P)} decididas{(txFoco.TaxaValor is double tv ? $" · por valor {P1(tv)}" : "")}",
-                    "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100 — a mesma regra da guia Conversão. Propostas abertas e não classificadas não entram no denominador.",
+                    $"{N0(txFoco.G)} ganhas / {N0(txFoco.Base)} {DenRot}{(txFoco.TaxaValor is double tv ? $" · por valor {P1(tv)}" : "")}",
+                    BaseTodas ? "Taxa de Conversão = Ganhas ÷ todas as propostas enviadas × 100 (ganhas, perdidas, abertas e não classificadas)."
+                              : "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100 — a mesma regra da guia Conversão. Propostas abertas e não classificadas não entram no denominador.",
                     CorTx, DeltaPp(txFocoAte.Taxa, txFocoAnt.Taxa, anoAnt))
             </div>
 
             <div class="panel vp-principal" id="mensal">
                 <div class="panel-head">
                     <div class="panel-title">@TituloGrafico()
-                        <span class="hint">uma linha por ano · jan a dez · @(_met switch { "vendas" => "vendas da empresa no mês · R$", "valor" => "mês de envio da proposta · R$", "taxa" => "ganhas ÷ todas as propostas enviadas no mês (regra da guia Conversão)", _ => "mês de envio da proposta" })@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
+                        <span class="hint">uma linha por ano · jan a dez · @(_met switch { "vendas" => "vendas da empresa no mês · R$", "valor" => "mês de envio da proposta · R$", "taxa" => BaseTodas ? "ganhas ÷ todas as propostas enviadas no mês" : "ganhas ÷ decididas do mês", _ => "mês de envio da proposta" })@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
                     </div>
                     <div class="rep-attain-group">
                         <div class="rep-attain-box">
@@ -159,7 +160,7 @@
                 <div class="chart-body">@((MarkupString)SvgAnos(_met, foco.Ano))</div>
 
                 @* ano a ano, embaixo do gráfico: taxa de conversão + valor enviado, valor médio e vendas, um cartão por ano na cor da linha *@
-                <div class="vp-anos-tit">Taxa de conversão e resultados, ano a ano <span>Ganhas ÷ (Ganhas + Perdidas) × 100 · regra da guia Conversão@(_setor != "" ? " · " + _setor : "")</span></div>
+                <div class="vp-anos-tit">Taxa de conversão e resultados, ano a ano <span>@RegraTxt · @(BaseTodas ? "todas as propostas" : "só as decididas") (botão "Taxa sobre" no filtro)@(_setor != "" ? " · " + _setor : "")</span></div>
                 <div class="vp-conv-grid">
                     @foreach (var a in AnosDoPainel)
                     {
@@ -178,7 +179,7 @@
                                 <b>@(c.Taxa is double t ? P1(t) : "—")</b>
                                 @if (dC is not null) { <em class="@DeltaCls(dC)">@Seta(dC)</em> }
                             </div>
-                            <div class="vp-cc-sub">@N0(c.G) ganhas de @N0(c.G + c.P) decididas</div>
+                            <div class="vp-cc-sub">@N0(c.G) ganhas de @N0(c.Base) @DenRot</div>
                             <div class="vp-cc-barra" title="@($"Ganhas {N0(c.G)} · Perdidas {N0(c.P)} · Abertas {N0(c.A)}" + (c.NC > 0 ? $" · Não classificadas {N0(c.NC)}" : ""))">
                                 <i style="width:@F(c.G * 100.0 / baseBarra)%;background:#1f9254"></i><i style="width:@F(c.P * 100.0 / baseBarra)%;background:#6FB3DC"></i><i style="width:@F(c.A * 100.0 / baseBarra)%;background:#007A9E"></i><i style="width:@F(c.NC * 100.0 / baseBarra)%;background:#c3ccd8"></i>
                             </div>
@@ -622,34 +623,43 @@
     /// <summary>O último mês a comparar no ano: no ano corrente, o mês de hoje; nos outros, dezembro.</summary>
     private static int MesLimite(int ano) => ano == DateTime.Today.Year ? DateTime.Today.Month : 12;
 
+    /// <summary>Base da taxa (botão "Taxa sobre" da barra de filtros): false = decididas; true = todas as propostas enviadas.</summary>
+    private bool BaseTodas => _fil.BaseTodas;
+    private string DenRot => BaseTodas ? "enviadas" : "decididas";
+    private string RegraTxt => BaseTodas ? "Ganhas ÷ todas as propostas enviadas × 100" : "Ganhas ÷ (Ganhas + Perdidas) × 100";
+
     /// <summary>
     /// Taxa de conversão do ano (até o mês dado), com a regra da guia Conversão:
-    /// Ganhas ÷ (Ganhas + Perdidas) × 100; por valor, valor ganho ÷ (ganho + perdido).
+    /// decididas = Ganhas ÷ (Ganhas + Perdidas), por valor ganho ÷ (ganho + perdido);
+    /// todas = Ganhas ÷ todas as propostas enviadas, por valor ganho ÷ valor total cotado.
     /// </summary>
-    private (int G, int P, double? Taxa, double? TaxaValor) Taxa(int ano, int ateMes = 12)
+    private (int G, int P, int Base, double? Taxa, double? TaxaValor) Taxa(int ano, int ateMes = 12)
     {
         var l = _convSetor.Where(x => x.Ano == ano && x.Mes <= ateMes).ToList();
         int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida);
         double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
-        return (g, p, g + p > 0 ? g * 100.0 / (g + p) : null, vg + vp > 0 ? vg / (vg + vp) * 100 : null);
+        var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
+        return (g, p, b, b > 0 ? g * 100.0 / b : null, vb > 0 ? vg / vb * 100 : null);
     }
 
     /// <summary>Composição do ano (regra da guia Conversão): ganhas, perdidas, abertas, não classificadas, a taxa e o valor ganho.</summary>
-    private (int Total, int G, int P, int A, int NC, double? Taxa, double VG, double? TaxaValor) Composicao(int ano)
+    private (int Total, int G, int P, int A, int NC, int Base, double? Taxa, double VG, double? TaxaValor) Composicao(int ano)
     {
         var l = _convSetor.Where(x => x.Ano == ano).ToList();
         int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida),
             a = l.Count(x => x.Classe == ClasseProposta.Aberta), nc = l.Count(x => x.Classe == ClasseProposta.NaoClassificada);
         double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
-        return (l.Count, g, p, a, nc, g + p > 0 ? g * 100.0 / (g + p) : null, vg, vg + vp > 0 ? vg / (vg + vp) * 100 : null);
+        var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
+        return (l.Count, g, p, a, nc, b, b > 0 ? g * 100.0 / b : null, vg, vb > 0 ? vg / vb * 100 : null);
     }
 
-    /// <summary>Taxa do mês no gráfico (regra do gráfico mensal da guia Conversão): ganhas ÷ todas as propostas enviadas no mês.</summary>
+    /// <summary>Taxa do mês no gráfico, pela base escolhida em "Taxa sobre": ganhas ÷ decididas do mês, ou ganhas ÷ todas as enviadas no mês.</summary>
     private (int Total, int G, double? Taxa) TaxaMes(int ano, int mes)
     {
         var l = _convSetor.Where(x => x.Ano == ano && x.Mes == mes).ToList();
         var g = l.Count(x => x.Classe == ClasseProposta.Ganha);
-        return (l.Count, g, l.Count > 0 ? g * 100.0 / l.Count : null);
+        var b = BaseTodas ? l.Count : g + l.Count(x => x.Classe == ClasseProposta.Perdida);
+        return (b, g, b > 0 ? g * 100.0 / b : null);
     }
 
     private PropMes? Prop(int a, int m) => _porMes.TryGetValue((a, m), out var p) ? p : null;
@@ -819,7 +829,7 @@
         {
             var v = Val(a, m);
             if (v is null) return met == "vendas" ? "sem venda registrada" : "sem propostas";
-            if (met == "taxa") { var tm = TaxaMes(a, m); return $"{P1(v.Value)} · {N0(tm.G)} ganhas de {N0(tm.Total)} enviadas"; }
+            if (met == "taxa") { var tm = TaxaMes(a, m); return $"{P1(v.Value)} · {N0(tm.G)} ganhas de {N0(tm.Total)} {DenRot}"; }
             var p = Prop(a, m);
             return met switch
             {
