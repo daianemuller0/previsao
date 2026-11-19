@@ -144,15 +144,53 @@
                         {
                             var ano = a;
                             <label class="vp-cor" title="Cor da linha de @ano">
-                                <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano, e.Value?.ToString())" />
+                                <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano.ToString(), e.Value?.ToString())" />
                                 <span>@ano</span>
                             </label>
                         }
-                        <button class="btn-link" disabled="@(_cores.Count == 0)" @onclick="RestaurarCores">Restaurar cores padrão</button>
+                        <button class="btn-link" disabled="@(!_cores.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
                         <span class="cvx-note">As cores ficam guardadas para o seu login.</span>
                     </div>
                 }
                 <div class="chart-body">@((MarkupString)SvgAnos(_met, foco.Ano))</div>
+            </div>
+
+            @{
+                var pctGrupo = foco.PctGrupo; var pctHsa = foco.PctHsa;
+            }
+            <div class="panel vp-principal">
+                <div class="panel-head">
+                    <div class="panel-title">Vendas totais × metas, ano a ano
+                        <span class="hint">vendas da empresa × Meta Grupo e Meta HSA · R$ · @AnoIni → @AnoFim</span>
+                    </div>
+                    <div class="rep-attain-group">
+                        <div class="rep-attain-box">
+                            <span class="ra-label">Atend. Meta Grupo (@foco.Ano)</span>
+                            <span class="ra-value" style="color:@CorAtend(pctGrupo)">@(pctGrupo is decimal pg0 ? Pct(pg0) : "—")</span>
+                        </div>
+                        <div class="rep-attain-box">
+                            <span class="ra-label">Atend. Meta HSA (@foco.Ano)</span>
+                            <span class="ra-value" style="color:@CorAtend(pctHsa)">@(pctHsa is decimal ph0 ? Pct(ph0) : "—")</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="vp-met">
+                    <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 Cores das linhas</button>
+                    <span class="cvx-note">@(foco.UltimoMes is > 0 and < 12 ? $"{foco.Ano} vai até {NomeDoMes(foco.UltimoMes).ToLowerInvariant()} (o ponto vazado tracejado é a projeção no ritmo do ano). " : "")Passe o mouse num ano para ver os valores e o atingimento.</span>
+                </div>
+                @if (_editCoresMetas)
+                {
+                    <div class="vp-cores">
+                        @foreach (var sm in SeriesMetas)
+                        {
+                            var chave = sm.Chave;
+                            <label class="vp-cor"><input type="color" value="@CorMeta(chave)" @onchange="e => MudarCor(chave, e.Value?.ToString())" /><span>@sm.Nome</span></label>
+                        }
+                        <button class="btn-link" disabled="@(!SeriesMetas.Any(x => _cores.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">Restaurar cores padrão</button>
+                        <span class="cvx-note">As cores ficam guardadas para o seu login.</span>
+                    </div>
+                }
+                <div class="chart-body">@((MarkupString)SvgMetas(foco.Ano))</div>
             </div>
 
             <div class="cvx-card">
@@ -240,7 +278,7 @@
         @* ================= 3 · VENDAS × BUDGET ================= *@
         <section id="budget" class="cvx-sec">
             <div class="xsec"><span class="xsec-t">Vendas × budget</span><span class="xsec-s">O ritmo de @foco.Ano contra os anos anteriores e os budgets HSA e Grupo</span><span class="xsec-line"></span></div>
-            <div class="vp-dois">
+            <div>
                 @{ var ac = Acumulado(foco); }
                 <div class="cvx-card">
                     <div class="cvx-ch"><div><h3 class="cvx-h3">Acumulado no ano</h3><p>Vendas somadas mês a mês</p></div></div>
@@ -309,45 +347,6 @@
                     </div>
                 </div>
 
-                @{ var aa = AnoAAno(foco.Ano); }
-                <div class="cvx-card">
-                    <div class="cvx-ch"><div><h3 class="cvx-h3">Ano a ano × budgets</h3><p>O total vendido em cada ano e onde ficaram os budgets</p></div></div>
-                    <div class="cvx-leg" style="margin:0 0 6px">
-                        <span><i class="vp-sw" style="background:@CorFoco"></i>vendas @foco.Ano</span>
-                        <span><i class="vp-sw" style="background:@CorContexto"></i>outros anos</span>
-                        <span><i class="vp-tick" style="background:#172B43"></i>budget HSA</span>
-                        <span><i class="vp-tick" style="background:#8493A3"></i>budget Grupo</span>
-                    </div>
-                    <div class="vp-grafico" @onmouseleave='() => SairDe("aa")'>
-                        <svg viewBox="0 0 @F(aa.W) @F(aa.H)" role="img" aria-label="Vendas por ano e budgets">
-                            @foreach (var (v, x) in aa.Ticks)
-                            {
-                                <g>
-                                <line x1="@F(x)" x2="@F(x)" y1="@F(aa.Topo - 4)" y2="@F(aa.Base)" stroke="@(v == 0 ? "#d3dcea" : "#edf1f6")" />
-                                <text x="@F(x)" y="@F(aa.Base + 16)" text-anchor="middle" class="vp-eixo">@Eixo(v)</text>
-                                </g>
-                            }
-                            @foreach (var l in aa.Linhas)
-                            {
-                                var linha = l;
-                                <g>
-                                <text x="@F(aa.X0 - 10)" y="@F(l.Y + 5)" text-anchor="end" class="vp-ano @(l.Ano.Ano == foco.Ano ? "foco" : "")">@l.Ano.Ano</text>
-                                @if (l.Ano.UltimoMes is > 0 and < 12)
-                                {
-                                    <g><text x="@F(aa.X0 - 10)" y="@F(l.Y + 18)" text-anchor="end" class="vp-eixo">jan–@MesCurto(l.Ano.UltimoMes).ToLowerInvariant()</text></g>
-                                }
-                                <path d="@Barra(aa.X0, l.Y - 9, l.Fim, 18)" fill="@(l.Ano.Ano == foco.Ano ? CorFoco : CorContexto)" />
-                                @if (l.Hsa is double xh) { <rect x="@F(xh - 1.5)" y="@F(l.Y - 15)" width="3" height="30" rx="1" fill="#172B43" /> }
-                                @if (l.Grupo is double xg) { <rect x="@F(xg - 1.5)" y="@F(l.Y - 13)" width="3" height="26" rx="1" fill="#8493A3" /> }
-                                <text x="@F(aa.W - 6)" y="@F(l.Y + 1)" text-anchor="end" class="vp-rotulo">@Mi(l.Ano.Vendas)</text>
-                                <text x="@F(aa.W - 6)" y="@F(l.Y + 15)" text-anchor="end" class="vp-eixo">@(l.Ano.PctHsa is decimal ph ? $"{Pct(ph)} do HSA" : l.Ano.PctGrupo is decimal pg ? $"{Pct(pg)} do Grupo" : "")</text>
-                                <rect x="@F(aa.X0)" y="@F(l.Y - 20)" width="@F(aa.Fim - aa.X0)" height="40" fill="transparent" @onmouseenter="() => DicaDoAno(linha, aa)" />
-                                </g>
-                            }
-                        </svg>
-                        @Dica("aa")
-                    </div>
-                </div>
             </div>
 
             @{
@@ -519,9 +518,9 @@
     private List<int> _anosEditor = new();
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private string _login = "";
-    private bool _editCores;
+    private bool _editCores, _editCoresMetas;
     /// <summary>Cores escolhidas pela pessoa para cada ano (as que faltam seguem o padrão).</summary>
-    private Dictionary<int, string> _cores = new();
+    private Dictionary<string, string> _cores = new();
     private const string ChaveCores = "vendas_propostas_cores";
 
     /// <summary>As propostas de um mês: quantidade, valor (null = sem valor), quantas sem taxa de câmbio e quantas com valor.</summary>
@@ -690,39 +689,50 @@
         ("#007A9E", ""), ("#b7791f", "5 3"), ("#1f9254", "2 3"), ("#64748b", "6 3 2 3"), ("#c2410c", "1 3"),
     };
 
-    /// <summary>"2026=#8b5cf6;2025=#007a9e" → ano → cor (só cores #rrggbb válidas).</summary>
-    private static Dictionary<int, string> LerCores(string? texto)
+    /// <summary>"2026=#8b5cf6;vendas=#8b5cf6;hsa=#1f9254" → chave → cor (só cores #rrggbb válidas).</summary>
+    private static Dictionary<string, string> LerCores(string? texto)
     {
-        var d = new Dictionary<int, string>();
+        var d = new Dictionary<string, string>();
         foreach (var par in (texto ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
         {
             var kv = par.Split('=');
-            if (kv.Length == 2 && int.TryParse(kv[0], out var a) && System.Text.RegularExpressions.Regex.IsMatch(kv[1].Trim(), "^#[0-9a-fA-F]{6}$"))
-                d[a] = kv[1].Trim().ToLowerInvariant();
+            if (kv.Length == 2 && System.Text.RegularExpressions.Regex.IsMatch(kv[0].Trim(), "^[a-z0-9]+$")
+                && System.Text.RegularExpressions.Regex.IsMatch(kv[1].Trim(), "^#[0-9a-fA-F]{6}$"))
+                d[kv[0].Trim()] = kv[1].Trim().ToLowerInvariant();
         }
         return d;
     }
 
-    private void GravarCores() =>
-        ChartPrefs.Save(_login, ChaveCores, string.Join(";", _cores.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}")), ChartPrefsRepository.BarraPadrao);
+    private void GravarCores()
+    {
+        if (_cores.Count == 0) ChartPrefs.Reset(_login, ChaveCores);
+        else ChartPrefs.Save(_login, ChaveCores, string.Join(";", _cores.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}")), ChartPrefsRepository.BarraPadrao);
+    }
 
-    private void MudarCor(int ano, string? cor)
+    private void MudarCor(string chave, string? cor)
     {
         if (cor is null || !System.Text.RegularExpressions.Regex.IsMatch(cor, "^#[0-9a-fA-F]{6}$")) return;
-        _cores[ano] = cor.ToLowerInvariant();
+        _cores[chave] = cor.ToLowerInvariant();
         GravarCores();
     }
 
-    private void RestaurarCores()
+    private void RestaurarCores(IEnumerable<string> chaves)
     {
-        _cores.Clear();
-        ChartPrefs.Reset(_login, ChaveCores);
+        foreach (var k in chaves.ToList()) _cores.Remove(k);
+        GravarCores();
     }
+
+    // cores padrão do gráfico de metas (as mesmas do Vendas x Meta da Visão Executiva)
+    private static readonly (string Chave, string Nome, string Padrao, string Traco)[] SeriesMetas =
+    {
+        ("vendas", "Vendas totais", "#8b5cf6", ""), ("grupo", "Meta Grupo", "#b7791f", "5 3"), ("hsa", "Meta HSA", "#1f9254", "2 3"),
+    };
+    private string CorMeta(string chave) => _cores.TryGetValue(chave, out var c) ? c : SeriesMetas.First(x => x.Chave == chave).Padrao;
 
     /// <summary>A cor do ano: a escolhida pela pessoa; senão, roxo para o ano em foco e a paleta para os outros (mais recente primeiro).</summary>
     private string CorDoAno(int ano)
     {
-        if (_cores.TryGetValue(ano, out var c)) return c;
+        if (_cores.TryGetValue(ano.ToString(), out var c)) return c;
         if (ano == _foco) return CorFocoLinha;
         var outros = AnosDoPainel.Where(a => a != _foco).OrderByDescending(a => a).ToList();
         var i = outros.IndexOf(ano);
@@ -855,6 +865,125 @@
         return sb.ToString();
     }
 
+    // ================= gráfico 2: vendas totais × metas, ano a ano =================
+
+    private static string CorAtend(decimal? p) => p is not decimal v ? "#93a1b5" : v >= 1m ? "#1f9254" : v >= 0.85m ? "#b7791f" : "#b42318";
+
+    /// <summary>
+    /// Vendas totais × Meta Grupo × Meta HSA, um ponto por ano (2022 em diante),
+    /// no mesmo desenho do Vendas x Meta da Visão Executiva: vendas com área,
+    /// traço grosso, pontos vazados e o valor escrito; metas tracejada e pontilhada.
+    /// O ano em andamento ganha a projeção (ritmo do ano até dezembro).
+    /// </summary>
+    private string SvgMetas(int focoAno)
+    {
+        var anos = _anos.Where(a => a.Ano >= AnoIni && (a.MesesComVendas > 0 || a.BudgetHsa is not null || a.BudgetGrupo is not null)).OrderBy(a => a.Ano).ToList();
+        if (anos.Count == 0) return "<div class='empty'>Sem vendas nem metas cadastradas.</div>";
+        string cV = CorMeta("vendas"), cG = CorMeta("grupo"), cH = CorMeta("hsa");
+        decimal? Projecao(ResumoDoAno a) => a.MesesComVendas is > 0 and < 12 && a.Ano == DateTime.Today.Year ? a.Vendas / a.MesesComVendas * 12m : null;
+
+        double Wd = 760, H = 290, top = 50, bot = 246, left = 56, right = 18;
+        var n = anos.Count;
+        var pad = 46.0;
+        double X(int i) => n == 1 ? (left + Wd - right) / 2 : left + pad + i * (Wd - left - right - 2 * pad) / (n - 1);
+        double max = 1;
+        foreach (var a in anos) max = Math.Max(max, (double)new[] { a.Vendas, a.BudgetGrupo ?? 0m, a.BudgetHsa ?? 0m, Projecao(a) ?? 0m }.Max());
+        max *= 1.18;
+        double Y(decimal v) => bot - (double)v / max * (bot - top);
+        string N(double v) => v.ToString("0.#", Inv);
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg viewBox='0 0 {N(Wd)} {N(H)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas totais por ano contra a Meta Grupo e a Meta HSA'>");
+        sb.Append($"<defs><linearGradient id='vpmeta' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cV}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cV}' stop-opacity='0.02'/></linearGradient></defs>");
+
+        // legenda
+        var dx = 0.0;
+        void Legenda(string cor, string traco, string texto, double larg)
+        {
+            var risco = traco == "" ? "" : $" stroke-dasharray='{traco}'";
+            sb.Append($"<line x1='{N(left + dx)}' y1='20' x2='{N(left + dx + 22)}' y2='20' stroke='{cor}' stroke-width='3'{risco} stroke-linecap='round'/>");
+            sb.Append($"<text x='{N(left + dx + 28)}' y='24' font-size='11.5' font-weight='600' fill='#3b4a61'>{Esc(texto)}</text>");
+            dx += larg;
+        }
+        Legenda(cV, "", "Vendas totais", 140);
+        Legenda(cG, "5 3", "Meta Grupo", 130);
+        Legenda(cH, "2 3", "Meta HSA", 120);
+        if (anos.Any(a => Projecao(a) is not null))
+        {
+            sb.Append($"<circle cx='{N(left + dx + 11)}' cy='20' r='4' fill='#fff' stroke='{cV}' stroke-width='2' stroke-dasharray='2 2'/>");
+            sb.Append($"<text x='{N(left + dx + 22)}' y='24' font-size='11.5' font-weight='600' fill='#3b4a61'>Projeção (ritmo do ano)</text>");
+        }
+
+        // grade + eixo Y
+        for (var g = 0; g <= 4; g++)
+        {
+            double gy = top + (bot - top) * g / 4.0, gv = max * (4 - g) / 4.0;
+            sb.Append($"<line x1='{N(left)}' y1='{N(gy)}' x2='{N(Wd - right)}' y2='{N(gy)}' stroke='#eef2f7'/>");
+            sb.Append($"<text x='{N(left - 6)}' y='{N(gy + 3)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(MiEixo((decimal)gv))}</text>");
+        }
+
+        string Pts(IEnumerable<(int I, decimal V)> pts) => string.Join(" ", pts.Select(p => $"{N(X(p.I))},{N(Y(p.V))}"));
+        var vend = anos.Select((a, i) => (I: i, A: a)).Where(x => x.A.MesesComVendas > 0).Select(x => (x.I, V: x.A.Vendas)).ToList();
+        var grupo = anos.Select((a, i) => (I: i, V: a.BudgetGrupo)).Where(x => x.V is not null).Select(x => (x.I, V: x.V!.Value)).ToList();
+        var hsa = anos.Select((a, i) => (I: i, V: a.BudgetHsa)).Where(x => x.V is not null).Select(x => (x.I, V: x.V!.Value)).ToList();
+
+        // vendas: área + traço grosso
+        if (vend.Count > 1)
+        {
+            sb.Append($"<polygon points='{N(X(vend[0].I))},{N(bot)} {Pts(vend)} {N(X(vend[^1].I))},{N(bot)}' fill='url(#vpmeta)'/>");
+            sb.Append($"<polyline points='{Pts(vend)}' fill='none' stroke='{cV}' stroke-width='2.8' stroke-linejoin='round' stroke-linecap='round'/>");
+        }
+        // metas
+        if (grupo.Count > 1) sb.Append($"<polyline points='{Pts(grupo)}' fill='none' stroke='{cG}' stroke-width='2' stroke-dasharray='5 3' stroke-linejoin='round' stroke-linecap='round'/>");
+        if (hsa.Count > 1) sb.Append($"<polyline points='{Pts(hsa)}' fill='none' stroke='{cH}' stroke-width='2' stroke-dasharray='2 3' stroke-linejoin='round' stroke-linecap='round'/>");
+
+        for (var i = 0; i < n; i++)
+        {
+            var a = anos[i];
+            var cx = X(i);
+            var foco = a.Ano == focoAno;
+            var periodo = a.UltimoMes is > 0 and < 12 ? $" (jan–{MesCurto(a.UltimoMes).ToLowerInvariant()})" : "";
+            var tip = $"{a.Ano}{periodo}\nVendas: {(a.MesesComVendas > 0 ? Cheio(a.Vendas) : "—")}"
+                + (a.BudgetGrupo is decimal g ? $"\nMeta Grupo: {Cheio(g)} · {(a.MesesComVendas > 0 ? Pct(a.Vendas / g) : "—")}" : "\nMeta Grupo: —")
+                + (a.BudgetHsa is decimal h ? $"\nMeta HSA: {Cheio(h)} · {(a.MesesComVendas > 0 ? Pct(a.Vendas / h) : "—")}" : "\nMeta HSA: —")
+                + (Projecao(a) is decimal pj ? $"\nProjeção até dezembro: {Cheio(pj)}" : "");
+            // metas: valor à direita do ponto; se as duas ficarem quase na mesma altura, afasta uma da outra
+            double? yg = a.BudgetGrupo is decimal bg0 ? Y(bg0) + 3 : null, yh = a.BudgetHsa is decimal bh0 ? Y(bh0) + 3 : null;
+            if (yg is double g1 && yh is double h1 && Math.Abs(g1 - h1) < 12)
+            {
+                var meio = (g1 + h1) / 2; var hsaEmCima = h1 <= g1;
+                yh = hsaEmCima ? meio - 6 : meio + 6; yg = hsaEmCima ? meio + 6 : meio - 6;
+            }
+            if (a.BudgetGrupo is decimal bg)
+            {
+                sb.Append($"<circle cx='{N(cx)}' cy='{N(Y(bg))}' r='3' fill='{cG}'><title>{Esc(tip)}</title></circle>");
+                sb.Append($"<text x='{N(cx + 7)}' y='{N(yg!.Value)}' font-size='8.5' fill='{cG}' font-weight='600' paint-order='stroke' stroke='#fff' stroke-width='3'>{Esc(MiEixo(bg))}</text>");
+            }
+            if (a.BudgetHsa is decimal bh)
+            {
+                sb.Append($"<circle cx='{N(cx)}' cy='{N(Y(bh))}' r='3' fill='{cH}'><title>{Esc(tip)}</title></circle>");
+                sb.Append($"<text x='{N(cx + 7)}' y='{N(yh!.Value)}' font-size='8.5' fill='{cH}' font-weight='600' paint-order='stroke' stroke='#fff' stroke-width='3'>{Esc(MiEixo(bh))}</text>");
+            }
+            if (Projecao(a) is decimal pjv && a.MesesComVendas > 0)
+            {
+                sb.Append($"<line x1='{N(cx)}' y1='{N(Y(a.Vendas))}' x2='{N(cx)}' y2='{N(Y(pjv))}' stroke='{cV}' stroke-width='1.6' stroke-dasharray='3 3' opacity='.7'/>");
+                sb.Append($"<circle cx='{N(cx)}' cy='{N(Y(pjv))}' r='4.5' fill='#fff' stroke='{cV}' stroke-width='2' stroke-dasharray='2 2'><title>{Esc(tip)}</title></circle>");
+                sb.Append($"<text x='{N(cx)}' y='{N(Y(pjv) - 9)}' text-anchor='middle' font-size='8.5' font-weight='600' fill='{cV}' paint-order='stroke' stroke='#fff' stroke-width='3'>projeção {Esc(MiEixo(pjv))}</text>");
+            }
+            if (a.MesesComVendas > 0)
+            {
+                var y = Y(a.Vendas);
+                sb.Append($"<circle cx='{N(cx)}' cy='{N(y)}' r='{(foco ? "5" : "3.5")}' fill='#fff' stroke='{cV}' stroke-width='{(foco ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
+                sb.Append($"<text x='{N(cx - 9)}' y='{N(y + 3.5)}' text-anchor='end' font-size='9.5' font-weight='{(foco ? "800" : "700")}' fill='{(foco ? "#3b0764" : "#3b4a61")}' paint-order='stroke' stroke='#fff' stroke-width='3'>{Esc(MiEixo(a.Vendas))}</text>");
+            }
+            sb.Append($"<text x='{N(cx)}' y='{N(H - 18)}' text-anchor='middle' font-size='10.5' font-weight='{(foco ? "800" : "600")}' fill='{(foco ? cV : "#93a1b5")}'>{a.Ano}</text>");
+            if (periodo != "") sb.Append($"<text x='{N(cx)}' y='{N(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(periodo.Trim(' ', '(', ')'))}</text>");
+            sb.Append($"<rect x='{N(cx - 40)}' y='{N(top)}' width='80' height='{N(bot - top)}' fill='transparent'><title>{Esc(tip)}</title></rect>");
+        }
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+
     // ================= gráficos de vendas × budget =================
 
     private static (string Fundo, string Tinta) CorDaCelula(decimal v, decimal max)
@@ -874,20 +1003,13 @@
         return 1e9m;
     }
 
-    /// <summary>Barra horizontal com a ponta arredondada à direita.</summary>
-    private static string Barra(double x0, double y, double x1, double h)
-    {
-        var r = Math.Min(4, Math.Max(0, (x1 - x0) / 2));
-        return $"M{F(x0)},{F(y)} H{F(x1 - r)} Q{F(x1)},{F(y)} {F(x1)},{F(y + r)} V{F(y + h - r)} Q{F(x1)},{F(y + h)} {F(x1 - r)},{F(y + h)} H{F(x0)} Z";
-    }
-
     private sealed record Serie(int Ano, string Pontos, double FimX, double FimY, decimal Fim);
     private sealed record GraficoAcumulado(double W, double H, double X0, double Topo, double Base, double Passo, Func<int, double> Xm, Func<decimal, double> Y,
         List<(decimal V, double Y)> Ticks, List<Serie> Series, Dictionary<int, decimal[]> Valores);
 
     private GraficoAcumulado Acumulado(ResumoDoAno foco)
     {
-        const double W = 560, H = 300, X0 = 58, Topo = 16, Base = 262;
+        const double W = 1100, H = 320, X0 = 64, Topo = 16, Base = 282;
         var passoX = (W - 110 - X0) / 12;
         double Xm(int m) => X0 + passoX * (m - 0.5);
         var valores = new Dictionary<int, decimal[]>();
@@ -918,27 +1040,6 @@
         return new GraficoAcumulado(W, H, X0, Topo, Base, passoX, Xm, Y, ticks, series, valores);
     }
 
-    private sealed record LinhaAno(ResumoDoAno Ano, double Y, double Fim, double? Hsa, double? Grupo);
-    private sealed record GraficoAnos(double W, double H, double X0, double Fim, double Topo, double Base, List<(decimal V, double X)> Ticks, List<LinhaAno> Linhas);
-
-    private GraficoAnos AnoAAno(int foco)
-    {
-        const double W = 560, X0 = 74, Topo = 22;
-        var anos = _anos.Where(a => a.MesesComVendas > 0).ToList();
-        var fim = W - 120;
-        var altura = 52.0;
-        var baseY = Topo + anos.Count * altura;
-        var max = anos.Select(a => new[] { a.Vendas, a.BudgetHsa ?? 0m, a.BudgetGrupo ?? 0m }.Max()).DefaultIfEmpty(1m).Max();
-        var passo = Passo(Math.Max(max, 1m));
-        var topoV = Math.Ceiling(Math.Max(max, 1m) / passo) * passo;
-        double X(decimal v) => X0 + (double)(Math.Max(0m, v) / topoV) * (fim - X0);
-        var ticks = new List<(decimal, double)>();
-        for (var v = 0m; v <= topoV; v += passo) ticks.Add((v, X(v)));
-        var linhas = anos.Select((a, i) => new LinhaAno(a, Topo + altura * i + altura / 2, X(a.Vendas),
-            a.BudgetHsa is decimal h ? X(h) : null, a.BudgetGrupo is decimal g ? X(g) : null)).ToList();
-        return new GraficoAnos(W, baseY + 26, X0, fim, Topo, baseY, ticks, linhas);
-    }
-
     // ================= dicas (hover) =================
 
     private sealed record DicaVisivel(string Grafico, string Chave, double XPct, double YPct, string Titulo, List<(string Cor, string Valor, string Rotulo)> Linhas, int? Mes = null);
@@ -954,15 +1055,6 @@
             .ToList();
         var topo = ac.Valores.Values.Where(v => v[mes - 1] >= 0).Select(v => v[mes - 1]).DefaultIfEmpty(0m).Max();
         _dica = new DicaVisivel("ac", $"ac{mes}", ac.Xm(mes) / ac.W * 100, ac.Y(topo) / ac.H * 100, $"Acumulado até {NomeDoMes(mes).ToLowerInvariant()}", linhas, mes);
-    }
-
-    private void DicaDoAno(LinhaAno l, GraficoAnos aa)
-    {
-        var a = l.Ano;
-        var linhas = new List<(string, string, string)> { (a.Ano == _foco ? CorFoco : CorContexto, Cheio(a.Vendas), a.UltimoMes is > 0 and < 12 ? $"vendido (jan–{MesCurto(a.UltimoMes).ToLowerInvariant()})" : "vendido no ano") };
-        if (a.BudgetHsa is decimal h) linhas.Add(("#172B43", Cheio(h), $"budget HSA · {Pct(a.Vendas / h)}"));
-        if (a.BudgetGrupo is decimal g) linhas.Add(("#8493A3", Cheio(g), $"budget Grupo · {Pct(a.Vendas / g)}"));
-        _dica = new DicaVisivel("aa", $"aa{a.Ano}", l.Fim / aa.W * 100, (l.Y - 12) / aa.H * 100, a.Ano.ToString(), linhas);
     }
 
     private RenderFragment Dica(string grafico) => __builder =>
