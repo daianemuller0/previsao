@@ -2765,3 +2765,11 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .vp-at-l em.pos { color: var(--pos, #1f9254); } .vp-at-l em.neg { color: var(--neg, #b42318); }
 .vp-at-l em.vp-parcial { margin: 0; }
 .vp-at-l.vendas { border-top: 1px dashed var(--cx-line); padding-top: 5px; margin-top: 1px; }
+/* taxa de conversão em destaque no cartão do ano */
+.vp-at-taxa { background: color-mix(in srgb, var(--ac) 10%, #fff); border: 1px solid color-mix(in srgb, var(--ac) 30%, var(--cx-line)); border-radius: 8px; padding: 7px 9px 6px; margin: 2px 0 3px; }
+.vp-at-taxa > span { display: block; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: color-mix(in srgb, var(--ac) 60%, #172B43); }
+.vp-at-taxa > div { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.vp-at-taxa b { font-size: 24px; font-weight: 800; letter-spacing: -.5px; color: #172B43; font-variant-numeric: tabular-nums; }
+.vp-at-taxa em { font-style: normal; font-size: 11.5px; font-weight: 700; white-space: nowrap; color: var(--cx-mut); }
+.vp-at-taxa em.pos { color: var(--pos, #1f9254); } .vp-at-taxa em.neg { color: var(--neg, #b42318); }
+.vp-at-taxa small { display: block; font-size: 11px; color: var(--cx-mut); line-height: 1.3; }

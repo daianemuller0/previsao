@@ -103,15 +103,17 @@
                     "valor enviado ÷ propostas com valor", "Média do valor das propostas enviadas no ano", "#2478B8")
                 @Kpi("Venda por proposta", linhaFoco.VendaPorProposta is decimal vpp ? Mi(vpp) : "—", "vendas ÷ propostas enviadas, nos mesmos meses",
                     "Quanto foi vendido para cada proposta enviada (meses com venda e propostas)", "#007A9E")
-                @Kpi("Vendas ÷ valor enviado", linhaFoco.Conversao is decimal cv ? Pct(cv) : "—",
-                    linhaFoco.SemTaxa > 0 ? "não calculado: valor enviado parcial" : "nos meses com venda e propostas",
-                    "Quanto do valor proposto virou venda no mesmo período. A venda de um mês pode vir de propostas de meses anteriores: leitura por ano.", "#8493A3")
+                @{ var txFoco = Taxa(foco.Ano); var txFocoAnt = Taxa(anoAnt, mesLim); var txFocoAte = Taxa(foco.Ano, mesLim); }
+                @Kpi($"Taxa de conversão · {foco.Ano}", txFoco.Taxa is double tq ? P1(tq) : "Não calculável",
+                    $"{N0(txFoco.G)} ganhas / {N0(txFoco.G + txFoco.P)} decididas{(txFoco.TaxaValor is double tv ? $" · por valor {P1(tv)}" : "")}",
+                    "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100 — a mesma regra da guia Conversão. Propostas abertas e não classificadas não entram no denominador.",
+                    CorTx, DeltaPp(txFocoAte.Taxa, txFocoAnt.Taxa, anoAnt))
             </div>
 
             <div class="panel vp-principal">
                 <div class="panel-head">
                     <div class="panel-title">@TituloGrafico()
-                        <span class="hint">uma linha por ano · jan a dez · @(_met == "vendas" ? "vendas da empresa no mês · R$" : _met == "valor" ? "mês de envio da proposta · R$" : "mês de envio da proposta")@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
+                        <span class="hint">uma linha por ano · jan a dez · @(_met switch { "vendas" => "vendas da empresa no mês · R$", "valor" => "mês de envio da proposta · R$", "taxa" => "ganhas ÷ todas as propostas enviadas no mês (regra da guia Conversão)", _ => "mês de envio da proposta" })@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
                     </div>
                     <div class="rep-attain-group">
                         <div class="rep-attain-box">
@@ -133,6 +135,7 @@
                         <button class="@(_met == "qtd" ? "on" : "")" @onclick='() => _met = "qtd"'>Quantidade de propostas</button>
                         <button class="@(_met == "valor" ? "on" : "")" @onclick='() => _met = "valor"'>Valor enviado (R$)</button>
                         <button class="@(_met == "vendas" ? "on" : "")" @onclick='() => _met = "vendas"'>Vendas (R$)</button>
+                        <button class="@(_met == "taxa" ? "on" : "")" @onclick='() => _met = "taxa"'>Taxa de conversão (%)</button>
                     </div>
                     <div class="vp-cores-wrap">
                         <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCores ? "true" : "false")" @onclick="() => _editCores = !_editCores">🎨 Cores das linhas</button>
@@ -176,6 +179,12 @@
                         var dVen = temAnt && r is { MesesComVendas: > 0 } ? DeltaCurto(r.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, r.UltimoMes)) : null;
                         <button type="button" class="vp-ano-tile @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
                             <div class="vp-at-ano">@a@if (a == DateTime.Today.Year) { <small>até @MesCurto(lim).ToLowerInvariant()</small> }</div>
+                            @{ var tx = Taxa(a); var dTx = temAnt ? DeltaPp(Taxa(a, lim).Taxa, Taxa(a - 1, lim).Taxa, null) : null; }
+                            <div class="vp-at-taxa" title="Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100 (regra da guia Conversão)">
+                                <span>Taxa de conversão</span>
+                                <div><b>@(tx.Taxa is double t1 ? P1(t1) : "—")</b>@if (dTx is not null) { <em class="@DeltaCls(dTx)">@Seta(dTx)</em> }</div>
+                                <small>@N0(tx.G) ganhas / @N0(tx.G + tx.P) decididas@(tx.TaxaValor is double tv1 ? $" · por valor {P1(tv1)}" : "")</small>
+                            </div>
                             <div class="vp-at-l"><span>Propostas</span><b>@(l.Qtd is int qq ? N0(qq) : "—")</b>@if (dQtd is not null) { <em class="@DeltaCls(dQtd)">@Seta(dQtd)</em> }</div>
                             <div class="vp-at-l"><span>Valor enviado</span><b>@(l.Valor is decimal vv ? Mi(vv) : "—")</b>
                                 @if (l.SemTaxa > 0) { <em class="vp-parcial" title="@N0(l.SemTaxa) proposta(s) do AFM sem taxa de câmbio do ano: fora do valor">parcial</em> }
@@ -515,6 +524,9 @@
     private List<ConversaoDeVendas.PropostaEnviada> _enviadas = new();
     private List<ConversaoDeVendas.PropostaEnviada> _enviadasSetor = new();
     private Dictionary<(int Ano, int Mes), PropMes> _porMes = new();
+    /// <summary>As linhas das planilhas da guia Conversão (sem juntar números repetidos, como na própria guia), para a taxa de conversão.</summary>
+    private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl);
+    private List<LinhaConv> _conv = new(), _convSetor = new();
     private string _fonte = "";
     private int _foco;
     private bool _editando, _msgOk, _carregando;
@@ -591,6 +603,16 @@
         }
         catch (Exception) { /* sem as propostas, o painel mostra só as vendas */ }
         _enviadas = enviadas;
+        try
+        {
+            var taxas = Cambio.Todas();
+            _conv = !Conv.Ok ? new() : Conv.Atual.Propostas
+                .Where(p => p.Data is DateTime d && d.Year >= AnoIni && d.Year <= AnoFim)
+                .Select(p => new LinhaConv(p.Data!.Value.Year, p.Data.Value.Month, p.Origem, p.Classe,
+                    p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null)))
+                .ToList();
+        }
+        catch { _conv = new(); }
         _meses = ConversaoDeVendas.Meses(_brutos, enviadas).Where(m => m.Ano >= AnoIni && m.Ano <= AnoFim).ToList();
         _anos = ConversaoDeVendas.Anos(_meses, _budgets);
         var informados = _brutos.Count(b => b.Propostas is not null);
@@ -611,6 +633,7 @@
     private void Montar()
     {
         _enviadasSetor = _setor == "" ? _enviadas : _enviadas.Where(p => p.Fonte == _setor).ToList();
+        _convSetor = _setor == "" ? _conv : _conv.Where(p => p.Origem == _setor).ToList();
         var d = _enviadasSetor.GroupBy(p => (p.Data.Year, p.Data.Month))
             .ToDictionary(g => g.Key, g => new PropMes(g.Count(), g.Sum(p => p.ValorReais), g.Count(p => p.SemTaxa), g.Count(p => p.ValorReais > 0)));
         if (_setor == "")
@@ -628,6 +651,26 @@
 
     /// <summary>O último mês a comparar no ano: no ano corrente, o mês de hoje; nos outros, dezembro.</summary>
     private static int MesLimite(int ano) => ano == DateTime.Today.Year ? DateTime.Today.Month : 12;
+
+    /// <summary>
+    /// Taxa de conversão do ano (até o mês dado), com a regra da guia Conversão:
+    /// Ganhas ÷ (Ganhas + Perdidas) × 100; por valor, valor ganho ÷ (ganho + perdido).
+    /// </summary>
+    private (int G, int P, double? Taxa, double? TaxaValor) Taxa(int ano, int ateMes = 12)
+    {
+        var l = _convSetor.Where(x => x.Ano == ano && x.Mes <= ateMes).ToList();
+        int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida);
+        double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
+        return (g, p, g + p > 0 ? g * 100.0 / (g + p) : null, vg + vp > 0 ? vg / (vg + vp) * 100 : null);
+    }
+
+    /// <summary>Taxa do mês no gráfico (regra do gráfico mensal da guia Conversão): ganhas ÷ todas as propostas enviadas no mês.</summary>
+    private (int Total, int G, double? Taxa) TaxaMes(int ano, int mes)
+    {
+        var l = _convSetor.Where(x => x.Ano == ano && x.Mes == mes).ToList();
+        var g = l.Count(x => x.Classe == ClasseProposta.Ganha);
+        return (l.Count, g, l.Count > 0 ? g * 100.0 / l.Count : null);
+    }
 
     private PropMes? Prop(int a, int m) => _porMes.TryGetValue((a, m), out var p) ? p : null;
     private int QtdAte(int ano, int mes) => Enumerable.Range(1, mes).Sum(m => Prop(ano, m)?.Qtd ?? 0);
@@ -683,6 +726,11 @@
         atual is decimal a && anterior is decimal b && b > 0 ? $"{(a - b) / b * 100:+0;-0;0}% vs mesmo período de {anoAnt}" : null;
     private static string? Delta(int atual, int? anterior, int anoAnt) => Delta((decimal)atual, anterior, anoAnt);
 
+    private static string P1(double v) => v.ToString("0.0", Br) + "%";
+    /// <summary>Variação da taxa em pontos percentuais ("+2,1 p.p."), contra o mesmo período do ano anterior.</summary>
+    private static string? DeltaPp(double? atual, double? anterior, int? anoAnt) =>
+        atual is double a && anterior is double b ? $"{(a - b).ToString("+0.0;-0.0;0.0", Br)} p.p.{(anoAnt is int y ? $" vs mesmo período de {y}" : "")}" : null;
+
     /// <summary>Variação curta para os cartões dos anos ("+12%").</summary>
     private static string? DeltaCurto(decimal? atual, decimal? anterior) =>
         atual is decimal x && anterior is decimal y && y > 0 ? $"{(x - y) / y * 100:+0;-0;0}%" : null;
@@ -702,6 +750,7 @@
     {
         "valor" => "Valor das propostas enviadas por mês (R$), comparando os anos",
         "vendas" => "Vendas por mês (R$), comparando os anos",
+        "taxa" => "Taxa de conversão por mês, comparando os anos",
         _ => "Propostas enviadas por mês, comparando os anos",
     };
 
@@ -781,14 +830,16 @@
         double? Val(int a, int m) => met switch
         {
             "qtd" => Prop(a, m)?.Qtd,
+            "taxa" => TaxaMes(a, m).Taxa,
             "valor" => Prop(a, m)?.Valor is decimal v && v > 0 ? (double)v : null,
             _ => _meses.FirstOrDefault(x => x.Ano == a && x.Mes == m)?.Vendas is decimal vd ? (double)vd : null,
         };
-        string Rot(double v) => met == "qtd" ? N0((int)Math.Round(v)) : MiEixo((decimal)v);
+        string Rot(double v) => met switch { "qtd" => N0((int)Math.Round(v)), "taxa" => P1(v), _ => MiEixo((decimal)v) };
         string Txt(int a, int m)
         {
             var v = Val(a, m);
             if (v is null) return met == "vendas" ? "sem venda registrada" : "sem propostas";
+            if (met == "taxa") { var tm = TaxaMes(a, m); return $"{P1(v.Value)} · {N0(tm.G)} ganhas de {N0(tm.Total)} enviadas"; }
             var p = Prop(a, m);
             return met switch
             {
@@ -833,7 +884,7 @@
         {
             double gy = top + (bot - top) * g / 4.0, gv = max - (max - min) * g / 4.0;
             sb.Append($"<line x1='{N(left)}' y1='{N(gy)}' x2='{N(Wd - right)}' y2='{N(gy)}' stroke='#eef2f7'/>");
-            sb.Append($"<text x='{N(left - 6)}' y='{N(gy + 3)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(met == "qtd" ? N0((int)Math.Round(gv)) : MiEixo((decimal)gv))}</text>");
+            sb.Append($"<text x='{N(left - 6)}' y='{N(gy + 3)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(met switch { "qtd" => N0((int)Math.Round(gv)), "taxa" => Math.Round(gv).ToString("0", Br) + "%", _ => MiEixo((decimal)gv) })}</text>");
         }
         if (min < 0) sb.Append($"<line x1='{N(left)}' y1='{N(Y(0))}' x2='{N(Wd - right)}' y2='{N(Y(0))}' stroke='#d3dcea'/>");
 
