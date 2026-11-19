@@ -134,24 +134,31 @@
                         <button class="@(_met == "valor" ? "on" : "")" @onclick='() => _met = "valor"'>Valor enviado (R$)</button>
                         <button class="@(_met == "vendas" ? "on" : "")" @onclick='() => _met = "vendas"'>Vendas (R$)</button>
                     </div>
-                    <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCores ? "true" : "false")" @onclick="() => _editCores = !_editCores">🎨 Cores das linhas</button>
+                    <div class="vp-cores-wrap">
+                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCores ? "true" : "false")" @onclick="() => _editCores = !_editCores">🎨 Cores das linhas</button>
+                        @if (_editCores)
+                        {
+                            <div class="flt-multi-backdrop" @onclick="() => _editCores = false"></div>
+                            <div class="vp-cores-pop" role="dialog" aria-label="Cores das linhas">
+                                <div class="vp-cores-tit">Cor de cada ano</div>
+                                @foreach (var a in AnosDoPainel.OrderByDescending(x => x))
+                                {
+                                    var ano = a;
+                                    <label class="vp-cor-lin" title="Cor da linha de @ano">
+                                        <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano.ToString(), e.Value?.ToString())" />
+                                        <span>@ano</span>
+                                    </label>
+                                }
+                                <div class="vp-cores-pe">
+                                    <button class="btn-link" disabled="@(!_cores.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
+                                    <button class="btn-primary" @onclick="() => _editCores = false">Concluir</button>
+                                </div>
+                                <div class="vp-cores-nota">Guardadas para o seu login.</div>
+                            </div>
+                        }
+                    </div>
                     <span class="cvx-note">Ano em foco (@foco.Ano) com área e valores; troque o ano no filtro acima. Passe o mouse num mês para ver todos os anos.</span>
                 </div>
-                @if (_editCores)
-                {
-                    <div class="vp-cores">
-                        @foreach (var a in AnosDoPainel.OrderByDescending(x => x))
-                        {
-                            var ano = a;
-                            <label class="vp-cor" title="Cor da linha de @ano">
-                                <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano.ToString(), e.Value?.ToString())" />
-                                <span>@ano</span>
-                            </label>
-                        }
-                        <button class="btn-link" disabled="@(!_cores.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
-                        <span class="cvx-note">As cores ficam guardadas para o seu login.</span>
-                    </div>
-                }
                 <div class="chart-body">@((MarkupString)SvgAnos(_met, foco.Ano))</div>
 
                 @* ano a ano, no mesmo quadro do gráfico: um cartão por ano, na cor da linha do ano *@
@@ -201,21 +208,28 @@
                     </div>
                 </div>
                 <div class="vp-met">
-                    <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 Cores das linhas</button>
+                    <div class="vp-cores-wrap">
+                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 Cores das linhas</button>
+                        @if (_editCoresMetas)
+                        {
+                            <div class="flt-multi-backdrop" @onclick="() => _editCoresMetas = false"></div>
+                            <div class="vp-cores-pop" role="dialog" aria-label="Cores das linhas">
+                                <div class="vp-cores-tit">Cor de cada linha</div>
+                                @foreach (var sm in SeriesMetas)
+                                {
+                                    var chave = sm.Chave;
+                                    <label class="vp-cor-lin"><input type="color" value="@CorMeta(chave)" @onchange="e => MudarCor(chave, e.Value?.ToString())" /><span>@sm.Nome</span></label>
+                                }
+                                <div class="vp-cores-pe">
+                                    <button class="btn-link" disabled="@(!SeriesMetas.Any(x => _cores.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">Restaurar cores padrão</button>
+                                    <button class="btn-primary" @onclick="() => _editCoresMetas = false">Concluir</button>
+                                </div>
+                                <div class="vp-cores-nota">Guardadas para o seu login.</div>
+                            </div>
+                        }
+                    </div>
                     <span class="cvx-note">@(foco.UltimoMes is > 0 and < 12 ? $"{foco.Ano} vai até {NomeDoMes(foco.UltimoMes).ToLowerInvariant()} (o ponto vazado tracejado é a projeção no ritmo do ano). " : "")Passe o mouse num ano para ver os valores e o atingimento.</span>
                 </div>
-                @if (_editCoresMetas)
-                {
-                    <div class="vp-cores">
-                        @foreach (var sm in SeriesMetas)
-                        {
-                            var chave = sm.Chave;
-                            <label class="vp-cor"><input type="color" value="@CorMeta(chave)" @onchange="e => MudarCor(chave, e.Value?.ToString())" /><span>@sm.Nome</span></label>
-                        }
-                        <button class="btn-link" disabled="@(!SeriesMetas.Any(x => _cores.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">Restaurar cores padrão</button>
-                        <span class="cvx-note">As cores ficam guardadas para o seu login.</span>
-                    </div>
-                }
                 <div class="chart-body">@((MarkupString)SvgMetas(foco.Ano))</div>
             </div>
 
