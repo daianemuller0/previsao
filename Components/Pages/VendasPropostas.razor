@@ -150,10 +150,10 @@
                                     </label>
                                 }
                                 <div class="vp-cores-pe">
-                                    <button class="btn-link" disabled="@(!_cores.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
+                                    <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
                                     <button class="btn-primary" @onclick="() => _editCores = false">Concluir</button>
                                 </div>
-                                <div class="vp-cores-nota">Guardadas para o seu login.</div>
+                                <div class="vp-cores-nota">@NotaCores</div>
                             </div>
                         }
                     </div>
@@ -221,10 +221,10 @@
                                     <label class="vp-cor-lin"><input type="color" value="@CorMeta(chave)" @onchange="e => MudarCor(chave, e.Value?.ToString())" /><span>@sm.Nome</span></label>
                                 }
                                 <div class="vp-cores-pe">
-                                    <button class="btn-link" disabled="@(!SeriesMetas.Any(x => _cores.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">Restaurar cores padrão</button>
+                                    <button class="btn-link" disabled="@(!SeriesMetas.Any(x => Editaveis.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">Restaurar cores padrão</button>
                                     <button class="btn-primary" @onclick="() => _editCoresMetas = false">Concluir</button>
                                 </div>
-                                <div class="vp-cores-nota">Guardadas para o seu login.</div>
+                                <div class="vp-cores-nota">@NotaCores</div>
                             </div>
                         }
                     </div>
@@ -526,7 +526,17 @@
     private bool _editCores, _editCoresMetas;
     /// <summary>Cores escolhidas pela pessoa para cada ano (as que faltam seguem o padrão).</summary>
     private Dictionary<string, string> _cores = new();
+    /// <summary>Cores-padrão de todos: as que o administrador escolheu (valem para quem não mudou as suas).</summary>
+    private Dictionary<string, string> _coresPadrao = new();
+    private bool _isAdmin;
     private const string ChaveCores = "vendas_propostas_cores";
+    /// <summary>"Login" reservado onde fica o padrão definido pelo administrador.</summary>
+    private const string LoginPadrao = "*padrao*";
+    /// <summary>O que esta pessoa edita: o administrador mexe no padrão de todos; os outros, nas suas cores.</summary>
+    private Dictionary<string, string> Editaveis => _isAdmin ? _coresPadrao : _cores;
+    private string NotaCores => _isAdmin
+        ? "Como administrador, a cor que você escolhe vira o padrão de todos. Cada pessoa ainda pode mudar a sua."
+        : "Guardadas só para o seu login. \"Restaurar\" volta ao padrão definido pelo administrador.";
 
     /// <summary>As propostas de um mês: quantidade, valor (null = sem valor), quantas sem taxa de câmbio e quantas com valor.</summary>
     private sealed record PropMes(int Qtd, decimal? Valor, int SemTaxa, int ComValor);
@@ -541,7 +551,16 @@
             var u = (await AuthState).User;
             _login = u.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? u.Identity?.Name ?? "";
         }
+        _isAdmin = AuthState is not null && (await AuthState).User.IsInRole("admin");
+        _coresPadrao = LerCores(ChartPrefs.Get(LoginPadrao, ChaveCores).Ordem);
         _cores = LerCores(ChartPrefs.Get(_login, ChaveCores).Ordem);
+        if (_isAdmin)
+        {
+            // o administrador não tem cor própria: o que ele escolhe é o padrão. Cores que ele tinha
+            // guardado só para si (antes desta regra) passam a ser o padrão, se o padrão ainda estiver vazio.
+            if (_coresPadrao.Count == 0 && _cores.Count > 0) { _coresPadrao = new(_cores); GravarCores(); }
+            _cores = new();
+        }
         Carregar();
         _foco = AnosDoPainel.DefaultIfEmpty(AnoFim).Max();
         // as propostas vêm das planilhas da guia Conversão (leitura da rede): em segundo plano
@@ -714,20 +733,26 @@
 
     private void GravarCores()
     {
-        if (_cores.Count == 0) ChartPrefs.Reset(_login, ChaveCores);
-        else ChartPrefs.Save(_login, ChaveCores, string.Join(";", _cores.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}")), ChartPrefsRepository.BarraPadrao);
+        var login = _isAdmin ? LoginPadrao : _login;
+        var d = Editaveis;
+        if (d.Count == 0) ChartPrefs.Reset(login, ChaveCores);
+        else ChartPrefs.Save(login, ChaveCores, string.Join(";", d.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}")), ChartPrefsRepository.BarraPadrao);
     }
+
+    /// <summary>A cor guardada para a chave: a da pessoa; senão, o padrão do administrador; null = a original do programa.</summary>
+    private string? CorSalva(string chave) =>
+        _cores.TryGetValue(chave, out var c) ? c : _coresPadrao.TryGetValue(chave, out var p) ? p : null;
 
     private void MudarCor(string chave, string? cor)
     {
         if (cor is null || !System.Text.RegularExpressions.Regex.IsMatch(cor, "^#[0-9a-fA-F]{6}$")) return;
-        _cores[chave] = cor.ToLowerInvariant();
+        Editaveis[chave] = cor.ToLowerInvariant();
         GravarCores();
     }
 
     private void RestaurarCores(IEnumerable<string> chaves)
     {
-        foreach (var k in chaves.ToList()) _cores.Remove(k);
+        foreach (var k in chaves.ToList()) Editaveis.Remove(k);
         GravarCores();
     }
 
@@ -736,12 +761,12 @@
     {
         ("vendas", "Vendas totais", "#8b5cf6", ""), ("grupo", "Meta Grupo", "#b7791f", "5 3"), ("hsa", "Meta HSA", "#1f9254", "2 3"),
     };
-    private string CorMeta(string chave) => _cores.TryGetValue(chave, out var c) ? c : SeriesMetas.First(x => x.Chave == chave).Padrao;
+    private string CorMeta(string chave) => CorSalva(chave) ?? SeriesMetas.First(x => x.Chave == chave).Padrao;
 
     /// <summary>A cor do ano: a escolhida pela pessoa; senão, roxo para o ano em foco e a paleta para os outros (mais recente primeiro).</summary>
     private string CorDoAno(int ano)
     {
-        if (_cores.TryGetValue(ano.ToString(), out var c)) return c;
+        if (CorSalva(ano.ToString()) is { } c) return c;
         if (ano == _foco) return CorFocoLinha;
         var outros = AnosDoPainel.Where(a => a != _foco).OrderByDescending(a => a).ToList();
         var i = outros.IndexOf(ano);
