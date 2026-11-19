@@ -3288,3 +3288,22 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm:fullscreen .vpm-corpo, .vpm.tela-cheia .vpm-corpo { grid-template-columns: minmax(0, 1fr); }
 .vpm:fullscreen .vpm-banda, .vpm.tela-cheia .vpm-banda { height: max(7.5vh, 82px); }
 .vpm:fullscreen .vpm-banda.conv, .vpm.tela-cheia .vpm-banda.conv { height: max(6.5vh, 74px); }
+
+/* ---- mês a mês, "Um ano" e "Comparar dois anos": gráfico único, estrutura dos mini-gráficos ---- */
+.vpm-combo-leg { margin: -2px 0 8px; }
+.vpm-combo-leg .sw.cheia { background: #475569; }
+.vpm-var-cap { font-size: 12px; font-weight: 700; color: #475569; margin: 2px 0 4px; }
+.vpm-graf.combo .vpm-plot.sobe { height: 190px; border-bottom: 1.5px solid #94a3b8; }
+.vpm-graf.combo .vpm-plot.desce { height: 140px; }
+.vpm-graf.combo .vpm-plot.desce .vpm-bar { top: 0; bottom: auto; border-radius: 0 0 3px 3px; background: color-mix(in srgb, var(--c) 48%, #fff); }
+.vpm-graf.combo .vpm-plot.desce .vpm-bar.parcial { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 70%, #fff) 0 4px, #fff 4px 8px); outline: 1px dashed var(--c); }
+.vpm-graf.combo .vpm-plot.desce .vpm-bar.apurar { background: repeating-linear-gradient(135deg, #cfd6df 0 4px, #f1f4f7 4px 8px); }
+.vpm-graf.combo.um .vpm-plot .vpm-bar { left: 22%; right: 22%; }
+.vpm-lp { position: absolute; left: 50%; transform: translateX(-50%); font-size: 12.5px; font-weight: 800; color: #172B43; white-space: nowrap; font-variant-numeric: tabular-nums; z-index: 4; line-height: 15px; }
+.vpm-lp.cmp { color: #475569; font-weight: 700; }
+.vpm-lp.nd { color: #9aa6b4; font-weight: 600; font-size: 11.5px; }
+.vpm-graf.combo .vpm-banda-cap { margin-top: 2px; }
+.vpm-graf.combo .vpm-meses { border-top: 1px solid #e4e9f0; }
+.vpm:fullscreen .vpm-graf.combo .vpm-plot.sobe, .vpm.tela-cheia .vpm-graf.combo .vpm-plot.sobe { height: 21vh; }
+.vpm:fullscreen .vpm-graf.combo .vpm-plot.desce, .vpm.tela-cheia .vpm-graf.combo .vpm-plot.desce { height: 13vh; }
+.vpm-graf.combo .vpm-zero.neg { border-top: 1px dashed #c0392b; opacity: .55; }

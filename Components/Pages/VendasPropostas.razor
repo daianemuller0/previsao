@@ -1119,8 +1119,7 @@
         {
             <div class="vpm-corpo">
                 <div class="vpm-graficos chart-body">
-                    @GraficoMm(true, anos, principal)
-                    @GraficoMm(false, anos, principal)
+                    @ComboMm(anos, principal)
                 </div>
                 @if (comp is int cc) { @ResumoComparativoMm(principal, cc) } else { @ResumoAnoMm(principal) }
             </div>
@@ -1143,89 +1142,121 @@
     };
 
     /// <summary>
-    /// Gráfico de barras por mês (vendas ou propostas) de 1 ou 2 anos, cada ano na sua cor (as de "Cores dos anos").
-    /// Vendas com o valor em reais ("R$ 31,4 mi") em cada coluna. No de propostas, duas linhas por ano, como nos
-    /// mini-gráficos: em cima, o valor enviado em propostas (R$); embaixo, tracejada, a taxa de conversão do mês.
-    /// Os rótulos que se encostariam sobem sozinhos (vpmAjustar, em app.js), que também desenha as linhas.
+    /// "Um ano" e "Comparar dois anos": um gráfico só, com a mesma estrutura dos mini-gráficos de "Todos os anos",
+    /// de cima para baixo: linha do valor enviado em propostas (R$) → colunas de vendas subindo da linha de base
+    /// ("R$ 31,4 mi") → colunas de propostas descendo, espelhadas (quantidade) → linha tracejada da conversão do
+    /// mês → meses. Um par de colunas por ano em cada mês, na cor do ano. vpmAjustar (app.js) desenha as linhas
+    /// e sobe os números que se encostariam.
     /// </summary>
-    private RenderFragment GraficoMm(bool vendas, List<int> anos, int principal) => __builder =>
+    private RenderFragment ComboMm(List<int> anos, int principal) => __builder =>
     {
         var dois = anos.Count == 2;
         var comp = dois ? anos[1] : 0;
-        var cel = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => Cel(vendas, a, m)).ToArray());
-        var esc = EscalaMmDe(cel.Values.SelectMany(x => x).Where(x => x.Tem).Select(x => (double)x.Valor), dois ? 0.3 : 0.2);
-        string Cor(int a, bool neg) => neg ? CorNegPri : CorDoAno(a);
-        string Rot(decimal v) => vendas ? ReaisMi(v) : N0((int)v);
-        <div class="vpm-graf @(vendas ? "v" : "p") @(dois ? "dois" : "um")">
+        var cv = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => CelVenda(a, m)).ToArray());
+        var cp = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => CelProp(a, m)).ToArray());
+        var escV = EscalaMmDe(cv.Values.SelectMany(x => x).Where(x => x.Tem).Select(x => (double)x.Valor), dois ? 0.3 : 0.2);
+        var maxP = (double)cp.Values.SelectMany(x => x).Where(x => x.Tem && !x.Parcial).Select(x => x.Valor).DefaultIfEmpty(0m).Max();
+        if (maxP <= 0) maxP = (double)cp.Values.SelectMany(x => x).Where(x => x.Tem).Select(x => x.Valor).DefaultIfEmpty(1m).Max();
+        if (maxP <= 0) maxP = 1;
+        <div class="vpm-graf combo @(dois ? "dois" : "um")">
             <div class="vpm-gtit">
-                <b>@(vendas ? "Vendas por mês" : "Propostas enviadas por mês")</b>
-                <span>@(vendas ? "em reais (R$ mi) · empresa toda" : "quantidade" + (_setor != "" ? " · " + _setor : ""))</span>
-                <span class="vpm-gleg">
-                    @foreach (var a in anos) { <span><i style="background:@CorDoAno(a)"></i>@a</span> }
-                    @if (dois) { <span class="vpm-gleg-var">variação @principal × @comp</span> }
-                </span>
+                <b>Vendas, propostas e conversão, mês a mês</b>
+                <span>@(dois ? $"{principal} × {comp}" : principal.ToString())@(_setor != "" ? " · propostas e conversão: " + _setor : "")</span>
+                <span class="vpm-gleg">@foreach (var a in anos) { <span><i style="background:@CorDoAno(a)"></i>@a</span> }</span>
+            </div>
+            <div class="vpm-sm-leg sub vpm-combo-leg">
+                <span><i class="sw cheia"></i>colunas para cima: vendas (R$, empresa toda)</span>
+                <span><i class="sw clara"></i>colunas para baixo: propostas enviadas (qtd)</span>
             </div>
             @if (dois)
             {
-                <div class="vpm-var" aria-label="Variação de cada mês">
+                <div class="vpm-var-cap">Variação das vendas, @principal × @comp</div>
+                <div class="vpm-var" aria-label="Variação das vendas em cada mês">
                     @for (var m = 1; m <= 12; m++)
                     {
-                        var a = cel[principal][m - 1]; var b = cel[comp][m - 1];
-                        var pct = a.Tem && b.Tem && !a.Parcial && !b.Parcial ? VarMm(a.Valor, b.Valor) : null;
-                        var dif = a.Tem && b.Tem && !a.Parcial && !b.Parcial ? a.Valor - b.Valor : (decimal?)null;
-                        var dica = dif is decimal d ? $"{NomeDoMes(m)}: {principal} × {comp} = {(vendas ? DifReais(d) : DifQtd((int)d))}" + (pct is null ? " (base zero ou negativa: sem %)" : "") : "";
-                        @if (a.Parcial || b.Parcial) { <span class="vpm-pill neu" title="Mês em andamento: fica fora da comparação">parcial</span> }
-                        else if (pct is double p) { <span class="vpm-pill @ClsVar(p, !vendas)" title="@dica">@(vendas ? PctSinal(p) : Seta(p) + Math.Abs(p).ToString("0.0", Br) + "%")</span> }
-                        else if (dif is decimal d2) { <span class="vpm-pill neu" title="@dica">@(vendas ? DifReais(d2) : DifQtd((int)d2))</span> }
+                        var a = cv[principal][m - 1]; var b = cv[comp][m - 1];
+                        var pct = a.Tem && b.Tem ? VarMm(a.Valor, b.Valor) : null;
+                        var dif = a.Tem && b.Tem ? a.Valor - b.Valor : (decimal?)null;
+                        var pa = cp[principal][m - 1]; var pb = cp[comp][m - 1];
+                        var difP = pa.Tem && pb.Tem && !pa.Parcial && !pb.Parcial ? (int)(pa.Valor - pb.Valor) : (int?)null;
+                        var dica = (dif is decimal d ? $"{NomeDoMes(m)}: vendas {DifReais(d)}" : NomeDoMes(m)) + (difP is int dp ? $" · propostas {DifQtd(dp)}" : "");
+                        @if (pct is double p) { <span class="vpm-pill @ClsVar(p, false)" title="@dica">@PctSinal(p)</span> }
+                        else if (dif is decimal d2) { <span class="vpm-pill neu" title="@dica">@DifReais(d2)</span> }
                         else { <span class="vpm-pill vazio">—</span> }
                     }
                 </div>
             }
-            @if (!vendas) { @BandaMm("env", anos, principal) }
-            <div class="vpm-plot vpm-dc">
-                <div class="vpm-zero" style="bottom:@F(esc.Zero)%"></div>
+            @BandaMm("env", anos, principal)
+            <div class="vpm-plot vpm-dc sobe">
+                @if (escV.Zero > 0.5) { <div class="vpm-zero neg" style="bottom:@F(escV.Zero)%"></div> }
                 @for (var m = 1; m <= 12; m++)
                 {
                     var mes = m;
                     <div class="vpm-col">
                         @foreach (var a in anos)
                         {
-                            var x = cel[a][mes - 1];
-                            var pri = a == principal;
-                            var dica = $"{NomeDoMes(mes)} {a}: {CelTxt(vendas, x, true)}";
-                            <div class="vpm-slot" title="@dica">
+                            var x = cv[a][mes - 1];
+                            <div class="vpm-slot" title="@($"{NomeDoMes(mes)} {a} · vendas: {CelTxt(true, x, true)}")">
                                 @if (x.Tem)
                                 {
                                     var v = (double)x.Valor; var neg = v < 0;
-                                    <i class="vpm-bar @(x.Parcial ? "parcial" : "")" style="bottom:@F(esc.Base(v))%;height:@F(Math.Max(esc.Alt(v), 0.5))%;--c:@Cor(a, neg)"></i>
-                                    <b class="vpm-val vpm-rot @(pri ? "pri" : "cmp") @(neg ? "neg" : "")" style="bottom:calc(@F(neg ? esc.Base(v) : esc.Topo(v))% @(neg ? "- 20px" : "+ 3px"))">@Rot(x.Valor)@(x.Parcial ? "*" : "")</b>
+                                    <i class="vpm-bar" style="bottom:@F(escV.Base(v))%;height:@F(Math.Max(escV.Alt(v), 0.5))%;--c:@(neg ? CorNegPri : CorDoAno(a))"></i>
+                                    <b class="vpm-val vpm-rot @(a == principal ? "pri" : "cmp") @(neg ? "neg" : "")" style="bottom:calc(@F(neg ? escV.Base(v) : escV.Topo(v))% @(neg ? "- 20px" : "+ 3px"))">@ReaisMi(x.Valor)</b>
                                 }
                                 else if (x.Sit == SitMes.AApurar)
                                 {
-                                    <i class="vpm-bar apurar" style="bottom:@F(esc.Zero)%;height:9%"></i>
+                                    <i class="vpm-bar apurar" style="bottom:@F(escV.Zero)%;height:7%"></i>
                                 }
                                 else
                                 {
-                                    <b class="vpm-val nd" style="bottom:calc(@F(esc.Zero)% + 3px)">n/d</b>
+                                    <b class="vpm-val nd" style="bottom:calc(@F(escV.Zero)% + 3px)">n/d</b>
                                 }
                             </div>
                         }
                     </div>
                 }
             </div>
-            @if (!vendas) { @BandaMm("conv", anos, principal) }
+            <div class="vpm-plot desce">
+                @for (var m = 1; m <= 12; m++)
+                {
+                    var mes = m;
+                    <div class="vpm-col">
+                        @foreach (var a in anos)
+                        {
+                            var x = cp[a][mes - 1];
+                            <div class="vpm-slot" title="@($"{NomeDoMes(mes)} {a} · propostas: {CelTxt(false, x, true)}")">
+                                @if (x.Tem)
+                                {
+                                    var h = Math.Min(100, Math.Max((double)x.Valor / maxP * 70, 0.6));
+                                    <i class="vpm-bar @(x.Parcial ? "parcial" : "")" style="height:@F(h)%;--c:@CorDoAno(a)"></i>
+                                    <b class="vpm-lp @(a == principal ? "pri" : "cmp")" style="top:calc(@F(h)% + 3px)">@N0((int)x.Valor)@(x.Parcial ? "*" : "")</b>
+                                }
+                                else if (x.Sit == SitMes.AApurar)
+                                {
+                                    <i class="vpm-bar apurar" style="height:8%"></i>
+                                }
+                                else
+                                {
+                                    <b class="vpm-lp nd" style="top:3px">n/d</b>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            @BandaMm("conv", anos, principal)
             <div class="vpm-meses">
                 @for (var m = 1; m <= 12; m++)
                 {
-                    var x = cel[principal][m - 1];
-                    <div><b>@MesCurto(m).ToUpperInvariant()</b>@if (x.Parcial) { <small>parcial</small> } else if (x.Sit == SitMes.AApurar) { <small>a apurar</small> }</div>
+                    var v = cv[principal][m - 1]; var p = cp[principal][m - 1];
+                    <div><b>@MesCurto(m).ToUpperInvariant()</b>@if (p.Parcial) { <small>parcial</small> } else if (v.Sit == SitMes.AApurar && p.Sit == SitMes.AApurar) { <small>a apurar</small> } else if (v.Sit == SitMes.AApurar) { <small>vendas a apurar</small> }</div>
                 }
             </div>
         </div>
     };
 
     /// <summary>
-    /// Faixa de linha por ano, alinhada às colunas do gráfico de propostas: "env" = valor enviado em propostas (R$);
+    /// Faixa de linha por ano, alinhada às colunas do gráfico do mês a mês: "env" = valor enviado em propostas (R$);
     /// "conv" = taxa de conversão do mês (regra de "Taxa sobre"). Os pontos e números ficam aqui; a linha que liga
     /// os pontos de cada ano é desenhada em app.js (vpmAjustar), a partir da posição real de cada ponto.
     /// </summary>
