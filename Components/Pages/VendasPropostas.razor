@@ -244,51 +244,6 @@
 
         </section>
 
-        @* ================= 2 · POR VENDEDOR ================= *@
-        @{ var doAno = _enviadasSetor.Where(p => p.Data.Year == foco.Ano).ToList(); }
-        <section id="vendedores" class="cvx-sec">
-            <div class="xsec"><span class="xsec-t">Propostas por vendedor</span><span class="xsec-s">@foco.Ano · quantas, quanto e quantas ganhas@(_setor == "" ? "" : " · " + _setor)</span><span class="xsec-line"></span></div>
-            <div class="cvx-card">
-                @if (doAno.Count == 0)
-                {
-                    <div class="empty" style="padding:24px 12px">@(_carregando ? "Lendo as planilhas de propostas…" : $"Nenhuma proposta com data de envio em {foco.Ano} nas planilhas da guia Conversão.")</div>
-                }
-                else
-                {
-                    var valorAno = doAno.Sum(p => p.ValorReais);
-                    var maxVal = doAno.GroupBy(p => p.Vendedor).Max(g => g.Sum(p => p.ValorReais));
-                    <table class="cvx-tbl">
-                        <thead>
-                            <tr><th>Vendedor</th><th class="r">Propostas</th><th style="width:28%">Valor enviado</th><th class="r">% do valor</th><th class="r">Ganhas</th><th class="r">Valor ganho</th>
-                                <th class="r" title="Valor das ganhas ÷ valor enviado">Conversão em valor</th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var g in doAno.GroupBy(p => p.Vendedor).OrderByDescending(g => g.Sum(p => p.ValorReais)).ThenByDescending(g => g.Count()))
-                            {
-                                var val = g.Sum(p => p.ValorReais);
-                                var gan = g.Where(p => p.Classe == ClasseProposta.Ganha).ToList();
-                                var valGan = gan.Sum(p => p.ValorReais);
-                                <tr>
-                                    <td><b>@g.Key</b></td>
-                                    <td class="r">@N0(g.Count())</td>
-                                    <td><div class="vp-barra"><div class="ibar-track"><span class="ibar-fill" style="width:@F(maxVal > 0 ? (double)(val / maxVal) * 100 : 0)%"></span></div><span>@Mi(val)</span></div></td>
-                                    <td class="r">@(valorAno > 0 ? Pct(val / valorAno) : "—")</td>
-                                    <td class="r">@(gan.Count > 0 ? N0(gan.Count) : "—")</td>
-                                    <td class="r">@(gan.Count > 0 ? Mi(valGan) : "—")</td>
-                                    <td class="r">@(val > 0 && gan.Count > 0 ? Pct(valGan / val) : "—")</td>
-                                </tr>
-                            }
-                        </tbody>
-                        <tfoot>
-                            <tr class="vp-tot"><td><b>Total</b></td><td class="r">@N0(doAno.Count)</td><td><b>@Mi(valorAno)</b></td><td></td>
-                                <td class="r">@N0(doAno.Count(p => p.Classe == ClasseProposta.Ganha))</td><td class="r">@Mi(doAno.Where(p => p.Classe == ClasseProposta.Ganha).Sum(p => p.ValorReais))</td><td></td></tr>
-                        </tfoot>
-                    </table>
-                    <p class="cvx-note" style="margin-top:8px">Ganhas = status de ganha na planilha (a mesma classificação da guia Conversão). Só as propostas das planilhas (meses informados à mão não têm vendedor).</p>
-                }
-            </div>
-        </section>
-
         @* ================= 3 · VENDAS × BUDGET ================= *@
         <section id="budget" class="cvx-sec">
             <div class="xsec"><span class="xsec-t">Vendas × budget</span><span class="xsec-s">O ritmo de @foco.Ano contra os anos anteriores e os budgets HSA e Grupo</span><span class="xsec-line"></span></div>
