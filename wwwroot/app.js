@@ -852,3 +852,19 @@ window.vpLinhas = (n) => {
         } else el.style.maxHeight = 'none';
     });
 };
+
+
+// Performance Comercial: um quadro na tela inteira (API de tela cheia; se o navegador
+// não deixar, o quadro cobre a janela). O mesmo botão, ou Esc, volta ao normal.
+window.vpTelaCheia = function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const sairJanela = () => { el.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia'); };
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (el.classList.contains('tela-cheia')) { sairJanela(); return; }
+    const cobrir = () => { el.classList.add('tela-cheia'); document.body.classList.add('vp-tela-cheia'); };
+    if (el.requestFullscreen) el.requestFullscreen().catch(cobrir); else cobrir();
+};
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.tela-cheia').forEach(x => { x.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia'); });
+});

@@ -3138,3 +3138,35 @@ body.vp-capturando #setores .vp-conv-grid { width: 1880px; max-width: none; }
     .vpm-resumo.um > .vpm-rtit { grid-column: 1 / -1; }
     .vpm-resumo.um > .vpm-blk { border-top: 0; padding-top: 0; }
 }
+
+/* ---- mês a mês: todos os anos em barras (números na vertical) ---- */
+.vpm-graf.muitos .vpm-col { gap: 2px; }
+.vpm-graf.muitos .vpm-bar { left: 2%; right: 2%; border-radius: 2px 2px 0 0; }
+.vpm-graf.muitos .vpm-plot { height: 250px; }
+.vpm-graf.muitos.p .vpm-plot { height: 215px; }
+.vpm-val.vert { writing-mode: vertical-rl; transform: translateX(-50%) rotate(180deg); font-size: 12px; font-weight: 700; color: #172B43; line-height: 1; letter-spacing: -.2px; }
+.vpm-val.vert.neg { color: #b42318; }
+.vpm-mats { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.vpm-rtab { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.vpm-rtab th, .vpm-rtab td { padding: 6px 4px; border-bottom: 1px solid var(--cx-line); text-align: right; white-space: nowrap; }
+.vpm-rtab thead th { font-size: 11.5px; color: var(--cx-mut); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.vpm-rtab th:first-child { text-align: left; }
+.vpm-rtab tbody th { color: #172B43; font-weight: 800; }
+.vpm-rtab td { color: #172B43; font-weight: 700; }
+.vpm-rtab tr.foco th { color: #1f8a4c; }
+
+/* ---- mês a mês: tela cheia ---- */
+.vpm-tela { margin-left: auto; order: 99; font-weight: 700; }
+.vpm-tela-off { display: none; }
+.vpm:fullscreen .vpm-tela-on, .vpm.tela-cheia .vpm-tela-on { display: none; }
+.vpm:fullscreen .vpm-tela-off, .vpm.tela-cheia .vpm-tela-off { display: inline; }
+.vpm:fullscreen, .vpm.tela-cheia { background: #fff; padding: 18px 26px; overflow: auto; margin: 0; }
+.vpm:fullscreen::backdrop { background: #fff; }
+.vpm.tela-cheia { position: fixed; inset: 0; z-index: 2000; border-radius: 0; }
+body.vp-tela-cheia { overflow: hidden; }
+.vpm:fullscreen .vpm-plot, .vpm.tela-cheia .vpm-plot { height: 30vh; }
+.vpm:fullscreen .vpm-graf.p .vpm-plot, .vpm.tela-cheia .vpm-graf.p .vpm-plot { height: 25vh; }
+.vpm:fullscreen .vpm-corpo, .vpm.tela-cheia .vpm-corpo { grid-template-columns: minmax(0, 1fr) 340px; }
+.vpm:fullscreen .vpm-val, .vpm.tela-cheia .vpm-val { font-size: 14.5px; }
+.vpm:fullscreen .vpm-val.vert, .vpm.tela-cheia .vpm-val.vert { font-size: 13px; }
+.vpm:fullscreen .panel-title, .vpm.tela-cheia .panel-title { font-size: 20px; }

@@ -128,14 +128,14 @@ public partial class VendasPropostas
     }
 
     /// <summary>Escala que cabe todos os valores, com folga em cima (rótulos) e embaixo (barras negativas e seus rótulos).</summary>
-    private static EscalaMm EscalaMmDe(IEnumerable<double> valores)
+    private static EscalaMm EscalaMmDe(IEnumerable<double> valores, double folgaTopo = 0.17)
     {
         var l = valores.ToList();
         double max = Math.Max(0, l.DefaultIfEmpty(0).Max()), min = Math.Min(0, l.DefaultIfEmpty(0).Min());
         if (max <= 0 && min >= 0) max = 1;
         var faixa = max - min;
-        max += faixa * 0.17;
-        if (min < 0) min -= faixa * 0.16;
+        max += faixa * folgaTopo;
+        if (min < 0) min -= faixa * (folgaTopo > 0.2 ? 0.3 : 0.16);
         return new EscalaMm(min, max);
     }
 
