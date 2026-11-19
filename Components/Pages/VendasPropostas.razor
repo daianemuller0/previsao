@@ -912,7 +912,7 @@
     // cores padrão do gráfico de metas (as mesmas do Vendas x Meta da Visão Executiva)
     private static readonly (string Chave, string Nome, string Padrao, string Traco)[] SeriesMetas =
     {
-        ("vendas", "Vendas totais", "#12355B", ""), ("grupo", "Meta Grupo", "#B7791F", "5 3"), ("hsa", "Meta HSA", "#2F855A", "2 3"),
+        ("vendas", "Vendas totais", "#159bbd", ""), ("grupo", "Meta Grupo", "#B7791F", "5 3"), ("hsa", "Meta HSA", "#2F855A", "2 3"),
     };
     private string CorMeta(string chave) => CorSalva(chave) ?? SeriesMetas.First(x => x.Chave == chave).Padrao;
 
@@ -1809,9 +1809,9 @@
 
 
     /// <summary>
-    /// Vendas × metas, ano a ano, em formato executivo: uma linha por ano com a
-    /// barra de vendas e as duas metas como marcadores finos sobre ela; ao lado,
-    /// os valores e o % atingido de cada meta.
+    /// Vendas × metas, ano a ano, no mesmo padrão das barras da guia Conversão (taxa por unidade): uma linha por
+    /// ano com os números em cima (vendido, Meta Grupo e Meta HSA com o atingido) e a barra grossa em degradê
+    /// embaixo; as metas são marcas sobre a barra. O ano em foco fica destacado. Clique num ano para focá-lo.
     /// </summary>
     private RenderFragment MetasExecutivo(int focoAno) => __builder =>
     {
@@ -1822,39 +1822,38 @@
         var passo = Passo(Math.Max(max, 1m));
         var escala = Math.Ceiling(Math.Max(max, 1m) * 1.04m / passo) * passo;
         double Pc(decimal v) => (double)(Math.Max(0m, v) / escala * 100m);
-        <div class="vp-bul">
-            <div class="vp-bul-leg">
-                <span><i class="vp-b" style="background:@cV"></i>Vendas totais</span>
-                <span><i class="vp-m" style="background:@cG"></i>Meta Grupo</span>
-                <span><i class="vp-m" style="background:@cH"></i>Meta HSA</span>
-            </div>
-            <div class="vp-bul-cab">
-                <span>Ano</span><span></span><span class="r">Vendas</span><span class="r">Meta Grupo</span><span class="r">Atingido</span><span class="r">Meta HSA</span><span class="r">Atingido</span>
-            </div>
+        <div class="vp-bul-leg">
+            <span><i class="vp-b vp-grad" style="--c:@cV"></i>Vendas totais</span>
+            <span><i class="vp-m" style="background:@cG"></i>Meta Grupo</span>
+            <span><i class="vp-m" style="background:@cH"></i>Meta HSA</span>
+        </div>
+        <div class="ibar cvx-ibar vp-metas-ibar">
             @foreach (var a in anos)
             {
                 var ano = a.Ano;
                 var periodo = a.UltimoMes is > 0 and < 12 ? $"jan–{MesCurto(a.UltimoMes).ToLowerInvariant()}" : "";
-                <div class="vp-bul-lin @(a.Ano == focoAno ? "foco" : "")" @onclick="() => { _foco = ano; _dica = null; }"
+                <div class="ibar-item @(a.Ano == focoAno ? "xf-on" : "")" @onclick="() => { _foco = ano; _dica = null; }"
                      title="@($"{a.Ano}{(periodo != "" ? $" ({periodo})" : "")} · Vendas {(a.MesesComVendas > 0 ? Cheio(a.Vendas) : "—")} · Meta Grupo {(a.BudgetGrupo is decimal g0 ? Cheio(g0) : "—")} · Meta HSA {(a.BudgetHsa is decimal h0 ? Cheio(h0) : "—")}")">
-                    <span class="vp-bul-ano">@a.Ano@if (periodo != "") { <small>@periodo</small> }</span>
-                    <span class="vp-bul-trilho">
-                        @if (a.MesesComVendas > 0) { <i class="vp-b" style="width:@F(Pc(a.Vendas))%;background:@cV"></i> }
-                        @if (a.BudgetGrupo is decimal bg) { <i class="vp-m" style="left:@F(Pc(bg))%;background:@cG"></i> }
-                        @if (a.BudgetHsa is decimal bh) { <i class="vp-m" style="left:@F(Pc(bh))%;background:@cH"></i> }
-                    </span>
-                    <span class="r vp-bul-v">@(a.MesesComVendas > 0 ? Mi(a.Vendas) : "—")</span>
-                    <span class="r vp-bul-m">@(a.BudgetGrupo is decimal g ? Mi(g) : "—")</span>
-                    <span class="r vp-bul-p">@(a.PctGrupo is decimal pg ? Pct(pg) : "—")</span>
-                    <span class="r vp-bul-m">@(a.BudgetHsa is decimal h ? Mi(h) : "—")</span>
-                    <span class="r vp-bul-p">@(a.PctHsa is decimal ph ? Pct(ph) : "—")</span>
+                    <div class="ibar-head">
+                        <span class="ibar-num vp-mt-ano">@a.Ano</span>
+                        @if (periodo != "") { <span class="vp-mt-per">@periodo</span> }
+                        <div class="ibar-metrics">
+                            <span class="vp-mt-v"><small>Vendido</small><b class="ibar-val">@(a.MesesComVendas > 0 ? Mi(a.Vendas) : "—")</b></span>
+                            <span class="ibar-sep"></span>
+                            <span class="vp-mt-m"><i style="background:@cG"></i><small>Meta Grupo</small><b>@(a.BudgetGrupo is decimal g ? Mi(g) : "—")</b><em>@(a.PctGrupo is decimal pg ? Pct(pg) : "—")</em></span>
+                            <span class="ibar-sep"></span>
+                            <span class="vp-mt-m"><i style="background:@cH"></i><small>Meta HSA</small><b>@(a.BudgetHsa is decimal h ? Mi(h) : "—")</b><em>@(a.PctHsa is decimal ph ? Pct(ph) : "—")</em></span>
+                        </div>
+                    </div>
+                    <div class="vp-mt-barra">
+                        <div class="ibar-track"><span class="ibar-fill" style="width:@F(a.MesesComVendas > 0 ? Pc(a.Vendas) : 0)%;--c:@cV"></span></div>
+                        @if (a.BudgetGrupo is decimal bg) { <em class="vp-mt-mk" style="left:@F(Pc(bg))%;background:@cG" title="Meta Grupo: @Cheio(bg)"></em> }
+                        @if (a.BudgetHsa is decimal bh) { <em class="vp-mt-mk" style="left:@F(Pc(bh))%;background:@cH" title="Meta HSA: @Cheio(bh)"></em> }
+                    </div>
                 </div>
             }
-            <div class="vp-bul-eixo">
-                <span></span>
-                <span class="vp-bul-escala">
-                    @for (var v = 0m; v <= escala; v += passo) { <em style="left:@F(Pc(v))%">@Eixo(v)</em> }
-                </span>
+            <div class="vp-mt-eixo">
+                @for (var v = 0m; v <= escala; v += passo) { <em style="left:@F(Pc(v))%">@Eixo(v)</em> }
             </div>
         </div>
     };

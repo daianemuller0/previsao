@@ -3323,3 +3323,48 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-pal-t tbody th { color: #172B43; font-size: 13px; text-align: left; }
 .vpm-pal-t td { padding: 3px 6px; text-align: center; }
 .vpm-pal-t input[type=color], .vpm-pal .vp-cor-lin input[type=color] { width: 34px; height: 24px; border: 1px solid var(--cx-line); border-radius: 5px; padding: 1px; background: #fff; cursor: pointer; }
+
+/* ===== Vendas × metas no padrão das barras da Conversão (ibar) ===== */
+.vp-metas-ibar .ibar-item { cursor: pointer; }
+.vp-metas-ibar .ibar-head { align-items: center; }
+.vp-mt-ano.ibar-num { width: auto; padding: 0 10px; height: 28px; font-size: 14px; border-radius: 8px; }
+.vp-metas-ibar .ibar-item.xf-on .vp-mt-ano.ibar-num { background: linear-gradient(135deg, #0b6c8c, #1aa5c4); color: #fff; box-shadow: 0 2px 8px rgba(11,79,111,.34); }
+.vp-mt-per { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.vp-metas-ibar .ibar-metrics { gap: 14px; }
+.vp-mt-v, .vp-mt-m { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.vp-mt-v small, .vp-mt-m small { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.vp-mt-v .ibar-val { font-size: 16px; }
+.vp-mt-m i { width: 3px; height: 13px; border-radius: 1px; display: inline-block; align-self: center; }
+.vp-mt-m b { font-size: 13.5px; font-weight: 700; color: #3b4a61; }
+.vp-mt-m em { font-style: normal; font-size: 14.5px; font-weight: 800; color: #172B43; min-width: 54px; text-align: right; }
+.vp-mt-barra { position: relative; }
+.vp-metas-ibar .ibar-track { --bar-h: 17px; }
+.vp-metas-ibar .ibar-fill, .vp-metas-ibar .ibar-item.xf-on .ibar-fill {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 78%, #000) 0%, var(--c) 66%, color-mix(in srgb, var(--c) 72%, #fff) 100%);
+}
+.vp-mt-mk { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px; border-radius: 2px; box-shadow: 0 0 0 1.5px #fff; z-index: 2; }
+.vp-mt-eixo { position: relative; height: 18px; margin: 2px 12px 0; }
+.vp-mt-eixo em { position: absolute; transform: translateX(-50%); font-style: normal; font-size: 11.5px; color: #93a1b5; white-space: nowrap; }
+.vp-mt-eixo em:first-child { transform: none; }
+.vp-mt-eixo em:last-child { transform: translateX(-100%); }
+.vp-bul-leg i.vp-grad { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 78%, #000), var(--c) 66%, color-mix(in srgb, var(--c) 72%, #fff)); border-radius: 999px; }
+@container (max-width: 900px) { .vp-metas-ibar .ibar-head { flex-wrap: wrap; } .vp-metas-ibar .ibar-metrics { margin-left: 0; padding-left: 0; flex-wrap: wrap; width: 100%; } }
+
+/* ===== O mesmo acabamento (degradê, sombra suave, animação) em todas as barras da página ===== */
+@keyframes vpSobe { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.vpm-graf.combo .vpm-plot.sobe .vpm-bar:not(.apurar):not(.parcial), .vpm-sm-bar.v {
+    background-image: linear-gradient(0deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,0) 48%, rgba(255,255,255,.22) 100%);
+    box-shadow: 0 1px 3px rgba(11,79,111,.22), inset 0 1px 0 rgba(255,255,255,.2);
+    border-radius: 6px 6px 0 0; transform-origin: bottom; animation: vpSobe .55s cubic-bezier(.22,.61,.36,1);
+}
+.vpm-graf.combo .vpm-plot.desce .vpm-bar:not(.apurar):not(.parcial), .vpm-sm-bar.p:not(.parcial), .vpm-sm-bar.neg {
+    background-image: linear-gradient(180deg, rgba(0,0,0,.14) 0%, rgba(0,0,0,0) 48%, rgba(255,255,255,.24) 100%);
+    box-shadow: 0 1px 3px rgba(11,79,111,.16);
+    border-radius: 0 0 6px 6px; transform-origin: top; animation: vpSobe .55s cubic-bezier(.22,.61,.36,1);
+}
+.vp-cs-barra i, .vp-cc-barra i { background-image: linear-gradient(90deg, rgba(0,0,0,.16) 0%, rgba(0,0,0,0) 55%, rgba(255,255,255,.2) 100%) !important; }
+.vp-cs-barra, .vp-cc-barra { box-shadow: inset 0 1px 2px rgba(18,38,63,.06); }
+/* números das metas alinhados entre os anos */
+.vp-mt-v .ibar-val { min-width: 112px; text-align: right; }
+.vp-mt-m b { min-width: 94px; text-align: right; }
+.vp-mt-m em { min-width: 60px; }
