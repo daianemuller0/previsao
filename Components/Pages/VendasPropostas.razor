@@ -518,7 +518,7 @@
     private string _setor => _fil.Ativos > 0 ? "filtrado" : "";
     private List<int> _anosEditor = new();
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-    private string _login = "";
+    private string _login = "", _usuario = "";
     private bool _editCores, _editCoresMetas;
 
     /// <summary>Cores escolhidas pela pessoa para cada ano (as que faltam seguem o padrão).</summary>
@@ -547,6 +547,7 @@
         {
             var u = (await AuthState).User;
             _login = u.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? u.Identity?.Name ?? "";
+            _usuario = u.Identity?.Name ?? _login;   // o nome que aparece no topo da tela: vai na capa da apresentação
         }
         _isAdmin = AuthState is not null && (await AuthState).User.IsInRole("admin");
         _coresPadrao = LerCores(ChartPrefs.Get(LoginPadrao, ChaveCores).Ordem);
@@ -1207,6 +1208,7 @@
         baseCurta = BaseTodas ? "todas as propostas" : "decididas",
         fonte = $"Propostas: {_fonte}. Vendas e budgets: histórico da equipe (empresa toda, não seguem os filtros).",
         foco = AnoDoFoco.Ano,
+        usuario = string.IsNullOrWhiteSpace(_usuario) ? "Howden South America" : _usuario,
     };
 
     private async Task ExportarPowerPoint()
