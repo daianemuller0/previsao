@@ -1332,7 +1332,7 @@
         if (base0.Count == 0) base0 = pts.Where(p => p.v is not null).Select(p => p.v!.Value).ToList();
         double min = env ? 0 : base0.DefaultIfEmpty(0).Min(), max = base0.DefaultIfEmpty(1).Max();
         double Y(double v) => max - min < 1e-9 ? 36 : 9 + Math.Clamp((v - min) / (max - min), 0, 1.05) * 50;   // folga em cima para os números
-        <div class="vpm-banda-cap @tipo"><i></i>@(env ? "Valor enviado em propostas (R$)" : $"Taxa de conversão do mês ({RegraCurtaMm})")</div>
+        <div class="vpm-banda-cap @tipo"><i></i>@(env ? "Valor enviado em propostas (R$)" : $"Taxa de conversão do mês ({RegraCurtaMm})")@if (!env) { @BotaoConvMm() }</div>
         <div class="vpm-banda @tipo vpm-dc">
             <svg class="vpm-banda-svg" aria-hidden="true"></svg>
             <div class="vpm-banda-g">
@@ -1422,6 +1422,7 @@
             <span><i class="sw cheia"></i>colunas de cima: vendas (R$ mi)</span>
             <span><i class="sw clara"></i>colunas de baixo: propostas enviadas (qtd)</span>
             <span><i class="sw conv"></i>linha de baixo: taxa de conversão do mês (@RegraCurtaMm)</span>
+            @BotaoConvMm()
             <span><i class="sw parcial"></i>mês em andamento (parcial)</span>
             <span><i class="sw neg"></i>venda negativa</span>
             <span class="txt">— = a apurar · n/d = sem dado registrado</span>
@@ -1581,6 +1582,15 @@
                 <div class="nd">@(semVenda.Count > 0 ? $"{string.Join(" e ", semVenda)}: sem vendas registradas. " : "")@(semProp.Count > 0 ? $"{string.Join(" e ", semProp)}: sem propostas registradas (n/d, não é zero)." : "") * = mês parcial ou valor parcial (proposta sem taxa de câmbio).</div>
             }
         </div>
+    };
+
+    /// <summary>O mesmo seletor "Conversão por", em miniatura, junto da linha de conversão.</summary>
+    private RenderFragment BotaoConvMm() => __builder =>
+    {
+        <span class="cvx-seg-ctl vpm-conv-mini" title="Calcular a taxa de conversão pela quantidade de propostas ou pelo valor (R$)">
+            <button class="@(!_mmConvValor ? "on" : "")" @onclick="() => _mmConvValor = false" @onclick:stopPropagation="true">Quantidade</button>
+            <button class="@(_mmConvValor ? "on" : "")" @onclick="() => _mmConvValor = true" @onclick:stopPropagation="true">Valor (R$)</button>
+        </span>
     };
 
     private string RegraCurtaMm => _mmConvValor
