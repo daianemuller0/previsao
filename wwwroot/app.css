@@ -2978,3 +2978,21 @@ html.apresentando .filterbar-sticky { top: calc(var(--topbar-h) + 52px); }
 .vp-page .vp-cs-grade > b small { font-size: 11.5px; }
 .vp-page .vp-cs-grade > b.cab { font-size: 12.5px; }
 .vp-page .vp-cs-grade > b.tx { font-size: 17px; }
+/* ===== apresentação: "modo foto" (sem botões, listas abertas) e aviso ===== */
+body.vp-capturando .vp-met, body.vp-capturando .map-zoom, body.vp-capturando #vendedores .cvx-ctrl,
+body.vp-capturando .vp-btn-cores, body.vp-capturando .vp-cores-pop { display: none !important; }
+body.vp-capturando .cvx-embed .cvx-ibar.scroll-y { max-height: none !important; overflow: visible !important; }
+body.vp-capturando .cvx-embed .cvx-ibar > .ibar-item:nth-child(n+9) { display: none !important; }
+body.vp-capturando .cvx-kpi:hover, body.vp-capturando .vp-conv-card:hover { transform: none; box-shadow: none; }
+.vp-gerando { position: fixed; inset: 0; z-index: 2000; background: rgba(18, 38, 63, .28); display: grid; place-items: center; }
+.vp-gerando > div { background: #fff; border-radius: 12px; padding: 22px 28px; box-shadow: 0 18px 48px rgba(13,35,64,.25); display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.vp-gerando b { font-size: 18px; color: #12355B; }
+.vp-gerando span { font-size: 14px; color: #556274; }
+/* modo foto: quadros largos (não dependem da largura da tela de quem gera) e mercado/produto um embaixo do outro */
+body.vp-capturando #mensal .vp-conv-grid { width: 1880px; max-width: none; }
+body.vp-capturando #metas { width: 1400px; max-width: none; }
+body.vp-capturando .cvx-embed .cvx-lado-a-lado { grid-template-columns: 1fr; }
+/* números de atingimento sempre lado a lado (não descem sobre a tabela) */
+.vp-page .panel-head { align-items: flex-start; }
+.vp-page .panel-head .panel-title { min-width: 0; flex: 1 1 auto; }
+.vp-page .rep-attain-group { flex-wrap: nowrap; flex-shrink: 0; }
