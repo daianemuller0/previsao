@@ -3188,7 +3188,7 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-grid { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 12px; }
 @container (max-width: 1240px) { .vpm-sm-grid { grid-template-columns: repeat(3, minmax(250px, 1fr)); } }
 @container (max-width: 860px) { .vpm-sm-grid { grid-template-columns: repeat(2, minmax(240px, 1fr)); } }
-.vpm-sm { --hl: 76px; --hv: 128px; --hp: 118px; border: 1px solid var(--cx-line); border-radius: 4px; background: #fff; padding: 8px 10px 6px; }
+.vpm-sm { --hl: 76px; --hv: 128px; --hp: 92px; --hc: 58px; border: 1px solid var(--cx-line); border-radius: 4px; background: #fff; padding: 8px 10px 6px; }
 .vpm-sm-t { font-size: 15px; font-weight: 800; color: #172B43; margin-bottom: 2px; }
 .vpm-sm-g { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); column-gap: 0; }
 .vpm-sm-base { position: absolute; left: 0; right: 0; top: calc(var(--hl) + var(--hv)); border-top: 1px solid #9aa8b8; z-index: 2; }
@@ -3212,7 +3212,7 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-tot { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; color: #3b4a61; font-variant-numeric: tabular-nums; }
 .vpm-sm-tot b { color: #172B43; }
 .vpm-sm-tot .nd { font-size: 12.5px; color: var(--cx-mut); }
-.vpm:fullscreen .vpm-sm, .vpm.tela-cheia .vpm-sm { --hl: 5vh; --hv: 7.5vh; --hp: 7vh; }
+.vpm:fullscreen .vpm-sm, .vpm.tela-cheia .vpm-sm { --hl: 4.5vh; --hv: 6.6vh; --hp: 4.8vh; --hc: 4vh; }
 .vpm:fullscreen .vpm-sm-leg.sub, .vpm.tela-cheia .vpm-sm-leg.sub { margin-bottom: 6px; }
 .vpm:fullscreen .vpm-sm-grid, .vpm.tela-cheia .vpm-sm-grid { gap: 8px; }
 .vpm-sm-leg .vp-cores-pop { left: auto; right: 0; }
@@ -3232,3 +3232,16 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-sm-pt.parc { background: #fff; border-color: #fff; }
 .vpm-sm-le { font-size: 11px; font-weight: 700; color: #334155; background: transparent; padding: 0; letter-spacing: -.1px; }
 .vpm-sm-leg .sw.linha { height: 1.5px; background: #64748b; }
+/* mini-gráficos: linha da taxa de conversão do mês (embaixo das propostas) */
+.vpm-sm-cz { height: var(--hc); }
+.vpm-sm-conv { position: absolute; left: 0; right: 0; top: calc(var(--hl) + var(--hv) + var(--hp)); height: var(--hc); z-index: 3; pointer-events: none; border-top: 1px dotted #e2e8f0; }
+.vpm-sm-conv svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.vpm-sm-conv polyline { fill: none; stroke: #b45309; stroke-width: 1.25; stroke-dasharray: 4 3; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.vpm-sm-pt.cv { background: #b45309; box-shadow: 0 0 0 1px #b45309; }
+.vpm-sm-pt.cv.parc { background: #fff; }
+.vpm-sm-le.cv { color: #92400e; }
+.vpm-sm-leg .sw.conv { height: 0; width: 18px; border-top: 1.5px dashed #b45309; border-radius: 0; background: none; }
+/* vendas em "R$ 12,1 mi": letra um pouco menor para caber na coluna em 1366 */
+.vpm-sm-num { font-size: 11px; letter-spacing: -.3px; }
+.vpm:fullscreen .vpm-sm-num, .vpm.tela-cheia .vpm-sm-num { font-size: 12px; }
+@container (min-width: 1400px) { .vpm-sm-num { font-size: 12px; } }

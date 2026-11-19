@@ -1312,7 +1312,8 @@
         <div class="vpm-sm-leg sub">
             <span><i class="sw linha"></i>linha: valor enviado em propostas (R$)</span>
             <span><i class="sw cheia"></i>colunas de cima: vendas (R$ mi)</span>
-            <span><i class="sw clara"></i>embaixo: propostas enviadas (qtd) e, menor, o valor enviado (R$ mi)</span>
+            <span><i class="sw clara"></i>colunas de baixo: propostas enviadas (qtd)</span>
+            <span><i class="sw conv"></i>linha de baixo: taxa de conversão do mês (@RegraCurtaMm)</span>
             <span><i class="sw parcial"></i>mês em andamento (parcial)</span>
             <span><i class="sw neg"></i>venda negativa</span>
             <span class="txt">— = a apurar · n/d = sem dado registrado</span>
@@ -1342,6 +1343,18 @@
                     trecho.Add((Xe(e.i), 100 - Ye(ev2)));
                 }
                 if (trecho.Count > 0) trechos.Add(trecho);
+                // linha da taxa de conversão do mês (regra de "Taxa sobre"): escala entre a menor e a maior taxa do mês
+                var conv = anos.Select((a, i) => (a, i, t: CelProp(a, mes).Tem ? TaxaMes(a, mes).Taxa : null, parc: CelProp(a, mes).Parcial)).ToList();
+                var tcs = conv.Where(x => x.t is not null).Select(x => x.t!.Value).ToList();
+                double tMin = tcs.DefaultIfEmpty(0).Min(), tMax = tcs.DefaultIfEmpty(0).Max();
+                double Yc(double t) => tMax - tMin < 0.5 ? 45 : 14 + (t - tMin) / (tMax - tMin) * 52;
+                var trechosC = new List<List<(double X, double Y)>>(); var trechoC = new List<(double X, double Y)>();
+                foreach (var c in conv)
+                {
+                    if (c.t is not double tc) { if (trechoC.Count > 0) { trechosC.Add(trechoC); trechoC = new(); } continue; }
+                    trechoC.Add((Xe(c.i), 100 - Yc(tc)));
+                }
+                if (trechoC.Count > 0) trechosC.Add(trechoC);
                 var topoV = Math.Max(maxV, 0.0001) * 1.25;          // folga para o número em cima da coluna
                 var faixaV = topoV - minV * 1.6;                     // folga para o número da venda negativa
                 var zeroV = -minV * 1.6 / faixaV * 100;              // onde fica o zero das vendas (0 = na linha central)
@@ -1350,6 +1363,20 @@
                     <div class="vpm-sm-g">
                         <i class="vpm-sm-base"></i>
                         @if (minV < 0) { <i class="vpm-sm-zero" style="top:calc(var(--hl) + var(--hv) * @F(1 - zeroV / 100))"></i> }
+                        <div class="vpm-sm-conv" aria-label="Taxa de conversão do mês, por ano">
+                            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                                @foreach (var t in trechosC.Where(t => t.Count > 1))
+                                {
+                                    <polyline points="@string.Join(" ", t.Select(q => $"{F(q.X)},{F(q.Y)}"))" />
+                                }
+                            </svg>
+                            @foreach (var c in conv.Where(x => x.t is not null))
+                            {
+                                var y = Yc(c.t!.Value);
+                                <i class="vpm-sm-pt cv @(c.parc ? "parc" : "")" style="left:@F(Xe(c.i))%;bottom:@F(y)%"></i>
+                                <b class="vpm-sm-le cv" style="left:@F(Xe(c.i))%;bottom:calc(@F(y)% + 5px)">@P1(c.t!.Value)@(c.parc ? "*" : "")</b>
+                            }
+                        </div>
                         <div class="vpm-sm-linha" aria-label="Valor enviado em propostas, por ano">
                             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                                 @foreach (var t in trechos.Where(t => t.Count > 1))
@@ -1373,7 +1400,7 @@
                             var txtP = p.Tem ? N0((int)p.Valor) + (p.Parcial ? " (parcial)" : "") : p.Sit == SitMes.AApurar ? "a apurar" : "n/d";
                             var txtE = pm?.Valor is decimal ve && ve > 0 ? Mi(ve) + (pm.SemTaxa > 0 ? $" (parcial: {pm.SemTaxa} sem câmbio)" : "") : "—";
                             var porProp = v.Tem && p.Tem && !p.Parcial && p.Valor > 0 ? $"\n{(v.Valor < 0 ? "−" : "")}R$ {(Math.Abs(v.Valor) / p.Valor / 1000m).ToString("#,##0", Br)} mil por proposta" : "";
-                            <div class="vpm-sm-c" style="--c:@cor" title="@($"{NomeDoMes(mes)} {a}\nVendas: {txtV}\nPropostas: {txtP}\nValor enviado: {txtE}{porProp}")">
+                            <div class="vpm-sm-c" style="--c:@cor" title="@($"{NomeDoMes(mes)} {a}\nVendas: {txtV}\nPropostas: {txtP}\nValor enviado: {txtE}\nConversão: {(conv.FirstOrDefault(x => x.a == a).t is double tcv ? P1(tcv) : "—")}{porProp}")">
                                 <div class="vpm-sm-l"></div>
                                 <div class="vpm-sm-v">
                                     @if (v.Tem)
@@ -1383,12 +1410,12 @@
                                         @if (val >= 0)
                                         {
                                             <i class="vpm-sm-bar v" style="bottom:@F(zeroV)%;height:@F(Math.Max(alt, 0.8))%"></i>
-                                            <b class="vpm-sm-num" style="bottom:calc(@F(zeroV + alt)% + 2px)">@MiCurto(v.Valor)</b>
+                                            <b class="vpm-sm-num" style="bottom:calc(@F(zeroV + alt)% + 2px)">@ReaisMi(v.Valor)</b>
                                         }
                                         else
                                         {
                                             <i class="vpm-sm-bar neg" style="bottom:@F(zeroV - alt)%;height:@F(alt)%"></i>
-                                            <b class="vpm-sm-num neg" style="bottom:calc(@F(zeroV)% + 2px)">@MiCurto(v.Valor)</b>
+                                            <b class="vpm-sm-num neg" style="bottom:calc(@F(zeroV)% + 2px)">@ReaisMi(v.Valor)</b>
                                         }
                                     }
                                     else
@@ -1403,7 +1430,6 @@
                                         <i class="vpm-sm-bar p @(p.Parcial ? "parcial" : "")" style="height:@F(h)%"></i>
                                         <span class="vpm-sm-lp" style="top:calc(@F(h)% + 2px)">
                                             <b>@N0((int)p.Valor)@(p.Parcial ? "*" : "")</b>
-                                            @if (pm?.Valor is decimal ve2 && ve2 > 0) { <small>@MiRot(ve2)@(pm.SemTaxa > 0 ? "*" : "")</small> }
                                         </span>
                                     }
                                     else
@@ -1411,6 +1437,7 @@
                                         <span class="vpm-sm-lp vazio" style="top:3px"><b>@(p.Sit == SitMes.AApurar ? "—" : "n/d")</b></span>
                                     }
                                 </div>
+                                <div class="vpm-sm-cz"></div>
                                 <span class="vpm-sm-ano">@Curto(a)</span>
                             </div>
                         }
@@ -1448,11 +1475,13 @@
         </div>
     };
 
+    private string RegraCurtaMm => BaseTodas ? "ganhas ÷ todas as enviadas no mês" : "ganhas ÷ decididas no mês";
+
     /// <summary>Valor em reais, curto: R$ 39.000.000 → "R$ 39 mi"; R$ 54.400.000 → "R$ 54,4 mi"; "R$ 1,2 bi".</summary>
     private static string ReaisMi(decimal v)
     {
         var mi = Math.Abs(v) / 1_000_000m;
-        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.#", Br) + " bi" : mi >= 100 ? mi.ToString("#,##0", Br) + " mi" : mi.ToString("#,##0.#", Br) + " mi";
+        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.#", Br) + " bi" : mi.ToString("#,##0.#", Br) + " mi";
         return (v < 0 ? "−" : "") + "R$ " + t;
     }
 
