@@ -135,7 +135,8 @@ public sealed class ConversaoService
     };
 
     /// <summary>Data a partir da qual a planilha deixa de valer (exclusiva): a antiga de NB vai até a migração.</summary>
-    private static readonly Dictionary<string, DateTime> AtePadrao = new() { [NbHistorico] = new DateTime(2024, 1, 1) };
+    /// (Sem data fixa: a passagem da planilha antiga de NB para a plataforma nova é achada nos próprios dados — ver CorteNbHistorico.)
+    private static readonly Dictionary<string, DateTime> AtePadrao = new();
     /// <summary>Linhas que não entram, por planilha: coluna e textos (sem diferença de caixa/acento/espaço).</summary>
     private static readonly Dictionary<string, (string Coluna, string[] Valores)> ExclusaoPadrao = new() { [Nb] = ("AD", new[] { "Budget Quote" }) };
 
@@ -198,6 +199,7 @@ public sealed class ConversaoService
                         aba: _cfg[$"Conversao:Fontes:{fonte.Chave}:Aba"] ?? _cfg["Conversao:Aba"], maiorAba: true);
                     Montar(dados, fonte, fi.Name, grade);
                 }
+                CorteNbHistorico(dados);
                 UnificarVendedores(dados);
                 UltimaRevisao(dados);
                 Conferir(dados, arquivos.Select(a => a.Fonte).ToList());
@@ -384,9 +386,14 @@ public sealed class ConversaoService
         // Data de envio: acha a coluna pelo TÍTULO ("Actual" no AFM e no NB 20-22, "Quotation Sent Date" no NB);
         // a letra configurada só vale se nenhum título conhecido estiver no cabeçalho. Assim uma coluna a mais
         // ou a menos na exportação não faz a data cair em outra coluna (ex.: nomes de engenheiros).
-        var titulosData = new[] { "actual", "quotation sent date", "quote sent date", "data de envio", "sent date" };
-        for (var i = 0; i < cab.Length; i++)
-            if (titulosData.Contains(OpportunityImporter.Normalizar((cab[i].Text ?? "").Trim()))) { iData = i; break; }
+        // em ordem de preferência: na NB 20-22 há "Actual" (AC) E "Envio Proposta" (AD) — vale "Envio Proposta"
+        var titulosData = new[] { "envio proposta", "envio da proposta", "data de envio", "quotation sent date", "quote sent date", "sent date", "actual" };
+        var titulosCab = cab.Select(c => OpportunityImporter.Normalizar((c.Text ?? "").Trim())).ToList();
+        foreach (var t in titulosData)
+        {
+            var i = titulosCab.IndexOf(t);
+            if (i >= 0) { iData = i; break; }
+        }
 
         string Cel(OpportunityImporter.Cel[] r, int i) => i >= 0 && i < r.Length ? (r[i].Text ?? "").Trim() : "";
         string Titulo(int i) => Cel(cab, i);
@@ -609,13 +616,31 @@ public sealed class ConversaoService
             d.Avisos.Add($"As propostas começam em datas diferentes ({string.Join("; ", d.Inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} desde {kv.Value:MM/yyyy}"))}): " +
                          $"antes de {ult.Value.Year} só há propostas de {string.Join(" e ", d.Inicio.Where(kv => kv.Value.Year < ult.Value.Year).Select(kv => kv.Key))}, então os totais desses anos não se comparam aos seguintes.");
         }
-        if (lidas.Any(f => f.Chave == NbHistorico))
+    }
+
+    /// <summary>
+    /// NB vem de duas planilhas: a antiga (NB 20-22, sistema anterior) e a da plataforma nova. Para a mesma
+    /// proposta não contar duas vezes, a antiga vale até o fim do último mês em que ela tem propostas de
+    /// verdade (pelo menos 3 no mês) e a nova vale daí em diante. Conversao:Fontes:NB_Historico:Ate fixa a data,
+    /// se for preciso.
+    /// </summary>
+    private void CorteNbHistorico(DadosConversao d)
+    {
+        var hist = d.Propostas.Where(p => p.Fonte == NbHistorico && p.Data is not null).ToList();
+        if (hist.Count == 0) return;
+        DateTime corte;
+        if (DateTime.TryParse(_cfg[$"Conversao:Fontes:{NbHistorico}:Ate"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var fixo)) corte = fixo.Date;
+        else
         {
-            var limite = DateTime.TryParse(_cfg[$"Conversao:Fontes:{NbHistorico}:Ate"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var a) ? a : AtePadrao[NbHistorico];
-            var antes = d.Propostas.Count(p => p.Fonte == Nb && p.Data is DateTime dt && dt.Date < limite);
-            if (antes > 0)
-                d.Avisos.Add($"NB: {antes} proposta(s) da plataforma nova foram enviadas antes de {limite:dd/MM/yyyy}, período também coberto pela planilha NB histórica: confira se não estão nas duas.");
+            var ultimoMes = hist.GroupBy(p => new DateTime(p.Data!.Value.Year, p.Data.Value.Month, 1)).Where(g => g.Count() >= 3)
+                .Select(g => g.Key).DefaultIfEmpty(hist.Max(p => new DateTime(p.Data!.Value.Year, p.Data.Value.Month, 1))).Max();
+            corte = ultimoMes.AddMonths(1);
         }
+        var foraHist = d.Propostas.RemoveAll(p => p.Fonte == NbHistorico && p.Data is DateTime dt && dt.Date >= corte);
+        var foraNova = d.Propostas.RemoveAll(p => p.Fonte == Nb && p.Data is DateTime dt && dt.Date < corte);
+        d.Desconsideradas += foraHist + foraNova;
+        d.Mapeamento.Add($"NB: passagem da planilha antiga para a plataforma nova em {corte:dd/MM/yyyy} — a NB 20-22 vale até {corte.AddDays(-1):dd/MM/yyyy} e a plataforma nova daí em diante." +
+                         $" Desconsideradas: {foraNova} linha(s) da plataforma nova antes dessa data (já estão na planilha antiga) e {foraHist} da planilha antiga depois dela.");
     }
 
     /// <summary>Valor numérico da célula (US$ ou R$). Número nativo vale como veio; texto usa o último
