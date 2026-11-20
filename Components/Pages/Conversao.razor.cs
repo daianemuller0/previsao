@@ -99,7 +99,7 @@ public partial class Conversao : IAsyncDisposable
         public readonly int[] Conv = new int[4];
         public int Decididas => G + P;
         public double VTotal => VG + VP + VA + VNC;
-        /// <summary>Base da taxa: false = decididas (padrão); true = todas as propostas enviadas.</summary>
+        /// <summary>Base da taxa: true = todas as propostas enviadas (padrão); false = só as decididas.</summary>
         public bool Todas;
         /// <summary>Conversão por valor (botão "Conversão por" da barra de filtros): a taxa principal passa a ser a por valor.</summary>
         public bool PorValor;
@@ -1126,8 +1126,8 @@ public partial class Conversao : IAsyncDisposable
     private string? _assinNotif;
 
     // ---- base da taxa de conversão (botão na barra de filtros) --------------------------
-    private bool _baseTodasLocal;
-    /// <summary>false = Ganhas ÷ decididas (padrão); true = Ganhas ÷ todas as propostas enviadas. Embutido: vem dos filtros compartilhados.</summary>
+    private bool _baseTodasLocal = true;   // padrão: taxa sobre todas as propostas enviadas
+    /// <summary>true = Ganhas ÷ todas as propostas enviadas (padrão); false = Ganhas ÷ decididas. Embutido: vem dos filtros compartilhados.</summary>
     private bool _baseTodas
     {
         get => Filtros?.BaseTodas ?? _baseTodasLocal;

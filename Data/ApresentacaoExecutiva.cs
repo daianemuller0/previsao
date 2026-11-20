@@ -33,7 +33,7 @@ public sealed class OpcoesApresentacao
     public bool Detalhadas { get; set; } = true;
     public bool Apendices { get; set; } = true;
     public bool CompararAnoAnterior { get; set; } = true;
-    public bool BaseTodas { get; set; }
+    public bool BaseTodas { get; set; } = true;
     public int AnoInicial { get; set; } = 2022;
 
     public string Assinatura() => string.Join("|", AnoRef, MesRef, Periodo, Ingles, Escopo, ValorEscopo, Usd, MaxSlides, Detalhadas, Apendices, CompararAnoAnterior, BaseTodas, AnoInicial);

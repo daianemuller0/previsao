@@ -31,8 +31,8 @@ public sealed class FiltroResumo
     public HashSet<string> Segmentos { get; } = Novo();
     public HashSet<string> Produtos { get; } = Novo();
     public HashSet<string> Vendedores { get; } = Novo();
-    /// <summary>Base das taxas: false = decididas (padrão); true = todas as propostas enviadas.</summary>
-    public bool BaseTodas { get; set; }
+    /// <summary>Base das taxas: true = todas as propostas enviadas (padrão); false = só as decididas.</summary>
+    public bool BaseTodas { get; set; } = true;
 
     /// <summary>Algum filtro de dimensão ligado (as vendas, que são da empresa toda, não seguem esses filtros).</summary>
     public bool TemDimensao => new[] { Setores, Bus, Paises, Segmentos, Produtos, Vendedores }.Any(s => s.Count > 0);

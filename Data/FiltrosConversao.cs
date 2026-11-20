@@ -22,10 +22,10 @@ public sealed class FiltrosConversao
     public HashSet<string> Produtos { get; } = Novo();
 
     /// <summary>
-    /// Base da taxa de conversão: false = decididas (Ganhas ÷ (Ganhas + Perdidas), o padrão);
-    /// true = todas as propostas enviadas (Ganhas ÷ tudo, abertas e não classificadas inclusive).
+    /// Base da taxa de conversão: true = todas as propostas enviadas (Ganhas ÷ tudo, abertas e não
+    /// classificadas inclusive — o padrão); false = só as decididas (Ganhas ÷ (Ganhas + Perdidas)).
     /// </summary>
-    public bool BaseTodas { get; set; }
+    public bool BaseTodas { get; set; } = true;
 
     /// <summary>
     /// Como a taxa de conversão é calculada: false = por quantidade de propostas (o padrão);
