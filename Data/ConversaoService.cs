@@ -490,8 +490,9 @@ public sealed class ConversaoService
 
     /// <summary>
     /// Cada número de proposta conta UMA vez em tudo (enviadas, valores e conversão): das linhas com o mesmo
-    /// número na mesma planilha (revisões), fica a última — a de maior revisão; sem revisão, a de data de envio
-    /// mais recente; empate, a que vem mais abaixo na planilha. Linhas sem número continuam cada uma por si.
+    /// número na mesma planilha (revisões), vale a última — a de maior revisão; sem revisão, a de data de envio
+    /// mais recente; empate, a que vem mais abaixo na planilha — com a data do PRIMEIRO envio. Linhas sem
+    /// número continuam cada uma por si.
     /// </summary>
     private static void UltimaRevisao(DadosConversao d)
     {
@@ -510,12 +511,21 @@ public sealed class ConversaoService
                 d.Avisos.Add($"{rot}: a coluna do número da proposta tem só {distintos} valores diferentes em {comNumero.Count} linhas ({string.Join(", ", exemplos)}): não parece o número da proposta, então as linhas NÃO foram juntadas como revisões. Confira a coluna em \"Colunas lidas da planilha\".");
                 continue;
             }
-            var ultimas = comNumero.GroupBy(p => p.Codigo)
-                .Select(g => g.OrderByDescending(p => p.Revisao ?? -1).ThenByDescending(p => p.Data ?? DateTime.MinValue).ThenByDescending(p => p.Linha).First())
-                .ToHashSet(ReferenceEqualityComparer.Instance);
-            var fora = d.Propostas.RemoveAll(p => p.Fonte == fonte && p.Chave.Trim().Length > 0 && !ultimas.Contains(p));
+            // a última revisão dá o status e o valor; a data é a do PRIMEIRO envio (a proposta continua no mês em
+            // que foi enviada, mesmo que tenha sido revisada meses ou anos depois — no NB, a mesma oportunidade
+            // aparece várias vezes ao longo do tempo)
+            var troca = new Dictionary<PropostaConv, PropostaConv>(ReferenceEqualityComparer.Instance);
+            foreach (var g in comNumero.GroupBy(p => p.Codigo))
+            {
+                var ultima = g.OrderByDescending(p => p.Revisao ?? -1).ThenByDescending(p => p.Data ?? DateTime.MinValue).ThenByDescending(p => p.Linha).First();
+                var primeira = g.Where(p => p.Data is not null).OrderBy(p => p.Data).FirstOrDefault();
+                troca[ultima] = primeira is null || primeira.Data == ultima.Data ? ultima : ultima with { Data = primeira.Data, DataTexto = primeira.DataTexto };
+            }
+            var fora = d.Propostas.RemoveAll(p => p.Fonte == fonte && p.Chave.Trim().Length > 0 && !troca.ContainsKey(p));
+            for (var i = 0; i < d.Propostas.Count; i++)
+                if (troca.TryGetValue(d.Propostas[i], out var nova)) d.Propostas[i] = nova;
             d.Desconsideradas += fora;
-            d.Mapeamento.Add($"{rot} · revisões: {fora} linha(s) de revisões anteriores desconsideradas — cada número de proposta conta uma vez, pela última revisão (data, valor e status dela).");
+            d.Mapeamento.Add($"{rot} · revisões: {fora} linha(s) de revisões anteriores desconsideradas — cada número de proposta conta uma vez, no mês do primeiro envio, com o status e o valor da última revisão.");
         }
         // resumo por planilha: quantas propostas ficaram e quantas por ano (para conferir com o Excel)
         foreach (var g in d.Propostas.GroupBy(p => p.Fonte))
