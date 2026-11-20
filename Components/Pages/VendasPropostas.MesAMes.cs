@@ -124,6 +124,7 @@ public partial class VendasPropostas
         decimal s = 0; var n = 0;
         for (var m = 1; m <= ate; m++)
         {
+            if (!MesNoFiltro(m)) continue;   // filtro "Mês": a comparação usa só os meses escolhidos
             var c = Cel(vendas, a, m);
             if (!c.Tem || c.Parcial) continue;
             s += c.Valor; n++;
@@ -194,7 +195,26 @@ public partial class VendasPropostas
     /// <summary>Valor exato, com centavos: "R$ 31.412.345,67".</summary>
     private static string Reais(decimal v) => (v < 0 ? "−" : "") + "R$ " + Math.Abs(v).ToString("#,##0.00", Br);
 
-    private static string MesesTxt(int ate) => ate <= 0 ? "sem meses fechados" : ate >= 12 ? "jan–dez" : ate == 1 ? "jan" : $"jan–{MesCurto(ate).ToLowerInvariant()}";
+    /// <summary>O mês está no filtro "Mês" da barra de filtros (sem filtro, todos estão).</summary>
+    private bool MesNoFiltro(int m) => _fil.Meses.Count == 0 || _fil.Meses.Contains(Fmt.MonthLong(m));
+
+    /// <summary>Os meses de jan até "ate" que estão no filtro, em faixas: "jan–mar", "jan–mar, jun", "jan–dez".</summary>
+    private string MesesTxt(int ate)
+    {
+        if (ate <= 0) return "sem meses fechados";
+        var l = Enumerable.Range(1, Math.Min(12, ate)).Where(MesNoFiltro).ToList();
+        if (l.Count == 0) return "nenhum mês do filtro";
+        var faixas = new List<string>();
+        for (var i = 0; i < l.Count;)
+        {
+            var j = i;
+            while (j + 1 < l.Count && l[j + 1] == l[j] + 1) j++;
+            var de = MesCurto(l[i]).ToLowerInvariant(); var ate2 = MesCurto(l[j]).ToLowerInvariant();
+            faixas.Add(i == j ? de : $"{de}–{ate2}");
+            i = j + 1;
+        }
+        return string.Join(", ", faixas);
+    }
 
     /// <summary>Variação % (null quando a base é zero ou negativa: a conta não tem sentido).</summary>
     private static double? VarMm(decimal atual, decimal baseAnt) => baseAnt > 0 ? (double)((atual - baseAnt) / baseAnt * 100) : null;

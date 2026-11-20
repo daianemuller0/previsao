@@ -1402,7 +1402,7 @@
                 <em></em>
             </div>
             <p class="vpm-rnota">
-                Mesmos meses nos dois anos@(mp < 12 && a1 == DateTime.Today.Year || a2 == DateTime.Today.Year ? $"; {NomeDoMes(DateTime.Today.Month).ToLowerInvariant()} (em andamento) fica fora" : "").
+                Mesmos meses nos dois anos@(_fil.Meses.Count > 0 ? " (os do filtro Mês)" : "")@((a1 == DateTime.Today.Year || a2 == DateTime.Today.Year) && MesNoFiltro(DateTime.Today.Month) ? $"; {NomeDoMes(DateTime.Today.Month).ToLowerInvariant()} (em andamento) fica fora" : "").
                 Conversão: @RegraMm.
                 Mais ou menos propostas não é, por si, melhora ou piora.
             </p>
@@ -1562,17 +1562,17 @@
         </div>
         string TotV(int a)
         {
-            var l = Enumerable.Range(1, 12).Select(m => (m, c: CelVenda(a, m))).Where(x => x.c.Tem).ToList();
+            var l = Enumerable.Range(1, 12).Where(MesNoFiltro).Select(m => (m, c: CelVenda(a, m))).Where(x => x.c.Tem).ToList();
             if (l.Count == 0) return $"{a} n/d";
             var ult = l.Max(x => x.m);
-            return $"{a} {MiCurto(l.Sum(x => x.c.Valor))}" + (ult < 12 ? $" ({MesesTxt(ult)})" : "");
+            return $"{a} {MiCurto(l.Sum(x => x.c.Valor))}" + (ult < 12 || _fil.Meses.Count > 0 ? $" ({MesesTxt(ult)})" : "");
         }
         string TotP(int a)
         {
-            var l = Enumerable.Range(1, 12).Select(m => (m, c: CelProp(a, m))).Where(x => x.c.Tem).ToList();
+            var l = Enumerable.Range(1, 12).Where(MesNoFiltro).Select(m => (m, c: CelProp(a, m))).Where(x => x.c.Tem).ToList();
             if (l.Count == 0) return $"{a} n/d";
             var ult = l.Max(x => x.m); var parc = l.FirstOrDefault(x => x.c.Parcial);
-            return $"{a} {N0((int)l.Sum(x => x.c.Valor))}" + (ult < 12 ? $" ({MesesTxt(ult)}{(parc.c.Parcial ? $", {MesCurto(parc.m).ToLowerInvariant()} parcial" : "")})" : "");
+            return $"{a} {N0((int)l.Sum(x => x.c.Valor))}" + (ult < 12 || _fil.Meses.Count > 0 ? $" ({MesesTxt(ult)}{(parc.c.Parcial ? $", {MesCurto(parc.m).ToLowerInvariant()} parcial" : "")})" : "");
         }
         string TotE(int a)
         {
@@ -1618,8 +1618,8 @@
         var mv = FechadoV(a); var mp = FechadoP(a);
         var (sv, nv) = SomaMm(true, a, mv);
         var (sp, np) = SomaMm(false, a, mp);
-        var vendasM = Enumerable.Range(1, mv).Select(m => (m, c: CelVenda(a, m))).Where(x => x.c.Tem).ToList();
-        var propsM = Enumerable.Range(1, mp).Select(m => (m, c: CelProp(a, m))).Where(x => x.c.Tem && !x.c.Parcial).ToList();
+        var vendasM = Enumerable.Range(1, mv).Where(MesNoFiltro).Select(m => (m, c: CelVenda(a, m))).Where(x => x.c.Tem).ToList();
+        var propsM = Enumerable.Range(1, mp).Where(MesNoFiltro).Select(m => (m, c: CelProp(a, m))).Where(x => x.c.Tem && !x.c.Parcial).ToList();
         var parcial = a == DateTime.Today.Year ? CelProp(a, DateTime.Today.Month) : default;
         var tx = Taxa(a);
         var txMm = tx.Taxa;   // já segue "Conversão por"
