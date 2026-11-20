@@ -114,8 +114,9 @@ public partial class VendasPropostas
     /// <summary>Último mês fechado de propostas: dezembro nos anos passados; no corrente, o mês anterior ao de hoje.</summary>
     private static int FechadoP(int a)
     {
+        // até o mês presente: o mês em andamento entra (parcial, até hoje), como no topo da página
         var hoje = DateTime.Today;
-        return a < hoje.Year ? 12 : a > hoje.Year ? 0 : hoje.Month - 1;
+        return a < hoje.Year ? 12 : a > hoje.Year ? 0 : hoje.Month;
     }
 
     /// <summary>Soma dos meses 1..ate que têm valor, e quantos meses entraram.</summary>
@@ -126,7 +127,7 @@ public partial class VendasPropostas
         {
             if (!MesNoFiltro(m)) continue;   // filtro "Mês": a comparação usa só os meses escolhidos
             var c = Cel(vendas, a, m);
-            if (!c.Tem || c.Parcial) continue;
+            if (!c.Tem) continue;
             s += c.Valor; n++;
         }
         return (s, n);
@@ -146,7 +147,7 @@ public partial class VendasPropostas
 
     /// <summary>
     /// Resumo de dois anos no período comparável: vendas de jan até o último mês fechado nos dois;
-    /// propostas e conversão de jan até o último mês fechado nos dois (o mês em andamento fica fora).
+    /// propostas e conversão de jan até o mês presente nos dois (o mês em andamento entra, parcial).
     /// </summary>
     private (int Mv, int Mp, LadoMm A, LadoMm B) ResumoMm(int a1, int a2)
     {

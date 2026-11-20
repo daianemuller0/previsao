@@ -1402,7 +1402,7 @@
                 <em></em>
             </div>
             <p class="vpm-rnota">
-                Mesmos meses nos dois anos@(_fil.Meses.Count > 0 ? " (os do filtro Mês)" : "")@((a1 == DateTime.Today.Year || a2 == DateTime.Today.Year) && MesNoFiltro(DateTime.Today.Month) ? $"; {NomeDoMes(DateTime.Today.Month).ToLowerInvariant()} (em andamento) fica fora" : "").
+                Mesmos meses nos dois anos@(_fil.Meses.Count > 0 ? " (os do filtro Mês)" : "")@((a1 == DateTime.Today.Year || a2 == DateTime.Today.Year) && MesNoFiltro(DateTime.Today.Month) ? $"; propostas e conversão até o mês presente ({NomeDoMes(DateTime.Today.Month).ToLowerInvariant()} parcial, até hoje); vendas até o último mês lançado" : "").
                 Conversão: @RegraMm.
                 Mais ou menos propostas não é, por si, melhora ou piora.
             </p>
@@ -1644,7 +1644,7 @@
                     <span>média @N0((int)Math.Round(sp / np)) por mês</span>
                     <span>maior: @MesCurto(mx.m).ToLowerInvariant() @N0((int)mx.c.Valor) · menor: @MesCurto(mn.m).ToLowerInvariant() @N0((int)mn.c.Valor)</span>
                 }
-                @if (parcial.Tem && parcial.Parcial) { <span class="vpm-parc">+ @N0((int)parcial.Valor) em @NomeDoMes(DateTime.Today.Month).ToLowerInvariant() (parcial, fora do total)</span> }
+                @if (parcial.Tem && parcial.Parcial && parcial.Valor > 0) { <span class="vpm-parc">inclui @N0((int)parcial.Valor) em @NomeDoMes(DateTime.Today.Month).ToLowerInvariant() (parcial, até hoje)</span> }
             </div>
             <div class="vpm-blk">
                 <span class="vpm-blk-t">Conversão · @(a == DateTime.Today.Year ? $"jan–{MesCurto(DateTime.Today.Month).ToLowerInvariant()}" : "jan–dez")</span>

@@ -122,6 +122,8 @@ public sealed class ModeloResumo
     public int Principal, Comparativo;
     /// <summary>Ano em curso dentro do período (0 = nenhum) e o último mês fechado dele.</summary>
     public int AnoIncompleto, MesCorte;
+    /// <summary>Último mês com vendas lançadas no ano em curso (as vendas do mês presente ainda não existem).</summary>
+    public int MesCorteVendas;
     /// <summary>true = todos os anos de janeiro até o MesCorte (período equivalente).</summary>
     public bool Equivalente;
     public bool BaseTodas, FiltroDimensao;
@@ -136,12 +138,17 @@ public sealed class ModeloResumo
     /// <summary>Até que mês comparar dois anos: se um deles está em curso, só os meses fechados dele.</summary>
     public int AteComparavel(int a, int b) => (a == AnoIncompleto || b == AnoIncompleto) && MesCorte > 0 ? MesCorte : Ate;
     public bool Parcial(int ano) => ano == AnoIncompleto && !(Equivalente && MesCorte > 0);
+    /// <summary>O período das vendas numa comparação (pode terminar antes do das propostas, que vão até o mês presente).</summary>
+    public string PeriodoVendasTxt(int ate) => PeriodoTxt(MesCorte > 0 && ate == MesCorte && MesCorteVendas is > 0 && MesCorteVendas < MesCorte ? MesCorteVendas : ate);
     public string PeriodoTxt(int ate) => ate >= 12 ? "jan–dez" : ate == 1 ? "jan" : "jan–" + MesCurto(ate);
 
     public Indicadores Ano(int ano, int? ate = null) => Soma(Mes.Where(kv => kv.Key.Ano == ano && kv.Key.Mes <= (ate ?? Ate)).Select(kv => kv.Value));
     public decimal? Vendas(int ano, int? ate = null)
     {
-        var l = VendasMes.Where(kv => kv.Key.Ano == ano && kv.Key.Mes <= (ate ?? Ate)).ToList();
+        // comparações até o mês presente: as vendas vão só até o último mês lançado, nos dois anos (mesmos meses)
+        var lim = ate ?? Ate;
+        if (MesCorte > 0 && lim == MesCorte && MesCorteVendas > 0 && MesCorteVendas < MesCorte) lim = MesCorteVendas;
+        var l = VendasMes.Where(kv => kv.Key.Ano == ano && kv.Key.Mes <= lim).ToList();
         return l.Count == 0 ? null : l.Sum(kv => kv.Value);
     }
     public int UltimoMesVendas(int ano) => VendasMes.Keys.Where(k => k.Ano == ano).Select(k => k.Mes).DefaultIfEmpty(0).Max();
@@ -226,13 +233,15 @@ public static class ResumoExecutivoCalc
             // dezembro fecha o ano. Quem chama já tirou os dados posteriores ao corte.
             m.AnoIncompleto = c.Mes < 12 && m.Anos.Contains(c.Ano) ? c.Ano : 0;
             m.MesCorte = c.Mes < 12 ? c.Mes : 0;
+            m.MesCorteVendas = m.MesCorte;
         }
         else if (m.Anos.Contains(hoje.Year))
         {
             m.AnoIncompleto = hoje.Year;
             var mv = m.UltimoMesVendas(hoje.Year);
-            var mp = hoje.Month - 1;                         // o mês corrente das propostas ainda está em andamento
-            m.MesCorte = mv > 0 ? Math.Min(mv, mp) : mp;
+            // até o mês presente: as propostas do mês em andamento entram (parciais); as vendas vão até o último mês lançado
+            m.MesCorte = hoje.Month;
+            m.MesCorteVendas = mv > 0 ? Math.Min(mv, hoje.Month) : 0;
         }
 
         var regs = Registros(todas.Where(f.Passa), taxas, f.AnoDe, f.AnoAte);
@@ -284,14 +293,14 @@ public static class ResumoExecutivoCalc
     {
         var l = new List<InsightResumo>();
         var p = m.Principal; var c = m.Comparativo;
-        var ate = m.AteComparavel(p, c); var per = m.PeriodoTxt(ate);
+        var ate = m.AteComparavel(p, c); var per = m.PeriodoTxt(ate); var perV = m.PeriodoVendasTxt(ate);
 
         // 1. vendas: ano principal × comparativo, no período equivalente
         if (m.Vendas(p, ate) is decimal vp && m.Vendas(c, ate) is decimal vc && vc > 0)
         {
             var cresceu = vp >= vc;
-            l.Add(new("Vendas", $"Vendas {(cresceu ? "cresceram" : "caíram")} {Var(vp, vc)} em {p} contra {c} ({per}).",
-                $"{Mi(vp)} em {p} × {Mi(vc)} em {c}, mesmos meses ({per}); diferença de {Mi(vp - vc)}.",
+            l.Add(new("Vendas", $"Vendas {(cresceu ? "cresceram" : "caíram")} {Var(vp, vc)} em {p} contra {c} ({perV}).",
+                $"{Mi(vp)} em {p} × {Mi(vc)} em {c}, mesmos meses ({perV}); diferença de {Mi(vp - vc)}.",
                 "Avaliar os fatores associados à variação (mix de produtos, BUs, sazonalidade); a base não indica a causa."));
         }
         else l.Add(new("Vendas", $"Não há vendas registradas nos dois anos ({p} e {c}) para comparar.", "—", "Completar o histórico de vendas para concluir.", false));
@@ -301,7 +310,7 @@ public static class ResumoExecutivoCalc
         if (anosV.Count >= 2)
         {
             var mx = anosV.MaxBy(x => x.v!.Value); var mn = anosV.MinBy(x => x.v!.Value);
-            l.Add(new("Vendas por ano", $"Maior volume de vendas: {mx.a}; menor: {mn.a} ({m.PeriodoTxt(m.Ate)}{(m.Ate < 12 ? ", todos os anos nos mesmos meses" : "")}).",
+            l.Add(new("Vendas por ano", $"Maior volume de vendas: {mx.a}; menor: {mn.a} ({m.PeriodoVendasTxt(m.Ate)}{(m.Ate < 12 ? ", todos os anos nos mesmos meses" : "")}).",
                 $"{mx.a}: {Mi(mx.v!.Value)} · {mn.a}: {Mi(mn.v!.Value)}." + (m.Ate >= 12 && m.AnoIncompleto > 0 ? $" {m.AnoIncompleto} ainda está em curso (ano incompleto)." : ""),
                 m.Ate >= 12 && m.AnoIncompleto > 0 ? "Para comparar com o ano em curso, use “Período equivalente”." : "—"));
         }

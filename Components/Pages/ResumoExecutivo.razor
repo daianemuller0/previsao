@@ -256,7 +256,7 @@
         if (_m is null) return "";
         var partes = new List<string>
         {
-            _m.AnoIncompleto > 0 ? (_m.Ate < 12 ? $"Período equivalente: todos os anos de {_m.PeriodoTxt(_m.Ate)} ({_m.AnoIncompleto} em curso: vendas até {ModeloResumo.MesCurto(Math.Max(1, _m.UltimoMesVendas(_m.AnoIncompleto)))}, propostas fechadas até {ModeloResumo.MesCurto(Math.Max(1, _m.MesCorte))})"
+            _m.AnoIncompleto > 0 ? (_m.Ate < 12 ? $"Período equivalente: todos os anos de {_m.PeriodoTxt(_m.Ate)} ({_m.AnoIncompleto} em curso: vendas até {ModeloResumo.MesCurto(Math.Max(1, _m.UltimoMesVendas(_m.AnoIncompleto)))}, propostas até {ModeloResumo.MesCurto(Math.Max(1, _m.MesCorte))}{(_m.MesCorte == DateTime.Today.Month ? " (mês presente, parcial)" : "")})"
                                                   : $"Ano inteiro: {_m.AnoIncompleto} está em curso e aparece parcial; as variações com ele usam os mesmos meses ({_m.PeriodoTxt(Math.Max(1, _m.MesCorte))})")
                                  : "Todos os anos completos",
             Conv.AtualizadoEm is { } q ? $"propostas lidas em {q:dd/MM/yyyy HH:mm}" : "propostas não lidas",
@@ -314,7 +314,7 @@
         var ip = m.Ano(p, ate); var ic = m.Ano(c, ate);
         var vp = m.Vendas(p, ate); var vc = m.Vendas(c, ate);
         <div class="rx-card">
-            <div class="rx-card-tit">@p × @c <span>mesmos meses: @per · @(m.FiltroDimensao ? "propostas com os filtros; vendas e metas da empresa toda" : "empresa toda")</span></div>
+            <div class="rx-card-tit">@p × @c <span>mesmos meses: propostas @per · vendas @m.PeriodoVendasTxt(ate) · @(m.FiltroDimensao ? "propostas com os filtros; vendas e metas da empresa toda" : "empresa toda")</span></div>
             <div class="rx-kpis">
                 @Kpi("Vendas realizadas", Mi(vp), Mi(vc), VarPct(vp, vc), false, "vendas", "Histórico da equipe, empresa toda")
                 @Kpi("Propostas enviadas", ip.Enviadas > 0 ? N0(ip.Enviadas) : "—", ic.Enviadas > 0 ? N0(ic.Enviadas) : "—", VarPct((double)ip.Enviadas, ic.Enviadas), true, "prop", "Cada número de proposta conta uma vez")
