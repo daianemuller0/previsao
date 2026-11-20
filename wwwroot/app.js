@@ -933,3 +933,22 @@ window.vpmAjustar = function () {
     window.addEventListener('resize', de);
     document.addEventListener('fullscreenchange', de);
 })();
+
+// Resumo Executivo: imprime só o relatório montado (.rx-print), em paisagem; "Salvar como PDF" no navegador.
+// Devolve uma promessa que só termina depois da impressão: a página mantém o relatório montado até lá.
+window.rxImprimir = function () {
+    return new Promise(resolve => {
+        document.body.classList.add('rx-imprimindo');
+        let st = document.getElementById('rx-pagina');
+        if (!st) { st = document.createElement('style'); st.id = 'rx-pagina'; document.head.appendChild(st); }
+        st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+        setTimeout(() => {
+            try { window.print(); } finally { window.rxFimImpressao(); resolve(); }
+        }, 200);
+    });
+};
+window.rxFimImpressao = function () {
+    document.body.classList.remove('rx-imprimindo');
+    const st = document.getElementById('rx-pagina');
+    if (st) st.remove();
+};
