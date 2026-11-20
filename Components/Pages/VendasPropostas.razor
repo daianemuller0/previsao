@@ -211,7 +211,6 @@
                     {
                         var ano = a;
                         var limC = MesLimite(a);
-                        var c = Composicao(a);
                         var l = Linha(a);
                         var r = _anos.FirstOrDefault(x => x.Ano == a);
                         var dVal = a - 1 >= AnoIni && l.SemTaxa == 0 ? DeltaCurto(ValorAte(a, limC), ValorAte(a - 1, limC)) : null;
@@ -234,10 +233,6 @@
                                     <span>Ganhas</span><b>@N0(sa.G)</b><b>@N0(sn.G)</b>
                                     <span>Valor enviado</span><b title="@(sa.Valor > 0 ? Cheio(sa.Valor) : "")">@(sa.Valor > 0 ? MiEixo(sa.Valor) : "—")@if (sa.SemTaxa > 0) { <em class="vp-parcial" title="@N0(sa.SemTaxa) proposta(s) sem taxa de câmbio do ano">parcial</em> }</b><b title="@(sn.Valor > 0 ? Cheio(sn.Valor) : "")">@(sn.Valor > 0 ? MiEixo(sn.Valor) : "—")</b>
                                 </div>
-                            </div>
-                            <div class="vp-cc-valor">
-                                <span>Valor ganho</span><b>@(c.VG > 0 ? Mi((decimal)c.VG) : "—")</b>
-                                <span>@(PorValor ? "Por quantidade" : "Por valor")</span><b>@((PorValor ? c.TaxaQtd : c.TaxaValor) is double tvc ? P1(tvc) : "—")</b>
                             </div>
                             <div class="vp-cc-valor">
                                 <span>Valor enviado</span><b>@(l.Valor is decimal vv ? Mi(vv) : "—")@if (l.SemTaxa > 0) { <em class="vp-parcial" title="@N0(l.SemTaxa) proposta(s) do AFM sem taxa de câmbio do ano: fora do valor">parcial</em> } else if (dVal is not null) { <em class="@DeltaCls(dVal)">@Seta(dVal)</em> }</b>
