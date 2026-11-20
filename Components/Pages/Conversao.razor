@@ -654,7 +654,7 @@ else
     // ---- qualidade e validação ------------------------------------------------
     private RenderFragment Qualidade() => @<section class="cvx-card">
         @{
-            var total = Conv.Atual.Propostas.Count(p => !p.StandBy && (Filtros?.NoPeriodo(p.Data) ?? true));
+            var total = Conv.Atual.Propostas.Count;
             var geral = Somar(_itens);
             var somaCat = geral.G + geral.P + geral.A + geral.NC;
             var okQtd = total == somaCat && total == _itens.Count;
@@ -677,8 +677,6 @@ else
                 <li class="bad">✖ Propostas com valor mas sem data de envio: @N0(geral.SemData) (US$ @geral.UsdSemData.ToString("N0", _pt) fora dos valores em R$)</li>
             }
             <li class="info">ℹ Propostas sem valor na planilha (US$ no AFM, R$ no NB): @N0(geral.SemValor) — contam nas quantidades, não nos valores</li>
-            @{ var sb = Conv.Atual.Propostas.Where(p => p.StandBy && (Filtros?.NoPeriodo(p.Data) ?? true)).ToList(); }
-            <li class="info">ℹ Stand by — aguardando o próximo ano: @N0(sb.Count) proposta(s) com a data do pedido num ano depois do envio@(sb.Count > 0 ? $" ({string.Join(", ", sb.GroupBy(p => p.Data!.Value.Year).OrderBy(g => g.Key).Select(g => $"{g.Key}: {N0(g.Count())}"))})" : "") — fora da conversão (e desta página); continuam contando como propostas enviadas na Performance Comercial</li>
         </ul>
 
         <h2 class="cvx-h2s" style="margin-top:18px">Conversão cambial rastreável (recorte atual · só AFM, o NB já vem em R$)</h2>

@@ -176,7 +176,6 @@
                         var limC = MesLimite(a);
                         var dC = a - 1 >= AnoIni ? DeltaPp(Taxa(a, limC).Taxa, Taxa(a - 1, limC).Taxa, null) : null;
                         var baseBarra = Math.Max(1, c.Total);
-                        var sbAno = _standBy.Count(x => x.Envio == a);
                         var rv = _anos.FirstOrDefault(x => x.Ano == a);
                         var dV = a - 1 >= AnoIni && rv is { MesesComVendas: > 0 } ? DeltaCurto(rv.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, rv.UltimoMes)) : null;
                         <button type="button" class="vp-conv-card @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
@@ -195,33 +194,16 @@
                                 <i style="width:@F(c.G * 100.0 / baseBarra)%;background:#1f9254"></i><i style="width:@F(c.P * 100.0 / baseBarra)%;background:#6FB3DC"></i><i style="width:@F(c.A * 100.0 / baseBarra)%;background:#007A9E"></i><i style="width:@F(c.NC * 100.0 / baseBarra)%;background:#c3ccd8"></i>
                             </div>
                             <div class="vp-cc-linhas">
-                                <span>Propostas enviadas</span><b>@N0(c.Total + sbAno)</b>
+                                <span>Propostas enviadas</span><b>@N0(c.Total)</b>
                                 <span><i style="background:#1f9254"></i>Ganhas</span><b>@N0(c.G)</b>
                                 <span><i style="background:#6FB3DC"></i>Perdidas</span><b>@N0(c.P)</b>
                                 <span><i style="background:#007A9E"></i>Abertas</span><b>@N0(c.A)</b>
-                                @if (sbAno > 0) { <span title="Pedido previsto para um ano depois do envio: conta como enviada, mas fica fora da taxa"><i style="background:#c7a24a"></i>Stand by</span><b>@N0(sbAno)</b> }
                             </div>
                         </button>
                     }
                 </div>
                 <div class="vp-cc-leg"><span><i style="background:#1f9254"></i>Ganhas</span><span><i style="background:#6FB3DC"></i>Perdidas</span><span><i style="background:#007A9E"></i>Abertas</span><span>Variação em pontos percentuais contra o mesmo período do ano anterior · clique num ano para colocá-lo em foco</span></div>
                 <p class="cvx-note" style="margin-top:8px">Propostas: @_fonte. Cada número de proposta conta uma vez, no mês da data de envio.</p>
-                @if (_standBy.Count > 0)
-                {
-                    <div class="vp-standby">
-                        <div class="vp-sb-tit">Stand by — aguardando o próximo ano <span>propostas com a data do pedido num ano depois do envio: contam como enviadas, mas ficam fora da taxa de conversão</span></div>
-                        <div class="vp-sb-grade">
-                            @foreach (var g in _standBy.GroupBy(x => x.Envio).OrderBy(g => g.Key))
-                            {
-                                <div class="vp-sb-ano">
-                                    <b>Enviadas em @g.Key</b>
-                                    <span>@N0(g.Count()) proposta(s) · @(g.Any(x => x.Brl is not null) ? Mi((decimal)g.Sum(x => x.Brl ?? 0)) : "—")</span>
-                                    <small>@string.Join(" · ", new[] { ConversaoService.Afm, ConversaoService.Nb }.Select(o => (o, n: g.Count(x => x.Origem == o))).Where(x => x.n > 0).Select(x => $"{x.o} {N0(x.n)}")) · pedido para @string.Join(", ", g.Select(x => x.Pedido).Distinct().OrderBy(x => x))</small>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                }
             </div>
 
             @* ano a ano por setor (AFM × NB) e os valores: o que antes ficava embaixo dos cartões da taxa *@
@@ -558,8 +540,6 @@
     /// <summary>As linhas das planilhas da guia Conversão (sem juntar números repetidos, como na própria guia), para a taxa de conversão.</summary>
     private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl);
     private List<LinhaConv> _conv = new(), _convSetor = new();
-    /// <summary>Propostas em stand by (pedido para um ano depois do envio), no recorte dos filtros.</summary>
-    private List<(int Envio, int Pedido, string Origem, double? Brl)> _standBy = new();
     private bool _gerandoPpt;
     private string _fonte = "";
     private int _foco;
@@ -676,13 +656,7 @@
         try
         {
             var taxas = Cambio.Todas();
-            // stand by (pedido para um ano depois do envio): conta como enviada, mas fica fora da conversão
-            _standBy = !Conv.Ok ? new() : Conv.Atual.Propostas.Where(p => p.StandBy && _fil.Passa(p, ignorarAno: true))
-                .Where(p => p.Data is DateTime d && d.Year >= AnoIni && d.Year <= AnoFim)
-                .Select(p => (p.Data!.Value.Year, p.DataPedido!.Value.Year, p.Origem,
-                    p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null)))
-                .ToList();
-            _conv = !Conv.Ok ? new() : Conv.Atual.Propostas.Where(p => !p.StandBy && _fil.Passa(p, ignorarAno: true))
+            _conv = !Conv.Ok ? new() : Conv.Atual.Propostas.Where(p => _fil.Passa(p, ignorarAno: true))
                 .Where(p => p.Data is DateTime d && d.Year >= AnoIni && d.Year <= AnoFim)
                 .Select(p => new LinhaConv(p.Data!.Value.Year, p.Data.Value.Month, p.Origem, p.Classe,
                     p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null)))

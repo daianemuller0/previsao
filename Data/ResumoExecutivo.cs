@@ -58,9 +58,6 @@ public sealed class Indicadores
     public decimal ValorEnviado;
     public int Linhas, G, P, A, NC, Canceladas;
     public double VG, VP, VA, VNC;
-    /// <summary>Stand by: pedido previsto para um ano depois do envio (fora da conversão; contam como enviadas).</summary>
-    public int SB;
-    public double VSB;
     public bool BaseTodas;
 
     public int Decididas => G + P;
@@ -82,14 +79,13 @@ public sealed class Indicadores
     {
         Enviadas += o.Enviadas; ComValor += o.ComValor; SemTaxa += o.SemTaxa; ValorEnviado += o.ValorEnviado;
         Linhas += o.Linhas; G += o.G; P += o.P; A += o.A; NC += o.NC; Canceladas += o.Canceladas;
-        VG += o.VG; VP += o.VP; VA += o.VA; VNC += o.VNC; SB += o.SB; VSB += o.VSB;
+        VG += o.VG; VP += o.VP; VA += o.VA; VNC += o.VNC;
     }
 
     public void Somar(RegistroResumo r)
     {
-        var v = r.Brl ?? 0;
-        if (r.P.StandBy) { SB++; VSB += v; return; }   // fora da conversão, aguardando o próximo ano
         Linhas++;
+        var v = r.Brl ?? 0;
         switch (r.P.Classe)
         {
             case ClasseProposta.Ganha: G++; VG += v; break;

@@ -701,10 +701,9 @@ internal sealed class ConstrutorApresentacao
         var abertas = ip.Linhas > 0 ? ip.A * 100.0 / ip.Linhas : (double?)null;
         Kpi(s, x, Y0 + 2 * (h + g), w, YB - Y0 - 2 * (h + g), T("STILL OPEN (SHARE OF SENT)", "AINDA EM ABERTO (DAS ENVIADAS)"), Pct(abertas),
             T($"{N(ip.A)} of {N(ip.Linhas)} proposals of {PerR}: the rate can still change", $"{N(ip.A)} de {N(ip.Linhas)} propostas de {PerR}: a taxa ainda pode mudar"), AxCores.Laranja);
-        var sbTxt = ip.SB > 0 ? T($" {N(ip.SB)} in stand by (order next year) excluded.", $" {N(ip.SB)} em stand by (pedido no ano seguinte) fora.") : "";
         var txt = T($"{PerR}: {N(ip.G)} won, {N(ip.P)} lost, {N(ip.A)} open. Quantity {Pct(ip.TaxaQtd)}" + (Cmp ? $" ({Pp(Dif(ip.TaxaQtd, ic.TaxaQtd))})" : "") + $", value {Pct(ip.TaxaValor)}" + (Cmp ? $" ({Pp(Dif(ip.TaxaValor, ic.TaxaValor))})." : "."),
                     $"{PerR}: {N(ip.G)} ganhas, {N(ip.P)} perdidas, {N(ip.A)} abertas. Quantidade {Pct(ip.TaxaQtd)}" + (Cmp ? $" ({Pp(Dif(ip.TaxaQtd, ic.TaxaQtd))})" : "") + $", valor {Pct(ip.TaxaValor)}" + (Cmp ? $" ({Pp(Dif(ip.TaxaValor, ic.TaxaValor))})." : "."));
-        Barra(s, T("DEFINITION", "DEFINIÇÃO"), txt + sbTxt);
+        Barra(s, T("DEFINITION", "DEFINIÇÃO"), txt);
         s.Notas = Notas(T("Show conversion by quantity and by value, with the official definition.", "Mostrar a conversão por quantidade e por valor, com a definição oficial."), txt,
             T("Rates use the proposal rows' current status (cohort by send date).", "Taxas pelo status atual das linhas (coorte pela data de envio)."),
             T("Quantity and value can diverge when large proposals are won or lost.", "Quantidade e valor divergem quando propostas grandes são ganhas ou perdidas."),
@@ -1196,10 +1195,6 @@ internal sealed class ConstrutorApresentacao
             lim.Add(T($"Proposal history starts at different times ({string.Join(", ", _inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} from {kv.Value}"))}): proposal charts start in {_anoComparavel} so all years compare like with like.",
                       $"O histórico de propostas começa em anos diferentes ({string.Join(", ", _inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} desde {kv.Value}"))}): os gráficos de propostas começam em {_anoComparavel} para comparar igual com igual."));
         else if (AnosP.First() > Anos.First()) lim.Add(T($"Proposal data is recorded from {AnosP.First()}: proposal-based charts start in that year.", $"Os dados de propostas existem a partir de {AnosP.First()}: os gráficos de propostas começam nesse ano."));
-        var sbR = IP(R);
-        if (sbR.SB > 0 || Anos.Any(a => IA(a).SB > 0))
-            lim.Add(T($"Stand by: proposals whose order date falls in a year after the send year count as sent but are excluded from conversion ({PerR}: {N(sbR.SB)} proposals, {Din(Mo(sbR.VSB, R))}).",
-                      $"Stand by: propostas com a data do pedido num ano depois do envio contam como enviadas, mas ficam fora da conversão ({PerR}: {N(sbR.SB)} propostas, {Din(Mo(sbR.VSB, R))})."));
         if (_o.Usd) lim.Add(T("USD values use one annual exchange rate per year.", "Os valores em US$ usam uma taxa de câmbio anual por ano."));
         var omit = _omitidos.Select(o => $"{o.Titulo}: {o.Motivo}").ToList();
         var pars = new List<AxPar> { new(new AxRun(T("DATA LIMITATIONS", "LIMITAÇÕES DOS DADOS"), 1000, true, AxCores.VerdeMedio), "l", 200) };

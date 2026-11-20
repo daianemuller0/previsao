@@ -59,15 +59,6 @@ public sealed record PropostaConv(
     /// <summary>A planilha de onde veio ("AFM", "NB" ou "NB_Historico"); vazio = a da própria origem.</summary>
     public string Fonte { get; init; } = "";
 
-    /// <summary>Data do pedido (AFM e NB histórico: coluna A · NB: coluna B, "Close Date").</summary>
-    public DateTime? DataPedido { get; init; }
-
-    /// <summary>
-    /// Stand by: o pedido está previsto para um ano DEPOIS do ano de envio. A proposta continua contando como
-    /// enviada (quantidade e valor enviado), mas fica fora da conversão, aguardando o próximo ano.
-    /// </summary>
-    public bool StandBy => Data is DateTime d && DataPedido is DateTime dp && dp.Year > d.Year;
-
     /// <summary>
     /// Identificador para contar cada proposta uma vez: o número da proposta dentro da mesma planilha
     /// (números de sistemas diferentes não se misturam) ou, sem número, a linha da planilha.
@@ -321,10 +312,10 @@ public sealed class ConversaoService
     // Letras padrão de cada origem (Conversao:Fontes:<origem>:Colunas sobrepõe).
     private static readonly Dictionary<string, Dictionary<string, string>> ColunasPadrao = new()
     {
-        [Afm] = new() { ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AC", ["DataPedido"] = "A",
+        [Afm] = new() { ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AC",
                         ["BuIcPrincipal"] = "AF", ["BuIcAlternativa"] = "AE",
                         ["Mercado"] = "F", ["Pais"] = "C", ["Produto"] = "I", ["Cliente"] = "D" },
-        [Nb]  = new() { ["Vendedor"] = "L", ["Valor"] = "P", ["Status"] = "R", ["Bu"] = "V", ["DataEnvio"] = "AB", ["DataPedido"] = "B",
+        [Nb]  = new() { ["Vendedor"] = "L", ["Valor"] = "P", ["Status"] = "R", ["Bu"] = "V", ["DataEnvio"] = "AB",
                         ["Mercado"] = "F", ["Pais"] = "D", ["Produto"] = "J", ["Cliente"] = "M" },
     };
     private static readonly Dictionary<string, int> CabecalhoPadrao = new() { [Afm] = 1, [Nb] = 15 };
@@ -355,7 +346,7 @@ public sealed class ConversaoService
             return letra == "" ? -1 : AplicacaoService.Idx(letra);
         }
         var iVend = Col("Vendedor"); var iValor = Col("Valor"); var iStatus = Col("Status");
-        var iBu = Col("Bu"); var iData = Col("DataEnvio"); var iPedido = Col("DataPedido");
+        var iBu = Col("Bu"); var iData = Col("DataEnvio");
         var iBuIcAlt = Col("BuIcAlternativa"); var iBuIcPrinc = Col("BuIcPrincipal");
         var iMerc = Col("Mercado"); var iPais = Col("Pais"); var iProd = Col("Produto"); var iCli = Col("Cliente");
         var valorEmBrl = _cfg.GetValue($"{cfg}:ValorEmBrl", fonte.Formato == Nb);
@@ -394,7 +385,7 @@ public sealed class ConversaoService
                          (fonte.Formato != fonte.Origem ? $" · formato {fonte.Formato} (colunas e status do {fonte.Formato}), propostas contadas como {origem}" : "") +
                          (ate is DateTime at ? $" · só propostas enviadas antes de {at:dd/MM/yyyy}" : ""));
         foreach (var (rot, i) in new[] { ("Vendedor", iVend), (valorEmBrl ? "Valor R$" : "Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
-                                         ("Data de envio", iData), ("Data do pedido (stand by)", iPedido), ("BU Intercompany (principal)", iBuIcPrinc), ("BU Intercompany (alternativa)", iBuIcAlt),
+                                         ("Data de envio", iData), ("BU Intercompany (principal)", iBuIcPrinc), ("BU Intercompany (alternativa)", iBuIcAlt),
                                          ("Mercado", iMerc), ("País", iPais), ("Produto", iProd), ("Cliente", iCli),
                                          ($"Desconsiderar \"{string.Join("\" / \"", exValores)}\"", iExcl) })
         {
@@ -412,7 +403,7 @@ public sealed class ConversaoService
         var vistasChave = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var vistasLinha = new HashSet<string>(StringComparer.Ordinal);
         var largura = cab.Length;
-        int lidas = 0, semData = 0, datasInv = 0, semValor = 0, valInv = 0, dup = 0, totais = 0, excluidas = 0, foraDoPeriodo = 0, standBy = 0;
+        int lidas = 0, semData = 0, datasInv = 0, semValor = 0, valInv = 0, dup = 0, totais = 0, excluidas = 0, foraDoPeriodo = 0;
         var vendSemEq = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var n = h + 1; n < grade.Count; n++)
@@ -435,10 +426,6 @@ public sealed class ConversaoService
             if (ate is DateTime limite && data is DateTime dt && dt.Date >= limite) { foraDoPeriodo++; continue; }
             if (dataTxt == "") semData++;
             else if (data is null) datasInv++;
-
-            var pedidoTxt = Cel(row, iPedido);
-            DateTime? pedido = pedidoTxt == "" ? null : AplicacaoService.Data(pedidoTxt);
-            if (data is DateTime de && pedido is DateTime dp && dp.Year > de.Year) standBy++;
 
             var status = Cel(row, iStatus);
             var vend = Cel(row, iVend);
@@ -464,7 +451,7 @@ public sealed class ConversaoService
             d.Propostas.Add(new PropostaConv(origem, n + 1, Ou(vend),
                 valorEmBrl ? null : valor, valorEmBrl ? valor : null, valorTxt, status,
                 Classificar(status, fonte.Formato), Ou(bu), buIc, data, dataTxt,
-                Ou(Cel(row, iMerc)), Ou(Cel(row, iPais)), Ou(Cel(row, iProd)), Ou(Cel(row, iCli)), chave, cels) { Fonte = fonte.Chave, DataPedido = pedido });
+                Ou(Cel(row, iMerc)), Ou(Cel(row, iPais)), Ou(Cel(row, iProd)), Ou(Cel(row, iCli)), chave, cels) { Fonte = fonte.Chave });
         }
 
         d.LinhasLidas += lidas; d.SemData += semData; d.DatasInvalidas += datasInv; d.SemValor += semValor;
@@ -472,8 +459,6 @@ public sealed class ConversaoService
         var moeda = valorEmBrl ? "R$" : "US$";
         if (iExcl >= 0)
             d.Mapeamento.Add($"{rotulo}: {excluidas} linha(s) com \"{string.Join("\" / \"", exValores)}\" na coluna {AplicacaoService.Letra(iExcl)} foram desconsideradas (não entram em nenhuma conta).");
-        if (iPedido >= 0)
-            d.Mapeamento.Add($"{rotulo}: {standBy} proposta(s) em stand by (data do pedido num ano depois do envio): contam como enviadas, mas ficam fora da conversão.");
         if (ate is DateTime lim)
             d.Mapeamento.Add($"{rotulo}: {foraDoPeriodo} linha(s) enviadas a partir de {lim:dd/MM/yyyy} foram desconsideradas: esse período vem da planilha da plataforma nova.");
         if (dup > 0)
