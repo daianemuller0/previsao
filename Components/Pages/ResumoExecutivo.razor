@@ -370,6 +370,7 @@
             ("  das quais canceladas", a => N0(m.Ano(a).Canceladas), null, true, false, "status"),
             ("Propostas em aberto", a => N0(m.Ano(a).A), null, true, false, "status"),
             ("Não classificadas", a => N0(m.Ano(a).NC), null, true, false, "status"),
+            ("Stand by (pedido no ano seguinte, fora da conversão)", a => m.Ano(a).SB > 0 ? $"{N0(m.Ano(a).SB)} · {Mi(m.Ano(a).VSB)}" : "0", null, true, false, "status"),
             ("Conversão por quantidade", a => P1(m.Ano(a).TaxaQtd), a => VarAnoPp(a, (x, t) => m.Ano(x, t).TaxaQtd), false, true, "conv"),
             ("Conversão por valor", a => P1(m.Ano(a).TaxaValor), a => VarAnoPp(a, (x, t) => m.Ano(x, t).TaxaValor), false, true, "conv"),
             ("Valor ganho", a => Mi(m.Ano(a).VG), a => VarAno(a, (x, t) => m.Ano(x, t).VG), false, false, "conv"),

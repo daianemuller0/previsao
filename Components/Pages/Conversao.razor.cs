@@ -149,7 +149,8 @@ public partial class Conversao : IAsyncDisposable
     {
         var taxas = Cambio.Todas();
         // embutida na Performance Comercial: só os anos da página (2022 em diante), sem as propostas sem data
-        _itens = Conv.Atual.Propostas.Where(p => Filtros?.NoPeriodo(p.Data) ?? true).Select(p =>
+        // stand by (pedido para um ano depois do envio): fora da conversão; aparece à parte
+        _itens = Conv.Atual.Propostas.Where(p => !p.StandBy && (Filtros?.NoPeriodo(p.Data) ?? true)).Select(p =>
         {
             int? ano = p.Data?.Year, mes = p.Data?.Month;
             // NB: o valor já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio

@@ -3541,3 +3541,12 @@ em.pos { color: #17663a; } em.neg { color: #b42318; } em.neu { color: #475569; }
     body.ax-imprimindo .ax-slide { width: 13.333in; height: 7.5in; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
     body.ax-imprimindo * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Performance: propostas em stand by (pedido para o ano seguinte ao envio) */
+.vp-standby { margin-top: 12px; border: 1px dashed #c7a24a; background: #fffaf0; border-radius: 10px; padding: 10px 14px; }
+.vp-sb-tit { font-weight: 700; color: #8a5a00; font-size: 14px; }
+.vp-sb-tit span { font-weight: 400; color: #92400e; font-size: 12.5px; margin-left: 6px; }
+.vp-sb-grade { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 8px; }
+.vp-sb-ano { display: flex; flex-direction: column; gap: 1px; font-size: 13px; color: #334155; }
+.vp-sb-ano b { color: #172b43; }
+.vp-sb-ano small { color: #64748b; }
