@@ -495,14 +495,35 @@ public sealed class ConversaoService
     /// </summary>
     private static void UltimaRevisao(DadosConversao d)
     {
-        var antes = d.Propostas.Count;
-        var ultimas = d.Propostas.Where(p => p.Chave.Trim().Length > 0).GroupBy(p => p.Codigo)
-            .Select(g => g.OrderByDescending(p => p.Revisao ?? -1).ThenByDescending(p => p.Data ?? DateTime.MinValue).ThenByDescending(p => p.Linha).First())
-            .ToHashSet(ReferenceEqualityComparer.Instance);
-        d.Propostas.RemoveAll(p => p.Chave.Trim().Length > 0 && !ultimas.Contains(p));
-        var fora = antes - d.Propostas.Count;
-        d.Desconsideradas += fora;
-        d.Mapeamento.Add($"Revisões: {fora} linha(s) de revisões anteriores desconsideradas — cada número de proposta conta uma vez, pela última revisão (data, valor e status dela).");
+        foreach (var fonte in d.Propostas.Select(p => p.Fonte).Distinct().ToList())
+        {
+            var linhas = d.Propostas.Where(p => p.Fonte == fonte).ToList();
+            var comNumero = linhas.Where(p => p.Chave.Trim().Length > 0).ToList();
+            var rot = fonte == NbHistorico ? "NB (NB histórico)" : fonte;
+            if (comNumero.Count == 0) continue;
+            // trava: se a coluna do número tem poucos valores diferentes, ela NÃO é o número da proposta
+            // (ex.: moeda, tipo, setor) — juntar por ela apagaria propostas de verdade
+            var distintos = comNumero.Select(p => p.Codigo).Distinct().Count();
+            if (comNumero.Count >= 20 && distintos < comNumero.Count * 0.6)
+            {
+                var exemplos = comNumero.GroupBy(p => p.Chave.Trim()).OrderByDescending(g => g.Count()).Take(3).Select(g => $"\"{g.Key}\" ({g.Count()}×)");
+                d.Avisos.Add($"{rot}: a coluna do número da proposta tem só {distintos} valores diferentes em {comNumero.Count} linhas ({string.Join(", ", exemplos)}): não parece o número da proposta, então as linhas NÃO foram juntadas como revisões. Confira a coluna em \"Colunas lidas da planilha\".");
+                continue;
+            }
+            var ultimas = comNumero.GroupBy(p => p.Codigo)
+                .Select(g => g.OrderByDescending(p => p.Revisao ?? -1).ThenByDescending(p => p.Data ?? DateTime.MinValue).ThenByDescending(p => p.Linha).First())
+                .ToHashSet(ReferenceEqualityComparer.Instance);
+            var fora = d.Propostas.RemoveAll(p => p.Fonte == fonte && p.Chave.Trim().Length > 0 && !ultimas.Contains(p));
+            d.Desconsideradas += fora;
+            d.Mapeamento.Add($"{rot} · revisões: {fora} linha(s) de revisões anteriores desconsideradas — cada número de proposta conta uma vez, pela última revisão (data, valor e status dela).");
+        }
+        // resumo por planilha: quantas propostas ficaram e quantas por ano (para conferir com o Excel)
+        foreach (var g in d.Propostas.GroupBy(p => p.Fonte))
+        {
+            var rot = g.Key == NbHistorico ? "NB (NB histórico)" : g.Key;
+            var anos = g.Where(p => p.Data is not null).GroupBy(p => p.Data!.Value.Year).OrderBy(x => x.Key).Select(x => $"{x.Key}: {x.Count()}");
+            d.Mapeamento.Add($"{rot} · propostas que entram nas contas: {g.Count()} ({string.Join(" · ", anos)}{(g.Any(p => p.Data is null) ? $" · sem data: {g.Count(p => p.Data is null)}" : "")}).");
+        }
     }
 
     /// <summary>Equivalências de vendedor que valem para todas as planilhas (Conversao:Vendedores sobrepõe/acrescenta).</summary>
