@@ -177,6 +177,8 @@
                         var dC = a - 1 >= AnoIni ? DeltaPp(Taxa(a, limC).Taxa, Taxa(a - 1, limC).Taxa, null) : null;
                         var baseBarra = Math.Max(1, c.Total);
                         var sbAno = _standBy.Count(x => x.Envio == a);
+                        var rv = _anos.FirstOrDefault(x => x.Ano == a);
+                        var dV = a - 1 >= AnoIni && rv is { MesesComVendas: > 0 } ? DeltaCurto(rv.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, rv.UltimoMes)) : null;
                         <button type="button" class="vp-conv-card @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
                             <div class="vp-cc-ano">@a@if (a == DateTime.Today.Year) { <small>até @MesCurto(limC).ToLowerInvariant()</small> }</div>
                             <div class="vp-cc-taxa">
@@ -184,6 +186,11 @@
                                 @if (dC is not null) { <em class="@DeltaCls(dC)">@Seta(dC)</em> }
                             </div>
                             <div class="vp-cc-sub">@N0(c.G) ganhas de @N0(c.Base) @DenRot</div>
+                            <div class="vp-cc-vendas" title="Vendas do ano (histórico da equipe, empresa toda, por mês de faturamento)@(dV is not null ? " · variação contra os mesmos meses do ano anterior" : "")">
+                                <span>Vendido no ano@(rv is { UltimoMes: > 0 and < 12 } ? $" (até {MesCurto(rv.UltimoMes).ToLowerInvariant()})" : "")</span>
+                                <b>@(rv is { MesesComVendas: > 0 } ? Mi(rv.Vendas) : "—")</b>
+                                @if (dV is not null) { <em class="@DeltaCls(dV)">@Seta(dV)</em> }
+                            </div>
                             <div class="vp-cc-barra" title="@($"Ganhas {N0(c.G)} · Perdidas {N0(c.P)} · Abertas {N0(c.A)}" + (c.NC > 0 ? $" · Não classificadas {N0(c.NC)}" : ""))">
                                 <i style="width:@F(c.G * 100.0 / baseBarra)%;background:#1f9254"></i><i style="width:@F(c.P * 100.0 / baseBarra)%;background:#6FB3DC"></i><i style="width:@F(c.A * 100.0 / baseBarra)%;background:#007A9E"></i><i style="width:@F(c.NC * 100.0 / baseBarra)%;background:#c3ccd8"></i>
                             </div>

@@ -3550,3 +3550,10 @@ em.pos { color: #17663a; } em.neg { color: #b42318; } em.neu { color: #475569; }
 .vp-sb-ano { display: flex; flex-direction: column; gap: 1px; font-size: 13px; color: #334155; }
 .vp-sb-ano b { color: #172b43; }
 .vp-sb-ano small { color: #64748b; }
+
+/* Performance: vendido no ano, em destaque embaixo da taxa de conversão */
+.vp-cc-vendas { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; margin: 8px 0 2px; padding: 7px 10px; border-radius: 8px;
+    background: color-mix(in srgb, var(--ac, #172b43) 9%, #fff); border-left: 3px solid var(--ac, #172b43); }
+.vp-cc-vendas span { flex-basis: 100%; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #64748b; }
+.vp-cc-vendas b { font-size: 21px; font-weight: 800; color: #172b43; line-height: 1.1; }
+.vp-cc-vendas em { font-style: normal; font-size: 13px; font-weight: 700; }
