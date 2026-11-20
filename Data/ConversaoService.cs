@@ -315,7 +315,7 @@ public sealed class ConversaoService
     // Letras padrão de cada origem (Conversao:Fontes:<origem>:Colunas sobrepõe).
     private static readonly Dictionary<string, Dictionary<string, string>> ColunasPadrao = new()
     {
-        [Afm] = new() { ["Proposta"] = "B", ["Revisao"] = "AA", ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AD",
+        [Afm] = new() { ["Proposta"] = "B", ["Revisao"] = "AA", ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AC",
                         ["Mercado"] = "F", ["Pais"] = "C", ["Produto"] = "I", ["Cliente"] = "D" },
         [Nb]  = new() { ["Proposta"] = "N", ["Vendedor"] = "L", ["Valor"] = "P", ["Status"] = "R", ["Bu"] = "V", ["DataEnvio"] = "AB",
                         ["Mercado"] = "G", ["Pais"] = "D", ["Produto"] = "J", ["Cliente"] = "E" },
@@ -380,6 +380,13 @@ public sealed class ConversaoService
         }
         if (grade.Count <= h) { d.Avisos.Add($"{rotulo}: a planilha {arquivo} não tem linhas de dados."); return; }
         var cab = grade[h];
+
+        // Data de envio: acha a coluna pelo TÍTULO ("Actual" no AFM e no NB 20-22, "Quotation Sent Date" no NB);
+        // a letra configurada só vale se nenhum título conhecido estiver no cabeçalho. Assim uma coluna a mais
+        // ou a menos na exportação não faz a data cair em outra coluna (ex.: nomes de engenheiros).
+        var titulosData = new[] { "actual", "quotation sent date", "quote sent date", "data de envio", "sent date" };
+        for (var i = 0; i < cab.Length; i++)
+            if (titulosData.Contains(OpportunityImporter.Normalizar((cab[i].Text ?? "").Trim()))) { iData = i; break; }
 
         string Cel(OpportunityImporter.Cel[] r, int i) => i >= 0 && i < r.Length ? (r[i].Text ?? "").Trim() : "";
         string Titulo(int i) => Cel(cab, i);
