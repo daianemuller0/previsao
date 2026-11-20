@@ -195,6 +195,7 @@ public sealed class ConversaoService
                         aba: _cfg[$"Conversao:Fontes:{fonte.Chave}:Aba"] ?? _cfg["Conversao:Aba"], maiorAba: true);
                     Montar(dados, fonte, fi.Name, grade);
                 }
+                UnificarVendedores(dados);
                 Conferir(dados, arquivos.Select(a => a.Fonte).ToList());
 
                 _atual = dados; _marca = marca;
@@ -466,6 +467,65 @@ public sealed class ConversaoService
         if (valInv > 0) d.Avisos.Add($"{rotulo}: {valInv} registro(s) com valor em {moeda} ilegível ou ambíguo: contam nas quantidades, mas não nos valores.");
         if (semValor > 0) d.Avisos.Add($"{rotulo}: {semValor} registro(s) sem valor em {moeda}: contam nas quantidades, mas não nos valores.");
         if (totais > 0) d.Avisos.Add($"{rotulo}: {totais} linha(s) de total da planilha foram ignoradas.");
+    }
+
+    /// <summary>Equivalências de vendedor que valem para todas as planilhas (Conversao:Vendedores sobrepõe/acrescenta).</summary>
+    private static readonly Dictionary<string, string> VendedoresPadrao = new() { ["Edson Geraldini"] = "Edson Luis Geraldini" };
+
+    /// <summary>
+    /// Junta o mesmo vendedor escrito de jeitos diferentes nas planilhas:
+    /// 1) equivalências fixas (ex.: "Edson Geraldini" → "Edson Luis Geraldini");
+    /// 2) mesmos nomes em outra ordem ou sem acento ("Veiga Thiago" = "Thiago Veiga");
+    /// 3) nome curto contido num nome completo ("Toledo Rafael" → "Rafael Ribeiro Toledo"), só quando
+    ///    há UM nome completo possível — se houver dois, não junta (seriam pessoas diferentes) e avisa.
+    /// O nome que fica é o mais completo (mais partes); empate, o que aparece mais vezes.
+    /// </summary>
+    private void UnificarVendedores(DadosConversao d)
+    {
+        var fixas = VendedoresPadrao.ToDictionary(kv => Chave(kv.Key), kv => kv.Value);
+        foreach (var c in _cfg.GetSection("Conversao:Vendedores").GetChildren().Where(c => !string.IsNullOrWhiteSpace(c.Value)))
+            fixas[Chave(c.Key)] = c.Value!.Trim();
+        string Fixo(string v) => fixas.TryGetValue(Chave(v), out var n) ? n : v;
+
+        static string[] Partes(string v) => SemAcento(v).Split(new[] { ' ', '.', ',', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => t.Length > 1).Distinct().OrderBy(t => t, StringComparer.Ordinal).ToArray();
+
+        var contagem = d.Propostas.Where(p => p.Vendedor != NaoInformado).GroupBy(p => Fixo(p.Vendedor)).ToDictionary(g => g.Key, g => g.Count());
+        // grupos com as mesmas partes (ordem/acento diferentes)
+        var grupos = contagem.Keys.GroupBy(n => string.Join(" ", Partes(n))).Where(g => g.Key.Length > 0)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var conjuntos = grupos.Keys.ToDictionary(k => k, k => k.Split(' ').ToHashSet());
+        // nome curto → o único nome completo que o contém
+        var destino = grupos.Keys.ToDictionary(k => k, k => k);
+        var ambiguos = new List<string>();
+        foreach (var k in grupos.Keys.Where(k => conjuntos[k].Count >= 2))
+        {
+            var sup = grupos.Keys.Where(o => o != k && conjuntos[o].Count > conjuntos[k].Count && conjuntos[k].IsSubsetOf(conjuntos[o])).ToList();
+            // entre os que contêm, fica só o "máximo" (os que não estão contidos em outro da lista)
+            var maximos = sup.Where(o => !sup.Any(x => x != o && conjuntos[o].IsSubsetOf(conjuntos[x]))).ToList();
+            if (maximos.Count == 1) destino[k] = maximos[0];
+            else if (maximos.Count > 1) ambiguos.Add($"\"{grupos[k][0]}\" ({string.Join(" / ", maximos.Select(m => grupos[m].OrderByDescending(n => contagem[n]).First()))})");
+        }
+        string Raiz(string k) { var vistos = 0; while (destino[k] != k && vistos++ < 10) k = destino[k]; return k; }
+        // nome que fica em cada grupo final: o mais completo; empate, o mais frequente
+        var final = new Dictionary<string, string>();
+        foreach (var raiz in grupos.Keys.GroupBy(Raiz))
+        {
+            var nomes = raiz.SelectMany(k => grupos[k]).ToList();
+            var escolhido = nomes.OrderByDescending(n => Partes(n).Length).ThenByDescending(n => contagem[n]).ThenBy(n => n, StringComparer.Ordinal).First();
+            foreach (var n in nomes) final[n] = escolhido;
+        }
+        var trocas = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        for (var i = 0; i < d.Propostas.Count; i++)
+        {
+            var p = d.Propostas[i];
+            if (p.Vendedor == NaoInformado) continue;
+            var f = Fixo(p.Vendedor);
+            var novo = final.TryGetValue(f, out var x) ? x : f;
+            if (novo != p.Vendedor) { d.Propostas[i] = p with { Vendedor = novo }; trocas.Add($"\"{p.Vendedor}\" → \"{novo}\""); }
+        }
+        if (trocas.Count > 0) d.Mapeamento.Add($"Vendedores unificados ({trocas.Count}): {string.Join("; ", trocas)}.");
+        if (ambiguos.Count > 0) d.Avisos.Add($"Vendedor(es) com nome curto que pode ser de mais de uma pessoa, mantido(s) separado(s): {string.Join("; ", ambiguos)}. Para juntar, informe em Conversao:Vendedores.");
     }
 
     /// <summary>
