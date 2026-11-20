@@ -125,9 +125,12 @@ internal sealed class ConstrutorApresentacao
     private readonly int R, C, Mr, De, Ate, AteV, UltV;
     private readonly bool Equiv, Escopado, Cmp;
     private readonly List<int> Anos;
+    private readonly Dictionary<string, int> _inicio;
+    private readonly int _anoComparavel;
     private List<int>? _anosP;
-    /// <summary>Anos com propostas registradas (gráficos de propostas não mostram anos vazios como zero).</summary>
-    private List<int> AnosP => _anosP ??= Anos.Where(a => !IA(a).Vazio).DefaultIfEmpty(R).ToList();
+    /// <summary>Anos com propostas de todas as origens do recorte (sem anos vazios como zero nem anos com só uma origem).</summary>
+    private List<int> AnosP => _anosP ??= Anos.Where(a => a >= _anoComparavel && !IA(a).Vazio).DefaultIfEmpty(R).ToList();
+    private bool SemPropComparavel(int a) => a < _anoComparavel || IA(a).Vazio;
     private readonly DateTime Corte;
     private readonly List<(string Id, string Titulo, string Motivo)> _omitidos = new();
     private readonly string _rotEscopo;
@@ -165,6 +168,10 @@ internal sealed class ConstrutorApresentacao
         var props = fonte.Propostas.Where(p => p.Data is DateTime d && d.Date <= Corte).ToList();
         var vendas = fonte.Vendas.Where(x => x.Ano < R || (x.Ano == R && x.Mes <= Mr)).ToList();
         _m = ResumoExecutivoCalc.Montar(props, fonte.Taxas, vendas, fonte.Budgets, f, R, C, true, (R, Mr));
+        // AFM e NB podem começar em anos diferentes (NB tem a planilha histórica): os gráficos de propostas
+        // começam no primeiro ano em que TODAS as origens do recorte têm dados, para comparar igual com igual.
+        _inicio = props.Where(p => f.Passa(p)).GroupBy(p => p.Origem).ToDictionary(g => g.Key, g => g.Min(p => p.Data!.Value.Year));
+        _anoComparavel = _inicio.Count == 0 ? R : _inicio.Values.Max();
         UltV = _m.UltimoMesVendas(R);
         AteV = Math.Min(Ate, UltV);
     }
@@ -610,15 +617,15 @@ internal sealed class ConstrutorApresentacao
             Tipo = AxTipoGrafico.Colunas, Categorias = Anos.Select(RotAno).ToArray(), Formato = FmtMi,
             Series =
             {
-                new AxSerie(T("Quoted value", "Valor ofertado"), Anos.Select(a => IA(a).Vazio ? null : MoMi(IA(a).ValorEnviado, a)).ToArray(), AxCores.Azul),
-                new AxSerie(T("Proposals sent", "Propostas enviadas"), Anos.Select(a => IA(a).Enviadas > 0 ? (double?)IA(a).Enviadas : null).ToArray(), AxCores.Laranja) { Linha = true, Formato = FmtQtd },
+                new AxSerie(T("Quoted value", "Valor ofertado"), Anos.Select(a => SemPropComparavel(a) ? null : MoMi(IA(a).ValorEnviado, a)).ToArray(), AxCores.Azul),
+                new AxSerie(T("Proposals sent", "Propostas enviadas"), Anos.Select(a => !SemPropComparavel(a) && IA(a).Enviadas > 0 ? (double?)IA(a).Enviadas : null).ToArray(), AxCores.Laranja) { Linha = true, Formato = FmtQtd },
             },
             Descricao = T("Quoted value and proposals by year", "Valor ofertado e propostas por ano"),
         };
         Grafico(s, XL, Y0, w, YB - Y0 - 640080, T($"Sales ({Sim} millions)", $"Vendas ({Sim} milhões)"), vendas);
-        var semProp = Anos.Where(a => IA(a).Vazio).ToList();
+        var semProp = Anos.Where(SemPropComparavel).ToList();
         Grafico(s, XL + w + 182880, Y0, w, YB - Y0 - 640080, T($"Quotation effort: quoted value ({Sim} millions) and proposals", $"Esforço: valor ofertado ({Sim} milhões) e propostas"), esforco,
-            semProp.Count == 0 ? null : T($"No proposal data recorded for {string.Join(", ", semProp)}.", $"Sem dados de propostas para {string.Join(", ", semProp)}."));
+            semProp.Count == 0 ? null : T($"No comparable proposal data for {string.Join(", ", semProp)} (see limitations).", $"Sem dados comparáveis de propostas para {string.Join(", ", semProp)} (ver limitações)."));
         var ip = IA(R); var ic = IA(C);
         var nota = T("Correlation is not causation: proposals sent in a period do not necessarily convert into sales in the same period (sales are recognised at billing).",
                      "Correlação não é causalidade: propostas enviadas num período não viram, necessariamente, vendas no mesmo período (a venda é reconhecida no faturamento).");
@@ -1184,7 +1191,10 @@ internal sealed class ConstrutorApresentacao
             T("Targets are annual (HSA and Group); there are no monthly, BU or sector targets.", "As metas são anuais (HSA e Grupo); não há metas mensais, por BU ou por setor."),
         };
         if (UltV < Mr && !Escopado) lim.Add(T($"Sales of {R} are recorded up to {(UltV > 0 ? Mn(UltV) : "—")}: sales comparisons use the same months.", $"As vendas de {R} estão lançadas até {(UltV > 0 ? Mn(UltV) : "—")}: as comparações de vendas usam os mesmos meses."));
-        if (AnosP.First() > Anos.First()) lim.Add(T($"Proposal data is recorded from {AnosP.First()}: proposal-based charts start in that year.", $"Os dados de propostas existem a partir de {AnosP.First()}: os gráficos de propostas começam nesse ano."));
+        if (_inicio.Count >= 2 && _inicio.Values.Distinct().Count() > 1)
+            lim.Add(T($"Proposal history starts at different times ({string.Join(", ", _inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} from {kv.Value}"))}): proposal charts start in {_anoComparavel} so all years compare like with like.",
+                      $"O histórico de propostas começa em anos diferentes ({string.Join(", ", _inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} desde {kv.Value}"))}): os gráficos de propostas começam em {_anoComparavel} para comparar igual com igual."));
+        else if (AnosP.First() > Anos.First()) lim.Add(T($"Proposal data is recorded from {AnosP.First()}: proposal-based charts start in that year.", $"Os dados de propostas existem a partir de {AnosP.First()}: os gráficos de propostas começam nesse ano."));
         if (_o.Usd) lim.Add(T("USD values use one annual exchange rate per year.", "Os valores em US$ usam uma taxa de câmbio anual por ano."));
         var omit = _omitidos.Select(o => $"{o.Titulo}: {o.Motivo}").ToList();
         var pars = new List<AxPar> { new(new AxRun(T("DATA LIMITATIONS", "LIMITAÇÕES DOS DADOS"), 1000, true, AxCores.VerdeMedio), "l", 200) };

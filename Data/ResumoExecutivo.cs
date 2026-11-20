@@ -187,7 +187,7 @@ public static class ResumoExecutivoCalc
             var d = p.Data!.Value;
             double? brl = p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(d.Year, out var t) ? u * t : null);
             var semTaxa = p.ValorBrl is null && p.ValorUsd is not null && brl is null;
-            var cod = p.Chave.Trim().Length > 0 ? p.Origem + ":" + p.Chave.Trim().ToUpperInvariant() : $"{p.Origem}#{p.Linha}";
+            var cod = p.Codigo;
             return (P: p, D: d, Brl: brl, SemTaxa: semTaxa, Cod: cod);
         }).ToList();
         var rep = l.GroupBy(x => x.Cod).ToDictionary(g => g.Key, g =>

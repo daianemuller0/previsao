@@ -25,6 +25,11 @@ namespace HowdenSalesForecast.Data;
 // NB (linhas 1–14 são resumo; cabeçalho na 15): L vendedor · P valor JÁ EM R$ ·
 //   R status · V BU ("HSA: Howden South America" → HSA) · AB data de envio ·
 //   F mercado · D país · J produto · M cliente. NB não tem BU intercompany.
+//   Linhas com "Budget Quote" na coluna AD NÃO entram (são contadas e informadas).
+// NB histórico ("NB 20-22", opcional): de 2022 até a migração para a plataforma
+//   nova (01/01/2024). Vem do sistema antigo, no MESMO formato do AFM (colunas,
+//   status, valor em US$), mas as propostas são de NB. Só entram as enviadas antes
+//   de 01/01/2024: daí em diante vale a planilha da plataforma nova.
 // ---------------------------------------------------------------------------
 public enum ClasseProposta { Ganha, Perdida, Aberta, NaoClassificada }
 
@@ -50,6 +55,22 @@ public sealed record PropostaConv(
 {
     /// <summary>Tem valor numérico (em US$ no AFM ou já em R$ no NB).</summary>
     public bool TemValor => ValorUsd is not null || ValorBrl is not null;
+
+    /// <summary>A planilha de onde veio ("AFM", "NB" ou "NB_Historico"); vazio = a da própria origem.</summary>
+    public string Fonte { get; init; } = "";
+
+    /// <summary>
+    /// Identificador para contar cada proposta uma vez: o número da proposta dentro da mesma planilha
+    /// (números de sistemas diferentes não se misturam) ou, sem número, a linha da planilha.
+    /// </summary>
+    public string Codigo
+    {
+        get
+        {
+            var f = Fonte.Length > 0 ? Fonte : Origem;
+            return Chave.Trim().Length > 0 ? f + ":" + Chave.Trim().ToUpperInvariant() : $"{f}#{Linha}";
+        }
+    }
 }
 
 public sealed record ColunaOrigem(int Indice, string Letra, string Titulo);
@@ -68,6 +89,10 @@ public sealed class DadosConversao
     public int ValoresInvalidos { get; set; }
     public int Duplicadas { get; set; }
     public int TotaisIgnorados { get; set; }
+    /// <summary>Linhas desconsideradas por regra (ex.: "Budget Quote" no NB, período coberto por outra planilha).</summary>
+    public int Desconsideradas { get; set; }
+    /// <summary>Data de envio mais antiga de cada origem (AFM/NB): mostra se os anos são comparáveis.</summary>
+    public Dictionary<string, DateTime> Inicio { get; } = new();
 }
 
 public sealed class ConversaoService
@@ -93,6 +118,25 @@ public sealed class ConversaoService
                           "Negotiation Phase/Review", "Arrived at Agreement on Need", "T&C's stage", "Verbal Commitment")),
     };
     private static HashSet<string> Conjunto(params string[] s) => new(s.Select(NormalizarStatus), StringComparer.Ordinal);
+
+    /// <summary>
+    /// Uma planilha de propostas: a origem das propostas (AFM/NB) e o FORMATO em que ela vem (colunas, linha
+    /// do cabeçalho, status e moeda). A planilha antiga de NB tem o formato do AFM, mas as propostas são NB.
+    /// </summary>
+    private sealed record FontePlanilha(string Chave, string Origem, string Formato, bool Opcional, string ArquivoPadrao, string Rotulo);
+
+    private const string NbHistorico = "NB_Historico";
+    private static readonly FontePlanilha[] Fontes =
+    {
+        new(Afm, Afm, Afm, false, "", "AFM"),
+        new(Nb, Nb, Nb, false, "", "NB"),
+        new(NbHistorico, Nb, Afm, true, "NB 20-22", "NB histórico"),
+    };
+
+    /// <summary>Data a partir da qual a planilha deixa de valer (exclusiva): a antiga de NB vai até a migração.</summary>
+    private static readonly Dictionary<string, DateTime> AtePadrao = new() { [NbHistorico] = new DateTime(2024, 1, 1) };
+    /// <summary>Linhas que não entram, por planilha: coluna e textos (sem diferença de caixa/acento/espaço).</summary>
+    private static readonly Dictionary<string, (string Coluna, string[] Valores)> ExclusaoPadrao = new() { [Nb] = ("AD", new[] { "Budget Quote" }) };
 
     private readonly IConfiguration _cfg;
     private readonly object _lock = new();
@@ -139,24 +183,27 @@ public sealed class ConversaoService
                     Falhou(aviso != "" ? aviso : "Planilhas de conversão não encontradas.");
                     return;
                 }
-                var marca = string.Join(";", arquivos.Select(a => { var fi = new FileInfo(a.Arquivo); return $"{a.Origem}|{fi.Name}|{fi.LastWriteTimeUtc.Ticks}|{fi.Length}"; }));
+                var marca = string.Join(";", arquivos.Select(a => { var fi = new FileInfo(a.Arquivo); return $"{a.Fonte.Chave}|{fi.Name}|{fi.LastWriteTimeUtc.Ticks}|{fi.Length}"; }));
                 if (!force && Ok && marca == _marca) return;
 
                 var dados = new DadosConversao();
                 if (aviso != "") dados.Avisos.Add(aviso);
-                foreach (var (origem, arquivo) in arquivos)
+                foreach (var (fonte, arquivo) in arquivos)
                 {
                     var fi = new FileInfo(arquivo);
                     var bytes = LeituraSegura.Bytes(arquivo);
                     using var ms = new MemoryStream(bytes);
                     var grade = OpportunityImporter.LerGrade(fi.Name, ms, manterLinhasVazias: true,
-                        aba: _cfg["Conversao:Aba"], maiorAba: true);
-                    Montar(dados, origem, fi.Name, grade);
+                        aba: _cfg[$"Conversao:Fontes:{fonte.Chave}:Aba"] ?? _cfg["Conversao:Aba"], maiorAba: true);
+                    Montar(dados, fonte, fi.Name, grade);
                 }
+                Conferir(dados, arquivos.Select(a => a.Fonte).ToList());
 
                 _atual = dados; _marca = marca;
                 Ok = true; AtualizadoEm = DateTime.Now;
-                Mensagem = $"{dados.Propostas.Count} propostas carregadas ({string.Join(" · ", arquivos.Select(a => $"{a.Origem} {dados.Propostas.Count(p => p.Origem == a.Origem)}"))}).";
+                var hist = dados.Propostas.Count(p => p.Fonte == NbHistorico);
+                Mensagem = $"{dados.Propostas.Count} propostas carregadas ({string.Join(" · ", Origens.Select(o => $"{o} {dados.Propostas.Count(p => p.Origem == o)}"))}" +
+                           (hist > 0 ? $", das quais {hist} de NB da planilha histórica" : "") + ").";
                 Version++;
             }
             catch (Exception ex)
@@ -179,15 +226,16 @@ public sealed class ConversaoService
     private static readonly string[] Exts = { ".xlsx", ".xlsm", ".xls", ".csv" };
 
     /// <summary>
-    /// Acha a planilha de cada origem na pasta: pelo nome configurado (Conversao:Fontes:X:Arquivo,
-    /// sem diferença de extensão, espaço, hífen ou maiúscula) e, se não houver, por um nome que
-    /// contenha a sigla da origem ("..._AFM_...", "...-NB_..."). Falta de uma origem vira aviso; a
-    /// outra é lida mesmo assim.
+    /// Acha a planilha de cada fonte na pasta: pelo nome configurado (Conversao:Fontes:X:Arquivo, sem
+    /// diferença de extensão, espaço, hífen ou maiúscula) e, nas fontes principais, se não houver, por um
+    /// nome que contenha a sigla da origem ("..._AFM_...", "...-NB_..."), sem pegar arquivo que já é de outra
+    /// fonte (a planilha "NB 20-22" também tem "NB" no nome). Falta de uma origem vira aviso; a outra é lida
+    /// mesmo assim. A planilha histórica é opcional.
     /// </summary>
-    private List<(string Origem, string Arquivo)> Resolver(out string aviso)
+    private List<(FontePlanilha Fonte, string Arquivo)> Resolver(out string aviso)
     {
         aviso = "";
-        var res = new List<(string, string)>();
+        var res = new List<(FontePlanilha, string)>();
         var path = (_cfg["Conversao:Path"] ?? "").Trim();
         if (string.IsNullOrWhiteSpace(path)) { aviso = "Caminho das planilhas de conversão não configurado (Conversao:Path)."; return res; }
         try
@@ -202,18 +250,28 @@ public sealed class ConversaoService
                 aviso = $"Nenhuma planilha (.xlsx, .xlsm, .xls ou .csv) na pasta {pasta.FullName}.";
                 return res;
             }
-            var faltam = new List<string>();
-            foreach (var origem in Origens)
+            string NomeDe(FontePlanilha f) => Chave(_cfg[$"Conversao:Fontes:{f.Chave}:Arquivo"] ?? f.ArquivoPadrao);
+            // 1) pelo nome exato de cada fonte
+            var achados = new Dictionary<FontePlanilha, FileInfo>();
+            foreach (var f in Fontes)
             {
-                var nome = Chave(_cfg[$"Conversao:Fontes:{origem}:Arquivo"] ?? "");
-                var sigla = new Regex($@"(^|[^a-z]){origem.ToLowerInvariant()}([^a-z]|$)");
-                var f = arqs.FirstOrDefault(a => nome != "" && Chave(Path.GetFileNameWithoutExtension(a.Name)) == nome)
-                        ?? arqs.FirstOrDefault(a => sigla.IsMatch(SemAcento(Path.GetFileNameWithoutExtension(a.Name))));
-                if (f is null) faltam.Add(origem);
-                else res.Add((origem, f.FullName));
+                var nome = NomeDe(f);
+                var a = nome == "" ? null : arqs.FirstOrDefault(x => Chave(Path.GetFileNameWithoutExtension(x.Name)) == nome && !achados.ContainsValue(x));
+                if (a is not null) achados[f] = a;
             }
+            // 2) fontes principais sem nome exato: pela sigla, entre os arquivos que não são de outra fonte
+            var nomesConhecidos = Fontes.Select(NomeDe).Where(n => n != "").ToHashSet();
+            foreach (var f in Fontes.Where(f => !f.Opcional && !achados.ContainsKey(f)))
+            {
+                var sigla = new Regex($@"(^|[^a-z]){f.Origem.ToLowerInvariant()}([^a-z]|$)");
+                var a = arqs.FirstOrDefault(x => !achados.ContainsValue(x) && !nomesConhecidos.Contains(Chave(Path.GetFileNameWithoutExtension(x.Name)))
+                                                 && sigla.IsMatch(SemAcento(Path.GetFileNameWithoutExtension(x.Name))));
+                if (a is not null) achados[f] = a;
+            }
+            var faltam = Fontes.Where(f => !f.Opcional && !achados.ContainsKey(f)).Select(f => f.Origem).ToList();
+            res.AddRange(Fontes.Where(achados.ContainsKey).Select(f => (f, achados[f].FullName)));
             if (faltam.Count > 0)
-                aviso = $"Planilha de {string.Join(" e ", faltam)} não encontrada na pasta {pasta.FullName}" + (res.Count > 0 ? $": exibindo só {string.Join(" e ", res.Select(r => r.Item1))}." : ".");
+                aviso = $"Planilha de {string.Join(" e ", faltam)} não encontrada na pasta {pasta.FullName}" + (res.Count > 0 ? $": exibindo só {string.Join(" e ", res.Select(r => r.Item1.Origem).Distinct())}." : ".");
             return res;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
@@ -263,29 +321,52 @@ public sealed class ConversaoService
     private static readonly Dictionary<string, int> CabecalhoPadrao = new() { [Afm] = 1, [Nb] = 15 };
 
     /// <summary>Equivalências da origem (ex.: nome do vendedor no NB → nome no AFM), sem diferença de acento/caixa.</summary>
-    private Dictionary<string, string> Equivalencias(string origem, string secao) =>
-        _cfg.GetSection($"Conversao:Fontes:{origem}:{secao}").GetChildren()
+    private Dictionary<string, string> Equivalencias(string fonte, string secao) =>
+        _cfg.GetSection($"Conversao:Fontes:{fonte}:{secao}").GetChildren()
             .Where(c => !string.IsNullOrWhiteSpace(c.Value))
             .GroupBy(c => Chave(c.Key)).ToDictionary(g => g.Key, g => g.First().Value!.Trim());
 
-    private void Montar(DadosConversao d, string origem, string arquivo, List<OpportunityImporter.Cel[]> grade)
+    /// <summary>Equivalências da planilha e, se ela for de outra fonte da mesma origem (NB histórico), também as da origem.</summary>
+    private Dictionary<string, string> Equivalencias(FontePlanilha f, string secao)
     {
+        var d = Equivalencias(f.Chave, secao);
+        if (f.Chave != f.Origem)
+            foreach (var (k, v) in Equivalencias(f.Origem, secao)) d.TryAdd(k, v);
+        return d;
+    }
+
+    private void Montar(DadosConversao d, FontePlanilha fonte, string arquivo, List<OpportunityImporter.Cel[]> grade)
+    {
+        var origem = fonte.Origem;
+        var cfg = $"Conversao:Fontes:{fonte.Chave}";
+        var rotulo = fonte.Chave == fonte.Origem ? origem : $"{origem} ({fonte.Rotulo})";
         int Col(string nome)
         {
-            var letra = (_cfg[$"Conversao:Fontes:{origem}:Colunas:{nome}"] ?? ColunasPadrao[origem].GetValueOrDefault(nome, "")).Trim();
+            var letra = (_cfg[$"{cfg}:Colunas:{nome}"] ?? ColunasPadrao[fonte.Formato].GetValueOrDefault(nome, "")).Trim();
             return letra == "" ? -1 : AplicacaoService.Idx(letra);
         }
         var iVend = Col("Vendedor"); var iValor = Col("Valor"); var iStatus = Col("Status");
         var iBu = Col("Bu"); var iData = Col("DataEnvio");
         var iBuIcAlt = Col("BuIcAlternativa"); var iBuIcPrinc = Col("BuIcPrincipal");
         var iMerc = Col("Mercado"); var iPais = Col("Pais"); var iProd = Col("Produto"); var iCli = Col("Cliente");
-        var valorEmBrl = _cfg.GetValue($"Conversao:Fontes:{origem}:ValorEmBrl", origem == Nb);
-        var vendEq = Equivalencias(origem, "Vendedores");
-        var buEq = Equivalencias(origem, "Bus");
+        var valorEmBrl = _cfg.GetValue($"{cfg}:ValorEmBrl", fonte.Formato == Nb);
+        var vendEq = Equivalencias(fonte, "Vendedores");
+        var buEq = Equivalencias(fonte, "Bus");
+
+        // linhas que não entram (ex.: NB, coluna AD = "Budget Quote")
+        var exPadrao = ExclusaoPadrao.TryGetValue(fonte.Chave, out var ep) ? ep : ("", Array.Empty<string>());
+        var exLetra = (_cfg[$"{cfg}:Excluir:Coluna"] ?? exPadrao.Item1).Trim();
+        var exValores = _cfg.GetSection($"{cfg}:Excluir:Valores").GetChildren().Select(c => c.Value ?? "").Where(v => v.Trim() != "").ToArray();
+        if (exValores.Length == 0 && _cfg[$"{cfg}:Excluir:Coluna"] is null) exValores = exPadrao.Item2;
+        var iExcl = exLetra == "" || exValores.Length == 0 ? -1 : AplicacaoService.Idx(exLetra);
+        var exNorm = exValores.Select(v => OpportunityImporter.Normalizar(v)).ToHashSet();
+        // período coberto por outra planilha: a antiga de NB só vale antes da migração
+        DateTime? ate = DateTime.TryParse(_cfg[$"{cfg}:Ate"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var ac) ? ac
+                      : AtePadrao.TryGetValue(fonte.Chave, out var ap) ? ap : null;
 
         // Linha do cabeçalho: configurada (1 = primeira). 0 = a primeira linha "cheia".
         static int Cheias(OpportunityImporter.Cel[] r) => r.Count(c => !string.IsNullOrWhiteSpace(c.Text));
-        var h = _cfg.GetValue($"Conversao:Fontes:{origem}:HeaderRow", CabecalhoPadrao[origem]) - 1;
+        var h = _cfg.GetValue($"{cfg}:HeaderRow", CabecalhoPadrao[fonte.Formato]) - 1;
         if (h < 0)
         {
             var janela = grade.Take(40).ToList();
@@ -294,20 +375,23 @@ public sealed class ConversaoService
             for (var i = 0; i < janela.Count; i++)
                 if (Cheias(janela[i]) >= 3 && Cheias(janela[i]) * 2 >= max) { h = i; break; }
         }
-        if (grade.Count <= h) { d.Avisos.Add($"{origem}: a planilha {arquivo} não tem linhas de dados."); return; }
+        if (grade.Count <= h) { d.Avisos.Add($"{rotulo}: a planilha {arquivo} não tem linhas de dados."); return; }
         var cab = grade[h];
 
         string Cel(OpportunityImporter.Cel[] r, int i) => i >= 0 && i < r.Length ? (r[i].Text ?? "").Trim() : "";
         string Titulo(int i) => Cel(cab, i);
 
-        d.Mapeamento.Add($"{origem}: arquivo {arquivo} · cabeçalho na linha {h + 1}{(valorEmBrl ? " · valor já em R$" : " · valor em US$")}");
+        d.Mapeamento.Add($"{rotulo}: arquivo {arquivo} · cabeçalho na linha {h + 1}{(valorEmBrl ? " · valor já em R$" : " · valor em US$")}" +
+                         (fonte.Formato != fonte.Origem ? $" · formato {fonte.Formato} (colunas e status do {fonte.Formato}), propostas contadas como {origem}" : "") +
+                         (ate is DateTime at ? $" · só propostas enviadas antes de {at:dd/MM/yyyy}" : ""));
         foreach (var (rot, i) in new[] { ("Vendedor", iVend), (valorEmBrl ? "Valor R$" : "Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
                                          ("Data de envio", iData), ("BU Intercompany (principal)", iBuIcPrinc), ("BU Intercompany (alternativa)", iBuIcAlt),
-                                         ("Mercado", iMerc), ("País", iPais), ("Produto", iProd), ("Cliente", iCli) })
+                                         ("Mercado", iMerc), ("País", iPais), ("Produto", iProd), ("Cliente", iCli),
+                                         ($"Desconsiderar \"{string.Join("\" / \"", exValores)}\"", iExcl) })
         {
             if (i < 0) continue;
-            d.Mapeamento.Add($"{origem} · {rot}: coluna {AplicacaoService.Letra(i)} · \"{(Titulo(i) == "" ? "sem título" : Titulo(i))}\"");
-            if (Titulo(i) == "") d.Avisos.Add($"{origem}: a coluna {AplicacaoService.Letra(i)} ({rot}) está sem título no cabeçalho (linha {h + 1}): confira se o mapeamento ainda vale.");
+            d.Mapeamento.Add($"{rotulo} · {rot}: coluna {AplicacaoService.Letra(i)} · \"{(Titulo(i) == "" ? "sem título" : Titulo(i))}\"");
+            if (Titulo(i) == "") d.Avisos.Add($"{rotulo}: a coluna {AplicacaoService.Letra(i)} ({rot}) está sem título no cabeçalho (linha {h + 1}): confira se o mapeamento ainda vale.");
         }
 
         // Coluna com o número da proposta (para checar duplicidade), se existir.
@@ -319,7 +403,7 @@ public sealed class ConversaoService
         var vistasChave = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var vistasLinha = new HashSet<string>(StringComparer.Ordinal);
         var largura = cab.Length;
-        int lidas = 0, semData = 0, datasInv = 0, semValor = 0, valInv = 0, dup = 0, totais = 0;
+        int lidas = 0, semData = 0, datasInv = 0, semValor = 0, valInv = 0, dup = 0, totais = 0, excluidas = 0, foraDoPeriodo = 0;
         var vendSemEq = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var n = h + 1; n < grade.Count; n++)
@@ -330,6 +414,7 @@ public sealed class ConversaoService
 
             var primeira = row.Select(c => OpportunityImporter.Normalizar(c.Text ?? "")).FirstOrDefault(x => x != "") ?? "";
             if (primeira is "total" or "totais" or "grand total" or "subtotal") { totais++; continue; }
+            if (iExcl >= 0 && exNorm.Contains(OpportunityImporter.Normalizar(Cel(row, iExcl)))) { excluidas++; continue; }
 
             var (valor, invalido) = Valor(iValor >= 0 && iValor < row.Length ? row[iValor] : default);
             var valorTxt = Cel(row, iValor);
@@ -338,6 +423,7 @@ public sealed class ConversaoService
 
             var dataTxt = Cel(row, iData);
             DateTime? data = dataTxt == "" ? null : AplicacaoService.Data(dataTxt);
+            if (ate is DateTime limite && data is DateTime dt && dt.Date >= limite) { foraDoPeriodo++; continue; }
             if (dataTxt == "") semData++;
             else if (data is null) datasInv++;
 
@@ -364,20 +450,47 @@ public sealed class ConversaoService
             string Ou(string x) => x == "" ? NaoInformado : x;
             d.Propostas.Add(new PropostaConv(origem, n + 1, Ou(vend),
                 valorEmBrl ? null : valor, valorEmBrl ? valor : null, valorTxt, status,
-                Classificar(status, origem), Ou(bu), buIc, data, dataTxt,
-                Ou(Cel(row, iMerc)), Ou(Cel(row, iPais)), Ou(Cel(row, iProd)), Ou(Cel(row, iCli)), chave, cels));
+                Classificar(status, fonte.Formato), Ou(bu), buIc, data, dataTxt,
+                Ou(Cel(row, iMerc)), Ou(Cel(row, iPais)), Ou(Cel(row, iProd)), Ou(Cel(row, iCli)), chave, cels) { Fonte = fonte.Chave });
         }
 
         d.LinhasLidas += lidas; d.SemData += semData; d.DatasInvalidas += datasInv; d.SemValor += semValor;
-        d.ValoresInvalidos += valInv; d.Duplicadas += dup; d.TotaisIgnorados += totais;
+        d.ValoresInvalidos += valInv; d.Duplicadas += dup; d.TotaisIgnorados += totais; d.Desconsideradas += excluidas + foraDoPeriodo;
         var moeda = valorEmBrl ? "R$" : "US$";
+        if (iExcl >= 0)
+            d.Mapeamento.Add($"{rotulo}: {excluidas} linha(s) com \"{string.Join("\" / \"", exValores)}\" na coluna {AplicacaoService.Letra(iExcl)} foram desconsideradas (não entram em nenhuma conta).");
+        if (ate is DateTime lim)
+            d.Mapeamento.Add($"{rotulo}: {foraDoPeriodo} linha(s) enviadas a partir de {lim:dd/MM/yyyy} foram desconsideradas: esse período vem da planilha da plataforma nova.");
         if (dup > 0)
-            d.Avisos.Add($"{origem}: {dup} registro(s) parecem duplicados ({(iChave >= 0 ? "mesmo número de proposta" : "linhas idênticas")}). Todos foram mantidos; confira na Base de Propostas.");
-        if (datasInv > 0) d.Avisos.Add($"{origem}: {datasInv} registro(s) com data de envio inválida: ficam sem ano{(valorEmBrl ? "" : " e sem conversão cambial")}.");
-        if (semData > 0) d.Avisos.Add($"{origem}: {semData} registro(s) sem data de envio: ficam sem ano{(valorEmBrl ? "" : " e sem conversão cambial")}.");
-        if (valInv > 0) d.Avisos.Add($"{origem}: {valInv} registro(s) com valor em {moeda} ilegível ou ambíguo: contam nas quantidades, mas não nos valores.");
-        if (semValor > 0) d.Avisos.Add($"{origem}: {semValor} registro(s) sem valor em {moeda}: contam nas quantidades, mas não nos valores.");
-        if (totais > 0) d.Avisos.Add($"{origem}: {totais} linha(s) de total da planilha foram ignoradas.");
+            d.Avisos.Add($"{rotulo}: {dup} registro(s) parecem duplicados ({(iChave >= 0 ? "mesmo número de proposta" : "linhas idênticas")}). Todos foram mantidos; confira na Base de Propostas.");
+        if (datasInv > 0) d.Avisos.Add($"{rotulo}: {datasInv} registro(s) com data de envio inválida: ficam sem ano{(valorEmBrl ? "" : " e sem conversão cambial")}.");
+        if (semData > 0) d.Avisos.Add($"{rotulo}: {semData} registro(s) sem data de envio: ficam sem ano{(valorEmBrl ? "" : " e sem conversão cambial")}.");
+        if (valInv > 0) d.Avisos.Add($"{rotulo}: {valInv} registro(s) com valor em {moeda} ilegível ou ambíguo: contam nas quantidades, mas não nos valores.");
+        if (semValor > 0) d.Avisos.Add($"{rotulo}: {semValor} registro(s) sem valor em {moeda}: contam nas quantidades, mas não nos valores.");
+        if (totais > 0) d.Avisos.Add($"{rotulo}: {totais} linha(s) de total da planilha foram ignoradas.");
+    }
+
+    /// <summary>
+    /// Depois de ler tudo: a data mais antiga de cada origem (para avisar quando os anos não são comparáveis)
+    /// e a sobreposição entre a planilha antiga de NB e a da plataforma nova (que contaria a mesma proposta duas vezes).
+    /// </summary>
+    private void Conferir(DadosConversao d, List<FontePlanilha> lidas)
+    {
+        foreach (var g in d.Propostas.Where(p => p.Data is not null).GroupBy(p => p.Origem))
+            d.Inicio[g.Key] = g.Min(p => p.Data!.Value);
+        if (d.Inicio.Count == Origens.Length && d.Inicio.Values.Select(x => x.Year).Distinct().Count() > 1)
+        {
+            var ult = d.Inicio.MaxBy(kv => kv.Value);
+            d.Avisos.Add($"As propostas começam em datas diferentes ({string.Join("; ", d.Inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} desde {kv.Value:MM/yyyy}"))}): " +
+                         $"antes de {ult.Value.Year} só há propostas de {string.Join(" e ", d.Inicio.Where(kv => kv.Value.Year < ult.Value.Year).Select(kv => kv.Key))}, então os totais desses anos não se comparam aos seguintes.");
+        }
+        if (lidas.Any(f => f.Chave == NbHistorico))
+        {
+            var limite = DateTime.TryParse(_cfg[$"Conversao:Fontes:{NbHistorico}:Ate"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var a) ? a : AtePadrao[NbHistorico];
+            var antes = d.Propostas.Count(p => p.Fonte == Nb && p.Data is DateTime dt && dt.Date < limite);
+            if (antes > 0)
+                d.Avisos.Add($"NB: {antes} proposta(s) da plataforma nova foram enviadas antes de {limite:dd/MM/yyyy}, período também coberto pela planilha NB histórica: confira se não estão nas duas.");
+        }
     }
 
     /// <summary>Valor numérico da célula (US$ ou R$). Número nativo vale como veio; texto usa o último

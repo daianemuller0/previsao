@@ -198,6 +198,8 @@
         if (!_isAdmin) { _m = null; return; }   // defesa extra: os números só são calculados para administradores
         var props = Conv.Ok ? Conv.Atual.Propostas : (IEnumerable<PropostaConv>)Array.Empty<PropostaConv>();
         _m = ResumoExecutivoCalc.Montar(props, Cambio.Todas(), VendasRepo.Meses(), VendasRepo.Budgets(), _f, _principal, _comparativo, _equivalente);
+        // primeiro ano com propostas de cada origem no recorte (AFM e NB podem começar em anos diferentes)
+        _inicio = props.Where(p => p.Data is not null && _f.Passa(p)).GroupBy(p => p.Origem).ToDictionary(g => g.Key, g => g.Min(p => p.Data!.Value.Year));
         _principal = _m.Principal; _comparativo = _m.Comparativo;
         if (!_m.Anos.Contains(_anoMensal)) _anoMensal = _m.Principal;
     }
@@ -235,6 +237,15 @@
     /// <summary>neutra = a variação não é "boa" nem "ruim" por si (ex.: quantidade de propostas).</summary>
     private static string ClsVar(double? v, bool neutra = false) => v is not double x || Math.Abs(x) < 0.05 || neutra ? "neu" : x > 0 ? "pos" : "neg";
 
+    private Dictionary<string, int> _inicio = new();
+    /// <summary>Ano em que só uma origem tem propostas (a outra planilha começa depois): "NB", "AFM"… ou null.</summary>
+    private string? SoOrigem(int ano)
+    {
+        if (_inicio.Count < 2 || ano >= _inicio.Values.Max()) return null;
+        var l = _inicio.Where(kv => kv.Value <= ano).Select(kv => kv.Key).ToList();
+        return l.Count == 0 ? null : string.Join(" e ", l);
+    }
+
     private string DenRot => _f.BaseTodas ? "enviadas" : "decididas";
     private string RegraTxt => _f.BaseTodas
         ? "Conversão sobre todas as propostas enviadas: ganhas ÷ enviadas (por valor: R$ ganho ÷ R$ de todas as enviadas)."
@@ -251,6 +262,8 @@
             Conv.AtualizadoEm is { } q ? $"propostas lidas em {q:dd/MM/yyyy HH:mm}" : "propostas não lidas",
             _f.TemDimensao ? "filtros valem para as propostas; vendas e metas são da empresa toda" : "sem filtros (empresa toda)",
         };
+        if (_inicio.Count >= 2 && _inicio.Values.Distinct().Count() > 1)
+            partes.Add($"propostas: {string.Join(", ", _inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} desde {kv.Value}"))} — antes de {_inicio.Values.Max()} os totais de propostas não são comparáveis aos seguintes");
         return string.Join(" · ", partes);
     }
 
@@ -369,7 +382,7 @@
             <div class="rx-card-tit">Resultados anuais, @m.Anos.First() → @m.Anos.Last() <span>@(m.Ate < 12 ? $"período equivalente: {m.PeriodoTxt(m.Ate)} de cada ano" : "ano inteiro") · ▲▼ = variação contra o ano anterior (mesmos meses)</span></div>
             <div class="rx-tw">
                 <table class="rx-tab">
-                    <thead><tr><th>Indicador</th>@foreach (var a in m.Anos) { <th class="@(a == m.Principal ? "pri" : "")">@a@if (m.Parcial(a)) { <small>parcial</small> }</th> }</tr></thead>
+                    <thead><tr><th>Indicador</th>@foreach (var a in m.Anos) { <th class="@(a == m.Principal ? "pri" : "")">@a@if (m.Parcial(a)) { <small>parcial</small> }@if (SoOrigem(a) is string so) { <small title="Neste ano a planilha das outras origens ainda não tem propostas: totais não comparáveis aos anos seguintes">só @so</small> }</th> }</tr></thead>
                     <tbody>
                         @foreach (var (nome, v, varf, neutra, pp, grupo) in linhas)
                         {
@@ -578,7 +591,7 @@
                         var t = m.AteComparavel(a, a - 1);
                         var dv = m.Anos.Contains(a - 1) ? VarPct(m.DimAno(dim, chave, a, t).VG, m.DimAno(dim, chave, a - 1, t).VG) : null;
                         <tr class="@(a == m.Principal ? "pri" : "")">
-                            <th>@a@if (m.Parcial(a)) { <small>parcial</small> }</th>
+                            <th>@a@if (m.Parcial(a)) { <small>parcial</small> }@if (SoOrigem(a) is string so) { <small>só @so</small> }</th>
                             <td>@Mi(i.ValorEnviado)</td><td>@N0(i.Enviadas)</td><td>@N0(i.G)</td><td>@N0(i.P)</td><td>@N0(i.A)</td>
                             <td><b>@P1(i.TaxaQtd)</b></td><td>@P1(i.TaxaValor)</td><td><b>@Mi(i.VG)</b></td><td>@P1(tot > 0 ? i.VG / tot * 100 : null)</td>
                             <td><em class="@ClsVar(dv)">@TxtVar(dv)</em></td>
@@ -755,7 +768,7 @@
                     double t = Math.Max(1, i.Linhas);
                     if (i.Linhas == 0) { <div class="rx-fun-lin"><span class="rx-fun-ano">@a</span><div class="rx-fun-nd">sem propostas registradas (n/d)</div><span class="rx-fun-tot">n/d</span></div> continue; }
                     <div class="rx-fun-lin">
-                        <span class="rx-fun-ano">@a@if (m.Parcial(a)) { <small>parcial</small> }</span>
+                        <span class="rx-fun-ano">@a@if (m.Parcial(a)) { <small>parcial</small> }@if (SoOrigem(a) is string so) { <small>só @so</small> }</span>
                         <div class="rx-fun-barra">
                             @foreach (var (rot, q, cls) in new[] { ("Ganhas", i.G, "g"), ("Perdidas", i.P, "p"), ("Abertas", i.A, "a"), ("Não classif.", i.NC, "n") })
                             {

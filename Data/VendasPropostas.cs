@@ -351,7 +351,7 @@ public static class ConversaoDeVendas
             if (p.Data is not DateTime d) continue;
             double? brl = p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(d.Year, out var t) ? u * t : null);
             var semTaxa = p.ValorBrl is null && p.ValorUsd is not null && brl is null;
-            lista.Add(new PropostaEnviada(p.Chave.Trim().Length > 0 ? p.Origem + ":" + p.Chave.Trim().ToUpperInvariant() : $"{p.Origem}#{p.Linha}",
+            lista.Add(new PropostaEnviada(p.Codigo,
                 d.Date, (decimal)Math.Round(brl ?? 0, 2), p.Origem, p.Vendedor.Trim().Length > 0 ? p.Vendedor.Trim() : ConversaoService.NaoInformado,
                 p.Classe, semTaxa));
         }
