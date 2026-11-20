@@ -230,7 +230,7 @@
                                 <div class="vp-cs-barra grossa">
                                     @if (sa.Total + sn.Total > 0)
                                     {
-                                        <i style="width:@F(pa)%;background:@CorAfm" title="AFM: @N0(sa.Total) propostas (@Math.Round(pa)%)">@(pa >= 14 ? Math.Round(pa) + "%" : "")</i><i style="width:@F(pn)%;background:@CorNb" title="NB: @N0(sn.Total) propostas (@Math.Round(pn)%)">@(pn >= 14 ? Math.Round(pn) + "%" : "")</i>
+                                        <i style="width:@F(pa)%;background:@CorAfm" title="AFM: @N0(sa.Total) propostas (@Math.Round(pa)% das enviadas)">@(pa >= 22 ? $"AFM {Math.Round(pa)}%" : pa >= 12 ? Math.Round(pa) + "%" : "")</i><i style="width:@F(pn)%;background:@CorNb" title="NB: @N0(sn.Total) propostas (@Math.Round(pn)% das enviadas)">@(pn >= 22 ? $"NB {Math.Round(pn)}%" : pn >= 12 ? Math.Round(pn) + "%" : "")</i>
                                     }
                                 </div>
                                 <div class="vp-cs-grade">
