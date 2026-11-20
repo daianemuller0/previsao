@@ -46,4 +46,10 @@
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Modelo corporativo da Apresentação Executiva: embutido no programa,
+         para não ficar numa pasta pública nem depender de arquivo ao lado do .exe. -->
+    <EmbeddedResource Include="Modelos\apresentacao_executiva.pptx" LogicalName="ModeloApresentacaoExecutiva.pptx" />
+  </ItemGroup>
+
 </Project>

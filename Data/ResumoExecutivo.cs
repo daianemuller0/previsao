@@ -205,7 +205,8 @@ public static class ResumoExecutivoCalc
     }
 
     public static ModeloResumo Montar(IEnumerable<PropostaConv> todas, IReadOnlyDictionary<int, double> taxas,
-        IReadOnlyList<MesDeVendas> vendas, IReadOnlyList<BudgetDoAno> budgets, FiltroResumo f, int principal, int comparativo, bool equivalente)
+        IReadOnlyList<MesDeVendas> vendas, IReadOnlyList<BudgetDoAno> budgets, FiltroResumo f, int principal, int comparativo, bool equivalente,
+        (int Ano, int Mes)? corte = null)
     {
         var hoje = DateTime.Today;
         var m = new ModeloResumo
@@ -219,7 +220,14 @@ public static class ResumoExecutivoCalc
         foreach (var v in vendas.Where(v => v.Vendas is not null && v.Ano >= f.AnoDe && v.Ano <= f.AnoAte)) m.VendasMes[(v.Ano, v.Mes)] = v.Vendas!.Value;
         foreach (var b in budgets.Where(b => b.Ano >= f.AnoDe && b.Ano <= f.AnoAte)) m.Metas[b.Ano] = (b.Hsa, b.Grupo);
 
-        if (m.Anos.Contains(hoje.Year))
+        if (corte is { } c)
+        {
+            // data de corte escolhida (Apresentação Executiva): o ano de referência vai até o mês de corte;
+            // dezembro fecha o ano. Quem chama já tirou os dados posteriores ao corte.
+            m.AnoIncompleto = c.Mes < 12 && m.Anos.Contains(c.Ano) ? c.Ano : 0;
+            m.MesCorte = c.Mes < 12 ? c.Mes : 0;
+        }
+        else if (m.Anos.Contains(hoje.Year))
         {
             m.AnoIncompleto = hoje.Year;
             var mv = m.UltimoMesVendas(hoje.Year);

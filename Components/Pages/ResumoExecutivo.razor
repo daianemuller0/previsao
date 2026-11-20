@@ -26,6 +26,7 @@
         </div>
         <div class="page-actions">
             <button class="btn-ghost" disabled="@_carregando" title="Reler as planilhas de propostas e recalcular" @onclick="Reler">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar indicadores")</button>
+            <a class="btn-ghost" href="/apresentacao-executiva" title="PowerPoint editável no modelo corporativo, com os mesmos cálculos deste resumo">@Icons.Svg("bar-chart")Gerar Apresentação Executiva</a>
             <button class="btn-primary" disabled="@(_m is null)" @onclick="() => { _exportar = true; _confirmo = false; _msg = null; }">@Icons.Svg("download")Exportar Resumo Executivo</button>
         </div>
     </div>
@@ -162,7 +163,7 @@
     {
         ("sumario", "Sumário"), ("anual", "Resultados anuais"), ("mensal", "Mês a mês"), ("setor", "Aftermarket × NB"),
         ("bu", "Business Unit"), ("pais", "País"), ("segmento", "Segmento"), ("produto", "Produto"), ("vendedor", "Vendedor"),
-        ("metas", "Metas"), ("funil", "Funil"), ("insights", "Insights"),
+        ("metas", "Metas"), ("funil", "Funil"), ("insights", "Executive Insights | Principais Conclusões"),
     };
 
     private static IEnumerable<int> AnosPossiveis => Enumerable.Range(AnoMin, DateTime.Today.Year - AnoMin + 1);
@@ -281,7 +282,12 @@
             case "setor": @Setores() break;
             case "metas": @Metas() break;
             case "funil": @Funil() break;
-            case "insights": @Insights(_m.Insights) break;
+            case "insights":
+                <div class="rx-card">
+                    <div class="rx-card-tit">Executive Insights | Principais Conclusões <span>fatos calculados dos números (resultado → evidência → ponto de atenção); os pontos de atenção não são explicações de causa</span></div>
+                    @Insights(_m.Insights)
+                </div>
+                break;
             default: @Dimensao(id, impressao) break;
         }
     };
@@ -341,6 +347,7 @@
         var linhas = new (string Nome, Func<int, string> V, Func<int, double?>? Var, bool Neutra, bool Pp, string Grupo)[]
         {
             ("Vendas realizadas (empresa toda)", a => Mi(m.Vendas(a)), a => VarAno(a, (x, t) => (double?)(m.Vendas(x, t) is decimal d ? (double)d : null)), false, false, "vendas"),
+            ("Crescimento das vendas vs ano anterior", a => TxtVar(VarAno(a, (x, t) => (double?)(m.Vendas(x, t) is decimal d ? (double)d : null))), null, false, false, "vendas"),
             ("Propostas enviadas", a => N0(m.Ano(a).Enviadas), a => VarAno(a, (x, t) => m.Ano(x, t).Enviadas), true, false, "prop"),
             ("Valor total enviado", a => Mi(m.Ano(a).ValorEnviado), a => VarAno(a, (x, t) => (double)m.Ano(x, t).ValorEnviado), true, false, "prop"),
             ("Valor médio por proposta", a => Mi(m.Ano(a).ValorMedio), null, true, false, "prop"),

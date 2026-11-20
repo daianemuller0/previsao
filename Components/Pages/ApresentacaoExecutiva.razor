@@ -1,0 +1,288 @@
+@page "/apresentacao-executiva"
+@attribute [Authorize(Roles = "admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject ConversaoService Conv
+@inject CambioAnualRepository Cambio
+@inject VendasMensaisRepository VendasRepo
+@inject IJSRuntime JS
+
+@* ===========================================================================
+   GERAR APRESENTAÇÃO EXECUTIVA | GLOBAL COMMERCIAL PERFORMANCE
+   Monta um PowerPoint editável (modelo corporativo, gráficos nativos, notas do
+   apresentador) a partir dos cálculos do Resumo Executivo. A pré-visualização e
+   o arquivo saem do MESMO desenho e do MESMO retrato dos dados.
+   Tudo é gerado na memória do servidor e entregue direto ao navegador: nenhum
+   arquivo temporário, nenhum serviço externo, nenhum dado financeiro em log.
+   Permissão conferida na página e de novo no servidor (GeradorApresentacao.Negado).
+   =========================================================================== *@
+
+<PageTitle>Apresentação Executiva · Howden South America</PageTitle>
+
+<div class="cvx ax-page">
+    <div class="breadcrumbs ax-tela"><span>Executivo</span><span class="sep">/</span><a href="/resumo-executivo">Resumo Executivo</a><span class="sep">/</span><span>Apresentação Executiva</span></div>
+    <div class="page-head ax-tela">
+        <div>
+            <h1>Gerar Apresentação Executiva</h1>
+            <p class="subtitle">Global Commercial Performance · PowerPoint editável no modelo corporativo, com gráficos nativos e notas do apresentador · documento confidencial</p>
+        </div>
+    </div>
+
+    @if (_msg is not null) { <div class="cvx-alert ax-tela @(_msgOk ? "vp-ok" : "erro")">@_msg</div> }
+
+    <div class="ax-config ax-tela">
+        <section class="ax-bloco">
+            <h3>Período</h3>
+            <div class="cvx-seg-ctl ax-seg">
+                @foreach (var (p, nome) in Periodos)
+                {
+                    var per = p;
+                    <button class="@(_o.Periodo == per ? "on" : "")" @onclick="() => Mudar(() => _o.Periodo = per)">@nome</button>
+                }
+            </div>
+            <div class="ax-linha">
+                <label>Mês de referência
+                    <select value="@_o.MesRef" @onchange="e => Mudar(() => _o.MesRef = int.Parse(e.Value!.ToString()!))">
+                        @for (var m = 1; m <= 12; m++) { var mm = m; <option value="@mm">@ModeloResumo.MesCurto(mm)</option> }
+                    </select>
+                </label>
+                <label>Ano
+                    <select value="@_o.AnoRef" @onchange="e => Mudar(() => _o.AnoRef = int.Parse(e.Value!.ToString()!))">
+                        @foreach (var a in AnosPossiveis) { <option value="@a">@a</option> }
+                    </select>
+                </label>
+            </div>
+            <p class="cvx-note">Data de corte: @Corte.ToString("dd/MM/yyyy") (último dia do mês de referência). @DescricaoPeriodo</p>
+            <label class="ax-check"><input type="checkbox" checked="@_o.CompararAnoAnterior" @onchange="e => Mudar(() => _o.CompararAnoAnterior = (bool)e.Value!)" /> Comparar com o período equivalente do ano anterior</label>
+        </section>
+
+        <section class="ax-bloco">
+            <h3>Recorte</h3>
+            <div class="ax-linha">
+                <label>Escopo
+                    <select value="@_o.Escopo" @onchange="e => Mudar(() => { _o.Escopo = e.Value!.ToString()!; _o.ValorEscopo = null; })">
+                        @foreach (var (id, pt, _) in GeradorApresentacao.Escopos) { <option value="@id">@pt</option> }
+                    </select>
+                </label>
+                @if (_o.Escopo != "consolidado")
+                {
+                    <label>Valor
+                        <select value="@(_o.ValorEscopo ?? "")" @onchange="e => Mudar(() => _o.ValorEscopo = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value!.ToString())">
+                            <option value="">Escolha…</option>
+                            @foreach (var v in OpcoesEscopo) { <option value="@v">@v</option> }
+                        </select>
+                    </label>
+                }
+            </div>
+            <p class="cvx-note">@(_o.Escopo == "consolidado" ? "Empresa toda: todos os setores, BUs e países." : "Vendas e metas só existem para a empresa toda: num recorte, esses slides saem e são listados nas limitações.")</p>
+            <h3>Idioma e moeda</h3>
+            <div class="ax-linha">
+                <div class="cvx-seg-ctl ax-seg">
+                    <button class="@(_o.Ingles ? "on" : "")" @onclick="() => Mudar(() => _o.Ingles = true)">English</button>
+                    <button class="@(!_o.Ingles ? "on" : "")" @onclick="() => Mudar(() => _o.Ingles = false)">Português</button>
+                </div>
+                <div class="cvx-seg-ctl ax-seg">
+                    <button class="@(!_o.Usd ? "on" : "")" @onclick="() => Mudar(() => _o.Usd = false)">R$ (BRL)</button>
+                    <button class="@(_o.Usd ? "on" : "")" @onclick="() => Mudar(() => _o.Usd = true)">US$ (USD)</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="ax-bloco">
+            <h3>Conteúdo</h3>
+            <div class="ax-linha">
+                <label>Máximo de slides
+                    <input type="number" min="10" max="30" value="@_o.MaxSlides" @onchange="MudarMax" />
+                </label>
+                <label>Taxa sobre
+                    <select value="@(_o.BaseTodas ? "todas" : "decididas")" @onchange="MudarBase">
+                        <option value="decididas">Decididas (regra oficial)</option>
+                        <option value="todas">Todas as propostas</option>
+                    </select>
+                </label>
+            </div>
+            <label class="ax-check"><input type="checkbox" checked="@_o.Detalhadas" @onchange="e => Mudar(() => _o.Detalhadas = (bool)e.Value!)" /> Incluir análises detalhadas (BU, país, segmento, produto, capacidade)</label>
+            <label class="ax-check"><input type="checkbox" checked="@_o.Apendices" @onchange="e => Mudar(() => _o.Apendices = (bool)e.Value!)" /> Incluir apêndices (definições e limitações)</label>
+        </section>
+    </div>
+
+    <div class="ax-acoes ax-tela">
+        <label class="rx-confirma"><input type="checkbox" checked="@_confirmo" @onchange="e => _confirmo = (bool)e.Value!" /> Confirmo que a apresentação é confidencial e será compartilhada apenas com pessoas autorizadas.</label>
+        <div class="ax-botoes">
+            <button class="btn-ghost" disabled="@(_ocupado || !Pronto)" @onclick="PreVisualizar">@Icons.Svg("image")Pré-visualizar apresentação</button>
+            <button class="btn-primary" disabled="@(_ocupado || !Pronto || !_confirmo)" @onclick="GerarPptx">@Icons.Svg("download")@(_ocupado ? "Gerando…" : "Gerar PowerPoint (.pptx)")</button>
+            <button class="btn-ghost" disabled="@(_ocupado || !Pronto || !_confirmo)" @onclick="GerarPdf">@Icons.Svg("download")Gerar PDF</button>
+        </div>
+        <p class="cvx-note">
+            @if (_carregando) { <b>Lendo as planilhas de propostas… </b> }
+            O arquivo é montado aqui, com os dados de @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy HH:mm") : "—") (propostas), e baixado direto pelo navegador:
+            nada é enviado a serviços externos nem gravado em pasta do servidor. Só dados agregados: sem clientes, números de proposta ou nomes de vendedores.
+            O PDF sai da pré-visualização pela impressão do navegador (“Salvar como PDF”, um slide por página).
+        </p>
+    </div>
+
+    @if (_r is not null)
+    {
+        <div class="ax-resumo ax-tela">
+            <div><b>@_r.Deck.Slides.Count slides</b> · arquivo <code>@_r.Arquivo</code> · retrato dos dados de @_r.Deck.Gerado.ToString("dd/MM/yyyy HH:mm")@(_desatualizada ? " · opções mudaram: pré-visualize de novo" : "")</div>
+            @foreach (var a in _r.Avisos) { <div class="ax-aviso">⚠ @a</div> }
+            @if (_r.Omitidos.Count > 0)
+            {
+                <details><summary>@_r.Omitidos.Count seção(ões) omitida(s) — listadas também no apêndice de limitações</summary><ul>@foreach (var o in _r.Omitidos) { <li>@o</li> }</ul></details>
+            }
+        </div>
+        <div class="ax-previa @(_imprimindo ? "ax-imprimir" : "")">
+            @for (var i = 0; i < _r.Deck.Slides.Count; i++)
+            {
+                var s = _r.Deck.Slides[i];
+                var n = i + 1;
+                <figure class="ax-fig">
+                    <figcaption class="ax-tela"><b>@n.ToString("00")</b> @s.Titulo</figcaption>
+                    @((MarkupString)AxHtml.Slide(s, Fundo(s.Tipo), Cultura))
+                    @if (!string.IsNullOrWhiteSpace(s.Notas))
+                    {
+                        <details class="ax-notas ax-tela"><summary>Notas do apresentador</summary><pre>@s.Notas</pre></details>
+                    }
+                </figure>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const int AnoMin = 2022;
+    private readonly OpcoesApresentacao _o = new();
+    private ResultadoApresentacao? _r;
+    private string? _assinaturaR;
+    private bool _carregando, _ocupado, _confirmo, _msgOk, _imprimindo, _desatualizada;
+    private string? _msg;
+    private string _autor = "";
+    private System.Security.Claims.ClaimsPrincipal? _user;
+    private (string Capa, string Interna, string Encerramento)? _fundos;
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private static readonly (PeriodoApresentacao P, string Nome)[] Periodos =
+    {
+        (PeriodoApresentacao.Ytd, "Acumulado do ano (YTD)"), (PeriodoApresentacao.Mes, "Mês"), (PeriodoApresentacao.Ano, "Ano"), (PeriodoApresentacao.Historico, "Histórico 2022 →"),
+    };
+
+    private static IEnumerable<int> AnosPossiveis => Enumerable.Range(AnoMin, DateTime.Today.Year - AnoMin + 1).Reverse();
+    private DateTime Corte => new(_o.AnoRef, _o.MesRef, DateTime.DaysInMonth(_o.AnoRef, _o.MesRef));
+    private System.Globalization.CultureInfo Cultura => new(_o.Ingles ? "en-US" : "pt-BR");
+    private bool Pronto => !_carregando && (_o.Escopo == "consolidado" || !string.IsNullOrEmpty(_o.ValorEscopo));
+
+    private string DescricaoPeriodo => _o.Periodo switch
+    {
+        PeriodoApresentacao.Mes => $"Indicadores de {ModeloResumo.MesCurto(_o.MesRef)}/{_o.AnoRef} contra o mesmo mês de {_o.AnoRef - 1}; histórico anual nos mesmos meses (jan–{ModeloResumo.MesCurto(_o.MesRef)}).",
+        PeriodoApresentacao.Ytd => $"Indicadores de jan–{ModeloResumo.MesCurto(_o.MesRef)}/{_o.AnoRef} contra os mesmos meses de {_o.AnoRef - 1}; histórico desde {AnoMin} nos mesmos meses.",
+        PeriodoApresentacao.Ano => $"{_o.AnoRef} contra {_o.AnoRef - 1} (anos inteiros; o ano em curso aparece acumulado).",
+        _ => $"Histórico {AnoMin}–{_o.AnoRef} em anos inteiros; indicadores do ano até {ModeloResumo.MesCurto(_o.MesRef)}.",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            _user = (await AuthState).User;
+            _autor = _user.Identity?.Name ?? "";
+        }
+        // referência padrão: o último mês fechado (e com vendas lançadas)
+        var hoje = DateTime.Today;
+        if (hoje.Month == 1) { _o.AnoRef = hoje.Year - 1; _o.MesRef = 12; }
+        else
+        {
+            var ult = VendasRepo.Meses().Where(v => v.Ano == hoje.Year && v.Vendas is not null).Select(v => v.Mes).DefaultIfEmpty(0).Max();
+            _o.AnoRef = hoje.Year; _o.MesRef = ult > 0 ? Math.Min(hoje.Month - 1, ult) : hoje.Month - 1;
+        }
+        _carregando = true;
+        try { await Task.Run(() => Conv.Carregar(false)); } catch { /* sem as planilhas: só os slides de vendas */ }
+        finally { _carregando = false; }
+    }
+
+    private void Mudar(Action a)
+    {
+        a();
+        _desatualizada = _r is not null && _assinaturaR != _o.Assinatura();
+    }
+
+    private void MudarBase(ChangeEventArgs e) => Mudar(() => _o.BaseTodas = e.Value?.ToString() == "todas");
+    private void MudarMax(ChangeEventArgs e) => Mudar(() => _o.MaxSlides = Math.Clamp(int.TryParse(e.Value?.ToString(), out var n) ? n : 22, 10, 30));
+
+    private IEnumerable<string> OpcoesEscopo
+    {
+        get
+        {
+            if (_o.Escopo == "setor") return ConversaoService.Origens;
+            if (!Conv.Ok) return Array.Empty<string>();
+            Func<PropostaConv, string?> campo = _o.Escopo switch { "bu" => p => p.Bu, "pais" => p => p.Pais, "segmento" => p => p.Mercado, _ => p => p.Produto };
+            return Conv.Atual.Propostas.Where(p => p.Data is DateTime d && d.Year >= AnoMin && d <= Corte).Select(p => FiltroResumo.Rot(campo(p)))
+                .Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+    }
+
+    private string Fundo(AxTipoSlide t)
+    {
+        _fundos ??= GeradorApresentacao.Fundos();
+        return t switch { AxTipoSlide.Capa => _fundos.Value.Capa, AxTipoSlide.Encerramento => _fundos.Value.Encerramento, _ => _fundos.Value.Interna };
+    }
+
+    /// <summary>Monta (ou reaproveita) a apresentação: um retrato só dos dados por geração.</summary>
+    private bool Montar(bool forcar)
+    {
+        _msg = null;
+        if (GeradorApresentacao.Negado(_user, _o) is string negado) { _msgOk = false; _msg = negado; _r = null; return false; }
+        if (!forcar && _r is not null && _assinaturaR == _o.Assinatura()) return true;
+        try
+        {
+            var fonte = new FonteApresentacao(
+                Conv.Ok ? Conv.Atual.Propostas.ToList() : new List<PropostaConv>(),
+                new Dictionary<int, double>(Cambio.Todas()),
+                VendasRepo.Meses().ToList(), VendasRepo.Budgets().ToList(),
+                Conv.AtualizadoEm, DateTime.Now);
+            _r = GeradorApresentacao.Montar(_user, fonte, _o, _autor);
+            _assinaturaR = _o.Assinatura();
+            _desatualizada = false;
+            return true;
+        }
+        catch (UnauthorizedAccessException ex) { _msgOk = false; _msg = ex.Message; _r = null; return false; }
+        catch (Exception ex) { _msgOk = false; _msg = "Não foi possível montar a apresentação: " + ex.Message; return false; }
+    }
+
+    private async Task PreVisualizar()
+    {
+        _ocupado = true; StateHasChanged();
+        await Task.Yield();
+        try { Montar(true); }
+        finally { _ocupado = false; }
+    }
+
+    private async Task GerarPptx()
+    {
+        if (!_confirmo) return;
+        _ocupado = true; StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            if (!Montar(false) || _r is null) return;
+            var bytes = await Task.Run(() => GeradorApresentacao.Pptx(_user, _o, _r));
+            using var stream = new MemoryStream(bytes);
+            using var refStream = new DotNetStreamReference(stream);
+            await JS.InvokeVoidAsync("appDownloadStream", _r.Arquivo, "application/vnd.openxmlformats-officedocument.presentationml.presentation", refStream);
+            _msgOk = true; _msg = $"Apresentação gerada: {_r.Arquivo} ({_r.Deck.Slides.Count} slides). Confira os números antes de compartilhar.";
+        }
+        catch (UnauthorizedAccessException ex) { _msgOk = false; _msg = ex.Message; }
+        catch (Exception ex) { _msgOk = false; _msg = "Não foi possível gerar o PowerPoint: " + ex.Message; }
+        finally { _ocupado = false; }
+    }
+
+    private async Task GerarPdf()
+    {
+        if (!_confirmo) return;
+        if (!Montar(false) || _r is null) return;
+        _imprimindo = true;
+        StateHasChanged();
+        await Task.Delay(150);
+        try { await JS.InvokeVoidAsync("axImprimir", System.IO.Path.ChangeExtension(_r.Arquivo, null)); }
+        catch { /* impressão cancelada */ }
+        finally { _imprimindo = false; StateHasChanged(); }
+    }
+}

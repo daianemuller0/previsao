@@ -3498,3 +3498,46 @@ em.pos { color: #17663a; } em.neg { color: #b42318; } em.neu { color: #475569; }
 .rx-tab td.nd b { color: #9aa6b4; font-weight: 600; }
 .rx-print-capa h3 { color: #172B43; margin: 18px 0 6px; font-size: 16px; }
 .rx-print-indice { columns: 2; font-size: 14px; color: #334155; margin: 0 0 16px; }
+
+/* ===================== Apresentação Executiva (gerador de PowerPoint) ===================== */
+.ax-config { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.ax-bloco { background: #fff; border: 1px solid var(--cx-line, #e2e8f0); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+.ax-bloco h3 { margin: 4px 0 0; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: #00866D; }
+.ax-linha { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.ax-linha label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; color: #475569; }
+.ax-linha select, .ax-linha input { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; min-width: 120px; max-width: 280px; }
+.ax-seg { flex-wrap: wrap; }
+.ax-check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: #334155; }
+.ax-acoes { background: #fff; border: 1px solid var(--cx-line, #e2e8f0); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.ax-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ax-resumo { font-size: 13.5px; color: #334155; background: #f2f7f5; border: 1px solid #dbe9e3; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.ax-resumo code { font-size: 12.5px; }
+.ax-resumo ul { margin: 6px 0 0 18px; }
+.ax-aviso { color: #b45309; }
+.ax-previa { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 18px; }
+.ax-fig { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.ax-fig figcaption { font-size: 13px; color: #475569; }
+.ax-fig figcaption b { color: #00866D; margin-right: 4px; }
+.ax-notas summary { cursor: pointer; font-size: 12.5px; color: #64748b; }
+.ax-notas pre { white-space: pre-wrap; font: inherit; font-size: 12.5px; color: #334155; background: #f8fafc; border-radius: 8px; padding: 8px 10px; margin: 6px 0 0; }
+
+/* o slide: 16:9, posições em %, fontes em cqw (escala com a largura) */
+.ax-slide { position: relative; width: 100%; aspect-ratio: 16 / 9; container-type: inline-size; overflow: hidden; background: #fff no-repeat center / 100% 100%;
+    border-radius: 6px; box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 6px 18px rgba(15,23,42,.10); font-family: Aptos, "Segoe UI", Calibri, Arial, sans-serif; color: #003D33; }
+.ax-el { position: absolute; box-sizing: border-box; margin: 0; }
+.ax-forma { display: flex; flex-direction: column; overflow: hidden; }
+.ax-forma p { margin: 0; line-height: 1.17; overflow-wrap: anywhere; }
+.ax-tab { border-collapse: collapse; table-layout: fixed; }
+.ax-tab td { border-bottom: 1px solid #DBE9E3; padding: 0 .45cqw; line-height: 1.12; overflow: hidden; vertical-align: middle; }
+.ax-el svg { display: block; overflow: visible; }
+
+/* PDF: só os slides, um por página (tamanho exato de um slide 16:9) */
+.ax-imprimindo .ax-tela { }
+@media print {
+    body.ax-imprimindo .ax-tela, body.ax-imprimindo .sidebar, body.ax-imprimindo .topbar, body.ax-imprimindo header, body.ax-imprimindo nav { display: none !important; }
+    body.ax-imprimindo, body.ax-imprimindo main, body.ax-imprimindo .page, body.ax-imprimindo .content, body.ax-imprimindo article { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+    body.ax-imprimindo .ax-previa { display: block; }
+    body.ax-imprimindo .ax-fig { display: block; break-after: page; page-break-after: always; }
+    body.ax-imprimindo .ax-slide { width: 13.333in; height: 7.5in; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+    body.ax-imprimindo * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

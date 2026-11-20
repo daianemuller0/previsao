@@ -952,3 +952,39 @@ window.rxFimImpressao = function () {
     const st = document.getElementById('rx-pagina');
     if (st) st.remove();
 };
+
+// Download de arquivo grande gerado no servidor (ex.: a Apresentação Executiva .pptx):
+// chega como stream (sem passar por base64 na conexão) e vira um Blob local.
+window.appDownloadStream = async (fileName, mime, streamRef) => {
+    const buf = await streamRef.arrayBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+};
+
+// PDF da Apresentação Executiva: imprime a pré-visualização, um slide 16:9 por página.
+// O título da aba vira o nome sugerido do arquivo em "Salvar como PDF".
+window.axImprimir = function (titulo) {
+    return new Promise(resolve => {
+        const tituloAntes = document.title;
+        if (titulo) document.title = titulo;
+        document.body.classList.add('ax-imprimindo');
+        let st = document.getElementById('ax-pagina');
+        if (!st) { st = document.createElement('style'); st.id = 'ax-pagina'; document.head.appendChild(st); }
+        st.textContent = '@page { size: 13.333in 7.5in; margin: 0; }';
+        setTimeout(() => {
+            try { window.print(); }
+            finally {
+                document.body.classList.remove('ax-imprimindo');
+                st.remove();
+                document.title = tituloAntes;
+                resolve();
+            }
+        }, 250);
+    });
+};
