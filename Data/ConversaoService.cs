@@ -19,12 +19,14 @@ namespace HowdenSalesForecast.Data;
 // descartada em silêncio. Só são ignoradas linhas totalmente em branco e linhas
 // de total (e isso também é contado).
 //
-// AFM (cabeçalho na linha 1): K vendedor · P valor US$ · T status · V BU ·
-//   AC data de envio · AF/AE BU intercompany (AF primeiro; vazia, AE) ·
-//   F mercado · C país · I produto · D cliente.
-// NB (linhas 1–14 são resumo; cabeçalho na 15): L vendedor · P valor JÁ EM R$ ·
-//   R status · V BU ("HSA: Howden South America" → HSA) · AB data de envio ·
-//   F mercado · D país · J produto · M cliente. NB não tem BU intercompany.
+// AFM e NB 20-22 (cabeçalho na linha 1): B nº da proposta · C país · D planta
+//   do cliente · F mercado · I produto · K vendedor · P valor US$ · T status ·
+//   V BU · AD data de envio. As demais colunas não são usadas (nem BU
+//   intercompany: todas ficam "Não é Intercompany").
+// NB (linhas 1–14 são resumo; cabeçalho na 15; equivale ao AFM com outras
+//   letras): N nº da proposta · D país · E planta do cliente · G mercado ·
+//   J produto · L vendedor · P valor JÁ EM R$ · R status · V BU ("HSA: Howden
+//   South America" → HSA) · AB data de envio.
 //   Linhas com "Budget Quote" na coluna AD NÃO entram (são contadas e informadas).
 // NB histórico ("NB 20-22", opcional): de 2022 até a migração para a plataforma
 //   nova (01/01/2024). Vem do sistema antigo, no MESMO formato do AFM (colunas,
@@ -106,17 +108,13 @@ public sealed class ConversaoService
     public const string Afm = "AFM", Nb = "NB";
     public static readonly string[] Origens = { Afm, Nb };
 
-    // Status → classe, por origem (comparados já normalizados). O que não estiver aqui é "Não classificada".
-    private static readonly Dictionary<string, (HashSet<string> Ganhas, HashSet<string> Perdidas, HashSet<string> Abertas)> StatusPorOrigem = new()
-    {
-        [Afm] = (Conjunto("Closed - Won", "OTP"),
-                 Conjunto("Cancelled", "Closed - Customer Lost", "Closed - Lost", "Closed - No Bid", "Closed - Unknown"),
-                 Conjunto("Open")),
-        [Nb]  = (Conjunto("Closed Won", "E1 Order Entry"),
-                 Conjunto("Closed Abandoned", "Closed Lost"),
-                 Conjunto("Qualification", "Proposal Pending/Waiting", "Outstanding Quote--No Formal Negotiation",
-                          "Negotiation Phase/Review", "Arrived at Agreement on Need", "T&C's stage", "Verbal Commitment")),
-    };
+    // Status → classe (comparados já normalizados: sem diferença de caixa, acento, espaço ou tipo de hífen).
+    // A mesma lista vale para todas as planilhas. O que não estiver aqui é "Não classificada".
+    private static readonly (HashSet<string> Ganhas, HashSet<string> Perdidas, HashSet<string> Abertas) StatusConversao =
+        (Conjunto("Closed - Won", "Closed Won", "E1 Order Entry", "OTP"),
+         Conjunto("Cancelled", "Closed - Lost", "Closed - Unknown", "Closed - No Bid", "Closed - Customer Lost", "Project Cancelled", "Closed Lost", "Closed Abandoned"),
+         Conjunto("Open", "Arrived at Agreement on Need", "Letter of Intent", "Negotiation Phase/Review", "Outstanding Quote--No Formal Negotiation",
+                  "Proposal Pending/Waiting", "Qualification"));
     private static HashSet<string> Conjunto(params string[] s) => new(s.Select(NormalizarStatus), StringComparer.Ordinal);
 
     /// <summary>
@@ -161,7 +159,7 @@ public sealed class ConversaoService
     public static ClasseProposta Classificar(string? status, string origem = Afm)
     {
         var n = NormalizarStatus(status);
-        var (g, p, a) = StatusPorOrigem.TryGetValue(origem, out var t) ? t : StatusPorOrigem[Afm];
+        var (g, p, a) = StatusConversao;
         if (g.Contains(n)) return ClasseProposta.Ganha;
         if (p.Contains(n)) return ClasseProposta.Perdida;
         if (a.Contains(n)) return ClasseProposta.Aberta;
@@ -312,11 +310,10 @@ public sealed class ConversaoService
     // Letras padrão de cada origem (Conversao:Fontes:<origem>:Colunas sobrepõe).
     private static readonly Dictionary<string, Dictionary<string, string>> ColunasPadrao = new()
     {
-        [Afm] = new() { ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AC",
-                        ["BuIcPrincipal"] = "AF", ["BuIcAlternativa"] = "AE",
+        [Afm] = new() { ["Proposta"] = "B", ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AD",
                         ["Mercado"] = "F", ["Pais"] = "C", ["Produto"] = "I", ["Cliente"] = "D" },
-        [Nb]  = new() { ["Vendedor"] = "L", ["Valor"] = "P", ["Status"] = "R", ["Bu"] = "V", ["DataEnvio"] = "AB",
-                        ["Mercado"] = "F", ["Pais"] = "D", ["Produto"] = "J", ["Cliente"] = "M" },
+        [Nb]  = new() { ["Proposta"] = "N", ["Vendedor"] = "L", ["Valor"] = "P", ["Status"] = "R", ["Bu"] = "V", ["DataEnvio"] = "AB",
+                        ["Mercado"] = "G", ["Pais"] = "D", ["Produto"] = "J", ["Cliente"] = "E" },
     };
     private static readonly Dictionary<string, int> CabecalhoPadrao = new() { [Afm] = 1, [Nb] = 15 };
 
@@ -349,6 +346,7 @@ public sealed class ConversaoService
         var iBu = Col("Bu"); var iData = Col("DataEnvio");
         var iBuIcAlt = Col("BuIcAlternativa"); var iBuIcPrinc = Col("BuIcPrincipal");
         var iMerc = Col("Mercado"); var iPais = Col("Pais"); var iProd = Col("Produto"); var iCli = Col("Cliente");
+        var iProposta = Col("Proposta");
         var valorEmBrl = _cfg.GetValue($"{cfg}:ValorEmBrl", fonte.Formato == Nb);
         var vendEq = Equivalencias(fonte, "Vendedores");
         var buEq = Equivalencias(fonte, "Bus");
@@ -384,7 +382,7 @@ public sealed class ConversaoService
         d.Mapeamento.Add($"{rotulo}: arquivo {arquivo} · cabeçalho na linha {h + 1}{(valorEmBrl ? " · valor já em R$" : " · valor em US$")}" +
                          (fonte.Formato != fonte.Origem ? $" · formato {fonte.Formato} (colunas e status do {fonte.Formato}), propostas contadas como {origem}" : "") +
                          (ate is DateTime at ? $" · só propostas enviadas antes de {at:dd/MM/yyyy}" : ""));
-        foreach (var (rot, i) in new[] { ("Vendedor", iVend), (valorEmBrl ? "Valor R$" : "Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
+        foreach (var (rot, i) in new[] { ("Nº da proposta", iProposta), ("Vendedor", iVend), (valorEmBrl ? "Valor R$" : "Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
                                          ("Data de envio", iData), ("BU Intercompany (principal)", iBuIcPrinc), ("BU Intercompany (alternativa)", iBuIcAlt),
                                          ("Mercado", iMerc), ("País", iPais), ("Produto", iProd), ("Cliente", iCli),
                                          ($"Desconsiderar \"{string.Join("\" / \"", exValores)}\"", iExcl) })
@@ -394,9 +392,9 @@ public sealed class ConversaoService
             if (Titulo(i) == "") d.Avisos.Add($"{rotulo}: a coluna {AplicacaoService.Letra(i)} ({rot}) está sem título no cabeçalho (linha {h + 1}): confira se o mapeamento ainda vale.");
         }
 
-        // Coluna com o número da proposta (para checar duplicidade), se existir.
+        // Coluna com o número da proposta (cada número conta uma vez): a configurada; sem ela, achada pelo título.
         var chaves = new[] { "quotenumber", "quote number", "proposta", "proposal", "opportunity number", "numero da proposta" };
-        var iChave = -1;
+        var iChave = iProposta;
         for (var i = 0; i < cab.Length && iChave < 0; i++)
             if (chaves.Contains(OpportunityImporter.Normalizar(Titulo(i)))) iChave = i;
 
