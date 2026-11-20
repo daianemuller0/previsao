@@ -988,3 +988,47 @@ window.axImprimir = function (titulo) {
         }, 250);
     });
 };
+
+// Performance Comercial: PDF de um quadro (ex.: "Vendas e propostas, mês a mês"), como está na tela.
+// O quadro mantém a largura (e o layout) da tela e é reduzido para caber numa folha A4 deitada; no modo
+// "Todos os anos" (12 meses) ele ocupa a largura da folha e quebra entre os meses, nunca no meio de um.
+// O resto da página some só durante a impressão.
+window.vpPdfPreparar = function (id) {
+    const alvo = document.getElementById(id);
+    if (!alvo) return null;
+    if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (e) { } }
+    alvo.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia');
+    const r = alvo.getBoundingClientRect();
+    const larguraFolha = 1060, alturaFolha = 720;          // A4 deitada, margens de 8 mm (px a 96 dpi)
+    const varios = !!alvo.querySelector('.vpm-sm-grid');
+    // nos 12 meses, um pouco menor que a largura da folha: as linhas de totais não sobram sozinhas numa página
+    const escala = varios ? Math.min(1, larguraFolha / r.width) * 0.93 : Math.min(1, larguraFolha / r.width, alturaFolha / r.height);
+    alvo.style.width = r.width + 'px';
+    alvo.style.setProperty('--vp-pdf-zoom', escala.toFixed(4));
+    const ocultos = [];
+    for (let el = alvo; el && el !== document.body; el = el.parentElement)
+        for (const irmao of el.parentElement ? el.parentElement.children : [])
+            if (irmao !== el && !irmao.classList.contains('vp-pdf-oculto')) { irmao.classList.add('vp-pdf-oculto'); ocultos.push(irmao); }
+    document.body.classList.add('vp-pdf');
+    alvo.classList.add('vp-pdf-alvo');
+    let st = document.getElementById('vp-pdf-pagina');
+    if (!st) { st = document.createElement('style'); st.id = 'vp-pdf-pagina'; document.head.appendChild(st); }
+    st.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+    return () => {
+        document.body.classList.remove('vp-pdf');
+        alvo.classList.remove('vp-pdf-alvo');
+        alvo.style.width = ''; alvo.style.removeProperty('--vp-pdf-zoom');
+        ocultos.forEach(x => x.classList.remove('vp-pdf-oculto'));
+        st.remove();
+        setTimeout(() => window.vpmAjustar && window.vpmAjustar(), 50);
+    };
+};
+window.vpPdf = function (id, titulo) {
+    const tituloAntes = document.title;
+    const fim = window.vpPdfPreparar(id);
+    if (!fim) return;
+    if (titulo) document.title = titulo + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    setTimeout(() => {
+        try { window.print(); } finally { fim(); document.title = tituloAntes; }
+    }, 200);
+};

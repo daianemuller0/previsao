@@ -3548,3 +3548,16 @@ em.pos { color: #17663a; } em.neg { color: #b42318; } em.neu { color: #475569; }
 .vp-cc-vendas span { flex-basis: 100%; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #64748b; }
 .vp-cc-vendas b { font-size: 21px; font-weight: 800; color: #172b43; line-height: 1.1; }
 .vp-cc-vendas em { font-style: normal; font-size: 13px; font-weight: 700; }
+
+/* Performance: "Gerar PDF" de um quadro (vpPdf) — o quadro na largura de uma A4 deitada */
+.vpm-pdf { order: 100; font-weight: 700; }
+.vpm:fullscreen .vpm-pdf, .vpm.tela-cheia .vpm-pdf { display: none; }
+body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box-shadow: none !important; }
+@media print {
+    body.vp-pdf .vp-pdf-oculto, body.vp-pdf .sidebar, body.vp-pdf .topbar, body.vp-pdf header { display: none !important; }
+    body.vp-pdf, body.vp-pdf main, body.vp-pdf article, body.vp-pdf .page, body.vp-pdf .content { margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }
+    body.vp-pdf .vp-pdf-alvo { border: 0 !important; zoom: var(--vp-pdf-zoom, 1); }
+    body.vp-pdf .vp-pdf-alvo .vpm-ctl, body.vp-pdf .vp-pdf-alvo .vpm-pal-wrap, body.vp-pdf .vp-pdf-alvo .vpm-detalhe-bar { display: none !important; }
+    body.vp-pdf .vp-pdf-alvo .vpm-sm-grid > * { break-inside: avoid; }
+    body.vp-pdf * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
