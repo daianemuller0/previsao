@@ -61,6 +61,9 @@ public sealed record PropostaConv(
     /// <summary>A planilha de onde veio ("AFM", "NB" ou "NB_Historico"); vazio = a da própria origem.</summary>
     public string Fonte { get; init; } = "";
 
+    /// <summary>Revisão da proposta (AFM e NB 20-22: coluna AA), quando houver: a maior é a última.</summary>
+    public int? Revisao { get; init; }
+
     /// <summary>
     /// Identificador para contar cada proposta uma vez: o número da proposta dentro da mesma planilha
     /// (números de sistemas diferentes não se misturam) ou, sem número, a linha da planilha.
@@ -196,6 +199,7 @@ public sealed class ConversaoService
                     Montar(dados, fonte, fi.Name, grade);
                 }
                 UnificarVendedores(dados);
+                UltimaRevisao(dados);
                 Conferir(dados, arquivos.Select(a => a.Fonte).ToList());
 
                 _atual = dados; _marca = marca;
@@ -311,7 +315,7 @@ public sealed class ConversaoService
     // Letras padrão de cada origem (Conversao:Fontes:<origem>:Colunas sobrepõe).
     private static readonly Dictionary<string, Dictionary<string, string>> ColunasPadrao = new()
     {
-        [Afm] = new() { ["Proposta"] = "B", ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AD",
+        [Afm] = new() { ["Proposta"] = "B", ["Revisao"] = "AA", ["Vendedor"] = "K", ["Valor"] = "P", ["Status"] = "T", ["Bu"] = "V", ["DataEnvio"] = "AD",
                         ["Mercado"] = "F", ["Pais"] = "C", ["Produto"] = "I", ["Cliente"] = "D" },
         [Nb]  = new() { ["Proposta"] = "N", ["Vendedor"] = "L", ["Valor"] = "P", ["Status"] = "R", ["Bu"] = "V", ["DataEnvio"] = "AB",
                         ["Mercado"] = "G", ["Pais"] = "D", ["Produto"] = "J", ["Cliente"] = "E" },
@@ -347,7 +351,7 @@ public sealed class ConversaoService
         var iBu = Col("Bu"); var iData = Col("DataEnvio");
         var iBuIcAlt = Col("BuIcAlternativa"); var iBuIcPrinc = Col("BuIcPrincipal");
         var iMerc = Col("Mercado"); var iPais = Col("Pais"); var iProd = Col("Produto"); var iCli = Col("Cliente");
-        var iProposta = Col("Proposta");
+        var iProposta = Col("Proposta"); var iRevisao = Col("Revisao");
         var valorEmBrl = _cfg.GetValue($"{cfg}:ValorEmBrl", fonte.Formato == Nb);
         var vendEq = Equivalencias(fonte, "Vendedores");
         var buEq = Equivalencias(fonte, "Bus");
@@ -383,7 +387,7 @@ public sealed class ConversaoService
         d.Mapeamento.Add($"{rotulo}: arquivo {arquivo} · cabeçalho na linha {h + 1}{(valorEmBrl ? " · valor já em R$" : " · valor em US$")}" +
                          (fonte.Formato != fonte.Origem ? $" · formato {fonte.Formato} (colunas e status do {fonte.Formato}), propostas contadas como {origem}" : "") +
                          (ate is DateTime at ? $" · só propostas enviadas antes de {at:dd/MM/yyyy}" : ""));
-        foreach (var (rot, i) in new[] { ("Nº da proposta", iProposta), ("Vendedor", iVend), (valorEmBrl ? "Valor R$" : "Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
+        foreach (var (rot, i) in new[] { ("Nº da proposta", iProposta), ("Revisão", iRevisao), ("Vendedor", iVend), (valorEmBrl ? "Valor R$" : "Valor US$", iValor), ("Status", iStatus), ("BU", iBu),
                                          ("Data de envio", iData), ("BU Intercompany (principal)", iBuIcPrinc), ("BU Intercompany (alternativa)", iBuIcAlt),
                                          ("Mercado", iMerc), ("País", iPais), ("Produto", iProd), ("Cliente", iCli),
                                          ($"Desconsiderar \"{string.Join("\" / \"", exValores)}\"", iExcl) })
@@ -450,7 +454,7 @@ public sealed class ConversaoService
             d.Propostas.Add(new PropostaConv(origem, n + 1, Ou(vend),
                 valorEmBrl ? null : valor, valorEmBrl ? valor : null, valorTxt, status,
                 Classificar(status, fonte.Formato), Ou(bu), buIc, data, dataTxt,
-                Ou(Cel(row, iMerc)), Ou(Cel(row, iPais)), Ou(Cel(row, iProd)), Ou(Cel(row, iCli)), chave, cels) { Fonte = fonte.Chave });
+                Ou(Cel(row, iMerc)), Ou(Cel(row, iPais)), Ou(Cel(row, iProd)), Ou(Cel(row, iCli)), chave, cels) { Fonte = fonte.Chave, Revisao = NumeroRevisao(Cel(row, iRevisao)) });
         }
 
         d.LinhasLidas += lidas; d.SemData += semData; d.DatasInvalidas += datasInv; d.SemValor += semValor;
@@ -461,12 +465,37 @@ public sealed class ConversaoService
         if (ate is DateTime lim)
             d.Mapeamento.Add($"{rotulo}: {foraDoPeriodo} linha(s) enviadas a partir de {lim:dd/MM/yyyy} foram desconsideradas: esse período vem da planilha da plataforma nova.");
         if (dup > 0)
-            d.Avisos.Add($"{rotulo}: {dup} registro(s) parecem duplicados ({(iChave >= 0 ? "mesmo número de proposta" : "linhas idênticas")}). Todos foram mantidos; confira na Base de Propostas.");
+            d.Avisos.Add(iChave >= 0
+                ? $"{rotulo}: {dup} linha(s) repetem um número de proposta (revisões): fica só a última revisão de cada proposta."
+                : $"{rotulo}: {dup} registro(s) parecem duplicados (linhas idênticas). Todos foram mantidos; confira na Base de Propostas.");
         if (datasInv > 0) d.Avisos.Add($"{rotulo}: {datasInv} registro(s) com data de envio inválida: ficam sem ano{(valorEmBrl ? "" : " e sem conversão cambial")}.");
         if (semData > 0) d.Avisos.Add($"{rotulo}: {semData} registro(s) sem data de envio: ficam sem ano{(valorEmBrl ? "" : " e sem conversão cambial")}.");
         if (valInv > 0) d.Avisos.Add($"{rotulo}: {valInv} registro(s) com valor em {moeda} ilegível ou ambíguo: contam nas quantidades, mas não nos valores.");
         if (semValor > 0) d.Avisos.Add($"{rotulo}: {semValor} registro(s) sem valor em {moeda}: contam nas quantidades, mas não nos valores.");
         if (totais > 0) d.Avisos.Add($"{rotulo}: {totais} linha(s) de total da planilha foram ignoradas.");
+    }
+
+    private static int? NumeroRevisao(string t)
+    {
+        var dig = new string(t.Where(char.IsDigit).ToArray());
+        return dig.Length is > 0 and <= 6 && int.TryParse(dig, out var n) ? n : null;
+    }
+
+    /// <summary>
+    /// Cada número de proposta conta UMA vez em tudo (enviadas, valores e conversão): das linhas com o mesmo
+    /// número na mesma planilha (revisões), fica a última — a de maior revisão; sem revisão, a de data de envio
+    /// mais recente; empate, a que vem mais abaixo na planilha. Linhas sem número continuam cada uma por si.
+    /// </summary>
+    private static void UltimaRevisao(DadosConversao d)
+    {
+        var antes = d.Propostas.Count;
+        var ultimas = d.Propostas.Where(p => p.Chave.Trim().Length > 0).GroupBy(p => p.Codigo)
+            .Select(g => g.OrderByDescending(p => p.Revisao ?? -1).ThenByDescending(p => p.Data ?? DateTime.MinValue).ThenByDescending(p => p.Linha).First())
+            .ToHashSet(ReferenceEqualityComparer.Instance);
+        d.Propostas.RemoveAll(p => p.Chave.Trim().Length > 0 && !ultimas.Contains(p));
+        var fora = antes - d.Propostas.Count;
+        d.Desconsideradas += fora;
+        d.Mapeamento.Add($"Revisões: {fora} linha(s) de revisões anteriores desconsideradas — cada número de proposta conta uma vez, pela última revisão (data, valor e status dela).");
     }
 
     /// <summary>Equivalências de vendedor que valem para todas as planilhas (Conversao:Vendedores sobrepõe/acrescenta).</summary>
