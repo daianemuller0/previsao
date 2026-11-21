@@ -289,6 +289,7 @@ public partial class Conversao : IAsyncDisposable
     {
         if (!_emIngles) return v;
         if (v == "Sem data") return "No date";
+        if (v == ConversaoService.NaoIntercompany) return "Not intercompany";
         for (var m = 1; m <= 12; m++)
             if (string.Equals(Fmt.MonthLong(m), v, StringComparison.OrdinalIgnoreCase)) return _enUs.DateTimeFormat.GetMonthName(m);
         return v;
@@ -1022,6 +1023,7 @@ public partial class Conversao : IAsyncDisposable
             "data" => i.P.Data?.ToString("dd MMM yyyy", cu) ?? (i.P.DataTexto == "" ? "—" : i.P.DataTexto + " (invalid)"),
             "mes" => i.Mes is { } m ? cu.DateTimeFormat.GetMonthName(m) : "—",
             "classe" => NomeClasse(i.P.Classe),
+            "buic" => RotuloValor(i.P.BuIc),
             "usd" => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", cu) : i.P.ValorBrl is not null ? "—" : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (unreadable)"),
             "taxa" => _emDolar
                 ? (i.P.ValorBrl is null ? "already in US$" : i.Taxa is { } t ? "R$ ÷ " + t.ToString("0.0000", cu) : "no rate")
