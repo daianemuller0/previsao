@@ -1173,8 +1173,8 @@ internal sealed class ConstrutorApresentacao
         {
             var lista = string.Join(", ", aj.Select(g => $"{g.Count()} {g.Key.Origem} {g.Key.Month:00}/{g.Key.Year}"));
             itens = itens.Append((T("Manual adjustment", "Ajuste manual"),
-                T($"Won proposals not yet entered in the CRM, counted as won: {lista}. Count conversion only; in value they remain open.",
-                  $"Propostas ganhas ainda não lançadas no CRM, contadas como ganhas: {lista}. Só na conversão por quantidade; no valor continuam em aberto."))).ToArray();
+                T($"Won proposals not yet entered in the CRM, counted as won: {lista}. They count in conversion by count and by value (at each proposal's value).",
+                  $"Propostas ganhas ainda não lançadas no CRM, contadas como ganhas: {lista}. Entram na conversão por quantidade e por valor (com o valor de cada proposta)."))).ToArray();
         }
         long h = 512064, g = 45720, y = Y0;
         var k = 0;

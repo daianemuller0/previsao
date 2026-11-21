@@ -60,12 +60,12 @@ public sealed record PropostaConv(
 
     /// <summary>
     /// Ajuste manual (appsettings "Conversao:AjustesGanhas"): proposta aberta que já virou pedido mas ainda não foi
-    /// lançada no CRM. Conta como ganha na conversão por quantidade; no valor, continua em aberto.
+    /// lançada no CRM. Conta como ganha na quantidade e no valor (com o valor da própria proposta).
     /// </summary>
     public bool AjusteManual { get; init; }
 
-    /// <summary>A classe para as contas por valor: a do ajuste manual continua aberta (o valor ganho não é conhecido).</summary>
-    public ClasseProposta ClasseValor => AjusteManual ? ClasseProposta.Aberta : Classe;
+    /// <summary>A classe para as contas por valor (a mesma da quantidade: a proposta do ajuste conta como ganha com o seu valor).</summary>
+    public ClasseProposta ClasseValor => Classe;
 
     /// <summary>A planilha de onde veio ("AFM", "NB" ou "NB_Historico"); vazio = a da própria origem.</summary>
     public string Fonte { get; init; } = "";
@@ -573,7 +573,7 @@ public sealed class ConversaoService
     /// Ajustes manuais de propostas ganhas ainda não lançadas no CRM (appsettings "Conversao:AjustesGanhas":
     /// Origem, Ano, Mes, Quantidade, Nota). As N propostas abertas mais recentes daquela origem e mês passam a
     /// contar como ganhas (se o mês tiver menos, completa com os meses anteriores do mesmo ano). O status original
-    /// fica registrado e a marca AjusteManual mantém o valor delas fora do valor ganho.
+    /// fica registrado (marca AjusteManual) e o valor de cada uma entra no valor ganho.
     /// </summary>
     private void AjustesGanhas(DadosConversao d)
     {
@@ -594,7 +594,7 @@ public sealed class ConversaoService
             var t = $"{origem}: {candidatas.Count} proposta(s) aberta(s) de {mes:00}/{ano} contada(s) como ganha(s) — ajuste manual, ainda não lançadas no CRM"
                 + (noMes < candidatas.Count ? $" ({noMes} do mês; {candidatas.Count - noMes} dos meses anteriores, porque o mês não tinha abertas suficientes)" : "")
                 + (candidatas.Count < qtd ? $"; pedidas {qtd}, só havia {candidatas.Count} aberta(s)" : "")
-                + ". Contam na conversão por quantidade; no valor continuam em aberto."
+                + ". Contam como ganhas na conversão por quantidade e por valor (com o valor de cada proposta)."
                 + (string.IsNullOrWhiteSpace(c["Nota"]) ? "" : " " + c["Nota"]!.Trim());
             d.Mapeamento.Add("Ajuste manual · " + t);
             textos.Add(t);

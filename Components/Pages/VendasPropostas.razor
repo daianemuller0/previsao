@@ -618,7 +618,7 @@
     private Dictionary<(int Ano, int Mes), PropMes> _porMes = new();
     /// <summary>As linhas das planilhas da guia Conversão (sem juntar números repetidos, como na própria guia), para a taxa de conversão.</summary>
     /// <param name="ClasseValor">a classe nas contas por valor (ajuste manual: ganha na quantidade, aberta no valor)</param>
-    private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl, ClasseProposta ClasseValor);
+    private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl, ClasseProposta ClasseValor, bool Aj = false);
     private List<LinhaConv> _conv = new(), _convSetor = new();
     private bool _gerandoPpt;
     private string _fonte = "";
@@ -655,8 +655,27 @@
         var g = Conv.Atual.Propostas.Where(p => p.AjusteManual && p.Data is not null)
             .GroupBy(p => (p.Origem, p.Data!.Value.Year, p.Data.Value.Month)).OrderBy(x => x.Key).ToList();
         var lista = string.Join(", ", g.Select(x => $"{x.Count()} {x.Key.Origem} {x.Key.Month:00}/{x.Key.Year}"));
-        return T($"{lista} proposta(s) aberta(s) contada(s) como ganha(s) — pedidos que ainda não foram lançados no CRM. Entram na conversão por quantidade; no valor continuam em aberto.",
-                 $"{lista} open proposal(s) counted as won — orders not yet entered in the CRM. Included in conversion by count; in value they remain open.");
+        // o efeito no ano do ajuste, com os filtros da tela: sem o ajuste (elas abertas) → com o ajuste (ganhas)
+        var efeitos = new List<string>();
+        foreach (var ano in g.Select(x => x.Key.Year).Distinct())
+        {
+            var l = _convSetor.Where(x => x.Ano == ano).ToList();
+            var aj = l.Where(x => x.Aj).ToList();
+            if (aj.Count == 0) continue;
+            int gC = l.Count(x => x.Classe == ClasseProposta.Ganha), pC = l.Count(x => x.Classe == ClasseProposta.Perdida);
+            double vgC = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vpC = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
+            int gS = gC - aj.Count; double vgS = vgC - aj.Sum(x => x.Brl ?? 0);
+            double? Q(int gg, int bb) => bb > 0 ? gg * 100.0 / bb : null;
+            double? V(double vv, double bb) => bb > 0 ? vv / bb * 100 : null;
+            var (bqC, bqS) = BaseTodas ? (l.Count, l.Count) : (gC + pC, gS + pC);
+            var (bvC, bvS) = BaseTodas ? (l.Sum(x => x.Brl ?? 0), l.Sum(x => x.Brl ?? 0)) : (vgC + vpC, vgS + vpC);
+            string P(double? x) => x is double d ? P1(d) : "—";
+            efeitos.Add(T($"{ano}: por quantidade {P(Q(gS, bqS))} → {P(Q(gC, bqC))} ({N0(gS)} → {N0(gC)} ganhas); por valor {P(V(vgS, bvS))} → {P(V(vgC, bvC))} (+{Mi((decimal)aj.Sum(x => x.Brl ?? 0))} ganhos)",
+                           $"{ano}: by count {P(Q(gS, bqS))} → {P(Q(gC, bqC))} ({N0(gS)} → {N0(gC)} won); by value {P(V(vgS, bvS))} → {P(V(vgC, bvC))} (+{Mi((decimal)aj.Sum(x => x.Brl ?? 0))} won)"));
+        }
+        return T($"{lista} proposta(s) aberta(s) contada(s) como ganha(s) — pedidos que ainda não foram lançados no CRM. Entram na conversão por quantidade e por valor (com o valor de cada proposta). Efeito, sem → com o ajuste: ",
+                 $"{lista} open proposal(s) counted as won — orders not yet entered in the CRM. Included in conversion by count and by value (at each proposal's value). Effect, without → with the adjustment: ")
+            + string.Join(" · ", efeitos) + ".";
     }
     private string TituloCelMes(int mes, int ano, decimal val, VendaPorSetor? sx) =>
         $"{NomeDoMes(mes)} {ano}: {Cheio(val)}" + (sx is { Nb: decimal nb, Afm: decimal af } ? $" · NB {Cheio(nb)} · AFM {Cheio(af)}" : "");
@@ -777,7 +796,7 @@
                     : dolar
                         ? p.ValorUsd ?? (p.ValorBrl is double r && taxas.TryGetValue(p.Data.Value.Year, out var tu) && tu > 0 ? r / tu : null)
                         : p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null),
-                    p.ClasseValor))
+                    p.ClasseValor, p.AjusteManual))
                 .ToList();
         }
         catch { _conv = new(); }
