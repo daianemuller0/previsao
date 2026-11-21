@@ -3256,6 +3256,7 @@ body.vp-tela-cheia { overflow: hidden; }
 .vpm-banda-cap { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #475569; margin: 6px 0 0; }
 .vpm-banda-cap i { width: 20px; height: 0; border-top: 1.6px solid #475569; display: inline-block; }
 .vpm-banda-cap.conv i { border-top-style: dashed; }
+.vpm-banda-cap.conv.valor i { border-top-style: dotted; border-top-width: 2px; }
 .vpm-banda { position: relative; height: 86px; }
 .vpm-banda.conv { height: 78px; }
 .vpm-banda-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }

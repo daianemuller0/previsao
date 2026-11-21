@@ -26,6 +26,17 @@ public sealed class MesDeVendas
     public string Id => $"{Ano:D4}-{Mes:D2}";
 }
 
+/// <summary>As vendas de um mês separadas por setor (R$): New Business (NB) e Aftermarket (AFM); null = sem número.</summary>
+public sealed class VendaPorSetor
+{
+    public int Ano { get; set; }
+    public int Mes { get; set; }
+    public decimal? Nb { get; set; }
+    public decimal? Afm { get; set; }
+
+    public string Id => $"{Ano:D4}-{Mes:D2}";
+}
+
 /// <summary>Os budgets de um ano (R$): o da HSA e o do grupo.</summary>
 public sealed class BudgetDoAno
 {
@@ -43,6 +54,7 @@ public sealed class VendasMensaisRepository
 {
     private const string EntidadeMeses = "vendas_mensais";
     private const string EntidadeBudgets = "budgets_anuais";
+    private const string EntidadeSetor = "vendas_setor";
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     private readonly ParquetStore _s;
     public VendasMensaisRepository(ParquetStore s) => _s = s;
@@ -77,6 +89,31 @@ public sealed class VendasMensaisRepository
             })
             .Where(b => b.Ano > 0).OrderBy(b => b.Ano).ToList();
     }
+
+    /// <summary>As vendas por setor (NB e AFM), mês a mês. Na primeira vez, vem com o relatório da equipe (2025 e 2026).</summary>
+    public List<VendaPorSetor> PorSetor()
+    {
+        if (_s.IsEmpty(EntidadeSetor)) GravarPorSetor(HistoricoDaPlanilha.PorSetor());
+        return _s.ReadLatest(EntidadeSetor, "id, nb, afm", r =>
+            {
+                var id = Txt(r, 0);
+                return new VendaPorSetor
+                {
+                    Ano = int.TryParse(id.Split('-')[0], out var a) ? a : 0,
+                    Mes = id.Length >= 7 && int.TryParse(id[5..7], out var m) ? m : 0,
+                    Nb = Dec(Txt(r, 1)),
+                    Afm = Dec(Txt(r, 2)),
+                };
+            })
+            .Where(x => x.Ano > 0 && x.Mes is >= 1 and <= 12)
+            .OrderBy(x => x.Ano).ThenBy(x => x.Mes).ToList();
+    }
+
+    public void GravarPorSetor(IEnumerable<VendaPorSetor> meses) =>
+        _s.WriteBatch(EntidadeSetor, meses.Select(m => (IReadOnlyList<KeyValuePair<string, object?>>)new KeyValuePair<string, object?>[]
+        {
+            new("id", m.Id), new("nb", S(m.Nb)), new("afm", S(m.Afm)),
+        }).ToList());
 
     public void GravarMeses(IEnumerable<MesDeVendas> meses) =>
         _s.WriteBatch(EntidadeMeses, meses.Select(m => (IReadOnlyList<KeyValuePair<string, object?>>)new KeyValuePair<string, object?>[]
@@ -131,7 +168,64 @@ public sealed class VendasMensaisRepository
         return null;
     }
 
-    public enum TipoDeImportacao { Vendas, Propostas, ValorProposto }
+    public enum TipoDeImportacao { Vendas, Propostas, ValorProposto, VendasPorSetor }
+
+    /// <summary>Cabeçalho de coluna de vendas por setor: "NB 2025", "AFM 2026", "Aftermarket 2026", "New Business 2025".</summary>
+    private static (string Setor, int Ano)? ColunaDeSetor(string? texto)
+    {
+        var t = Simples(texto);
+        var ano = System.Text.RegularExpressions.Regex.Match(t, @"\b(20\d\d)\b");
+        if (!ano.Success) return null;
+        var resto = " " + t.Replace(ano.Value, " ") + " ";
+        string? setor = resto.Contains(" nb ") || resto.Contains("new business") ? "NB"
+            : resto.Contains(" afm ") || resto.Contains("aftermarket") || resto.Contains("after market") ? "AFM" : null;
+        return setor is null ? null : (setor, int.Parse(ano.Value));
+    }
+
+    /// <summary>
+    /// Lê a planilha de vendas por setor: a 1ª coluna com os meses e uma coluna por setor e ano
+    /// ("NB 2025", "AFM 2025", "NB 2026", "AFM 2026"…). Grava por cima do mesmo mês. Coluna repetida
+    /// (o mesmo setor e ano duas vezes) não entra: fica o aviso para corrigir o cabeçalho.
+    /// </summary>
+    private (int Meses, int Budgets, List<string> Avisos) ImportarPorSetor(List<string[]> todas)
+    {
+        var avisos = new List<string>();
+        var iCab = todas.FindIndex(l => l.Count(c => ColunaDeSetor(c) is not null) >= 1);
+        if (iCab < 0) return (0, 0, new List<string> { "Não achei as colunas por setor: o cabeçalho deve ter \"NB 2025\", \"AFM 2025\", \"NB 2026\"…" });
+        var cols = new Dictionary<int, (string Setor, int Ano)>();
+        for (var c = 0; c < todas[iCab].Length; c++)
+        {
+            if (ColunaDeSetor(todas[iCab][c]) is not { } k) continue;
+            if (cols.Values.Contains(k))
+            {
+                avisos.Add($"A coluna {XLHelper.GetColumnLetterFromNumber(c + 1)} repete \"{todas[iCab][c]}\" e ficou de fora: corrija o cabeçalho (ex.: o ano) e importe de novo.");
+                continue;
+            }
+            cols[c] = k;
+        }
+        var atuais = PorSetor().ToDictionary(m => m.Id);
+        var mudados = new Dictionary<string, VendaPorSetor>();
+        foreach (var l in todas.Skip(iCab + 1))
+        {
+            var mes = l.Select(MesDe).FirstOrDefault(m => m is not null);
+            var rotulo = l.FirstOrDefault(c => MesDe(c) is not null);
+            if (mes is not int m || cols.Keys.Any(c => c < l.Length && ReferenceEquals(l[c], rotulo))) continue;
+            foreach (var (c, (setor, ano)) in cols)
+            {
+                var texto = c < l.Length ? (l[c] ?? "").Trim() : "";
+                if (texto.Length == 0 || texto is "-" or "—") continue;
+                var v = Numero(texto);
+                if (v is null) { avisos.Add($"{rotulo} {setor} {ano}: \"{texto}\" não é número."); continue; }
+                var id = $"{ano:D4}-{m:D2}";
+                var a = atuais.GetValueOrDefault(id);
+                var reg = mudados.GetValueOrDefault(id) ?? new VendaPorSetor { Ano = ano, Mes = m, Nb = a?.Nb, Afm = a?.Afm };
+                if (setor == "NB") reg.Nb = v; else reg.Afm = v;
+                mudados[id] = reg;
+            }
+        }
+        if (mudados.Count > 0) GravarPorSetor(mudados.Values);
+        return (mudados.Count, 0, avisos);
+    }
 
     /// <summary>
     /// Lê a planilha no layout da equipe: a coluna "Mês" e uma coluna por ano;
@@ -144,6 +238,7 @@ public sealed class VendasMensaisRepository
         using var ms = new MemoryStream(arquivo);
         var todas = OpportunityImporter.LerGrade(nome, ms)
             .Select(l => l.Select(c => c.Num is double n ? n.ToString(Inv) : c.Text).ToArray()).ToList();
+        if (tipo == TipoDeImportacao.VendasPorSetor) return ImportarPorSetor(todas);
         var iCab = todas.FindIndex(l => l.Length > 1 && Simples(l[0]).StartsWith("mes"));
         if (iCab < 0) iCab = todas.FindIndex(l => l.Skip(1).Count(c => int.TryParse((c ?? "").Trim().Split('.')[0], out var a) && a is > 2000 and < 2100) >= 1);
         if (iCab < 0) return (0, 0, new List<string> { "Não achei o cabeçalho: a 1ª coluna \"Mês\" e uma coluna por ano (2022, 2023…)." });
@@ -200,7 +295,8 @@ public sealed class VendasMensaisRepository
         : new MesDeVendas { Ano = m.Ano, Mes = m.Mes, Vendas = m.Vendas, Propostas = m.Propostas, ValorProposto = m.ValorProposto };
 
     /// <summary>A planilha com as três abas (vendas com totais e budgets, propostas e valor proposto), no layout da equipe.</summary>
-    public static byte[] Planilha(IReadOnlyList<MesDeVendas> meses, IReadOnlyList<BudgetDoAno> budgets, IReadOnlyList<ResumoDoMes>? conversao = null)
+    public static byte[] Planilha(IReadOnlyList<MesDeVendas> meses, IReadOnlyList<BudgetDoAno> budgets, IReadOnlyList<ResumoDoMes>? conversao = null,
+        IReadOnlyList<VendaPorSetor>? porSetor = null)
     {
         var anos = meses.Select(m => m.Ano).Concat(budgets.Select(b => b.Ano)).Distinct().OrderBy(a => a).ToList();
         using var wb = new XLWorkbook();
@@ -258,6 +354,37 @@ public sealed class VendasMensaisRepository
             Aba("Propostas enviadas", (a, m) => M(a, m)?.Propostas, false, false);
             Aba("Valor proposto", (a, m) => M(a, m)?.ValorProposto, true, false);
         }
+        if (porSetor is { Count: > 0 })
+        {
+            // vendas por setor no layout do relatório da equipe: Mês | NB 2025 | AFM 2025 | NB 2026 | AFM 2026 …
+            var ws = wb.Worksheets.Add("Vendas por setor");
+            var anosS = porSetor.Select(x => x.Ano).Distinct().OrderBy(a => a).ToList();
+            ws.Cell(1, 1).SetValue("Mês");
+            for (var i = 0; i < anosS.Count; i++) { ws.Cell(1, 2 + i * 2).SetValue($"NB {anosS[i]}"); ws.Cell(1, 3 + i * 2).SetValue($"AFM {anosS[i]}"); }
+            var nc = anosS.Count * 2 + 1;
+            ws.Range(1, 1, 1, nc).Style.Font.Bold = true; ws.Range(1, 1, 1, nc).Style.Fill.BackgroundColor = XLColor.FromHtml("#9DC3E6");
+            for (var m = 1; m <= 12; m++)
+            {
+                ws.Cell(m + 1, 1).SetValue(NomesDosMeses[m - 1]);
+                for (var i = 0; i < anosS.Count; i++)
+                {
+                    var r = porSetor.FirstOrDefault(x => x.Ano == anosS[i] && x.Mes == m);
+                    if (r?.Nb is decimal nb) ws.Cell(m + 1, 2 + i * 2).SetValue(nb);
+                    if (r?.Afm is decimal af) ws.Cell(m + 1, 3 + i * 2).SetValue(af);
+                }
+            }
+            ws.Cell(14, 1).SetValue("TOTAL").Style.Font.Bold = true;
+            for (var c = 2; c <= nc; c++)
+            {
+                var col = XLHelper.GetColumnLetterFromNumber(c);
+                ws.Cell(14, c).FormulaA1 = $"SUM({col}2:{col}13)";
+                ws.Cell(14, c).Style.Font.Bold = true;
+            }
+            ws.Range(2, 2, 14, nc).Style.NumberFormat.Format = "\"R$\" #,##0.00;-\"R$\" #,##0.00";
+            ws.Column(1).Width = 16;
+            for (var c = 2; c <= nc; c++) ws.Column(c).Width = 18;
+            ws.SheetView.FreezeRows(1);
+        }
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();
@@ -280,6 +407,20 @@ public static class HistoricoDaPlanilha
         Vendas.SelectMany(kv => kv.Value.Select((v, i) => (kv.Key, Mes: i + 1, v)))
             .Where(x => x.v is not null)
             .Select(x => new MesDeVendas { Ano = x.Key, Mes = x.Mes, Vendas = x.v })
+            .ToList();
+
+    /// <summary>Vendas por setor do relatório da equipe (R$): NB e AFM, 2025 e 2026 (até outubro).</summary>
+    private static readonly Dictionary<int, (decimal?[] Nb, decimal?[] Afm)> Setores = new()
+    {
+        [2025] = (new decimal?[] { 2_360_000, 14_691_000, 1_550_000, 4_376_000, 4_451_000, 4_581_000, 14_337_000, 17_562_000, 20_826_000, 7_454_000, 64_310_000, 12_128_000 },
+                  new decimal?[] { 17_527_000, 11_761_000, 35_829_000, 15_474_000, 20_031_000, 18_086_000, 46_545_000, 24_539_000, 21_319_000, 55_589_000, 10_656_000, 6_499_000 }),
+        [2026] = (new decimal?[] { 2_619_000, 5_460_000, 5_267_000, 7_566_000, 5_140_000, 37_528_000, -1_108_000, 11_739_000, 21_449_000, 11_609_000, null, null },
+                  new decimal?[] { 28_748_000, 25_260_000, 16_645_000, 35_633_000, 36_540_000, 6_499_000, -4_996_000, 32_532_000, 31_527_000, 21_644_000, null, null }),
+    };
+
+    public static List<VendaPorSetor> PorSetor() =>
+        Setores.SelectMany(kv => Enumerable.Range(1, 12).Select(m => new VendaPorSetor { Ano = kv.Key, Mes = m, Nb = kv.Value.Nb[m - 1], Afm = kv.Value.Afm[m - 1] }))
+            .Where(x => x.Nb is not null || x.Afm is not null)
             .ToList();
 
     public static List<BudgetDoAno> Budgets() => new()

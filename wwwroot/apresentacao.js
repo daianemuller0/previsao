@@ -106,6 +106,7 @@ window.vpPptx = (function () {
         const itens = [
             ['kpis', 'Indicadores de ' + d.foco, 'Comparações com o mesmo período do ano anterior · ' + ff],
             ['mes-a-mes', 'Vendas e propostas, mês a mês · ' + d.foco, 'Em cima, quanto foi vendido no mês (R$, empresa toda); embaixo, quantas propostas foram enviadas · ' + ff],
+            ['mes-a-mes-setor', 'Vendas por setor (NB e AFM), propostas e conversão · ' + d.foco, 'Vendas do relatório por setor (seguem o filtro de Setor); embaixo, as propostas e a conversão por quantidade e por valor · ' + ff],
             ['mensal-qtd', 'Propostas enviadas por mês, comparando os anos', 'Uma linha por ano · mês de envio da proposta · ' + ff],
             ['mensal-valor', 'Valor das propostas enviadas por mês (R$)', 'Uma linha por ano · mês de envio da proposta · ' + ff],
             ['mensal-vendas', 'Vendas por mês (R$), comparando os anos', 'Uma linha por ano · vendas da empresa no mês (não seguem os filtros)'],

@@ -874,8 +874,10 @@ document.addEventListener('keydown', e => {
 // os pontos pela posição real deles na tela; (2) sobe os rótulos que se encostariam,
 // para nenhum número ficar por cima de outro.
 window.vpmAjustar = function () {
-    const raiz = document.getElementById('mes-a-mes');
-    if (!raiz) return;
+    // os dois quadros: "mes-a-mes" (vendas da empresa toda) e "mes-a-mes-setor" (vendas NB e AFM)
+    document.querySelectorAll('.vpm').forEach(raiz => vpmAjustarQuadro(raiz));
+};
+function vpmAjustarQuadro(raiz) {
     raiz.querySelectorAll('.vpm-banda').forEach(b => {
         const svg = b.querySelector('svg.vpm-banda-svg');
         if (!svg) return;
@@ -888,7 +890,8 @@ window.vpmAjustar = function () {
             if (!grupos.has(a)) grupos.set(a, []);
             grupos.get(a).push(p);
         });
-        const tracejada = b.classList.contains('conv') ? ' stroke-dasharray="5 3"' : '';
+        // conversão por quantidade: tracejada; por valor (quadro por setor): pontilhada
+        const tracejada = b.classList.contains('valor') ? ' stroke-dasharray="1.5 3"' : b.classList.contains('conv') ? ' stroke-dasharray="5 3"' : '';
         let html = '';
         grupos.forEach(pts => {
             const cor = pts[0].dataset.cor, larg = pts[0].dataset.pri ? 1.7 : 1.3;
@@ -926,7 +929,7 @@ window.vpmAjustar = function () {
             postos.push(r);
         });
     });
-};
+}
 (function () {
     let t;
     const de = () => { clearTimeout(t); t = setTimeout(() => window.vpmAjustar && window.vpmAjustar(), 120); };

@@ -15,11 +15,50 @@ namespace HowdenSalesForecast.Components.Pages;
 // ---------------------------------------------------------------------------
 public partial class VendasPropostas
 {
-    private string _mmModo = "comparar";
-    private int? _mmComp;
-    private bool _mmDetalhe;
-    /// <summary>Taxa de conversão do mês no quadro: por quantidade ou por valor (botões da barra de filtros).</summary>
-    private double? TaxaMm(int ano, int mes) => TaxaMes(ano, mes).Taxa;
+    /// <summary>O estado de cada quadro do mês a mês (modo, ano comparado, dados detalhados): cada um tem o seu.</summary>
+    private sealed class EstadoMm
+    {
+        public string Modo = "comparar";
+        public int? Comp;
+        public bool Detalhe;
+    }
+    private readonly EstadoMm _mmEmpresa = new(), _mmSetores = new();
+    /// <summary>
+    /// Qual quadro está sendo desenhado: false = "Vendas e propostas, mês a mês" (vendas da empresa toda);
+    /// true = "Vendas por setor" (vendas NB e AFM, que seguem o filtro de Setor, e as duas conversões, quantidade e valor).
+    /// Ligado só durante o desenho do quadro (SecaoMesAMes); os cliques usam o estado capturado.
+    /// </summary>
+    private bool _mmS;
+    private EstadoMm Mm => _mmS ? _mmSetores : _mmEmpresa;
+
+    /// <summary>Taxa de conversão do mês no quadro: por quantidade ou por valor (botões da barra de filtros); no quadro por setor, sempre por quantidade (a de valor tem a sua linha).</summary>
+    private double? TaxaMm(int ano, int mes) => _mmS ? TaxaQtdMes(ano, mes) : TaxaMes(ano, mes).Taxa;
+
+    /// <summary>Por quantidade: ganhas ÷ todas as enviadas no mês, ou ÷ decididas (botão "Taxa sobre").</summary>
+    private double? TaxaQtdMes(int ano, int mes)
+    {
+        var l = _convSetor.Where(x => x.Ano == ano && x.Mes == mes).ToList();
+        var g = l.Count(x => x.Classe == ClasseProposta.Ganha);
+        var b = BaseTodas ? l.Count : g + l.Count(x => x.Classe == ClasseProposta.Perdida);
+        return b > 0 ? g * 100.0 / b : null;
+    }
+
+    // ---- vendas por setor (NB e AFM) ----
+
+    private Dictionary<(int Ano, int Mes), VendaPorSetor> _vSetor = new();
+    private bool VeNb => _fil.Origens.Count == 0 || _fil.Origens.Contains(ConversaoService.Nb);
+    private bool VeAfm => _fil.Origens.Count == 0 || _fil.Origens.Contains(ConversaoService.Afm);
+
+    /// <summary>Vendas do mês pelo filtro de Setor: só NB, só AFM ou as duas somadas (sem filtro). null = falta o número.</summary>
+    private decimal? VendaSetor(int a, int m)
+    {
+        if (!_vSetor.TryGetValue((a, m), out var r) || (!VeNb && !VeAfm)) return null;
+        if ((VeNb && r.Nb is null) || (VeAfm && r.Afm is null)) return null;
+        return (VeNb ? r.Nb ?? 0m : 0m) + (VeAfm ? r.Afm ?? 0m : 0m);
+    }
+
+    /// <summary>De que vendas o quadro fala: "empresa toda", "NB + AFM", "só NB", "só AFM".</summary>
+    private string VendasDeMm => !_mmS ? "empresa toda" : VeNb && VeAfm ? "NB + AFM" : VeNb ? "só NB" : VeAfm ? "só AFM" : "nenhum setor";
 
     /// <summary>Por valor: valor ganho ÷ (ganho + perdido), ou ÷ valor de todas as enviadas (mesma regra da guia Conversão).</summary>
     private double? TaxaValorMes(int ano, int mes)
@@ -83,7 +122,8 @@ public partial class VendasPropostas
     /// <summary>Vendas do mês. No ano corrente, mês sem venda registrada ainda está "a apurar"; nos anteriores, "n/d".</summary>
     private CelMm CelVenda(int a, int m)
     {
-        if (_meses.FirstOrDefault(x => x.Ano == a && x.Mes == m)?.Vendas is decimal v) return new(SitMes.Valor, v, false);
+        var venda = _mmS ? VendaSetor(a, m) : _meses.FirstOrDefault(x => x.Ano == a && x.Mes == m)?.Vendas;
+        if (venda is decimal v) return new(SitMes.Valor, v, false);
         return a >= DateTime.Today.Year ? AApurarMm : SemDadoMm;
     }
 
@@ -138,12 +178,14 @@ public partial class VendasPropostas
     {
         var anos = AnosDoPainel.Where(a => a != principal).ToList();
         if (anos.Count == 0) return null;
-        if (_mmComp is int c && anos.Contains(c)) return c;
+        if (Mm.Comp is int c && anos.Contains(c)) return c;
         if (anos.Contains(principal - 1)) return principal - 1;
         return anos.OrderBy(a => Math.Abs(a - principal)).ThenByDescending(a => a).First();
     }
 
-    private sealed record LadoMm(int Ano, decimal Vendas, int MesesV, int Propostas, int MesesP, double? Taxa, int G, int Base);
+    /// <param name="Taxa">a conversão do quadro (no quadro por setor, por quantidade)</param>
+    /// <param name="TaxaV">a conversão por valor (R$ ganho ÷ R$ da base)</param>
+    private sealed record LadoMm(int Ano, decimal Vendas, int MesesV, int Propostas, int MesesP, double? Taxa, int G, int Base, double? TaxaV);
 
     /// <summary>
     /// Resumo de dois anos no período comparável: vendas de jan até o último mês fechado nos dois;
@@ -158,7 +200,7 @@ public partial class VendasPropostas
             var (v, nv) = SomaMm(true, a, mv);
             var (p, np) = SomaMm(false, a, mp);
             var t = mp > 0 ? Taxa(a, mp) : default;
-            return new LadoMm(a, v, nv, (int)p, np, mp > 0 ? t.Taxa : null, t.G, t.Base);
+            return new LadoMm(a, v, nv, (int)p, np, mp > 0 ? (_mmS ? t.TaxaQtd : t.Taxa) : null, t.G, t.Base, mp > 0 ? t.TaxaValor : null);
         }
         return (mv, mp, Lado(a1), Lado(a2));
     }
@@ -240,10 +282,12 @@ public partial class VendasPropostas
     private string StatusMm()
     {
         var hoje = DateTime.Today;
-        var ultV = _meses.Where(m => m.Vendas is not null).OrderBy(m => m.Ano * 100 + m.Mes).LastOrDefault();
+        var ultV = _mmS
+            ? _vSetor.Keys.Where(k => VendaSetor(k.Ano, k.Mes) is not null).Select(k => (k.Ano, k.Mes)).OrderBy(k => k.Ano * 100 + k.Mes).Select(k => ((int, int)?)k).LastOrDefault()
+            : _meses.Where(m => m.Vendas is not null).OrderBy(m => m.Ano * 100 + m.Mes).Select(m => ((int, int)?)(m.Ano, m.Mes)).LastOrDefault();
         var partes = new List<string>
         {
-            ultV is null ? "Vendas: nenhuma registrada" : $"Vendas registradas até {NomeDoMes(ultV.Mes).ToLowerInvariant()}/{ultV.Ano}",
+            ultV is not (int ua, int um) ? "Vendas: nenhuma registrada" : $"Vendas{(_mmS ? $" por setor ({VendasDeMm})" : "")} registradas até {NomeDoMes(um).ToLowerInvariant()}/{ua}",
             Conv.AtualizadoEm is { } q ? $"propostas lidas das planilhas em {q:dd/MM/yyyy 'às' HH:mm}" : "propostas: planilhas ainda não lidas",
             $"{NomeDoMes(hoje.Month).ToLowerInvariant()}/{hoje.Year} em andamento (propostas parciais)",
         };
