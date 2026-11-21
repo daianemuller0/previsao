@@ -17,27 +17,27 @@
    as vendas e os budgets, do histórico da equipe (editável aqui).
    =========================================================================== *@
 
-<PageTitle>Performance Comercial · Howden South America</PageTitle>
+<PageTitle>@T("Performance Comercial", "Sales Performance") · Howden South America</PageTitle>
 
 <div class="cvx vp-page">
-    <div class="breadcrumbs"><span>Executivo</span><span class="sep">/</span><span>Performance Comercial</span></div>
+    <div class="breadcrumbs"><span>@T("Executivo", "Executive")</span><span class="sep">/</span><span>@T("Performance Comercial", "Sales Performance")</span></div>
     <div class="page-head">
         <div>
-            <h1>Performance Comercial | Howden South America</h1>
+            <h1>@T("Performance Comercial", "Sales Performance") | Howden South America</h1>
             <p class="subtitle">
-                Resultados, indicadores e oportunidades de crescimento · @Periodo · valores em @Sim@(_fil.EmDolar ? " (R$ ÷ taxa USD/BRL do ano; AFM no valor original em US$)" : "")<br />
-                Propostas: planilhas da guia Conversão (AFM e NB), pela data de envio@(Conv.AtualizadoEm is { } quando ? $" · atualizadas em {quando:dd/MM/yyyy 'às' HH:mm}" : "") · Vendas e budgets: histórico da equipe
+                @T("Resultados, indicadores e oportunidades de crescimento", "Results, indicators and growth opportunities") · @Periodo · @T("valores em", "values in") @Sim@(_fil.EmDolar ? T(" (R$ ÷ taxa USD/BRL do ano; AFM no valor original em US$)", " (R$ ÷ the year's USD/BRL rate; AFM at its original US$ value)") : "")<br />
+                @T("Propostas: planilhas da guia Conversão (AFM e NB), pela data de envio", "Proposals: Conversion tab spreadsheets (AFM and NB), by send date")@(Conv.AtualizadoEm is { } quando ? (En ? $" · updated {quando.ToString("MM/dd/yyyy 'at' h:mm tt", EnUs)}" : $" · atualizadas em {quando:dd/MM/yyyy 'às' HH:mm}") : "") · @T("Vendas e budgets: histórico da equipe", "Sales and budgets: team history")
             </p>
         </div>
         <div class="page-actions">
-            <button class="btn-ghost" title="Reler as planilhas de propostas" disabled="@_carregando" @onclick="Reler">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
-            <button class="btn-ghost" @onclick="Exportar">@Icons.Svg("download")Exportar Excel</button>
-            <button class="btn-ghost" disabled="@_gerandoPpt" title="Gera uma apresentação com os gráficos e os dados desta tela (com os filtros atuais)" @onclick="ExportarPowerPoint">@Icons.Svg("download")@(_gerandoPpt ? "Gerando…" : "Apresentação (PowerPoint)")</button>
-            <button class="btn-primary" @onclick="() => { _editando = !_editando; _msg = null; }">@(_editando ? "✕ Fechar edição" : "✎ Atualizar dados")</button>
+            <button class="btn-ghost" title="@T("Reler as planilhas de propostas", "Reload the proposal spreadsheets")" disabled="@_carregando" @onclick="Reler">@Icons.Svg("import")@(_carregando ? T("Atualizando…", "Refreshing…") : T("Atualizar", "Refresh"))</button>
+            <button class="btn-ghost" @onclick="Exportar">@Icons.Svg("download")@T("Exportar Excel", "Export Excel")</button>
+            <button class="btn-ghost" disabled="@_gerandoPpt" title="@T("Gera uma apresentação com os gráficos e os dados desta tela (com os filtros atuais)", "Builds a presentation with the charts and data on this screen (with the current filters)")" @onclick="ExportarPowerPoint">@Icons.Svg("download")@(_gerandoPpt ? T("Gerando…", "Generating…") : T("Apresentação (PowerPoint)", "Presentation (PowerPoint)"))</button>
+            <button class="btn-primary" @onclick="() => { _editando = !_editando; _msg = null; }">@(_editando ? T("✕ Fechar edição", "✕ Close editing") : T("✎ Atualizar dados", "✎ Edit data"))</button>
         </div>
     </div>
 
-    @if (_gerandoPpt) { <div class="vp-gerando" role="status"><div><b>Gerando a apresentação…</b><span>Fotografando os gráficos da tela. Leva alguns segundos; não feche a página.</span></div></div> }
+    @if (_gerandoPpt) { <div class="vp-gerando" role="status"><div><b>@T("Gerando a apresentação…", "Generating the presentation…")</b><span>@T("Fotografando os gráficos da tela. Leva alguns segundos; não feche a página.", "Capturing the charts on screen. It takes a few seconds; do not close the page.")</span></div></div> }
     @if (_msg is not null) { <div class="cvx-alert @(_msgOk ? "vp-ok" : "erro")">@_msg</div> }
 
     @* filtros da guia Conversão (mesma barra, congelada no topo): valem para as propostas e as seções de conversão *@
@@ -45,7 +45,7 @@
 
     @if (_anos.Count == 0)
     {
-        <div class="cvx-card"><div class="empty" style="padding:34px 12px">Sem dados de vendas nem de propostas.</div></div>
+        <div class="cvx-card"><div class="empty" style="padding:34px 12px">@T("Sem dados de vendas nem de propostas.", "No sales or proposal data.")</div></div>
     }
     else
     {
@@ -56,11 +56,11 @@
         var qtdAnt = AnoIni <= anoAnt ? QtdAte(anoAnt, mesLim) : (int?)null;
         var valAnt = AnoIni <= anoAnt ? ValorAte(anoAnt, mesLim) : null;
         var vendAnt = AnoIni <= anoAnt && foco.UltimoMes > 0 ? ConversaoDeVendas.AteOMes(_meses, anoAnt, foco.UltimoMes) : 0m;
-        var periodo = mesLim < 12 ? $"jan–{MesCurto(mesLim).ToLowerInvariant()}" : "ano inteiro";
-        var periodoVendas = foco.UltimoMes is > 0 and < 12 ? $"jan–{MesCurto(foco.UltimoMes).ToLowerInvariant()}" : "ano inteiro";
+        var periodo = mesLim < 12 ? JanAte(mesLim) : T("ano inteiro", "full year");
+        var periodoVendas = foco.UltimoMes is > 0 and < 12 ? JanAte(foco.UltimoMes) : T("ano inteiro", "full year");
 
         <div class="cvx-filters vp-foco">
-            <div class="flt"><span class="flt-label">Ano em foco</span>
+            <div class="flt"><span class="flt-label">@T("Ano em foco", "Focus year")</span>
                 <div class="cvx-seg-ctl">
                     @foreach (var a in AnosDoPainel)
                     {
@@ -69,23 +69,23 @@
                     }
                 </div>
             </div>
-            <span class="cvx-note">O filtro de Ano escolhe os anos da página. Os outros filtros valem para as propostas e as taxas; vendas e metas são da empresa toda. Comparações com o mesmo período de @anoAnt.</span>
+            <span class="cvx-note">@T($"O filtro de Ano escolhe os anos da página. Os outros filtros valem para as propostas e as taxas; vendas e metas são da empresa toda. Comparações com o mesmo período de {anoAnt}.", $"The Year filter picks the years shown on the page. The other filters apply to proposals and rates; sales and targets are company-wide. Comparisons with the same period of {anoAnt}.")</span>
         </div>
 
-        @if (_carregando && _enviadas.Count == 0) { <div class="cvx-alert">Lendo as planilhas de propostas…</div> }
+        @if (_carregando && _enviadas.Count == 0) { <div class="cvx-alert">@T("Lendo as planilhas de propostas…", "Reading the proposal spreadsheets…")</div> }
         @if (_anosSemCambio.Count > 0)
         {
             <div class="cvx-alert">
-                <strong>Em US$ falta a taxa de câmbio de @string.Join(", ", _anosSemCambio):</strong>
-                as vendas e os budgets desses anos (em R$) ficam "n/d" em dólar. Cadastre a taxa USD/BRL na guia Conversão (botão “Taxas de câmbio”).
+                <strong>@T("Em US$ falta a taxa de câmbio de", "In US$, the exchange rate is missing for") @string.Join(", ", _anosSemCambio):</strong>
+                @T("as vendas e os budgets desses anos (em R$) ficam \"n/d\" em dólar. Cadastre a taxa USD/BRL na guia Conversão (botão “Taxas de câmbio”).", "sales and budgets for those years (in R$) show \"n/a\" in dollars. Add the USD/BRL rate in the Conversion tab (“Exchange rates” button).")
             </div>
         }
         @if (AnosSemTaxa() is { Count: > 0 } semTaxa)
         {
             <div class="cvx-alert">
-                <strong>Valor enviado parcial em @string.Join(", ", semTaxa.Select(s => s.Ano)):</strong>
-                @string.Join(" · ", semTaxa.Select(s => $"{N0(s.Qtd)} proposta(s) do {(_fil.EmDolar ? "NB" : "AFM")} em {s.Ano} sem taxa de câmbio")).
-                Elas contam na quantidade, mas ficam fora do valor. Cadastre a taxa USD/BRL desses anos na guia Conversão (botão “Taxas de câmbio”).
+                <strong>@T("Valor enviado parcial em", "Partial value sent in") @string.Join(", ", semTaxa.Select(s => s.Ano)):</strong>
+                @string.Join(" · ", semTaxa.Select(s => En ? $"{N0(s.Qtd)} {(_fil.EmDolar ? "NB" : "AFM")} proposal(s) in {s.Ano} without an exchange rate" : $"{N0(s.Qtd)} proposta(s) do {(_fil.EmDolar ? "NB" : "AFM")} em {s.Ano} sem taxa de câmbio")).
+                @T("Elas contam na quantidade, mas ficam fora do valor. Cadastre a taxa USD/BRL desses anos na guia Conversão (botão “Taxas de câmbio”).", "They count in the number of proposals but are left out of the value. Add the USD/BRL rate for those years in the Conversion tab (“Exchange rates” button).")
             </div>
         }
 
@@ -93,24 +93,25 @@
 
         @* ================= 1 · PROPOSTAS ENVIADAS (o principal) ================= *@
         <section id="propostas" class="cvx-sec">
-            <div class="xsec lvl1"><span class="xsec-t">Propostas enviadas</span><span class="xsec-s">Quantidade, valor enviado e vendas · mês a mês e ano a ano · @Periodo</span><span class="xsec-line"></span></div>
+            <div class="xsec lvl1"><span class="xsec-t">@T("Propostas enviadas", "Proposals sent")</span><span class="xsec-s">@T("Quantidade, valor enviado e vendas · mês a mês e ano a ano", "Count, value sent and sales · month by month and year by year") · @Periodo</span><span class="xsec-line"></span></div>
 
             <div class="cvx-kpis">
-                @Kpi($"Propostas enviadas · {foco.Ano}", linhaFoco.Qtd is int qk ? N0(qk) : "—", $"{periodo}{(_setor == "" ? "" : " · " + _setor)}",
-                    "Propostas com data de envio no ano (cada número de proposta conta uma vez)", CorTx, Delta(QtdAte(foco.Ano, mesLim), qtdAnt, anoAnt))
-                @Kpi($"Valor enviado · {foco.Ano}", linhaFoco.Valor is decimal vk ? Mi(vk) : "—", linhaFoco.SemTaxa > 0 ? $"{periodo} · parcial: {N0(linhaFoco.SemTaxa)} sem taxa de câmbio" : periodo,
-                    $"Soma do valor das propostas enviadas no ano, em {Sim}", "#155A96", Delta(ValorAte(foco.Ano, mesLim), valAnt, anoAnt))
-                @Kpi($"Vendas · {foco.Ano}", foco.MesesComVendas > 0 ? Mi(foco.Vendas) : "—", $"{periodoVendas}{(foco.BudgetHsa is > 0 ? $" · {Pct(foco.Vendas / foco.BudgetHsa!.Value)} do budget HSA" : "")}",
-                    "Vendas da empresa no ano (histórico da equipe)", "#1f9254", Delta(foco.Vendas, vendAnt, anoAnt))
-                @Kpi($"Valor médio por proposta · {foco.Ano}", linhaFoco.Qtd is > 0 && linhaFoco.Valor is decimal vm && linhaFoco.ComValor > 0 ? Mi(vm / linhaFoco.ComValor) : "—",
-                    $"{periodo} · valor enviado ÷ propostas com valor", $"Média do valor das propostas enviadas no ano ({Sim})", "#2478B8",
+                @Kpi($"{T("Propostas enviadas", "Proposals sent")} · {foco.Ano}", linhaFoco.Qtd is int qk ? N0(qk) : "—", $"{periodo}{(_setor == "" ? "" : " · " + _setor)}",
+                    T("Propostas com data de envio no ano (cada número de proposta conta uma vez)", "Proposals with a send date in the year (each proposal number counts once)"), CorTx, Delta(QtdAte(foco.Ano, mesLim), qtdAnt, anoAnt))
+                @Kpi($"{T("Valor enviado", "Value sent")} · {foco.Ano}", linhaFoco.Valor is decimal vk ? Mi(vk) : "—", linhaFoco.SemTaxa > 0 ? (En ? $"{periodo} · partial: {N0(linhaFoco.SemTaxa)} without an exchange rate" : $"{periodo} · parcial: {N0(linhaFoco.SemTaxa)} sem taxa de câmbio") : periodo,
+                    T($"Soma do valor das propostas enviadas no ano, em {Sim}", $"Total value of proposals sent in the year, in {Sim}"), "#155A96", Delta(ValorAte(foco.Ano, mesLim), valAnt, anoAnt))
+                @Kpi($"{T("Vendas", "Sales")} · {foco.Ano}", foco.MesesComVendas > 0 ? Mi(foco.Vendas) : "—", $"{periodoVendas}{(foco.BudgetHsa is > 0 ? $" · {Pct(foco.Vendas / foco.BudgetHsa!.Value)} {T("do budget HSA", "of HSA budget")}" : "")}",
+                    T("Vendas da empresa no ano (histórico da equipe)", "Company sales in the year (team history)"), "#1f9254", Delta(foco.Vendas, vendAnt, anoAnt))
+                @Kpi($"{T("Valor médio por proposta", "Average value per proposal")} · {foco.Ano}", linhaFoco.Qtd is > 0 && linhaFoco.Valor is decimal vm && linhaFoco.ComValor > 0 ? Mi(vm / linhaFoco.ComValor) : "—",
+                    $"{periodo} · {T("valor enviado ÷ propostas com valor", "value sent ÷ proposals with a value")}", T($"Média do valor das propostas enviadas no ano ({Sim})", $"Average value of proposals sent in the year ({Sim})"), "#2478B8",
                     AnoIni <= anoAnt ? Delta(MedioAte(foco.Ano, mesLim), MedioAte(anoAnt, mesLim), anoAnt) : null)
-                @Kpi($"Venda por proposta · {foco.Ano}", linhaFoco.VendaPorProposta is decimal vpp ? Mi(vpp) : "—", $"{periodoVendas} · vendas ÷ propostas enviadas, nos meses com as duas",
-                    $"Quanto foi vendido ({Sim}) para cada proposta enviada, só nos meses que têm venda e propostas", "#007A9E")
+                @Kpi($"{T("Venda por proposta", "Sales per proposal")} · {foco.Ano}", linhaFoco.VendaPorProposta is decimal vpp ? Mi(vpp) : "—", $"{periodoVendas} · {T("vendas ÷ propostas enviadas, nos meses com as duas", "sales ÷ proposals sent, in months with both")}",
+                    T($"Quanto foi vendido ({Sim}) para cada proposta enviada, só nos meses que têm venda e propostas", $"How much was sold ({Sim}) for each proposal sent, only in months with both sales and proposals"), "#007A9E")
                 @{ var txFoco = Taxa(foco.Ano); var txFocoAnt = Taxa(anoAnt, mesLim); var txFocoAte = Taxa(foco.Ano, mesLim); }
-                @Kpi($"Taxa de conversão · {foco.Ano}", txFoco.Taxa is double tq ? P1(tq) : "Não calculável",
-                    $"{N0(txFoco.G)} ganhas / {N0(txFoco.Base)} {DenRot}{(PorValor ? (txFoco.TaxaQtd is double tqq ? $" · por quantidade {P1(tqq)}" : "") : (txFoco.TaxaValor is double tv ? $" · por valor {P1(tv)}" : ""))}",
-                    $"Taxa de Conversão {(PorValor ? "por valor" : "por quantidade")} = {RegraTxt}. Mesma regra da guia Conversão; os botões \"Taxa sobre\" e \"Conversão por\" ficam na barra de filtros.",
+                @Kpi($"{T("Taxa de conversão", "Conversion rate")} · {foco.Ano}", txFoco.Taxa is double tq ? P1(tq) : T("Não calculável", "Not computable"),
+                    $"{N0(txFoco.G)} {T("ganhas", "won")} / {N0(txFoco.Base)} {DenRot}{(PorValor ? (txFoco.TaxaQtd is double tqq ? $" · {T("por quantidade", "by count")} {P1(tqq)}" : "") : (txFoco.TaxaValor is double tv ? $" · {T("por valor", "by value")} {P1(tv)}" : ""))}",
+                    En ? $"Conversion rate {(PorValor ? "by value" : "by count")} = {RegraTxt}. Same rule as the Conversion tab; the \"Rate base\" and \"Conversion by\" buttons are in the filter bar."
+                       : $"Taxa de Conversão {(PorValor ? "por valor" : "por quantidade")} = {RegraTxt}. Mesma regra da guia Conversão; os botões \"Taxa sobre\" e \"Conversão por\" ficam na barra de filtros.",
                     CorTx, DeltaPp(txFocoAte.Taxa, txFocoAnt.Taxa, anoAnt))
             </div>
 
@@ -127,59 +128,59 @@
             <div class="panel vp-principal" id="mensal">
                 <div class="panel-head">
                     <div class="panel-title">@TituloGrafico()
-                        <span class="hint">uma linha por ano · jan a dez · @(_met switch { "vendas" => "vendas da empresa no mês · " + Sim, "valor" => "mês de envio da proposta · " + Sim, "taxa" => BaseTodas ? "ganhas ÷ todas as propostas enviadas no mês" : "ganhas ÷ decididas do mês", _ => "mês de envio da proposta" })@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
+                        <span class="hint">@T("uma linha por ano · jan a dez", "one line per year · Jan to Dec") · @(_met switch { "vendas" => T("vendas da empresa no mês · ", "company sales in the month · ") + Sim, "valor" => T("mês de envio da proposta · ", "proposal send month · ") + Sim, "taxa" => BaseTodas ? T("ganhas ÷ todas as propostas enviadas no mês", "won ÷ all proposals sent in the month") : T("ganhas ÷ decididas do mês", "won ÷ decided in the month"), _ => T("mês de envio da proposta", "proposal send month") })@(_met != "vendas" && _setor != "" ? " · " + _setor : "")</span>
                     </div>
                     <div class="rep-attain-group">
                         <div class="rep-attain-box">
-                            <span class="ra-label">Propostas enviadas (@foco.Ano)</span>
+                            <span class="ra-label">@T("Propostas enviadas", "Proposals sent") (@foco.Ano)</span>
                             <span class="ra-value" style="color:@CorDoAno(foco.Ano)">@(linhaFoco.Qtd is int qh ? N0(qh) : "—")</span>
                         </div>
                         <div class="rep-attain-box">
-                            <span class="ra-label">Valor enviado (@foco.Ano)</span>
+                            <span class="ra-label">@T("Valor enviado", "Value sent") (@foco.Ano)</span>
                             <span class="ra-value" style="color:@CorDoAno(foco.Ano)">@(linhaFoco.Valor is decimal vh ? Mi(vh) : "—")</span>
                         </div>
                         <div class="rep-attain-box">
-                            <span class="ra-label">Vendas (@foco.Ano)</span>
+                            <span class="ra-label">@T("Vendas", "Sales") (@foco.Ano)</span>
                             <span class="ra-value" style="color:#1f9254">@(foco.MesesComVendas > 0 ? Mi(foco.Vendas) : "—")</span>
                         </div>
                     </div>
                 </div>
                 <div class="vp-met">
                     <div class="cvx-seg-ctl">
-                        <button class="@(_met == "qtd" ? "on" : "")" @onclick='() => _met = "qtd"'>Quantidade de propostas</button>
-                        <button class="@(_met == "valor" ? "on" : "")" @onclick='() => _met = "valor"'>Valor enviado (@Sim)</button>
-                        <button class="@(_met == "vendas" ? "on" : "")" @onclick='() => _met = "vendas"'>Vendas (@Sim)</button>
-                        <button class="@(_met == "taxa" ? "on" : "")" @onclick='() => _met = "taxa"'>Taxa de conversão (%)</button>
+                        <button class="@(_met == "qtd" ? "on" : "")" @onclick='() => _met = "qtd"'>@T("Quantidade de propostas", "Number of proposals")</button>
+                        <button class="@(_met == "valor" ? "on" : "")" @onclick='() => _met = "valor"'>@T("Valor enviado", "Value sent") (@Sim)</button>
+                        <button class="@(_met == "vendas" ? "on" : "")" @onclick='() => _met = "vendas"'>@T("Vendas", "Sales") (@Sim)</button>
+                        <button class="@(_met == "taxa" ? "on" : "")" @onclick='() => _met = "taxa"'>@T("Taxa de conversão (%)", "Conversion rate (%)")</button>
                     </div>
                     <div class="vp-cores-wrap">
-                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCores ? "true" : "false")" @onclick="() => _editCores = !_editCores">🎨 Cores das linhas</button>
+                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCores ? "true" : "false")" @onclick="() => _editCores = !_editCores">🎨 @T("Cores das linhas", "Line colors")</button>
                         @if (_editCores)
                         {
                             <div class="flt-multi-backdrop" @onclick="() => _editCores = false"></div>
-                            <div class="vp-cores-pop" role="dialog" aria-label="Cores das linhas">
-                                <div class="vp-cores-tit">Cor de cada ano</div>
+                            <div class="vp-cores-pop" role="dialog" aria-label="@T("Cores das linhas", "Line colors")">
+                                <div class="vp-cores-tit">@T("Cor de cada ano", "Color of each year")</div>
                                 @foreach (var a in AnosDoPainel.OrderByDescending(x => x))
                                 {
                                     var ano = a;
-                                    <label class="vp-cor-lin" title="Cor da linha de @ano">
+                                    <label class="vp-cor-lin" title="@T("Cor da linha de", "Line color for") @ano">
                                         <input type="color" value="@CorDoAno(ano)" @onchange="e => MudarCor(ano.ToString(), e.Value?.ToString())" />
                                         <span>@ano</span>
                                     </label>
                                 }
                                 <div class="vp-cores-pe">
-                                    <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">Restaurar cores padrão</button>
-                                    <button class="btn-primary" @onclick="() => _editCores = false">Concluir</button>
+                                    <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => int.TryParse(k, out _)))" @onclick="() => RestaurarCores(AnosDoPainel.Select(a => a.ToString()))">@T("Restaurar cores padrão", "Restore default colors")</button>
+                                    <button class="btn-primary" @onclick="() => _editCores = false">@T("Concluir", "Done")</button>
                                 </div>
                                 <div class="vp-cores-nota">@NotaCores</div>
                             </div>
                         }
                     </div>
-                    <span class="cvx-note">Ano em foco (@foco.Ano) com área e valores; troque o ano no filtro acima. Passe o mouse num mês para ver todos os anos.</span>
+                    <span class="cvx-note">@T($"Ano em foco ({foco.Ano}) com área e valores; troque o ano no filtro acima. Passe o mouse num mês para ver todos os anos.", $"Focus year ({foco.Ano}) with area and values; change the year in the filter above. Hover over a month to see all years.")</span>
                 </div>
                 <div class="chart-body">@((MarkupString)SvgAnos(_met, foco.Ano))</div>
 
                 @* ano a ano, embaixo do gráfico: taxa de conversão + valor enviado, valor médio e vendas, um cartão por ano na cor da linha *@
-                <div class="vp-anos-tit">Taxa de conversão e resultados, ano a ano <span>@RegraTxt · @(BaseTodas ? "todas as propostas" : "só as decididas") (botão "Taxa sobre" no filtro)@(_setor != "" ? " · " + _setor : "")</span></div>
+                <div class="vp-anos-tit">@T("Taxa de conversão e resultados, ano a ano", "Conversion rate and results, year by year") <span>@RegraTxt · @(BaseTodas ? T("todas as propostas", "all proposals") : T("só as decididas", "decided only")) @T("(botão \"Taxa sobre\" no filtro)", "(\"Rate base\" button in the filter)")@(_setor != "" ? " · " + _setor : "")</span></div>
                 <div class="vp-conv-grid">
                     @foreach (var a in AnosDoPainel)
                     {
@@ -191,38 +192,38 @@
                         var rv = _anos.FirstOrDefault(x => x.Ano == a);
                         var dV = a - 1 >= AnoIni && rv is { MesesComVendas: > 0 } ? DeltaCurto(rv.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, rv.UltimoMes)) : null;
                         <button type="button" class="vp-conv-card @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
-                            <div class="vp-cc-ano">@a@if (a == DateTime.Today.Year) { <small>até @MesCurto(limC).ToLowerInvariant()</small> }</div>
+                            <div class="vp-cc-ano">@a@if (a == DateTime.Today.Year) { <small>@T("até", "through") @MesCurtoFrase(limC)</small> }</div>
                             <div class="vp-cc-taxa">
                                 <b>@(c.Taxa is double t ? P1(t) : "—")</b>
                                 @if (dC is not null) { <em class="@DeltaCls(dC)">@Seta(dC)</em> }
                             </div>
-                            <div class="vp-cc-sub">@N0(c.G) ganhas de @N0(c.Base) @DenRot</div>
-                            <div class="vp-cc-vendas" title="Vendas do ano (histórico da equipe, empresa toda, por mês de faturamento)@(dV is not null ? " · variação contra os mesmos meses do ano anterior" : "")">
-                                <span>Vendido no ano@(rv is { UltimoMes: > 0 and < 12 } ? $" (até {MesCurto(rv.UltimoMes).ToLowerInvariant()})" : "")</span>
+                            <div class="vp-cc-sub">@N0(c.G) @T("ganhas de", "won of") @N0(c.Base) @DenRot</div>
+                            <div class="vp-cc-vendas" title="@(T("Vendas do ano (histórico da equipe, empresa toda, por mês de faturamento)", "Sales for the year (team history, company-wide, by billing month)") + (dV is not null ? T(" · variação contra os mesmos meses do ano anterior", " · change vs the same months of the previous year") : ""))">
+                                <span>@T("Vendido no ano", "Sold in the year")@(rv is { UltimoMes: > 0 and < 12 } ? $" ({T("até", "through")} {MesCurtoFrase(rv.UltimoMes)})" : "")</span>
                                 <b>@(rv is { MesesComVendas: > 0 } ? Mi(rv.Vendas) : "—")</b>
                                 @if (dV is not null) { <em class="@DeltaCls(dV)">@Seta(dV)</em> }
                             </div>
-                            <div class="vp-cc-barra" title="@($"Ganhas {N0(c.G)} · Perdidas {N0(c.P)} · Abertas {N0(c.A)}" + (c.NC > 0 ? $" · Não classificadas {N0(c.NC)}" : ""))">
+                            <div class="vp-cc-barra" title="@($"{T("Ganhas", "Won")} {N0(c.G)} · {T("Perdidas", "Lost")} {N0(c.P)} · {T("Abertas", "Open")} {N0(c.A)}" + (c.NC > 0 ? $" · {T("Não classificadas", "Unclassified")} {N0(c.NC)}" : ""))">
                                 <i style="width:@F(c.G * 100.0 / baseBarra)%;background:#1f9254"></i><i style="width:@F(c.P * 100.0 / baseBarra)%;background:#6FB3DC"></i><i style="width:@F(c.A * 100.0 / baseBarra)%;background:#007A9E"></i><i style="width:@F(c.NC * 100.0 / baseBarra)%;background:#c3ccd8"></i>
                             </div>
                             <div class="vp-cc-linhas">
-                                <span>Propostas enviadas</span><b>@N0(c.Total)</b>
-                                <span><i style="background:#1f9254"></i>Ganhas</span><b>@N0(c.G)</b>
-                                <span><i style="background:#6FB3DC"></i>Perdidas</span><b>@N0(c.P)</b>
-                                <span><i style="background:#007A9E"></i>Abertas</span><b>@N0(c.A)</b>
+                                <span>@T("Propostas enviadas", "Proposals sent")</span><b>@N0(c.Total)</b>
+                                <span><i style="background:#1f9254"></i>@T("Ganhas", "Won")</span><b>@N0(c.G)</b>
+                                <span><i style="background:#6FB3DC"></i>@T("Perdidas", "Lost")</span><b>@N0(c.P)</b>
+                                <span><i style="background:#007A9E"></i>@T("Abertas", "Open")</span><b>@N0(c.A)</b>
                             </div>
                         </button>
                     }
                 </div>
-                <div class="vp-cc-leg"><span><i style="background:#1f9254"></i>Ganhas</span><span><i style="background:#6FB3DC"></i>Perdidas</span><span><i style="background:#007A9E"></i>Abertas</span><span>Variação em pontos percentuais contra o mesmo período do ano anterior · clique num ano para colocá-lo em foco</span></div>
-                <p class="cvx-note" style="margin-top:8px">Propostas: @_fonte. Cada número de proposta conta uma vez, no mês da data de envio.</p>
+                <div class="vp-cc-leg"><span><i style="background:#1f9254"></i>@T("Ganhas", "Won")</span><span><i style="background:#6FB3DC"></i>@T("Perdidas", "Lost")</span><span><i style="background:#007A9E"></i>@T("Abertas", "Open")</span><span>@T("Variação em pontos percentuais contra o mesmo período do ano anterior · clique num ano para colocá-lo em foco", "Change in percentage points vs the same period of the previous year · click a year to bring it into focus")</span></div>
+                <p class="cvx-note" style="margin-top:8px">@T("Propostas", "Proposals"): @_fonte. @T("Cada número de proposta conta uma vez, no mês da data de envio.", "Each proposal number counts once, in the month of its send date.")</p>
             </div>
 
             @* ano a ano por setor (AFM × NB) e os valores: o que antes ficava embaixo dos cartões da taxa *@
             <div class="panel vp-principal" id="setores">
                 <div class="panel-head">
-                    <div class="panel-title">AFM × NB e valores, ano a ano
-                        <span class="hint">AFM = planilha de Aftermarket · NB = planilha de New Business · valores em @Sim · taxa: @RegraTxt@(_setor != "" ? " · " + _setor : "")</span>
+                    <div class="panel-title">@T("AFM × NB e valores, ano a ano", "AFM × NB and values, year by year")
+                        <span class="hint">@T("AFM = planilha de Aftermarket · NB = planilha de New Business · valores em", "AFM = Aftermarket spreadsheet · NB = New Business spreadsheet · values in") @Sim · @T("taxa", "rate"): @RegraTxt@(_setor != "" ? " · " + _setor : "")</span>
                     </div>
                 </div>
                 <div class="vp-conv-grid vp-setores">
@@ -236,32 +237,32 @@
                         var dVen = a - 1 >= AnoIni && r is { MesesComVendas: > 0 } ? DeltaCurto(r.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, r.UltimoMes)) : null;
                         var sa = PorSetor(a, ConversaoService.Afm); var sn = PorSetor(a, ConversaoService.Nb); var totSet = Math.Max(1, sa.Total + sn.Total);
                         <button type="button" class="vp-conv-card @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
-                            <div class="vp-cc-ano">@a@if (a == DateTime.Today.Year) { <small>até @MesCurto(limC).ToLowerInvariant()</small> }</div>
+                            <div class="vp-cc-ano">@a@if (a == DateTime.Today.Year) { <small>@T("até", "through") @MesCurtoFrase(limC)</small> }</div>
                             @{ var pa = sa.Total * 100.0 / totSet; var pn = sn.Total * 100.0 / totSet; }
-                            <div class="vp-cc-setor" title="AFM = planilha de Aftermarket · NB = planilha de New Business">
+                            <div class="vp-cc-setor" title="@T("AFM = planilha de Aftermarket · NB = planilha de New Business", "AFM = Aftermarket spreadsheet · NB = New Business spreadsheet")">
                                 <div class="vp-cs-barra grossa">
                                     @if (sa.Total + sn.Total > 0)
                                     {
-                                        <i style="width:@F(pa)%;background:@CorAfm" title="AFM: @N0(sa.Total) propostas (@Math.Round(pa)% das enviadas)">@(pa >= 22 ? $"AFM {Math.Round(pa)}%" : pa >= 12 ? Math.Round(pa) + "%" : "")</i><i style="width:@F(pn)%;background:@CorNb" title="NB: @N0(sn.Total) propostas (@Math.Round(pn)% das enviadas)">@(pn >= 22 ? $"NB {Math.Round(pn)}%" : pn >= 12 ? Math.Round(pn) + "%" : "")</i>
+                                        <i style="width:@F(pa)%;background:@CorAfm" title="AFM: @N0(sa.Total) @T("propostas", "proposals") (@Math.Round(pa)% @T("das enviadas", "of those sent"))">@(pa >= 22 ? $"AFM {Math.Round(pa)}%" : pa >= 12 ? Math.Round(pa) + "%" : "")</i><i style="width:@F(pn)%;background:@CorNb" title="NB: @N0(sn.Total) @T("propostas", "proposals") (@Math.Round(pn)% @T("das enviadas", "of those sent"))">@(pn >= 22 ? $"NB {Math.Round(pn)}%" : pn >= 12 ? Math.Round(pn) + "%" : "")</i>
                                     }
                                 </div>
                                 <div class="vp-cs-grade">
                                     <span></span><b class="cab"><i style="background:@CorAfm"></i>AFM</b><b class="cab"><i style="background:@CorNb"></i>NB</b>
-                                    <span>Taxa</span><b class="tx">@(sa.Taxa is double ta ? P1(ta) : "—")</b><b class="tx">@(sn.Taxa is double tn ? P1(tn) : "—")</b>
-                                    <span>Propostas</span><b>@N0(sa.Total)</b><b>@N0(sn.Total)</b>
-                                    <span>Ganhas</span><b>@N0(sa.G)</b><b>@N0(sn.G)</b>
-                                    <span>Valor enviado</span><b title="@(sa.Valor > 0 ? Cheio(sa.Valor) : "")">@(sa.Valor > 0 ? MiEixo(sa.Valor) : "—")@if (sa.SemTaxa > 0) { <em class="vp-parcial" title="@N0(sa.SemTaxa) proposta(s) sem taxa de câmbio do ano">parcial</em> }</b><b title="@(sn.Valor > 0 ? Cheio(sn.Valor) : "")">@(sn.Valor > 0 ? MiEixo(sn.Valor) : "—")</b>
+                                    <span>@T("Taxa", "Rate")</span><b class="tx">@(sa.Taxa is double ta ? P1(ta) : "—")</b><b class="tx">@(sn.Taxa is double tn ? P1(tn) : "—")</b>
+                                    <span>@T("Propostas", "Proposals")</span><b>@N0(sa.Total)</b><b>@N0(sn.Total)</b>
+                                    <span>@T("Ganhas", "Won")</span><b>@N0(sa.G)</b><b>@N0(sn.G)</b>
+                                    <span>@T("Valor enviado", "Value sent")</span><b title="@(sa.Valor > 0 ? Cheio(sa.Valor) : "")">@(sa.Valor > 0 ? MiEixo(sa.Valor) : "—")@if (sa.SemTaxa > 0) { <em class="vp-parcial" title="@N0(sa.SemTaxa) @T("proposta(s) sem taxa de câmbio do ano", "proposal(s) without the year's exchange rate")">@T("parcial", "partial")</em> }</b><b title="@(sn.Valor > 0 ? Cheio(sn.Valor) : "")">@(sn.Valor > 0 ? MiEixo(sn.Valor) : "—")</b>
                                 </div>
                             </div>
                             <div class="vp-cc-valor">
-                                <span>Valor enviado</span><b>@(l.Valor is decimal vv ? Mi(vv) : "—")@if (l.SemTaxa > 0) { <em class="vp-parcial" title="@N0(l.SemTaxa) proposta(s) do AFM sem taxa de câmbio do ano: fora do valor">parcial</em> } else if (dVal is not null) { <em class="@DeltaCls(dVal)">@Seta(dVal)</em> }</b>
-                                <span>Valor médio</span><b>@(l.Valor is decimal vm2 && l.ComValor > 0 ? Mi(vm2 / l.ComValor) : "—")</b>
-                                <span>Vendas@(r is { UltimoMes: > 0 and < 12 } ? $" (até {MesCurto(r.UltimoMes).ToLowerInvariant()})" : "")</span><b>@(r is { MesesComVendas: > 0 } ? Mi(r.Vendas) : "—")@if (dVen is not null) { <em class="@DeltaCls(dVen)">@Seta(dVen)</em> }</b>
+                                <span>@T("Valor enviado", "Value sent")</span><b>@(l.Valor is decimal vv ? Mi(vv) : "—")@if (l.SemTaxa > 0) { <em class="vp-parcial" title="@N0(l.SemTaxa) @T("proposta(s) do AFM sem taxa de câmbio do ano: fora do valor", "AFM proposal(s) without the year's exchange rate: left out of the value")">@T("parcial", "partial")</em> } else if (dVal is not null) { <em class="@DeltaCls(dVal)">@Seta(dVal)</em> }</b>
+                                <span>@T("Valor médio", "Average value")</span><b>@(l.Valor is decimal vm2 && l.ComValor > 0 ? Mi(vm2 / l.ComValor) : "—")</b>
+                                <span>@T("Vendas", "Sales")@(r is { UltimoMes: > 0 and < 12 } ? $" ({T("até", "through")} {MesCurtoFrase(r.UltimoMes)})" : "")</span><b>@(r is { MesesComVendas: > 0 } ? Mi(r.Vendas) : "—")@if (dVen is not null) { <em class="@DeltaCls(dVen)">@Seta(dVen)</em> }</b>
                             </div>
                         </button>
                     }
                 </div>
-                <div class="vp-cc-leg"><span><i style="background:@CorAfm"></i>AFM</span><span><i style="background:@CorNb"></i>NB</span><span>Barra: divisão das propostas enviadas entre AFM e NB · “parcial” = há propostas do AFM sem taxa de câmbio do ano · variação contra o mesmo período do ano anterior · clique num ano para colocá-lo em foco</span></div>
+                <div class="vp-cc-leg"><span><i style="background:@CorAfm"></i>AFM</span><span><i style="background:@CorNb"></i>NB</span><span>@T("Barra: divisão das propostas enviadas entre AFM e NB · “parcial” = há propostas do AFM sem taxa de câmbio do ano · variação contra o mesmo período do ano anterior · clique num ano para colocá-lo em foco", "Bar: split of proposals sent between AFM and NB · “partial” = some AFM proposals lack the year's exchange rate · change vs the same period of the previous year · click a year to bring it into focus")</span></div>
             </div>
 
             @{
@@ -269,42 +270,42 @@
             }
             <div class="panel vp-principal" id="metas">
                 <div class="panel-head">
-                    <div class="panel-title">Vendas totais × metas, ano a ano
-                        <span class="hint">vendas da empresa × Meta Grupo e Meta HSA · @Sim · @Periodo</span>
+                    <div class="panel-title">@T("Vendas totais × metas, ano a ano", "Total sales × targets, year by year")
+                        <span class="hint">@T("vendas da empresa × Meta Grupo e Meta HSA", "company sales × Group Target and HSA Target") · @Sim · @Periodo</span>
                     </div>
                     <div class="rep-attain-group">
                         <div class="rep-attain-box">
-                            <span class="ra-label">Atend. Meta Grupo (@foco.Ano)</span>
+                            <span class="ra-label">@T("Atend. Meta Grupo", "Group Target attainment") (@foco.Ano)</span>
                             <span class="ra-value" style="color:#172B43">@(pctGrupo is decimal pg0 ? Pct(pg0) : "—")</span>
                         </div>
                         <div class="rep-attain-box">
-                            <span class="ra-label">Atend. Meta HSA (@foco.Ano)</span>
+                            <span class="ra-label">@T("Atend. Meta HSA", "HSA Target attainment") (@foco.Ano)</span>
                             <span class="ra-value" style="color:#172B43">@(pctHsa is decimal ph0 ? Pct(ph0) : "—")</span>
                         </div>
                     </div>
                 </div>
                 <div class="vp-met">
                     <div class="vp-cores-wrap">
-                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 Cores das barras</button>
+                        <button class="btn-ghost vp-btn-cores" aria-expanded="@(_editCoresMetas ? "true" : "false")" @onclick="() => _editCoresMetas = !_editCoresMetas">🎨 @T("Cores das barras", "Bar colors")</button>
                         @if (_editCoresMetas)
                         {
                             <div class="flt-multi-backdrop" @onclick="() => _editCoresMetas = false"></div>
-                            <div class="vp-cores-pop" role="dialog" aria-label="Cores das barras">
-                                <div class="vp-cores-tit">Cor da barra e das metas</div>
+                            <div class="vp-cores-pop" role="dialog" aria-label="@T("Cores das barras", "Bar colors")">
+                                <div class="vp-cores-tit">@T("Cor da barra e das metas", "Color of the bar and the targets")</div>
                                 @foreach (var sm in SeriesMetas)
                                 {
                                     var chave = sm.Chave;
-                                    <label class="vp-cor-lin"><input type="color" value="@CorMeta(chave)" @onchange="e => MudarCor(chave, e.Value?.ToString())" /><span>@sm.Nome</span></label>
+                                    <label class="vp-cor-lin"><input type="color" value="@CorMeta(chave)" @onchange="e => MudarCor(chave, e.Value?.ToString())" /><span>@NomeSerieMeta(chave, sm.Nome)</span></label>
                                 }
                                 <div class="vp-cores-pe">
-                                    <button class="btn-link" disabled="@(!SeriesMetas.Any(x => Editaveis.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">Restaurar cores padrão</button>
-                                    <button class="btn-primary" @onclick="() => _editCoresMetas = false">Concluir</button>
+                                    <button class="btn-link" disabled="@(!SeriesMetas.Any(x => Editaveis.ContainsKey(x.Chave)))" @onclick="() => RestaurarCores(SeriesMetas.Select(x => x.Chave))">@T("Restaurar cores padrão", "Restore default colors")</button>
+                                    <button class="btn-primary" @onclick="() => _editCoresMetas = false">@T("Concluir", "Done")</button>
                                 </div>
                                 <div class="vp-cores-nota">@NotaCores</div>
                             </div>
                         }
                     </div>
-                    <span class="cvx-note">@(foco.UltimoMes is > 0 and < 12 ? $"{foco.Ano} até {NomeDoMes(foco.UltimoMes).ToLowerInvariant()} (vendas até o último mês fechado). " : "")A barra é o vendido; os traços, onde ficam as metas. Clique num ano para colocá-lo em foco.</span>
+                    <span class="cvx-note">@(foco.UltimoMes is > 0 and < 12 ? (En ? $"{foco.Ano} through {NomeDoMesFrase(foco.UltimoMes)} (sales up to the last closed month). " : $"{foco.Ano} até {NomeDoMesFrase(foco.UltimoMes)} (vendas até o último mês fechado). ") : "")@T("A barra é o vendido; os traços, onde ficam as metas. Clique num ano para colocá-lo em foco.", "The bar is what was sold; the marks show where the targets are. Click a year to bring it into focus.")</span>
                 </div>
                 @MetasExecutivo(foco.Ano)
             </div>
@@ -316,20 +317,20 @@
 
         @* ================= 3 · VENDAS × BUDGET ================= *@
         <section id="budget" class="cvx-sec">
-            <div class="xsec"><span class="xsec-t">Vendas × budget</span><span class="xsec-s">O ritmo de @foco.Ano contra os anos anteriores e os budgets HSA e Grupo</span><span class="xsec-line"></span></div>
+            <div class="xsec"><span class="xsec-t">@T("Vendas × budget", "Sales × budget")</span><span class="xsec-s">@T($"O ritmo de {foco.Ano} contra os anos anteriores e os budgets HSA e Grupo", $"The pace of {foco.Ano} against previous years and the HSA and Group budgets")</span><span class="xsec-line"></span></div>
             <div>
                 @{ var ac = Acumulado(foco); }
                 <div class="cvx-card">
-                    <div class="cvx-ch"><div><h3 class="cvx-h3">Acumulado no ano</h3><p>Vendas somadas mês a mês</p></div></div>
+                    <div class="cvx-ch"><div><h3 class="cvx-h3">@T("Acumulado no ano", "Year to date")</h3><p>@T("Vendas somadas mês a mês", "Sales added up month by month")</p></div></div>
                     <div class="cvx-leg" style="margin:0 0 6px">
                         <span><i class="cvx-ln" style="border-top-color:@CorFoco"></i>@foco.Ano</span>
                         @if (AnoVisivel(anoAnt) && _anos.Any(a => a.Ano == anoAnt && a.MesesComVendas > 0)) { <span><i class="cvx-ln dash" style="border-top-color:@CorAnterior"></i>@anoAnt</span> }
-                        <span><i class="cvx-ln" style="border-top-color:@CorOutros"></i>outros anos</span>
-                        <span><i class="cvx-ln" style="border-top-color:#172B43;border-top-width:1.5px"></i>budget HSA</span>
-                        <span><i class="cvx-ln dash" style="border-top-color:#8493A3;border-top-width:1.5px"></i>budget Grupo</span>
+                        <span><i class="cvx-ln" style="border-top-color:@CorOutros"></i>@T("outros anos", "other years")</span>
+                        <span><i class="cvx-ln" style="border-top-color:#172B43;border-top-width:1.5px"></i>@T("budget HSA", "HSA budget")</span>
+                        <span><i class="cvx-ln dash" style="border-top-color:#8493A3;border-top-width:1.5px"></i>@T("budget Grupo", "Group budget")</span>
                     </div>
                     <div class="vp-grafico" @onmouseleave='() => SairDe("ac")'>
-                        <svg viewBox="0 0 @F(ac.W) @F(ac.H)" role="img" aria-label="Vendas acumuladas por mês, por ano, e os budgets de @foco.Ano">
+                        <svg viewBox="0 0 @F(ac.W) @F(ac.H)" role="img" aria-label="@T($"Vendas acumuladas por mês, por ano, e os budgets de {foco.Ano}", $"Cumulative sales by month, by year, and the {foco.Ano} budgets")">
                             @foreach (var (v, y) in ac.Ticks)
                             {
                                 <g>
@@ -345,7 +346,7 @@
                             {
                                 <g>
                                 <line x1="@F(ac.X0)" x2="@F(ac.W - 110)" y1="@F(ac.Y(bg))" y2="@F(ac.Y(bg))" stroke="#8493A3" stroke-dasharray="6 4" />
-                                <text x="@F(ac.W - 104)" y="@F(ac.Y(bg) + 4)" class="vp-meta-rot">Grupo @MiEixo(bg)</text>
+                                <text x="@F(ac.W - 104)" y="@F(ac.Y(bg) + 4)" class="vp-meta-rot">@T("Grupo", "Group") @MiEixo(bg)</text>
                                 </g>
                             }
                             @if (foco.BudgetHsa is decimal bh)
@@ -398,9 +399,18 @@
                 var necessarias = (int)Math.Ceiling(bhs / vpr);
                 var faltam = Math.Max(0m, bhs - foco.Vendas);
                 <div class="cvx-insight static">
-                    <small>Quantas propostas o budget HSA @foco.Ano pede</small>
-                    Em <b>@referencia.Ano</b>, cada proposta enviada correspondeu, em média, a <b>@Mi(vpr)</b> em vendas (todas as origens).
-                    No mesmo ritmo, o budget HSA de @foco.Ano (@Mi(bhs)) pede <b>≈ @N0(necessarias) propostas</b>@(faltam > 0 ? $"; faltam {Mi(faltam)}, ≈ {N0((int)Math.Ceiling(faltam / vpr))} propostas." : " — budget atingido.")
+                    @if (En)
+                    {
+                        <small>How many proposals the @foco.Ano HSA budget calls for</small>
+                        @:In <b>@referencia.Ano</b>, each proposal sent corresponded, on average, to <b>@Mi(vpr)</b> in sales (all sources).
+                        @:At the same pace, the @foco.Ano HSA budget (@Mi(bhs)) calls for <b>≈ @N0(necessarias) proposals</b>@(faltam > 0 ? $"; {Mi(faltam)} to go, ≈ {N0((int)Math.Ceiling(faltam / vpr))} proposals." : " — budget achieved.")
+                    }
+                    else
+                    {
+                        <small>Quantas propostas o budget HSA @foco.Ano pede</small>
+                        @:Em <b>@referencia.Ano</b>, cada proposta enviada correspondeu, em média, a <b>@Mi(vpr)</b> em vendas (todas as origens).
+                        @:No mesmo ritmo, o budget HSA de @foco.Ano (@Mi(bhs)) pede <b>≈ @N0(necessarias) propostas</b>@(faltam > 0 ? $"; faltam {Mi(faltam)}, ≈ {N0((int)Math.Ceiling(faltam / vpr))} propostas." : " — budget atingido.")
+                    }
                 </div>
             }
         </section>
@@ -412,18 +422,18 @@
             var maxMes = _meses.Where(m => m.Vendas is > 0).Select(m => m.Vendas!.Value).DefaultIfEmpty(1m).Max();
         }
         <section id="mes-ano" class="cvx-sec">
-            <div class="xsec"><span class="xsec-t">Vendas mês × ano</span><span class="xsec-s">Como a planilha da equipe · quanto mais escuro, maior a venda do mês</span><span class="xsec-line"></span></div>
+            <div class="xsec"><span class="xsec-t">@T("Vendas mês × ano", "Sales month × year")</span><span class="xsec-s">@T("Como a planilha da equipe · quanto mais escuro, maior a venda do mês", "Like the team spreadsheet · the darker, the higher the month's sales")</span><span class="xsec-line"></span></div>
             <div class="cvx-card">
                 <div class="cvx-ch">
-                    <div><p>A média é dos anos fechados (@(completos.Count > 0 ? $"{completos.Min()}–{completos.Max()}" : "—")).</p></div>
-                    <div class="vp-escala" aria-hidden="true"><span>menor</span>@foreach (var c in Rampa) { <i style="background:@c"></i> }<span>maior</span></div>
+                    <div><p>@T("A média é dos anos fechados", "The average is over closed years") (@(completos.Count > 0 ? $"{completos.Min()}–{completos.Max()}" : "—")).</p></div>
+                    <div class="vp-escala" aria-hidden="true"><span>@T("menor", "lowest")</span>@foreach (var c in Rampa) { <i style="background:@c"></i> }<span>@T("maior", "highest")</span></div>
                 </div>
                 <table class="vp-tabela">
                     <thead>
                         <tr>
-                            <th>Mês</th>
+                            <th>@T("Mês", "Month")</th>
                             @foreach (var a in anosTabela) { <th class="r @(a == foco.Ano ? "foco" : "")">@a</th> }
-                            <th class="r vp-media">Média</th>
+                            <th class="r vp-media">@T("Média", "Average")</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -449,10 +459,10 @@
                     </tbody>
                     <tfoot>
                         <tr class="vp-tot"><th>Total</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MiEixo(r.Vendas)</td> }<td class="r vp-media">@(completos.Count > 0 ? MiEixo(_anos.Where(x => completos.Contains(x.Ano)).Average(x => x.Vendas)) : "—")</td></tr>
-                        <tr><th>Budget HSA</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@(r.BudgetHsa is decimal b ? MiEixo(b) : "—")</td> }<td></td></tr>
-                        <tr><th>% do budget HSA</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MedidorFino(r.PctHsa)</td> }<td></td></tr>
-                        <tr><th>Budget Grupo</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@(r.BudgetGrupo is decimal b ? MiEixo(b) : "—")</td> }<td></td></tr>
-                        <tr><th>% do budget Grupo</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MedidorFino(r.PctGrupo)</td> }<td></td></tr>
+                        <tr><th>@T("Budget HSA", "HSA budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@(r.BudgetHsa is decimal b ? MiEixo(b) : "—")</td> }<td></td></tr>
+                        <tr><th>@T("% do budget HSA", "% of HSA budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MedidorFino(r.PctHsa)</td> }<td></td></tr>
+                        <tr><th>@T("Budget Grupo", "Group budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@(r.BudgetGrupo is decimal b ? MiEixo(b) : "—")</td> }<td></td></tr>
+                        <tr><th>@T("% do budget Grupo", "% of Group budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MedidorFino(r.PctGrupo)</td> }<td></td></tr>
                     </tfoot>
                 </table>
             </div>
@@ -461,11 +471,11 @@
         @if (_editando)
         {
             <section id="editar" class="cvx-sec">
-                <div class="xsec"><span class="xsec-t">Atualizar dados</span><span class="xsec-s">Digite os valores por mês (sempre em R$ cheios, mesmo com a tela em US$; ex.: 33.253.000) ou importe a planilha no layout da equipe: coluna "Mês" e uma coluna por ano</span><span class="xsec-line"></span></div>
+                <div class="xsec"><span class="xsec-t">@T("Atualizar dados", "Edit data")</span><span class="xsec-s">@T("Digite os valores por mês (sempre em R$ cheios, mesmo com a tela em US$; ex.: 33.253.000) ou importe a planilha no layout da equipe: coluna \"Mês\" e uma coluna por ano", "Type the values per month (always in whole R$, even with the screen in US$; Brazilian format, e.g. 33.253.000) or import the spreadsheet in the team layout: a \"Mês\" (month) column and one column per year")</span><span class="xsec-line"></span></div>
                 <div class="cvx-card">
                     <div class="cvx-ch">
                         <div class="cvx-seg-ctl">
-                            @foreach (var (cod, nome) in new[] { ("vendas", "Vendas"), ("vnb", "Vendas NB"), ("vafm", "Vendas AFM"), ("propostas", "Propostas enviadas"), ("valor", "Valor enviado"), ("budgets", "Budgets") })
+                            @foreach (var (cod, nome) in new[] { ("vendas", T("Vendas", "Sales")), ("vnb", T("Vendas NB", "NB sales")), ("vafm", T("Vendas AFM", "AFM sales")), ("propostas", T("Propostas enviadas", "Proposals sent")), ("valor", T("Valor enviado", "Value sent")), ("budgets", "Budgets") })
                             {
                                 var c = cod;
                                 <button class="@(_aba == c ? "on" : "")" @onclick="() => _aba = c">@nome</button>
@@ -475,7 +485,7 @@
                     @if (_aba == "budgets")
                     {
                         <table class="cvx-tbl vp-ed">
-                            <thead><tr><th>Ano</th><th class="r">Budget HSA (R$)</th><th class="r">Budget Grupo (R$)</th></tr></thead>
+                            <thead><tr><th>@T("Ano", "Year")</th><th class="r">@T("Budget HSA (R$)", "HSA budget (R$)")</th><th class="r">@T("Budget Grupo (R$)", "Group budget (R$)")</th></tr></thead>
                             <tbody>
                                 @foreach (var a in _anosEditor)
                                 {
@@ -493,7 +503,7 @@
                     else
                     {
                         <table class="cvx-tbl vp-ed">
-                            <thead><tr><th>Mês</th>@foreach (var a in _anosEditor) { <th class="r">@a</th> }</tr></thead>
+                            <thead><tr><th>@T("Mês", "Month")</th>@foreach (var a in _anosEditor) { <th class="r">@a</th> }</tr></thead>
                             <tbody>
                                 @for (var m = 1; m <= 12; m++)
                                 {
@@ -512,21 +522,28 @@
                                                 _ => Campo(reg?.ValorProposto),
                                             };
                                             var dica = reg?.Propostas is null && sist?.FonteDasPropostas == "sistema"
-                                                ? _aba switch { "propostas" => $"planilhas: {sist.Propostas}", "valor" => sist.ValorProposto is decimal vs ? $"planilhas: {Campo(Math.Round(vs))}" : "", _ => "" } : "";
+                                                ? _aba switch { "propostas" => $"{T("planilhas", "spreadsheets")}: {sist.Propostas}", "valor" => sist.ValorProposto is decimal vs ? $"{T("planilhas", "spreadsheets")}: {Campo(Math.Round(vs))}" : "", _ => "" } : "";
                                             <td class="r"><input class="cell num" value="@valor" placeholder="@dica" @onchange="e => MudarMes(ano, mes, e)" /></td>
                                         }
                                     </tr>
                                 }
                             </tbody>
                         </table>
-                        @if (_aba is "vnb" or "vafm") { <p class="cvx-note">Vendas por setor do quadro "Vendas por setor (NB e AFM)". Na importação, a planilha tem a coluna dos meses e uma coluna por setor e ano: "NB 2025", "AFM 2025", "NB 2026", "AFM 2026"…</p> }
-                        else if (_aba != "vendas") { <p class="cvx-note">Vazio = vale a contagem das planilhas da guia Conversão (o número em cinza). Digitar um valor troca a das planilhas naquele mês.</p> }
+                        @if (_aba is "vnb" or "vafm") { <p class="cvx-note">@T("Vendas por setor do quadro \"Vendas por setor (NB e AFM)\". Na importação, a planilha tem a coluna dos meses e uma coluna por setor e ano: \"NB 2025\", \"AFM 2025\", \"NB 2026\", \"AFM 2026\"…", "Sales by sector for the \"Sales by sector (NB and AFM)\" panel. For import, the spreadsheet has the months column and one column per sector and year: \"NB 2025\", \"AFM 2025\", \"NB 2026\", \"AFM 2026\"…")</p> }
+                        else if (_aba != "vendas") { <p class="cvx-note">@T("Vazio = vale a contagem das planilhas da guia Conversão (o número em cinza). Digitar um valor troca a das planilhas naquele mês.", "Empty = the count from the Conversion tab spreadsheets applies (the number in grey). Typing a value replaces the spreadsheets' figure for that month.")</p> }
                     }
                     <div class="vp-editor-pe">
-                        <button class="btn-ghost" @onclick="AcrescentarAno">+ ano @((_anosEditor.LastOrDefault() + 1).ToString())</button>
+                        <button class="btn-ghost" @onclick="AcrescentarAno">+ @T("ano", "year") @((_anosEditor.LastOrDefault() + 1).ToString())</button>
                         <label class="vp-drop">
                             <InputFile OnChange="Importar" accept=".xlsx,.xlsm,.xls,.csv" />
-                            <span>⇪ <strong>Importar planilha</strong> de @(_aba switch { "propostas" => "propostas enviadas", "valor" => "valor enviado", "vnb" or "vafm" => "vendas por setor (NB e AFM)", _ => "vendas (com BUDGET HSA e BUDGET GRUPO)" })</span>
+                            @if (En)
+                            {
+                                <span>⇪ <strong>Import spreadsheet</strong> of @(_aba switch { "propostas" => "proposals sent", "valor" => "value sent", "vnb" or "vafm" => "sales by sector (NB and AFM)", _ => "sales (with BUDGET HSA and BUDGET GRUPO)" })</span>
+                            }
+                            else
+                            {
+                                <span>⇪ <strong>Importar planilha</strong> de @(_aba switch { "propostas" => "propostas enviadas", "valor" => "valor enviado", "vnb" or "vafm" => "vendas por setor (NB e AFM)", _ => "vendas (com BUDGET HSA e BUDGET GRUPO)" })</span>
+                            }
                         </label>
                     </div>
                 </div>
@@ -583,7 +600,7 @@
     /// "" sem filtro; senão um rótulo curto (as vendas não seguem os filtros, então as relações com elas só valem sem filtro).
     /// O filtro de Ano não conta: ele só escolhe quais anos a página mostra, não muda as propostas de cada ano.
     /// </summary>
-    private string _setor => _fil.Ativos - (_fil.Anos.Count > 0 ? 1 : 0) > 0 ? "filtrado" : "";
+    private string _setor => _fil.Ativos - (_fil.Anos.Count > 0 ? 1 : 0) > 0 ? T("filtrado", "filtered") : "";
     /// <summary>O ano aparece na página? (filtro de Ano vazio = todos, de 2022 até hoje)</summary>
     private string _anosFiltrados = "";
     private bool AnoVisivel(int ano) => _fil.Anos.Count == 0 || _fil.Anos.Contains(ano.ToString());
@@ -613,8 +630,8 @@
     /// <summary>O que esta pessoa edita: o administrador mexe no padrão de todos; os outros, nas suas cores.</summary>
     private Dictionary<string, string> Editaveis => _isAdmin ? _coresPadrao : _cores;
     private string NotaCores => _isAdmin
-        ? "Como administrador, a cor que você escolhe vira o padrão de todos. Cada pessoa ainda pode mudar a sua."
-        : "Guardadas só para o seu login. \"Restaurar\" volta ao padrão definido pelo administrador.";
+        ? T("Como administrador, a cor que você escolhe vira o padrão de todos. Cada pessoa ainda pode mudar a sua.", "As an administrator, the color you pick becomes everyone's default. Each person can still change their own.")
+        : T("Guardadas só para o seu login. \"Restaurar\" volta ao padrão definido pelo administrador.", "Saved only for your login. \"Restore\" goes back to the default set by the administrator.");
 
     /// <summary>As propostas de um mês: quantidade, valor (null = sem valor), quantas sem taxa de câmbio e quantas com valor.</summary>
     private sealed record PropMes(int Qtd, decimal? Valor, int SemTaxa, int ComValor);
@@ -716,10 +733,10 @@
         var informados = _brutos.Count(b => b.Propostas is not null);
         _fonte = string.Join("; ", new[]
         {
-            enviadas.Count(p => p.Fonte == ConversaoService.Afm) is var s && s > 0 ? $"{N0(s)} da planilha AFM" : "",
-            enviadas.Count(p => p.Fonte == ConversaoService.Nb) is var r && r > 0 ? $"{N0(r)} da planilha NB" : "",
-            informados > 0 ? $"{informados} mês(es) informado(s) à mão" : "",
-        }.Where(x => x.Length > 0)) is { Length: > 0 } t ? t : (_carregando ? "lendo as planilhas…" : "nenhuma registrada ainda");
+            enviadas.Count(p => p.Fonte == ConversaoService.Afm) is var s && s > 0 ? $"{N0(s)} {T("da planilha AFM", "from the AFM spreadsheet")}" : "",
+            enviadas.Count(p => p.Fonte == ConversaoService.Nb) is var r && r > 0 ? $"{N0(r)} {T("da planilha NB", "from the NB spreadsheet")}" : "",
+            informados > 0 ? $"{informados} {T("mês(es) informado(s) à mão", "month(s) entered by hand")}" : "",
+        }.Where(x => x.Length > 0)) is { Length: > 0 } t ? t : (_carregando ? T("lendo as planilhas…", "reading the spreadsheets…") : T("nenhuma registrada ainda", "none recorded yet"));
         var anos = _brutos.Select(b => b.Ano).Concat(_budgets.Select(b => b.Ano)).Append(AnoIni).Distinct().ToList();
         _anosEditor = Enumerable.Range(AnoIni, Math.Max(anos.Max(), _anosEditor.DefaultIfEmpty(AnoIni).Max()) - AnoIni + 1).ToList();
         Montar();
@@ -773,12 +790,12 @@
 
     /// <summary>Base da taxa (botão "Taxa sobre" da barra de filtros): false = decididas; true = todas as propostas enviadas.</summary>
     private bool BaseTodas => _fil.BaseTodas;
-    private string DenRot => BaseTodas ? "enviadas" : "decididas";
+    private string DenRot => BaseTodas ? T("enviadas", "sent") : T("decididas", "decided");
     /// <summary>Conversão por valor (botão "Conversão por" da barra de filtros): false = por quantidade de propostas.</summary>
     private bool PorValor => _fil.PorValor;
     private string RegraTxt => PorValor
-        ? (BaseTodas ? "Por valor: valor ganho ÷ valor de todas as propostas enviadas × 100" : "Por valor: valor ganho ÷ (valor ganho + valor perdido) × 100")
-        : (BaseTodas ? "Ganhas ÷ todas as propostas enviadas × 100" : "Ganhas ÷ (Ganhas + Perdidas) × 100");
+        ? (BaseTodas ? T("Por valor: valor ganho ÷ valor de todas as propostas enviadas × 100", "By value: won value ÷ value of all proposals sent × 100") : T("Por valor: valor ganho ÷ (valor ganho + valor perdido) × 100", "By value: won value ÷ (won value + lost value) × 100"))
+        : (BaseTodas ? T("Ganhas ÷ todas as propostas enviadas × 100", "Won ÷ all proposals sent × 100") : T("Ganhas ÷ (Ganhas + Perdidas) × 100", "Won ÷ (Won + Lost) × 100"));
 
     /// <summary>
     /// Taxa de conversão do ano (até o mês dado), com a regra da guia Conversão:
@@ -872,33 +889,46 @@
 
     // ================= formatos =================
 
+    /// <summary>A cultura dos números da tela: pt-BR, ou en-US com a tela em inglês.</summary>
+    private CultureInfo Cul => En ? EnUs : Br;
+    /// <summary>Unidade curta: pt " mi"/" bi"/" mil"; en "M"/"B"/"K" (colado ao número).</summary>
+    private string Uni(string pt) => En ? pt switch { "bi" => "B", "mi" => "M", "mil" => "K", _ => pt } : " " + pt;
+    private static readonly string[] NomesDosMesesEn = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+    private static readonly string[] MesesCurtosEn = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
     private static string F(double v) => v.ToString("0.##", Inv);
-    private static string N0(int v) => v.ToString("#,##0", Br);
-    private static string Pct(decimal v) => v.ToString("P1", Br);
-    private string Cheio(decimal v) => (v < 0 ? "−" : "") + Sim + " " + Math.Abs(v).ToString("#,##0", Br);
+    private string N0(int v) => v.ToString("#,##0", Cul);
+    private string Pct(decimal v) => v.ToString("P1", Cul);
+    private string Cheio(decimal v) => (v < 0 ? "−" : "") + Sim + " " + Math.Abs(v).ToString("#,##0", Cul);
     private string Mi(decimal v) => (v < 0 ? "−" : "") + Sim + " " + Compacto(Math.Abs(v));
-    private static string MiEixo(decimal v) => (v < 0 ? "−" : "") + Compacto(Math.Abs(v));
-    private static string Compacto(decimal a) =>
-        a >= 1_000_000_000m ? (a / 1_000_000_000m).ToString("#,##0.0#", Br) + " bi"
-        : a >= 1_000_000m ? (a / 1_000_000m).ToString("#,##0.0", Br) + " mi"
-        : a >= 1_000m ? (a / 1_000m).ToString("#,##0", Br) + " mil" : a.ToString("#,##0", Br);
-    private static string Eixo(decimal v) => (v < 0 ? "−" : "") +
-        (Math.Abs(v) >= 1_000_000_000m ? (Math.Abs(v) / 1_000_000_000m).ToString("#,##0.#", Br) + " bi"
-        : Math.Abs(v) >= 1_000_000m ? (Math.Abs(v) / 1_000_000m).ToString("#,##0.#", Br) + " mi" : Math.Abs(v).ToString("#,##0", Br));
-    private static string NomeDoMes(int m) => VendasMensaisRepository.NomesDosMeses[m - 1];
-    private static string MesCurto(int m) => VendasMensaisRepository.MesesCurtos[m - 1];
+    private string MiEixo(decimal v) => (v < 0 ? "−" : "") + Compacto(Math.Abs(v));
+    private string Compacto(decimal a) =>
+        a >= 1_000_000_000m ? (a / 1_000_000_000m).ToString("#,##0.0#", Cul) + Uni("bi")
+        : a >= 1_000_000m ? (a / 1_000_000m).ToString("#,##0.0", Cul) + Uni("mi")
+        : a >= 1_000m ? (a / 1_000m).ToString("#,##0", Cul) + Uni("mil") : a.ToString("#,##0", Cul);
+    private string Eixo(decimal v) => (v < 0 ? "−" : "") +
+        (Math.Abs(v) >= 1_000_000_000m ? (Math.Abs(v) / 1_000_000_000m).ToString("#,##0.#", Cul) + Uni("bi")
+        : Math.Abs(v) >= 1_000_000m ? (Math.Abs(v) / 1_000_000m).ToString("#,##0.#", Cul) + Uni("mi") : Math.Abs(v).ToString("#,##0", Cul));
+    private string NomeDoMes(int m) => En ? NomesDosMesesEn[m - 1] : VendasMensaisRepository.NomesDosMeses[m - 1];
+    private string MesCurto(int m) => En ? MesesCurtosEn[m - 1] : VendasMensaisRepository.MesesCurtos[m - 1];
+    /// <summary>Mês no meio da frase: em português, minúsculo ("out", "outubro"); em inglês, com maiúscula ("Oct", "October").</summary>
+    private string MesCurtoFrase(int m) => En ? MesCurto(m) : MesCurto(m).ToLowerInvariant();
+    private string NomeDoMesFrase(int m) => En ? NomeDoMes(m) : NomeDoMes(m).ToLowerInvariant();
+    /// <summary>De janeiro até o mês: "jan–out" / "Jan–Oct".</summary>
+    private string JanAte(int m) => $"{MesCurtoFrase(1)}–{MesCurtoFrase(m)}";
+    /// <summary>Campo do editor ("Atualizar dados"): sempre pt-BR, porque volta a ser lido por VendasMensaisRepository.Numero.</summary>
     private static string Campo(decimal? v) => v?.ToString("#,##0.##", Br) ?? "";
     private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s);
 
     /// <summary>Variação contra o mesmo período do ano anterior (texto começa pelo sinal).</summary>
-    private static string? Delta(decimal? atual, decimal? anterior, int anoAnt) =>
-        atual is decimal a && anterior is decimal b && b > 0 ? $"{(a - b) / b * 100:+0;-0;0}% vs mesmo período de {anoAnt}" : null;
-    private static string? Delta(int atual, int? anterior, int anoAnt) => Delta((decimal)atual, anterior, anoAnt);
+    private string? Delta(decimal? atual, decimal? anterior, int anoAnt) =>
+        atual is decimal a && anterior is decimal b && b > 0 ? $"{(a - b) / b * 100:+0;-0;0}% {T("vs mesmo período de", "vs same period of")} {anoAnt}" : null;
+    private string? Delta(int atual, int? anterior, int anoAnt) => Delta((decimal)atual, anterior, anoAnt);
 
-    private static string P1(double v) => v.ToString("0.0", Br) + "%";
+    private string P1(double v) => v.ToString("0.0", Cul) + "%";
     /// <summary>Variação da taxa em pontos percentuais ("+2,1 p.p."), contra o mesmo período do ano anterior.</summary>
-    private static string? DeltaPp(double? atual, double? anterior, int? anoAnt) =>
-        atual is double a && anterior is double b ? $"{(a - b).ToString("+0.0;-0.0;0.0", Br)} p.p.{(anoAnt is int y ? $" vs mesmo período de {y}" : "")}" : null;
+    private string? DeltaPp(double? atual, double? anterior, int? anoAnt) =>
+        atual is double a && anterior is double b ? $"{(a - b).ToString("+0.0;-0.0;0.0", Cul)} {T("p.p.", "pp")}{(anoAnt is int y ? $" {T("vs mesmo período de", "vs same period of")} {y}" : "")}" : null;
 
     /// <summary>Variação curta para os cartões dos anos ("+12%").</summary>
     private static string? DeltaCurto(decimal? atual, decimal? anterior) =>
@@ -917,10 +947,10 @@
 
     private string TituloGrafico() => _met switch
     {
-        "valor" => $"Valor das propostas enviadas por mês ({Sim}), comparando os anos",
-        "vendas" => $"Vendas por mês ({Sim}), comparando os anos",
-        "taxa" => "Taxa de conversão por mês, comparando os anos",
-        _ => "Propostas enviadas por mês, comparando os anos",
+        "valor" => T($"Valor das propostas enviadas por mês ({Sim}), comparando os anos", $"Value of proposals sent per month ({Sim}), comparing years"),
+        "vendas" => T($"Vendas por mês ({Sim}), comparando os anos", $"Sales per month ({Sim}), comparing years"),
+        "taxa" => T("Taxa de conversão por mês, comparando os anos", "Conversion rate per month, comparing years"),
+        _ => T("Propostas enviadas por mês, comparando os anos", "Proposals sent per month, comparing years"),
     };
 
     // ================= gráfico principal: uma linha por ano, jan–dez =================
@@ -980,6 +1010,8 @@
         ("vendas", "Vendas totais", "#159bbd", ""), ("grupo", "Meta Grupo", "#B7791F", "5 3"), ("hsa", "Meta HSA", "#2F855A", "2 3"),
     };
     private string CorMeta(string chave) => CorSalva(chave) ?? SeriesMetas.First(x => x.Chave == chave).Padrao;
+    /// <summary>O nome da série na tela (a chave não muda): em inglês, "Total sales", "Group Target", "HSA Target".</summary>
+    private string NomeSerieMeta(string chave, string nome) => !En ? nome : chave switch { "vendas" => "Total sales", "grupo" => "Group Target", "hsa" => "HSA Target", _ => nome };
 
     /// <summary>A cor do ano: a escolhida pela pessoa; senão, roxo para o ano em foco e a paleta para os outros (mais recente primeiro).</summary>
     private string CorDoAno(int ano)
@@ -999,7 +1031,7 @@
     private string SvgAnos(string met, int focoAno)
     {
         var anos = AnosDoPainel.OrderBy(a => a).ToList();
-        if (anos.Count == 0) return "<div class='empty'>Sem dados.</div>";
+        if (anos.Count == 0) return $"<div class='empty'>{T("Sem dados.", "No data.")}</div>";
         if (!anos.Contains(focoAno)) focoAno = anos[^1];
         double? Val(int a, int m) => met switch
         {
@@ -1012,13 +1044,13 @@
         string Txt(int a, int m)
         {
             var v = Val(a, m);
-            if (v is null) return met == "vendas" ? "sem venda registrada" : "sem propostas";
-            if (met == "taxa") { var tm = TaxaMes(a, m); return $"{P1(v.Value)} · {N0(tm.G)} ganhas de {N0(tm.Total)} {DenRot}"; }
+            if (v is null) return met == "vendas" ? T("sem venda registrada", "no sales recorded") : T("sem propostas", "no proposals");
+            if (met == "taxa") { var tm = TaxaMes(a, m); return $"{P1(v.Value)} · {N0(tm.G)} {T("ganhas de", "won of")} {N0(tm.Total)} {DenRot}"; }
             var p = Prop(a, m);
             return met switch
             {
-                "qtd" => $"{N0(p!.Qtd)} propostas" + (p.Valor is decimal pv && pv > 0 ? $" · {Mi(pv)}" : ""),
-                "valor" => $"{Mi((decimal)v.Value)} · {N0(p!.Qtd)} propostas" + (p.SemTaxa > 0 ? $" · parcial: {p.SemTaxa} sem taxa de câmbio" : ""),
+                "qtd" => $"{N0(p!.Qtd)} {T("propostas", "proposals")}" + (p.Valor is decimal pv && pv > 0 ? $" · {Mi(pv)}" : ""),
+                "valor" => $"{Mi((decimal)v.Value)} · {N0(p!.Qtd)} {T("propostas", "proposals")}" + (p.SemTaxa > 0 ? (En ? $" · partial: {p.SemTaxa} without an exchange rate" : $" · parcial: {p.SemTaxa} sem taxa de câmbio") : ""),
                 _ => Cheio((decimal)v.Value),
             };
         }
@@ -1058,7 +1090,7 @@
         {
             double gy = top + (bot - top) * g / 4.0, gv = max - (max - min) * g / 4.0;
             sb.Append($"<line x1='{N(left)}' y1='{N(gy)}' x2='{N(Wd - right)}' y2='{N(gy)}' stroke='#eef2f7'/>");
-            sb.Append($"<text x='{N(left - 7)}' y='{N(gy + 4)}' text-anchor='end' font-size='11' fill='#7b8798'>{Esc(met switch { "qtd" => N0((int)Math.Round(gv)), "taxa" => Math.Round(gv).ToString("0", Br) + "%", _ => MiEixo((decimal)gv) })}</text>");
+            sb.Append($"<text x='{N(left - 7)}' y='{N(gy + 4)}' text-anchor='end' font-size='11' fill='#7b8798'>{Esc(met switch { "qtd" => N0((int)Math.Round(gv)), "taxa" => Math.Round(gv).ToString("0", Cul) + "%", _ => MiEixo((decimal)gv) })}</text>");
         }
         if (min < 0) sb.Append($"<line x1='{N(left)}' y1='{N(Y(0))}' x2='{N(Wd - right)}' y2='{N(Y(0))}' stroke='#d3dcea'/>");
 
@@ -1090,7 +1122,7 @@
                 sb.Append($"<polyline points='{Pts(s)}' fill='none' stroke='{cor}' stroke-width='2'{risco} stroke-linejoin='round' stroke-linecap='round' opacity='0.9'/>");
             for (var m = 1; m <= 12; m++)
                 if (Val(a, m) is double v)
-                    sb.Append($"<circle cx='{N(X(m))}' cy='{N(Y(v))}' r='2.5' fill='{cor}'><title>{Esc($"{a} · {NomeDoMes(m).ToLowerInvariant()}: {Txt(a, m)}")}</title></circle>");
+                    sb.Append($"<circle cx='{N(X(m))}' cy='{N(Y(v))}' r='2.5' fill='{cor}'><title>{Esc($"{a} · {NomeDoMesFrase(m)}: {Txt(a, m)}")}</title></circle>");
         }
 
         // ano em foco: área + traço grosso + pontos vazados + valores
@@ -1108,7 +1140,7 @@
             if (Val(focoAno, m) is double v)
             {
                 var y = Y(v);
-                sb.Append($"<circle cx='{N(X(m))}' cy='{N(y)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cf}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc($"{focoAno} · {NomeDoMes(m).ToLowerInvariant()}: {Txt(focoAno, m)}")}</title></circle>");
+                sb.Append($"<circle cx='{N(X(m))}' cy='{N(y)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cf}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc($"{focoAno} · {NomeDoMesFrase(m)}: {Txt(focoAno, m)}")}</title></circle>");
                 sb.Append($"<text x='{N(X(m))}' y='{N(y - 10)}' text-anchor='middle' font-size='11.5' font-weight='{(cur ? "800" : "700")}' fill='{(cur ? "#3b0764" : "#3b4a61")}' paint-order='stroke' stroke='#fff' stroke-width='3' stroke-linejoin='round'>{Esc(Rot(v))}</text>");
             }
             sb.Append($"<text x='{N(X(m))}' y='{N(H - 10)}' text-anchor='middle' font-size='12' font-weight='{(cur ? "800" : "600")}' fill='{(cur ? cf : "#64748b")}'>{MesCurto(m).ToUpperInvariant()}</text>");
@@ -1134,41 +1166,41 @@
         _mmS = setor;   // as contas de baixo (vendas, conversão, rótulos) seguem o quadro que está sendo desenhado
         var st = Mm;
         var idq = setor ? "mes-a-mes-setor" : "mes-a-mes";
-        var tituloPdf = setor ? "Vendas por setor (NB e AFM), propostas e conversão mês a mês" : "Vendas e propostas mês a mês";
+        var tituloPdf = setor ? T("Vendas por setor (NB e AFM), propostas e conversão mês a mês", "Sales by sector (NB and AFM), proposals and conversion month by month") : T("Vendas e propostas mês a mês", "Sales and proposals month by month");
         var anosDisp = AnosDoPainel;
         var modo = st.Modo == "comparar" && CompMm(principal) is null ? "ano" : st.Modo;
         var comp = modo == "comparar" ? CompMm(principal) : null;
         var anos = modo == "historico" ? anosDisp.OrderByDescending(a => a).ToList() : comp is int c0 ? new List<int> { principal, c0 } : new List<int> { principal };
         <div class="panel-head">
-            <div class="panel-title">@(setor ? "Vendas por setor (NB e AFM), propostas e conversão, mês a mês" : "Vendas e propostas, mês a mês")
-                <span class="hint">@(modo switch { "comparar" => $"{principal} × {comp}", "historico" => "todos os anos", _ => principal.ToString() }) · @(setor ? $"vendas {VendasDeMm} ({Sim}, relatório de vendas por setor; segue o filtro de Setor)" : $"vendas da empresa toda ({Sim})") · propostas enviadas@(_setor != "" ? " (" + _setor + ")" : "")@(setor ? " · conversão por quantidade e por valor" : "")</span>
+            <div class="panel-title">@(setor ? T("Vendas por setor (NB e AFM), propostas e conversão, mês a mês", "Sales by sector (NB and AFM), proposals and conversion, month by month") : T("Vendas e propostas, mês a mês", "Sales and proposals, month by month"))
+                <span class="hint">@(modo switch { "comparar" => $"{principal} × {comp}", "historico" => T("todos os anos", "all years"), _ => principal.ToString() }) · @(setor ? (En ? $"{VendasDeMm} sales ({Sim}, sales-by-sector report; follows the Sector filter)" : $"vendas {VendasDeMm} ({Sim}, relatório de vendas por setor; segue o filtro de Setor)") : T($"vendas da empresa toda ({Sim})", $"company-wide sales ({Sim})")) · @T("propostas enviadas", "proposals sent")@(_setor != "" ? " (" + _setor + ")" : "")@(setor ? T(" · conversão por quantidade e por valor", " · conversion by count and by value") : "")</span>
             </div>
         </div>
         <div class="vpm-ctl">
-            <div class="cvx-seg-ctl vpm-modos" role="tablist" aria-label="Modo de visualização">
-                <button class="@(modo == "ano" ? "on" : "")" @onclick='() => st.Modo = "ano"'>Um ano</button>
-                <button class="@(modo == "comparar" ? "on" : "")" disabled="@(anosDisp.Count < 2)" @onclick='() => st.Modo = "comparar"'>Comparar dois anos</button>
-                <button class="@(modo == "historico" ? "on" : "")" @onclick='() => st.Modo = "historico"'>Todos os anos</button>
+            <div class="cvx-seg-ctl vpm-modos" role="tablist" aria-label="@T("Modo de visualização", "View mode")">
+                <button class="@(modo == "ano" ? "on" : "")" @onclick='() => st.Modo = "ano"'>@T("Um ano", "One year")</button>
+                <button class="@(modo == "comparar" ? "on" : "")" disabled="@(anosDisp.Count < 2)" @onclick='() => st.Modo = "comparar"'>@T("Comparar dois anos", "Compare two years")</button>
+                <button class="@(modo == "historico" ? "on" : "")" @onclick='() => st.Modo = "historico"'>@T("Todos os anos", "All years")</button>
             </div>
-            <button type="button" class="btn-ghost vpm-tela" onclick="@($"vpTelaCheia('{idq}')")" title="Mostrar este quadro na tela inteira (Esc para sair)">
-                <span class="vpm-tela-on">⛶ Tela cheia</span><span class="vpm-tela-off">✕ Sair da tela cheia</span>
+            <button type="button" class="btn-ghost vpm-tela" onclick="@($"vpTelaCheia('{idq}')")" title="@T("Mostrar este quadro na tela inteira (Esc para sair)", "Show this panel full screen (Esc to exit)")">
+                <span class="vpm-tela-on">⛶ @T("Tela cheia", "Full screen")</span><span class="vpm-tela-off">✕ @T("Sair da tela cheia", "Exit full screen")</span>
             </button>
             @if (setor)
             {
                 <button type="button" class="btn-ghost vpm-pdf" disabled="@_gerandoPdfSetores" @onclick="PdfSetores"
-                        title="Gera um PDF com o gráfico 3 vezes, uma por página: 1) Aftermarket + NB juntos, 2) só Aftermarket, 3) só NB (no diálogo de impressão, escolha “Salvar como PDF”)">
-                    @(_gerandoPdfSetores ? "Gerando…" : "⤓ Gerar PDF (AFM + NB, AFM, NB)")
+                        title="@T("Gera um PDF com o gráfico 3 vezes, uma por página: 1) Aftermarket + NB juntos, 2) só Aftermarket, 3) só NB (no diálogo de impressão, escolha “Salvar como PDF”)", "Creates a PDF with the chart 3 times, one per page: 1) Aftermarket + NB together, 2) Aftermarket only, 3) NB only (in the print dialog, choose “Save as PDF”)")">
+                    @(_gerandoPdfSetores ? T("Gerando…", "Generating…") : T("⤓ Gerar PDF (AFM + NB, AFM, NB)", "⤓ Export PDF (AFM + NB, AFM, NB)"))
                 </button>
             }
             else
             {
-                <button type="button" class="btn-ghost vpm-pdf" onclick="@($"vpPdf('{idq}', '{tituloPdf}')")" title="Gerar um PDF deste quadro, como está na tela (no diálogo de impressão, escolha “Salvar como PDF”)">
-                    ⤓ Gerar PDF
+                <button type="button" class="btn-ghost vpm-pdf" onclick="@($"vpPdf('{idq}', '{tituloPdf}')")" title="@T("Gerar um PDF deste quadro, como está na tela (no diálogo de impressão, escolha “Salvar como PDF”)", "Export a PDF of this panel as shown on screen (in the print dialog, choose “Save as PDF”)")">
+                    ⤓ @T("Gerar PDF", "Export PDF")
                 </button>
             }
             @if (modo != "historico")
             {
-                <div class="vpm-sel"><span>Ano principal</span>
+                <div class="vpm-sel"><span>@T("Ano principal", "Main year")</span>
                     <div class="cvx-seg-ctl">
                         @foreach (var a in anosDisp)
                         {
@@ -1180,7 +1212,7 @@
             }
             @if (modo == "comparar")
             {
-                <div class="vpm-sel"><span>Comparar com</span>
+                <div class="vpm-sel"><span>@T("Comparar com", "Compare with")</span>
                     <div class="cvx-seg-ctl">
                         @foreach (var a in anosDisp.Where(x => x != principal))
                         {
@@ -1207,15 +1239,15 @@
             </div>
         }
         <div class="vpm-leg @(modo == "historico" ? "oculta" : "")">
-            @if (setor) { <span>linha tracejada = conversão por quantidade · pontilhada = conversão por valor</span> }
-            <span><i class="sw parcial"></i>listrada = mês em andamento (parcial)</span>
-            <span><i class="sw apurar"></i>cinza listrado = a apurar (o mês ainda não tem o dado)</span>
-            <span><b>n/d</b> = sem dado registrado (não é zero)</span>
-            <span><i class="sw neg"></i>venda negativa</span>
+            @if (setor) { <span>@T("linha tracejada = conversão por quantidade · pontilhada = conversão por valor", "dashed line = conversion by count · dotted = conversion by value")</span> }
+            <span><i class="sw parcial"></i>@T("listrada = mês em andamento (parcial)", "striped = month in progress (partial)")</span>
+            <span><i class="sw apurar"></i>@T("cinza listrado = a apurar (o mês ainda não tem o dado)", "grey striped = pending (the month has no data yet)")</span>
+            <span><b>@T("n/d", "n/a")</b> = @T("sem dado registrado (não é zero)", "no data recorded (not zero)")</span>
+            <span><i class="sw neg"></i>@T("venda negativa", "negative sales")</span>
         </div>
         <div class="vpm-detalhe-bar">
-            <button class="btn-ghost" aria-expanded="@(st.Detalhe ? "true" : "false")" @onclick="() => st.Detalhe = !st.Detalhe">@(st.Detalhe ? "▴ Ocultar dados detalhados" : "▾ Ver dados detalhados")</button>
-            <span class="cvx-note">Valores completos, em reais e centavos, e as quantidades exatas de cada mês.@(setor ? " Vendas por setor: os outros filtros (vendedor, BU, mercado…) valem só para as propostas e a conversão." : "")</span>
+            <button class="btn-ghost" aria-expanded="@(st.Detalhe ? "true" : "false")" @onclick="() => st.Detalhe = !st.Detalhe">@(st.Detalhe ? T("▴ Ocultar dados detalhados", "▴ Hide detailed data") : T("▾ Ver dados detalhados", "▾ Show detailed data"))</button>
+            <span class="cvx-note">@T("Valores completos, em reais e centavos, e as quantidades exatas de cada mês.", "Full values, with cents, and the exact counts for each month.")@(setor ? T(" Vendas por setor: os outros filtros (vendedor, BU, mercado…) valem só para as propostas e a conversão.", " Sales by sector: the other filters (salesperson, BU, market…) apply only to proposals and conversion.") : "")</span>
         </div>
         @if (st.Detalhe)
         {
@@ -1235,17 +1267,17 @@
         var chaveAberta = (_mmS ? "s" : "") + modo;   // cada quadro abre a sua (as cores são as mesmas nos dois)
         var aberto = _mmPaleta == chaveAberta;
         var porAno = modo != "t";   // nos mini-gráficos as linhas ligam os anos de um mês: uma cor para cada linha
-        var nomeModo = modo switch { "u" => "Um ano", "c" => "Comparar dois anos", _ => "Todos os anos" };
+        var nomeModo = modo switch { "u" => T("Um ano", "One year"), "c" => T("Comparar dois anos", "Compare two years"), _ => T("Todos os anos", "All years") };
         var prefixo = "m" + modo;
         <div class="vp-cores-wrap vpm-pal-wrap">
-            <button class="btn-ghost vp-btn-cores" aria-expanded="@(aberto ? "true" : "false")" @onclick="() => _mmPaleta = aberto ? null : chaveAberta">🎨 Cores</button>
+            <button class="btn-ghost vp-btn-cores" aria-expanded="@(aberto ? "true" : "false")" @onclick="() => _mmPaleta = aberto ? null : chaveAberta">🎨 @T("Cores", "Colors")</button>
             @if (aberto)
             {
                 <div class="flt-multi-backdrop" @onclick="() => _mmPaleta = null"></div>
-                <div class="vp-cores-pop vpm-pal" role="dialog" aria-label="Cores do gráfico · @nomeModo">
-                    <div class="vp-cores-tit">Cores · @nomeModo</div>
+                <div class="vp-cores-pop vpm-pal" role="dialog" aria-label="@T("Cores do gráfico", "Chart colors") · @nomeModo">
+                    <div class="vp-cores-tit">@T("Cores", "Colors") · @nomeModo</div>
                     <table class="vpm-pal-t">
-                        <thead><tr><th></th><th>Vendas</th><th>Propostas</th>@if (porAno) { <th>Valor enviado</th><th>Conversão</th> }</tr></thead>
+                        <thead><tr><th></th><th>@T("Vendas", "Sales")</th><th>@T("Propostas", "Proposals")</th>@if (porAno) { <th>@T("Valor enviado", "Value sent")</th><th>@T("Conversão", "Conversion")</th> }</tr></thead>
                         <tbody>
                             @foreach (var a in anos.OrderByDescending(x => x))
                             {
@@ -1263,15 +1295,15 @@
                     </table>
                     @if (!porAno)
                     {
-                        <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'e', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'e', 0), e.Value?.ToString())" /><span>Linha do valor enviado</span></label>
-                        <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'x', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'x', 0), e.Value?.ToString())" /><span>Linha da conversão</span></label>
+                        <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'e', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'e', 0), e.Value?.ToString())" /><span>@T("Linha do valor enviado", "Value sent line")</span></label>
+                        <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'x', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'x', 0), e.Value?.ToString())" /><span>@T("Linha da conversão", "Conversion line")</span></label>
                     }
-                    <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'n', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'n', 0), e.Value?.ToString())" /><span>Venda negativa</span></label>
+                    <label class="vp-cor-lin"><input type="color" value="@CorMm(modo, 'n', 0)" @onchange="e => MudarCor(ChaveMm(modo, 'n', 0), e.Value?.ToString())" /><span>@T("Venda negativa", "Negative sales")</span></label>
                     <div class="vp-cores-pe">
-                        <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => k.StartsWith(prefixo)))" @onclick="() => RestaurarCores(Editaveis.Keys.Where(k => k.StartsWith(prefixo)).ToList())">Restaurar padrão</button>
-                        <button class="btn-primary" @onclick="() => _mmPaleta = null">Concluir</button>
+                        <button class="btn-link" disabled="@(!Editaveis.Keys.Any(k => k.StartsWith(prefixo)))" @onclick="() => RestaurarCores(Editaveis.Keys.Where(k => k.StartsWith(prefixo)).ToList())">@T("Restaurar padrão", "Restore default")</button>
+                        <button class="btn-primary" @onclick="() => _mmPaleta = null">@T("Concluir", "Done")</button>
                     </div>
-                    <div class="vp-cores-nota">Só para "@nomeModo". Sem escolha, vale a cor do ano (botão de cores do gráfico de linhas). @NotaCores</div>
+                    <div class="vp-cores-nota">@T($"Só para \"{nomeModo}\". Sem escolha, vale a cor do ano (botão de cores do gráfico de linhas).", $"Only for \"{nomeModo}\". With no choice, the year's color applies (colors button of the line chart).") @NotaCores</div>
                 </div>
             }
         </div>
@@ -1297,19 +1329,19 @@
         if (maxP <= 0) maxP = 1;
         <div class="vpm-graf combo @(dois ? "dois" : "um")">
             <div class="vpm-gtit">
-                <b>@(_mmS ? "Vendas por setor, propostas e conversão, mês a mês" : "Vendas, propostas e conversão, mês a mês")</b>
-                <span>@(dois ? $"{principal} × {comp}" : principal.ToString())@(_setor != "" ? " · propostas e conversão: " + _setor : "")</span>
+                <b>@(_mmS ? T("Vendas por setor, propostas e conversão, mês a mês", "Sales by sector, proposals and conversion, month by month") : T("Vendas, propostas e conversão, mês a mês", "Sales, proposals and conversion, month by month"))</b>
+                <span>@(dois ? $"{principal} × {comp}" : principal.ToString())@(_setor != "" ? T(" · propostas e conversão: ", " · proposals and conversion: ") + _setor : "")</span>
                 <span class="vpm-gleg">@foreach (var a in anos) { <span><i style="background:@CorMm(modo, 'v', a)"></i>@a</span> }</span>
                 @PaletaMm(modo, anos)
             </div>
             <div class="vpm-sm-leg sub vpm-combo-leg">
-                <span><i class="sw cheia"></i>colunas para cima: vendas (@Sim, @VendasDeMm)</span>
-                <span><i class="sw clara"></i>colunas para baixo: propostas enviadas (qtd)</span>
+                <span><i class="sw cheia"></i>@T("colunas para cima: vendas", "upward columns: sales") (@Sim, @VendasDeMm)</span>
+                <span><i class="sw clara"></i>@T("colunas para baixo: propostas enviadas (qtd)", "downward columns: proposals sent (count)")</span>
             </div>
             @if (dois)
             {
-                <div class="vpm-var-cap">Variação das vendas, @principal × @comp</div>
-                <div class="vpm-var" aria-label="Variação das vendas em cada mês">
+                <div class="vpm-var-cap">@T("Variação das vendas", "Sales change"), @principal × @comp</div>
+                <div class="vpm-var" aria-label="@T("Variação das vendas em cada mês", "Sales change in each month")">
                     @for (var m = 1; m <= 12; m++)
                     {
                         var a = cv[principal][m - 1]; var b = cv[comp][m - 1];
@@ -1317,7 +1349,7 @@
                         var dif = a.Tem && b.Tem ? a.Valor - b.Valor : (decimal?)null;
                         var pa = cp[principal][m - 1]; var pb = cp[comp][m - 1];
                         var difP = pa.Tem && pb.Tem && !pa.Parcial && !pb.Parcial ? (int)(pa.Valor - pb.Valor) : (int?)null;
-                        var dica = (dif is decimal d ? $"{NomeDoMes(m)}: vendas {DifReais(d)}" : NomeDoMes(m)) + (difP is int dp ? $" · propostas {DifQtd(dp)}" : "");
+                        var dica = (dif is decimal d ? $"{NomeDoMes(m)}: {T("vendas", "sales")} {DifReais(d)}" : NomeDoMes(m)) + (difP is int dp ? $" · {T("propostas", "proposals")} {DifQtd(dp)}" : "");
                         @if (pct is double p) { <span class="vpm-pill @ClsVar(p, false)" title="@dica">@PctSinal(p)</span> }
                         else if (dif is decimal d2) { <span class="vpm-pill neu" title="@dica">@DifReais(d2)</span> }
                         else { <span class="vpm-pill vazio">—</span> }
@@ -1334,7 +1366,7 @@
                         @foreach (var a in anos)
                         {
                             var x = cv[a][mes - 1];
-                            <div class="vpm-slot" title="@($"{NomeDoMes(mes)} {a} · vendas: {CelTxt(true, x, true)}")">
+                            <div class="vpm-slot" title="@($"{NomeDoMes(mes)} {a} · {T("vendas", "sales")}: {CelTxt(true, x, true)}")">
                                 @if (x.Tem)
                                 {
                                     var v = (double)x.Valor; var neg = v < 0;
@@ -1347,7 +1379,7 @@
                                 }
                                 else
                                 {
-                                    <b class="vpm-val nd" style="bottom:calc(@F(escV.Zero)% + 3px)">n/d</b>
+                                    <b class="vpm-val nd" style="bottom:calc(@F(escV.Zero)% + 3px)">@T("n/d", "n/a")</b>
                                 }
                             </div>
                         }
@@ -1362,7 +1394,7 @@
                         @foreach (var a in anos)
                         {
                             var x = cp[a][mes - 1];
-                            <div class="vpm-slot" title="@($"{NomeDoMes(mes)} {a} · propostas: {CelTxt(false, x, true)}")">
+                            <div class="vpm-slot" title="@($"{NomeDoMes(mes)} {a} · {T("propostas", "proposals")}: {CelTxt(false, x, true)}")">
                                 @if (x.Tem)
                                 {
                                     var h = Math.Min(100, Math.Max((double)x.Valor / maxP * 70, 0.6));
@@ -1375,7 +1407,7 @@
                                 }
                                 else
                                 {
-                                    <b class="vpm-lp nd" style="top:3px">n/d</b>
+                                    <b class="vpm-lp nd" style="top:3px">@T("n/d", "n/a")</b>
                                 }
                             </div>
                         }
@@ -1388,7 +1420,7 @@
                 @for (var m = 1; m <= 12; m++)
                 {
                     var v = cv[principal][m - 1]; var p = cp[principal][m - 1];
-                    <div><b>@MesCurto(m).ToUpperInvariant()</b>@if (p.Parcial) { <small>parcial</small> } else if (v.Sit == SitMes.AApurar && p.Sit == SitMes.AApurar) { <small>a apurar</small> } else if (v.Sit == SitMes.AApurar) { <small>vendas a apurar</small> }</div>
+                    <div><b>@MesCurto(m).ToUpperInvariant()</b>@if (p.Parcial) { <small>@T("parcial", "partial")</small> } else if (v.Sit == SitMes.AApurar && p.Sit == SitMes.AApurar) { <small>@T("a apurar", "pending")</small> } else if (v.Sit == SitMes.AApurar) { <small>@T("vendas a apurar", "sales pending")</small> }</div>
                 }
             </div>
         </div>
@@ -1414,7 +1446,7 @@
         if (base0.Count == 0) base0 = pts.Where(p => p.v is not null).Select(p => p.v!.Value).ToList();
         double min = env ? 0 : base0.DefaultIfEmpty(0).Min(), max = base0.DefaultIfEmpty(1).Max();
         double Y(double v) => max - min < 1e-9 ? 36 : 9 + Math.Clamp((v - min) / (max - min), 0, 1.05) * 50;   // folga em cima para os números
-        <div class="vpm-banda-cap @cls"><i></i>@(env ? $"Valor enviado em propostas ({Sim})" : porValor ? $"Taxa de conversão do mês por valor ({RegraValorMm})" : $"Taxa de conversão do mês ({RegraCurtaMm})")</div>
+        <div class="vpm-banda-cap @cls"><i></i>@(env ? T($"Valor enviado em propostas ({Sim})", $"Value sent in proposals ({Sim})") : porValor ? T($"Taxa de conversão do mês por valor ({RegraValorMm})", $"Monthly conversion rate by value ({RegraValorMm})") : T($"Taxa de conversão do mês ({RegraCurtaMm})", $"Monthly conversion rate ({RegraCurtaMm})"))</div>
         <div class="vpm-banda @cls vpm-dc">
             <svg class="vpm-banda-svg" aria-hidden="true"></svg>
             <div class="vpm-banda-g">
@@ -1430,7 +1462,7 @@
                                 {
                                     var y = Y(v);
                                     <i class="vpm-pt @(p.parc ? "parc" : "")" style="bottom:@F(y)%;--c:@CorMm(modo, el, a)" data-ano="@a" data-m="@mes" data-cor="@CorMm(modo, el, a)" data-pri="@(a == principal ? "1" : "")"
-                                       title="@($"{NomeDoMes(mes)} {a} · {(env ? "valor enviado " + Mi((decimal)v) : (porValor ? "conversão por valor " : "conversão ") + P1(v))}{(p.parc ? " (parcial)" : "")}")"></i>
+                                       title="@($"{NomeDoMes(mes)} {a} · {(env ? T("valor enviado ", "value sent ") + Mi((decimal)v) : (porValor ? T("conversão por valor ", "conversion by value ") : T("conversão ", "conversion ")) + P1(v))}{(p.parc ? T(" (parcial)", " (partial)") : "")}")"></i>
                                     <b class="vpm-blab vpm-rot @(a == principal ? "pri" : "cmp")" style="bottom:calc(@F(y)% + 6px)">@(env ? ReaisMi((decimal)v) : P1(v))@(p.parc ? "*" : "")</b>
                                 }
                             </div>
@@ -1458,55 +1490,55 @@
             return (l.Sum(x => x.c.Valor), l.Count > 0 ? l.Max(x => x.m) : 0);
         }
         <aside class="vpm-resumo cmp">
-            <div class="vpm-rtit">Resumo comparativo</div>
-            <div class="vpm-rper">Vendas@(_mmS ? $" ({VendasDeMm})" : ""): @MesesTxt(mv) · propostas e conversão: @MesesTxt(mp)</div>
+            <div class="vpm-rtit">@T("Resumo comparativo", "Comparison summary")</div>
+            <div class="vpm-rper">@T("Vendas", "Sales")@(_mmS ? $" ({VendasDeMm})" : ""): @MesesTxt(mv) · @T("propostas e conversão", "proposals and conversion"): @MesesTxt(mp)</div>
             <div class="vpm-anos2">
                 @foreach (var L in new[] { A, B })
                 {
                     <div class="vpm-ano @(L.Ano == a1 ? "pri" : "")" style="--ac:@CorMm("c", 'v', L.Ano)">
                         <div class="vpm-ano-t">@L.Ano</div>
-                        <div class="vpm-ano-l"><span>Vendas</span><b title="@(L.MesesV > 0 ? Reais(L.Vendas) : "")">@(L.MesesV > 0 ? Mi(L.Vendas) : "n/d")</b></div>
-                        <div class="vpm-ano-l"><span>Propostas</span><b>@(L.MesesP > 0 ? N0(L.Propostas) : "n/d")</b></div>
+                        <div class="vpm-ano-l"><span>@T("Vendas", "Sales")</span><b title="@(L.MesesV > 0 ? Reais(L.Vendas) : "")">@(L.MesesV > 0 ? Mi(L.Vendas) : T("n/d", "n/a"))</b></div>
+                        <div class="vpm-ano-l"><span>@T("Propostas", "Proposals")</span><b>@(L.MesesP > 0 ? N0(L.Propostas) : T("n/d", "n/a"))</b></div>
                         @if (_mmS)
                         {
-                            <div class="vpm-ano-l"><span>Conversão (qtd)</span><b title="@($"{N0(L.G)} ganhas de {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
-                            <div class="vpm-ano-l"><span>Conversão (valor)</span><b title="@RegraValorMm">@(L.TaxaV is double tv ? P1(tv) : "—")</b></div>
+                            <div class="vpm-ano-l"><span>@T("Conversão (qtd)", "Conversion (count)")</span><b title="@($"{N0(L.G)} {T("ganhas de", "won of")} {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
+                            <div class="vpm-ano-l"><span>@T("Conversão (valor)", "Conversion (value)")</span><b title="@RegraValorMm">@(L.TaxaV is double tv ? P1(tv) : "—")</b></div>
                         }
                         else
                         {
-                            <div class="vpm-ano-l"><span>Conversão@(PorValor ? " (valor)" : "")</span><b title="@(PorValor ? RegraMm : $"{N0(L.G)} ganhas de {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
+                            <div class="vpm-ano-l"><span>@T("Conversão", "Conversion")@(PorValor ? T(" (valor)", " (value)") : "")</span><b title="@(PorValor ? RegraMm : $"{N0(L.G)} {T("ganhas de", "won of")} {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
                         }
                         @{ var (totAno, ultAno) = TotalAno(L.Ano); var andamento = ultAno is > 0 and < 12 && L.Ano >= DateTime.Today.Year; }
                         <div class="vpm-ano-l vpm-ano-tot" title="@(ultAno > 0 ? $"{Reais(totAno)} · {MesesTxtSemFiltro(ultAno)}" : "")">
-                            <span>Venda total do ano</span>
-                            <b>@(ultAno > 0 ? Mi(totAno) : "n/d")</b>
-                            @if (ultAno > 0) { <small>@MesesTxtSemFiltro(ultAno)@(andamento ? " · ano em andamento" : "")</small> }
+                            <span>@T("Venda total do ano", "Total sales for the year")</span>
+                            <b>@(ultAno > 0 ? Mi(totAno) : T("n/d", "n/a"))</b>
+                            @if (ultAno > 0) { <small>@MesesTxtSemFiltro(ultAno)@(andamento ? T(" · ano em andamento", " · year in progress") : "")</small> }
                         </div>
                     </div>
                 }
             </div>
-            <div class="vpm-rtit2">Variação @a1 × @a2</div>
+            <div class="vpm-rtit2">@T("Variação", "Change") @a1 × @a2</div>
             <div class="vpm-varl">
-                <span>Vendas</span>
+                <span>@T("Vendas", "Sales")</span>
                 <b class="@ClsVar(vV, false)">@(temV && vV is double x1 ? Seta(x1) + PctSinal(x1) : "—")</b>
                 <em>@(temV ? DifReais(A.Vendas - B.Vendas) : "")</em>
-                <span>Propostas</span>
+                <span>@T("Propostas", "Proposals")</span>
                 <b class="neu">@(temP && vP is double x2 ? Seta(x2) + PctSinal(x2) : "—")</b>
                 <em>@(temP ? DifQtd(A.Propostas - B.Propostas) : "")</em>
-                <span>@(_mmS ? "Conversão (qtd)" : "Conversão")</span>
+                <span>@(_mmS ? T("Conversão (qtd)", "Conversion (count)") : T("Conversão", "Conversion"))</span>
                 <b class="@ClsVar(dT, false)">@(dT is double x3 ? Seta(x3) + PpSinal(x3) : "—")</b>
                 <em></em>
                 @if (_mmS)
                 {
-                    <span>Conversão (valor)</span>
+                    <span>@T("Conversão (valor)", "Conversion (value)")</span>
                     <b class="@ClsVar(dTv, false)">@(dTv is double x4 ? Seta(x4) + PpSinal(x4) : "—")</b>
                     <em></em>
                 }
             </div>
             <p class="vpm-rnota">
-                Mesmos meses nos dois anos@(_fil.Meses.Count > 0 ? " (os do filtro Mês)" : "")@((a1 == DateTime.Today.Year || a2 == DateTime.Today.Year) && MesNoFiltro(DateTime.Today.Month) ? $"; propostas e conversão até o mês presente ({NomeDoMes(DateTime.Today.Month).ToLowerInvariant()} parcial, até hoje); vendas até o último mês lançado" : "").
-                Conversão: @RegraMm.
-                Mais ou menos propostas não é, por si, melhora ou piora.
+                @T("Mesmos meses nos dois anos", "Same months in both years")@(_fil.Meses.Count > 0 ? T(" (os do filtro Mês)", " (those in the Month filter)") : "")@((a1 == DateTime.Today.Year || a2 == DateTime.Today.Year) && MesNoFiltro(DateTime.Today.Month) ? (En ? $"; proposals and conversion up to the current month ({NomeDoMesFrase(DateTime.Today.Month)} partial, up to today); sales up to the last month entered" : $"; propostas e conversão até o mês presente ({NomeDoMesFrase(DateTime.Today.Month)} parcial, até hoje); vendas até o último mês lançado") : "").
+                @T("Conversão", "Conversion"): @RegraMm.
+                @T("Mais ou menos propostas não é, por si, melhora ou piora.", "More or fewer proposals is not, by itself, an improvement or a decline.")
             </p>
         </aside>
     };
@@ -1527,13 +1559,13 @@
             @PaletaMm("t", anos)
         </div>
         <div class="vpm-sm-leg sub">
-            <span><i class="sw linha"></i>linha: valor enviado em propostas (@Sim)</span>
-            <span><i class="sw cheia"></i>colunas de cima: vendas (@Sim mi@(_mmS ? ", " + VendasDeMm : ""))</span>
-            <span><i class="sw clara"></i>colunas de baixo: propostas enviadas (qtd)</span>
-            <span><i class="sw conv"></i>linha de baixo: taxa de conversão do mês (@RegraCurtaMm)</span>
-            <span><i class="sw parcial"></i>mês em andamento (parcial)</span>
-            <span><i class="sw neg"></i>venda negativa</span>
-            <span class="txt">— = a apurar · n/d = sem dado registrado</span>
+            <span><i class="sw linha"></i>@T("linha: valor enviado em propostas", "line: value sent in proposals") (@Sim)</span>
+            <span><i class="sw cheia"></i>@T("colunas de cima: vendas", "upper columns: sales") (@Sim @T("mi", "M")@(_mmS ? ", " + VendasDeMm : ""))</span>
+            <span><i class="sw clara"></i>@T("colunas de baixo: propostas enviadas (qtd)", "lower columns: proposals sent (count)")</span>
+            <span><i class="sw conv"></i>@T("linha de baixo: taxa de conversão do mês", "bottom line: monthly conversion rate") (@RegraCurtaMm)</span>
+            <span><i class="sw parcial"></i>@T("mês em andamento (parcial)", "month in progress (partial)")</span>
+            <span><i class="sw neg"></i>@T("venda negativa", "negative sales")</span>
+            <span class="txt">@T("— = a apurar · n/d = sem dado registrado", "— = pending · n/a = no data recorded")</span>
         </div>
         <div class="vpm-sm-grid" style="--cn:@CorMm("t", 'n', 0);--le:@CorMm("t", 'e', 0);--lx:@CorMm("t", 'x', 0)">
             @for (var m = 1; m <= 12; m++)
@@ -1580,7 +1612,7 @@
                     <div class="vpm-sm-g">
                         <i class="vpm-sm-base"></i>
                         @if (minV < 0) { <i class="vpm-sm-zero" style="top:calc(var(--hl) + var(--hv) * @F(1 - zeroV / 100))"></i> }
-                        <div class="vpm-sm-conv" aria-label="Taxa de conversão do mês, por ano">
+                        <div class="vpm-sm-conv" aria-label="@T("Taxa de conversão do mês, por ano", "Monthly conversion rate, by year")">
                             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                                 @foreach (var t in trechosC.Where(t => t.Count > 1))
                                 {
@@ -1594,7 +1626,7 @@
                                 <b class="vpm-sm-le cv" style="left:@F(Xe(c.i))%;bottom:calc(@F(y)% + 5px)">@P1(c.t!.Value)@(c.parc ? "*" : "")</b>
                             }
                         </div>
-                        <div class="vpm-sm-linha" aria-label="Valor enviado em propostas, por ano">
+                        <div class="vpm-sm-linha" aria-label="@T("Valor enviado em propostas, por ano", "Value sent in proposals, by year")">
                             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                                 @foreach (var t in trechos.Where(t => t.Count > 1))
                                 {
@@ -1613,11 +1645,11 @@
                             var v = cv.First(x => x.a == a).c; var p = cp.First(x => x.a == a).c;
                             var pm = Prop(a, mes);
                             var cor = CorMm("t", 'v', a);
-                            var txtV = v.Tem ? (v.Valor < 0 ? "−" : "") + Sim + " " + (Math.Abs(v.Valor) / 1_000_000m).ToString("#,##0.0", Br) + " mi" : v.Sit == SitMes.AApurar ? "a apurar" : "n/d";
-                            var txtP = p.Tem ? N0((int)p.Valor) + (p.Parcial ? " (parcial)" : "") : p.Sit == SitMes.AApurar ? "a apurar" : "n/d";
-                            var txtE = pm?.Valor is decimal ve && ve > 0 ? Mi(ve) + (pm.SemTaxa > 0 ? $" (parcial: {pm.SemTaxa} sem câmbio)" : "") : "—";
-                            var porProp = v.Tem && p.Tem && !p.Parcial && p.Valor > 0 ? $"\n{(v.Valor < 0 ? "−" : "")}{Sim} {(Math.Abs(v.Valor) / p.Valor / 1000m).ToString("#,##0", Br)} mil por proposta" : "";
-                            <div class="vpm-sm-c" style="--c:@cor;--cp:@CorMm("t", 'p', a)" title="@($"{NomeDoMes(mes)} {a}\nVendas: {txtV}\nPropostas: {txtP}\nValor enviado: {txtE}\nConversão: {(conv.FirstOrDefault(x => x.a == a).t is double tcv ? P1(tcv) : "—")}{(_mmS && p.Tem && TaxaValorMes(a, mes) is double tvv ? $"\nConversão por valor: {P1(tvv)}" : "")}{porProp}")">
+                            var txtV = v.Tem ? (v.Valor < 0 ? "−" : "") + Sim + " " + (Math.Abs(v.Valor) / 1_000_000m).ToString("#,##0.0", Cul) + Uni("mi") : v.Sit == SitMes.AApurar ? T("a apurar", "pending") : T("n/d", "n/a");
+                            var txtP = p.Tem ? N0((int)p.Valor) + (p.Parcial ? T(" (parcial)", " (partial)") : "") : p.Sit == SitMes.AApurar ? T("a apurar", "pending") : T("n/d", "n/a");
+                            var txtE = pm?.Valor is decimal ve && ve > 0 ? Mi(ve) + (pm.SemTaxa > 0 ? (En ? $" (partial: {pm.SemTaxa} without exchange rate)" : $" (parcial: {pm.SemTaxa} sem câmbio)") : "") : "—";
+                            var porProp = v.Tem && p.Tem && !p.Parcial && p.Valor > 0 ? $"\n{(v.Valor < 0 ? "−" : "")}{Sim} {(Math.Abs(v.Valor) / p.Valor / 1000m).ToString("#,##0", Cul)}{Uni("mil")} {T("por proposta", "per proposal")}" : "";
+                            <div class="vpm-sm-c" style="--c:@cor;--cp:@CorMm("t", 'p', a)" title="@($"{NomeDoMes(mes)} {a}\n{T("Vendas", "Sales")}: {txtV}\n{T("Propostas", "Proposals")}: {txtP}\n{T("Valor enviado", "Value sent")}: {txtE}\n{T("Conversão", "Conversion")}: {(conv.FirstOrDefault(x => x.a == a).t is double tcv ? P1(tcv) : "—")}{(_mmS && p.Tem && TaxaValorMes(a, mes) is double tvv ? $"\n{T("Conversão por valor", "Conversion by value")}: {P1(tvv)}" : "")}{porProp}")">
                                 <div class="vpm-sm-l"></div>
                                 <div class="vpm-sm-v">
                                     @if (v.Tem)
@@ -1637,7 +1669,7 @@
                                     }
                                     else
                                     {
-                                        <b class="vpm-sm-num vazio" style="bottom:calc(@F(zeroV)% + 2px)">@(v.Sit == SitMes.AApurar ? "—" : "n/d")</b>
+                                        <b class="vpm-sm-num vazio" style="bottom:calc(@F(zeroV)% + 2px)">@(v.Sit == SitMes.AApurar ? "—" : T("n/d", "n/a"))</b>
                                     }
                                 </div>
                                 <div class="vpm-sm-p">
@@ -1651,7 +1683,7 @@
                                     }
                                     else
                                     {
-                                        <span class="vpm-sm-lp vazio" style="top:3px"><b>@(p.Sit == SitMes.AApurar ? "—" : "n/d")</b></span>
+                                        <span class="vpm-sm-lp vazio" style="top:3px"><b>@(p.Sit == SitMes.AApurar ? "—" : T("n/d", "n/a"))</b></span>
                                     }
                                 </div>
                                 <div class="vpm-sm-cz"></div>
@@ -1665,56 +1697,66 @@
         string TotV(int a)
         {
             var l = Enumerable.Range(1, 12).Where(MesNoFiltro).Select(m => (m, c: CelVenda(a, m))).Where(x => x.c.Tem).ToList();
-            if (l.Count == 0) return $"{a} n/d";
+            if (l.Count == 0) return $"{a} {T("n/d", "n/a")}";
             var ult = l.Max(x => x.m);
             return $"{a} {MiCurto(l.Sum(x => x.c.Valor))}" + (ult < 12 || _fil.Meses.Count > 0 ? $" ({MesesTxt(ult)})" : "");
         }
         string TotP(int a)
         {
             var l = Enumerable.Range(1, 12).Where(MesNoFiltro).Select(m => (m, c: CelProp(a, m))).Where(x => x.c.Tem).ToList();
-            if (l.Count == 0) return $"{a} n/d";
+            if (l.Count == 0) return $"{a} {T("n/d", "n/a")}";
             var ult = l.Max(x => x.m); var parc = l.FirstOrDefault(x => x.c.Parcial);
-            return $"{a} {N0((int)l.Sum(x => x.c.Valor))}" + (ult < 12 || _fil.Meses.Count > 0 ? $" ({MesesTxt(ult)}{(parc.c.Parcial ? $", {MesCurto(parc.m).ToLowerInvariant()} parcial" : "")})" : "");
+            return $"{a} {N0((int)l.Sum(x => x.c.Valor))}" + (ult < 12 || _fil.Meses.Count > 0 ? $" ({MesesTxt(ult)}{(parc.c.Parcial ? $", {MesCurtoFrase(parc.m)} {T("parcial", "partial")}" : "")})" : "");
         }
         string TotE(int a)
         {
             var l = Enumerable.Range(1, 12).Select(m => Prop(a, m)).Where(p => p?.Valor is > 0).ToList();
-            return l.Count == 0 ? $"{a} n/d" : $"{a} {MiRot(l.Sum(p => p!.Valor!.Value))}" + (l.Any(p => p!.SemTaxa > 0) ? " (parcial: sem câmbio)" : "");
+            return l.Count == 0 ? $"{a} {T("n/d", "n/a")}" : $"{a} {MiRot(l.Sum(p => p!.Valor!.Value))}" + (l.Any(p => p!.SemTaxa > 0) ? T(" (parcial: sem câmbio)", " (partial: no exchange rate)") : "");
         }
         <div class="vpm-sm-tot">
-            <div><b>Vendas (@Sim mi@(_mmS ? ", " + VendasDeMm : "")):</b> @string.Join(" · ", anos.Select(TotV))</div>
-            <div><b>Propostas:</b> @string.Join(" · ", anos.Select(TotP))@(_setor != "" ? " · " + _setor : "")</div>
-            <div><b>Valor enviado (@Sim mi):</b> @string.Join(" · ", anos.Select(TotE))</div>
+            <div><b>@T("Vendas", "Sales") (@Sim @T("mi", "M")@(_mmS ? ", " + VendasDeMm : "")):</b> @string.Join(" · ", anos.Select(TotV))</div>
+            <div><b>@T("Propostas", "Proposals"):</b> @string.Join(" · ", anos.Select(TotP))@(_setor != "" ? " · " + _setor : "")</div>
+            <div><b>@T("Valor enviado", "Value sent") (@Sim @T("mi", "M")):</b> @string.Join(" · ", anos.Select(TotE))</div>
             @if (semProp.Count > 0 || semVenda.Count > 0)
             {
-                <div class="nd">@(semVenda.Count > 0 ? $"{string.Join(" e ", semVenda)}: sem vendas{(_mmS ? " por setor" : "")} registradas. " : "")@(semProp.Count > 0 ? $"{string.Join(" e ", semProp)}: sem propostas registradas (n/d, não é zero)." : "") * = mês parcial ou valor parcial (proposta sem taxa de câmbio).</div>
+                @if (En)
+                {
+                    <div class="nd">@(semVenda.Count > 0 ? $"{string.Join(" and ", semVenda)}: no{(_mmS ? " sector" : "")} sales recorded. " : "")@(semProp.Count > 0 ? $"{string.Join(" and ", semProp)}: no proposals recorded (n/a, not zero)." : "") * = partial month or partial value (proposal without an exchange rate).</div>
+                }
+                else
+                {
+                    <div class="nd">@(semVenda.Count > 0 ? $"{string.Join(" e ", semVenda)}: sem vendas{(_mmS ? " por setor" : "")} registradas. " : "")@(semProp.Count > 0 ? $"{string.Join(" e ", semProp)}: sem propostas registradas (n/d, não é zero)." : "") * = mês parcial ou valor parcial (proposta sem taxa de câmbio).</div>
+                }
             }
         </div>
     };
 
     private string RegraCurtaMm => PorValor && !_mmS
-        ? (BaseTodas ? $"por valor: {Sim} ganho ÷ {Sim} de todas as enviadas no mês" : $"por valor: {Sim} ganho ÷ {Sim} (ganho + perdido) no mês")
-        : (BaseTodas ? "por quantidade: ganhas ÷ todas as enviadas no mês" : "por quantidade: ganhas ÷ decididas no mês");
+        ? (BaseTodas ? T($"por valor: {Sim} ganho ÷ {Sim} de todas as enviadas no mês", $"by value: {Sim} won ÷ {Sim} of all sent in the month") : T($"por valor: {Sim} ganho ÷ {Sim} (ganho + perdido) no mês", $"by value: {Sim} won ÷ {Sim} (won + lost) in the month"))
+        : (BaseTodas ? T("por quantidade: ganhas ÷ todas as enviadas no mês", "by count: won ÷ all sent in the month") : T("por quantidade: ganhas ÷ decididas no mês", "by count: won ÷ decided in the month"));
     /// <summary>A regra da conversão do quadro mês a mês, por extenso (quantidade ou valor; decididas ou todas).</summary>
     private string RegraMm => _mmS
-        ? $"por quantidade, {(BaseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ (ganhas + perdidas)")}; por valor, {RegraValorMm}"
+        ? (En ? $"by count, {(BaseTodas ? "won ÷ all proposals sent" : "won ÷ (won + lost)")}; by value, {RegraValorMm}"
+              : $"por quantidade, {(BaseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ (ganhas + perdidas)")}; por valor, {RegraValorMm}")
         : RegraTxt;
     /// <summary>A conversão por valor do mês (linha pontilhada do quadro por setor), pela base de "Taxa sobre".</summary>
-    private string RegraValorMm => BaseTodas ? $"{Sim} ganho ÷ {Sim} de todas as enviadas no mês" : $"{Sim} ganho ÷ {Sim} (ganho + perdido) no mês";
+    private string RegraValorMm => BaseTodas
+        ? T($"{Sim} ganho ÷ {Sim} de todas as enviadas no mês", $"{Sim} won ÷ {Sim} of all sent in the month")
+        : T($"{Sim} ganho ÷ {Sim} (ganho + perdido) no mês", $"{Sim} won ÷ {Sim} (won + lost) in the month");
 
     /// <summary>Valor em reais, curto: R$ 39.000.000 → "R$ 39 mi"; R$ 54.400.000 → "R$ 54,4 mi"; "R$ 1,2 bi".</summary>
     private string ReaisMi(decimal v)
     {
         var mi = Math.Abs(v) / 1_000_000m;
-        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.#", Br) + " bi" : mi.ToString("#,##0.#", Br) + " mi";
+        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.#", Cul) + Uni("bi") : mi.ToString("#,##0.#", Cul) + Uni("mi");
         return (v < 0 ? "−" : "") + Sim + " " + t;
     }
 
     /// <summary>R$ em milhões, curto para caber na coluna: "45,2", "421", "1,2 bi".</summary>
-    private static string MiRot(decimal v)
+    private string MiRot(decimal v)
     {
         var mi = Math.Abs(v) / 1_000_000m;
-        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.0", Br) + " bi" : mi >= 100 ? mi.ToString("#,##0", Br) : mi.ToString("#,##0.0", Br);
+        var t = mi >= 1000 ? (mi / 1000m).ToString("#,##0.0", Cul) + Uni("bi") : mi >= 100 ? mi.ToString("#,##0", Cul) : mi.ToString("#,##0.0", Cul);
         return (v < 0 ? "−" : "") + t;
     }
 
@@ -1730,39 +1772,39 @@
         var tx = Taxa(a);
         var txMm = _mmS ? tx.TaxaQtd : tx.Taxa;   // já segue "Conversão por" (no quadro por setor, quantidade; a de valor tem o seu bloco)
         <aside class="vpm-resumo um">
-            <div class="vpm-rtit">Resumo de @a</div>
+            <div class="vpm-rtit">@T("Resumo de", "Summary of") @a</div>
             <div class="vpm-blk">
-                <span class="vpm-blk-t">Vendas@(_mmS ? $" ({VendasDeMm})" : "") · @MesesTxt(mv)</span>
-                <b class="vpm-blk-v" title="@(nv > 0 ? Reais(sv) : "")">@(nv > 0 ? Mi(sv) : "n/d")</b>
+                <span class="vpm-blk-t">@T("Vendas", "Sales")@(_mmS ? $" ({VendasDeMm})" : "") · @MesesTxt(mv)</span>
+                <b class="vpm-blk-v" title="@(nv > 0 ? Reais(sv) : "")">@(nv > 0 ? Mi(sv) : T("n/d", "n/a"))</b>
                 @if (nv > 0)
                 {
                     var mx = vendasM.MaxBy(x => x.c.Valor); var mn = vendasM.MinBy(x => x.c.Valor);
-                    <span>média @Mi(sv / nv) por mês</span>
-                    <span>maior: @MesCurto(mx.m).ToLowerInvariant() @Mi(mx.c.Valor) · menor: @MesCurto(mn.m).ToLowerInvariant() @Mi(mn.c.Valor)</span>
+                    <span>@T("média", "average") @Mi(sv / nv) @T("por mês", "per month")</span>
+                    <span>@T("maior", "highest"): @MesCurtoFrase(mx.m) @Mi(mx.c.Valor) · @T("menor", "lowest"): @MesCurtoFrase(mn.m) @Mi(mn.c.Valor)</span>
                 }
             </div>
             <div class="vpm-blk">
-                <span class="vpm-blk-t">Propostas enviadas · @MesesTxt(mp)</span>
-                <b class="vpm-blk-v">@(np > 0 ? N0((int)sp) : "n/d")</b>
+                <span class="vpm-blk-t">@T("Propostas enviadas", "Proposals sent") · @MesesTxt(mp)</span>
+                <b class="vpm-blk-v">@(np > 0 ? N0((int)sp) : T("n/d", "n/a"))</b>
                 @if (np > 0)
                 {
                     var mx = propsM.MaxBy(x => x.c.Valor); var mn = propsM.MinBy(x => x.c.Valor);
-                    <span>média @N0((int)Math.Round(sp / np)) por mês</span>
-                    <span>maior: @MesCurto(mx.m).ToLowerInvariant() @N0((int)mx.c.Valor) · menor: @MesCurto(mn.m).ToLowerInvariant() @N0((int)mn.c.Valor)</span>
+                    <span>@T("média", "average") @N0((int)Math.Round(sp / np)) @T("por mês", "per month")</span>
+                    <span>@T("maior", "highest"): @MesCurtoFrase(mx.m) @N0((int)mx.c.Valor) · @T("menor", "lowest"): @MesCurtoFrase(mn.m) @N0((int)mn.c.Valor)</span>
                 }
-                @if (parcial.Tem && parcial.Parcial && parcial.Valor > 0) { <span class="vpm-parc">inclui @N0((int)parcial.Valor) em @NomeDoMes(DateTime.Today.Month).ToLowerInvariant() (parcial, até hoje)</span> }
+                @if (parcial.Tem && parcial.Parcial && parcial.Valor > 0) { <span class="vpm-parc">@(En ? $"includes {N0((int)parcial.Valor)} in {NomeDoMesFrase(DateTime.Today.Month)} (partial, up to today)" : $"inclui {N0((int)parcial.Valor)} em {NomeDoMesFrase(DateTime.Today.Month)} (parcial, até hoje)")</span> }
             </div>
             <div class="vpm-blk">
-                <span class="vpm-blk-t">Conversão · @(a == DateTime.Today.Year ? $"jan–{MesCurto(DateTime.Today.Month).ToLowerInvariant()}" : "jan–dez")</span>
+                <span class="vpm-blk-t">@T("Conversão", "Conversion") · @(a == DateTime.Today.Year ? JanAte(DateTime.Today.Month) : JanAte(12))</span>
                 <b class="vpm-blk-v">@(txMm is double t ? P1(t) : "—")</b>
-                <span>@(PorValor && !_mmS ? "por valor · " + RegraMm : $"{(_mmS ? "por quantidade · " : "")}{N0(tx.G)} ganhas de {N0(tx.Base)} {DenRot}{(_mmS ? "" : " · " + RegraTxt)}")</span>
+                <span>@(PorValor && !_mmS ? T("por valor · ", "by value · ") + RegraMm : $"{(_mmS ? T("por quantidade · ", "by count · ") : "")}{N0(tx.G)} {T("ganhas de", "won of")} {N0(tx.Base)} {DenRot}{(_mmS ? "" : " · " + RegraTxt)}")</span>
             </div>
             @if (_mmS)
             {
                 <div class="vpm-blk">
-                    <span class="vpm-blk-t">Conversão por valor · @(a == DateTime.Today.Year ? $"jan–{MesCurto(DateTime.Today.Month).ToLowerInvariant()}" : "jan–dez")</span>
+                    <span class="vpm-blk-t">@T("Conversão por valor", "Conversion by value") · @(a == DateTime.Today.Year ? JanAte(DateTime.Today.Month) : JanAte(12))</span>
                     <b class="vpm-blk-v">@(tx.TaxaValor is double tv ? P1(tv) : "—")</b>
-                    <span>@RegraValorMm.Replace(" no mês", "")</span>
+                    <span>@RegraValorMm.Replace(T(" no mês", " in the month"), "")</span>
                 </div>
             }
         </aside>
@@ -1777,13 +1819,13 @@
         var corFraca = vendas ? "#f3faf5" : "#f2f6fc";
         <div class="vpm-mat-card">
             <div class="vpm-gtit">
-                <b>@(vendas ? "Vendas por ano e mês" : "Propostas enviadas por ano e mês")</b>
-                <span>@(vendas ? Sim + " milhões · " + VendasDeMm : "quantidade" + (_setor != "" ? " · " + _setor : ""))</span>
-                <span class="vpm-gleg"><span><i class="ol forte"></i>mês mais forte do ano</span><span><i class="ol fraco"></i>mês mais fraco</span></span>
+                <b>@(vendas ? T("Vendas por ano e mês", "Sales by year and month") : T("Propostas enviadas por ano e mês", "Proposals sent by year and month"))</b>
+                <span>@(vendas ? Sim + T(" milhões · ", " millions · ") + VendasDeMm : T("quantidade", "count") + (_setor != "" ? " · " + _setor : ""))</span>
+                <span class="vpm-gleg"><span><i class="ol forte"></i>@T("mês mais forte do ano", "strongest month of the year")</span><span><i class="ol fraco"></i>@T("mês mais fraco", "weakest month")</span></span>
             </div>
             <div class="vpm-mat-wrap">
                 <table class="vpm-mat">
-                    <thead><tr><th>Ano</th>@for (var m = 1; m <= 12; m++) { <th>@MesCurto(m).ToUpperInvariant()</th> }<th class="tot">Total</th></tr></thead>
+                    <thead><tr><th>@T("Ano", "Year")</th>@for (var m = 1; m <= 12; m++) { <th>@MesCurto(m).ToUpperInvariant()</th> }<th class="tot">Total</th></tr></thead>
                     <tbody>
                         @foreach (var a in anos)
                         {
@@ -1816,8 +1858,8 @@
                                     }
                                 }
                                 <td class="tot" title="@(vendas ? Reais(total) : N0((int)total))">
-                                    @(ultimo > 0 ? (vendas ? MiCurto(total) : N0((int)total)) : "n/d")
-                                    @if (ultimo is > 0 and < 12 || temParc) { <small>@MesesTxt(ultimo)@(temParc ? " (último parcial)" : "")</small> }
+                                    @(ultimo > 0 ? (vendas ? MiCurto(total) : N0((int)total)) : T("n/d", "n/a"))
+                                    @if (ultimo is > 0 and < 12 || temParc) { <small>@MesesTxt(ultimo)@(temParc ? T(" (último parcial)", " (last one partial)") : "")</small> }
                                 </td>
                             </tr>
                         }
@@ -1836,8 +1878,8 @@
                 var (mv, mp, A, B) = ResumoMm(principal, b);
                 <table class="vpm-det">
                     <thead>
-                        <tr><th rowspan="2">Mês</th><th colspan="4">Vendas (@Sim@(_mmS ? ", " + VendasDeMm : ""))</th><th colspan="4">Propostas enviadas</th><th colspan="2">@(_mmS ? "Conversão (qtd)" : "Conversão")</th>@if (_mmS) { <th colspan="2">Conversão (valor)</th> }</tr>
-                        <tr><th>@principal</th><th>@b</th><th>Diferença</th><th>Var.</th><th>@principal</th><th>@b</th><th>Dif.</th><th>Var.</th><th>@principal</th><th>@b</th>@if (_mmS) { <th>@principal</th><th>@b</th> }</tr>
+                        <tr><th rowspan="2">@T("Mês", "Month")</th><th colspan="4">@T("Vendas", "Sales") (@Sim@(_mmS ? ", " + VendasDeMm : ""))</th><th colspan="4">@T("Propostas enviadas", "Proposals sent")</th><th colspan="2">@(_mmS ? T("Conversão (qtd)", "Conversion (count)") : T("Conversão", "Conversion"))</th>@if (_mmS) { <th colspan="2">@T("Conversão (valor)", "Conversion (value)")</th> }</tr>
+                        <tr><th>@principal</th><th>@b</th><th>@T("Diferença", "Difference")</th><th>@T("Var.", "Chg.")</th><th>@principal</th><th>@b</th><th>@T("Dif.", "Diff.")</th><th>@T("Var.", "Chg.")</th><th>@principal</th><th>@b</th>@if (_mmS) { <th>@principal</th><th>@b</th> }</tr>
                     </thead>
                     <tbody>
                         @for (var m = 1; m <= 12; m++)
@@ -1862,10 +1904,10 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <th>Período comparável<small>vendas @MesesTxt(mv) · propostas @MesesTxt(mp)</small></th>
-                            <td>@(A.MesesV > 0 ? Reais(A.Vendas) : "n/d")</td><td>@(B.MesesV > 0 ? Reais(B.Vendas) : "n/d")</td>
+                            <th>@T("Período comparável", "Comparable period")<small>@T("vendas", "sales") @MesesTxt(mv) · @T("propostas", "proposals") @MesesTxt(mp)</small></th>
+                            <td>@(A.MesesV > 0 ? Reais(A.Vendas) : T("n/d", "n/a"))</td><td>@(B.MesesV > 0 ? Reais(B.Vendas) : T("n/d", "n/a"))</td>
                             <td>@(A.MesesV > 0 && B.MesesV > 0 ? Reais(A.Vendas - B.Vendas) : "—")</td><td>@(VarMm(A.Vendas, B.Vendas) is double xv && A.MesesV > 0 ? PctSinal(xv) : "—")</td>
-                            <td>@(A.MesesP > 0 ? N0(A.Propostas) : "n/d")</td><td>@(B.MesesP > 0 ? N0(B.Propostas) : "n/d")</td>
+                            <td>@(A.MesesP > 0 ? N0(A.Propostas) : T("n/d", "n/a"))</td><td>@(B.MesesP > 0 ? N0(B.Propostas) : T("n/d", "n/a"))</td>
                             <td>@(A.MesesP > 0 && B.MesesP > 0 ? DifQtd(A.Propostas - B.Propostas) : "—")</td><td>@(VarMm(A.Propostas, B.Propostas) is double yp && A.MesesP > 0 ? PctSinal(yp) : "—")</td>
                             <td>@(A.Taxa is double ta1 ? P1(ta1) : "—")</td><td>@(B.Taxa is double tb2 ? P1(tb2) : "—")</td>
                             @if (_mmS) { <td>@(A.TaxaV is double tav ? P1(tav) : "—")</td><td>@(B.TaxaV is double tbv ? P1(tbv) : "—")</td> }
@@ -1877,8 +1919,8 @@
             {
                 <table class="vpm-det">
                     <thead>
-                        <tr><th rowspan="2">Mês</th>@foreach (var a in anos) { <th colspan="2">@a</th> }</tr>
-                        <tr>@foreach (var a in anos) { <th>Vendas (@Sim)</th><th>Propostas</th> }</tr>
+                        <tr><th rowspan="2">@T("Mês", "Month")</th>@foreach (var a in anos) { <th colspan="2">@a</th> }</tr>
+                        <tr>@foreach (var a in anos) { <th>@T("Vendas", "Sales") (@Sim)</th><th>@T("Propostas", "Proposals")</th> }</tr>
                     </thead>
                     <tbody>
                         @for (var m = 1; m <= 12; m++)
@@ -1896,12 +1938,12 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <th>Total registrado<small>inclui o mês parcial</small></th>
+                            <th>@T("Total registrado", "Total recorded")<small>@T("inclui o mês parcial", "includes the partial month")</small></th>
                             @foreach (var a in anos)
                             {
                                 var sv = Enumerable.Range(1, 12).Select(m => CelVenda(a, m)).Where(x => x.Tem).ToList();
                                 var sp = Enumerable.Range(1, 12).Select(m => CelProp(a, m)).Where(x => x.Tem).ToList();
-                                <td>@(sv.Count > 0 ? Reais(sv.Sum(x => x.Valor)) : "n/d")</td><td>@(sp.Count > 0 ? N0((int)sp.Sum(x => x.Valor)) : "n/d")</td>
+                                <td>@(sv.Count > 0 ? Reais(sv.Sum(x => x.Valor)) : T("n/d", "n/a"))</td><td>@(sp.Count > 0 ? N0((int)sp.Sum(x => x.Valor)) : T("n/d", "n/a"))</td>
                             }
                         </tr>
                     </tfoot>
@@ -1916,17 +1958,17 @@
                 var txAte = mp > 0 ? Taxa(a, mp) : default;
                 var txF = mp > 0 ? (_mmS ? txAte.TaxaQtd : txAte.Taxa) : null;
                 <table class="vpm-det">
-                    <thead><tr><th>Mês @a</th><th>Situação</th><th>Vendas (@Sim@(_mmS ? ", " + VendasDeMm : ""))</th><th>Propostas enviadas</th><th>Valor enviado (@Sim)</th><th>@(_mmS ? "Conversão (qtd)" : "Conversão do mês")</th>@if (_mmS) { <th>Conversão (valor)</th> }</tr></thead>
+                    <thead><tr><th>@T("Mês", "Month") @a</th><th>@T("Situação", "Status")</th><th>@T("Vendas", "Sales") (@Sim@(_mmS ? ", " + VendasDeMm : ""))</th><th>@T("Propostas enviadas", "Proposals sent")</th><th>@T("Valor enviado", "Value sent") (@Sim)</th><th>@(_mmS ? T("Conversão (qtd)", "Conversion (count)") : T("Conversão do mês", "Monthly conversion"))</th>@if (_mmS) { <th>@T("Conversão (valor)", "Conversion (value)")</th> }</tr></thead>
                     <tbody>
                         @for (var m = 1; m <= 12; m++)
                         {
                             var v = CelVenda(a, m); var p = CelProp(a, m); var pm = Prop(a, m); var tm = TaxaMm(a, m);
-                            var sit = p.Parcial ? "parcial (em andamento)" : v.Sit == SitMes.AApurar && p.Sit == SitMes.AApurar ? "a apurar" : v.Tem || p.Tem ? "fechado" : "sem dado";
+                            var sit = p.Parcial ? T("parcial (em andamento)", "partial (in progress)") : v.Sit == SitMes.AApurar && p.Sit == SitMes.AApurar ? T("a apurar", "pending") : v.Tem || p.Tem ? T("fechado", "closed") : T("sem dado", "no data");
                             <tr>
                                 <th>@NomeDoMes(m)</th><td class="sit">@sit</td>
                                 <td class="@(v.Tem && v.Valor < 0 ? "neg" : "")">@CelTxt(true, v, true)</td>
                                 <td>@CelTxt(false, p, true)</td>
-                                <td>@(pm?.Valor is decimal ve && ve > 0 ? Reais(ve) + (pm.SemTaxa > 0 ? $" (parcial: {pm.SemTaxa} sem câmbio)" : "") : "—")</td>
+                                <td>@(pm?.Valor is decimal ve && ve > 0 ? Reais(ve) + (pm.SemTaxa > 0 ? (En ? $" (partial: {pm.SemTaxa} without exchange rate)" : $" (parcial: {pm.SemTaxa} sem câmbio)") : "") : "—")</td>
                                 <td>@(p.Tem && tm is double t ? P1(t) : "—")</td>
                                 @if (_mmS) { <td>@(p.Tem && TaxaValorMes(a, m) is double tvm ? P1(tvm) : "—")</td> }
                             </tr>
@@ -1934,8 +1976,8 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <th>Meses fechados<small>vendas @MesesTxt(mv) · propostas @MesesTxt(mp)</small></th><td></td>
-                            <td>@(nv > 0 ? Reais(sv) : "n/d")</td><td>@(np > 0 ? N0((int)sp) : "n/d")</td>
+                            <th>@T("Meses fechados", "Closed months")<small>@T("vendas", "sales") @MesesTxt(mv) · @T("propostas", "proposals") @MesesTxt(mp)</small></th><td></td>
+                            <td>@(nv > 0 ? Reais(sv) : T("n/d", "n/a"))</td><td>@(np > 0 ? N0((int)sp) : T("n/d", "n/a"))</td>
                             <td>@(envF.Count > 0 ? Reais(envF.Sum(p => p!.Valor ?? 0m)) : "—")</td><td>@(txF is double tf ? P1(tf) : "—")</td>
                             @if (_mmS) { <td>@(mp > 0 && txAte.TaxaValor is double tfv ? P1(tfv) : "—")</td> }
                         </tr>
@@ -1956,39 +1998,39 @@
     private RenderFragment MetasExecutivo(int focoAno) => __builder =>
     {
         var anos = _anos.Where(a => a.Ano >= AnoIni && AnoVisivel(a.Ano) && (a.MesesComVendas > 0 || a.BudgetHsa is not null || a.BudgetGrupo is not null)).OrderBy(a => a.Ano).ToList();
-        if (anos.Count == 0) { <div class="empty">Sem vendas nem metas cadastradas.</div> return; }
+        if (anos.Count == 0) { <div class="empty">@T("Sem vendas nem metas cadastradas.", "No sales or targets recorded.")</div> return; }
         string cV = CorMeta("vendas"), cG = CorMeta("grupo"), cH = CorMeta("hsa");
         var max = anos.Select(a => new[] { a.Vendas, a.BudgetGrupo ?? 0m, a.BudgetHsa ?? 0m }.Max()).DefaultIfEmpty(1m).Max();
         var passo = Passo(Math.Max(max, 1m));
         var escala = Math.Ceiling(Math.Max(max, 1m) * 1.04m / passo) * passo;
         double Pc(decimal v) => (double)(Math.Max(0m, v) / escala * 100m);
         <div class="vp-bul-leg">
-            <span><i class="vp-b vp-grad" style="--c:@cV"></i>Vendas totais</span>
-            <span><i class="vp-m" style="background:@cG"></i>Meta Grupo</span>
-            <span><i class="vp-m" style="background:@cH"></i>Meta HSA</span>
+            <span><i class="vp-b vp-grad" style="--c:@cV"></i>@T("Vendas totais", "Total sales")</span>
+            <span><i class="vp-m" style="background:@cG"></i>@T("Meta Grupo", "Group Target")</span>
+            <span><i class="vp-m" style="background:@cH"></i>@T("Meta HSA", "HSA Target")</span>
         </div>
         <div class="ibar cvx-ibar vp-metas-ibar">
             @foreach (var a in anos)
             {
                 var ano = a.Ano;
-                var periodo = a.UltimoMes is > 0 and < 12 ? $"jan–{MesCurto(a.UltimoMes).ToLowerInvariant()}" : "";
+                var periodo = a.UltimoMes is > 0 and < 12 ? JanAte(a.UltimoMes) : "";
                 <div class="ibar-item @(a.Ano == focoAno ? "xf-on" : "")" @onclick="() => { _foco = ano; _dica = null; }"
-                     title="@($"{a.Ano}{(periodo != "" ? $" ({periodo})" : "")} · Vendas {(a.MesesComVendas > 0 ? Cheio(a.Vendas) : "—")} · Meta Grupo {(a.BudgetGrupo is decimal g0 ? Cheio(g0) : "—")} · Meta HSA {(a.BudgetHsa is decimal h0 ? Cheio(h0) : "—")}")">
+                     title="@($"{a.Ano}{(periodo != "" ? $" ({periodo})" : "")} · {T("Vendas", "Sales")} {(a.MesesComVendas > 0 ? Cheio(a.Vendas) : "—")} · {T("Meta Grupo", "Group Target")} {(a.BudgetGrupo is decimal g0 ? Cheio(g0) : "—")} · {T("Meta HSA", "HSA Target")} {(a.BudgetHsa is decimal h0 ? Cheio(h0) : "—")}")">
                     <div class="ibar-head">
                         <span class="ibar-num vp-mt-ano">@a.Ano</span>
                         @if (periodo != "") { <span class="vp-mt-per">@periodo</span> }
                         <div class="ibar-metrics">
-                            <span class="vp-mt-v"><small>Vendido</small><b class="ibar-val">@(a.MesesComVendas > 0 ? Mi(a.Vendas) : "—")</b></span>
+                            <span class="vp-mt-v"><small>@T("Vendido", "Sold")</small><b class="ibar-val">@(a.MesesComVendas > 0 ? Mi(a.Vendas) : "—")</b></span>
                             <span class="ibar-sep"></span>
-                            <span class="vp-mt-m"><i style="background:@cG"></i><small>Meta Grupo</small><b>@(a.BudgetGrupo is decimal g ? Mi(g) : "—")</b><em>@(a.PctGrupo is decimal pg ? Pct(pg) : "—")</em></span>
+                            <span class="vp-mt-m"><i style="background:@cG"></i><small>@T("Meta Grupo", "Group Target")</small><b>@(a.BudgetGrupo is decimal g ? Mi(g) : "—")</b><em>@(a.PctGrupo is decimal pg ? Pct(pg) : "—")</em></span>
                             <span class="ibar-sep"></span>
-                            <span class="vp-mt-m"><i style="background:@cH"></i><small>Meta HSA</small><b>@(a.BudgetHsa is decimal h ? Mi(h) : "—")</b><em>@(a.PctHsa is decimal ph ? Pct(ph) : "—")</em></span>
+                            <span class="vp-mt-m"><i style="background:@cH"></i><small>@T("Meta HSA", "HSA Target")</small><b>@(a.BudgetHsa is decimal h ? Mi(h) : "—")</b><em>@(a.PctHsa is decimal ph ? Pct(ph) : "—")</em></span>
                         </div>
                     </div>
                     <div class="vp-mt-barra">
                         <div class="ibar-track"><span class="ibar-fill" style="width:@F(a.MesesComVendas > 0 ? Pc(a.Vendas) : 0)%;--c:@cV"></span></div>
-                        @if (a.BudgetGrupo is decimal bg) { <em class="vp-mt-mk" style="left:@F(Pc(bg))%;background:@cG" title="Meta Grupo: @Cheio(bg)"></em> }
-                        @if (a.BudgetHsa is decimal bh) { <em class="vp-mt-mk" style="left:@F(Pc(bh))%;background:@cH" title="Meta HSA: @Cheio(bh)"></em> }
+                        @if (a.BudgetGrupo is decimal bg) { <em class="vp-mt-mk" style="left:@F(Pc(bg))%;background:@cG" title="@T("Meta Grupo", "Group Target"): @Cheio(bg)"></em> }
+                        @if (a.BudgetHsa is decimal bh) { <em class="vp-mt-mk" style="left:@F(Pc(bh))%;background:@cH" title="@T("Meta HSA", "HSA Target"): @Cheio(bh)"></em> }
                     </div>
                 </div>
             }
@@ -2068,7 +2110,7 @@
             .Select(kv => (kv.Key == foco ? CorFoco : kv.Key == foco - 1 ? CorAnterior : CorOutros, Mi(kv.Value[mes - 1]), kv.Key.ToString()))
             .ToList();
         var topo = ac.Valores.Values.Where(v => v[mes - 1] >= 0).Select(v => v[mes - 1]).DefaultIfEmpty(0m).Max();
-        _dica = new DicaVisivel("ac", $"ac{mes}", ac.Xm(mes) / ac.W * 100, ac.Y(topo) / ac.H * 100, $"Acumulado até {NomeDoMes(mes).ToLowerInvariant()}", linhas, mes);
+        _dica = new DicaVisivel("ac", $"ac{mes}", ac.Xm(mes) / ac.W * 100, ac.Y(topo) / ac.H * 100, $"{T("Acumulado até", "Year to date through")} {NomeDoMesFrase(mes)}", linhas, mes);
     }
 
     private RenderFragment Dica(string grafico) => __builder =>
@@ -2105,7 +2147,7 @@
     {
         var texto = (e.Value?.ToString() ?? "").Trim();
         var v = texto.Length == 0 ? null : VendasMensaisRepository.Numero(texto);
-        if (texto.Length > 0 && v is null) { _msgOk = false; _msg = $"\"{texto}\" não é um número."; return; }
+        if (texto.Length > 0 && v is null) { _msgOk = false; _msg = T($"\"{texto}\" não é um número.", $"\"{texto}\" is not a number."); return; }
         if (_aba is "vnb" or "vafm")
         {
             var atual = _vSetorBrl.GetValueOrDefault((ano, mes));
@@ -2114,7 +2156,7 @@
             VendasRepo.GravarPorSetor(new[] { vs });
             Carregar();
             _msgOk = true;
-            _msg = $"{NomeDoMes(mes)} {ano} ({(_aba == "vnb" ? "NB" : "AFM")}) gravado.";
+            _msg = $"{NomeDoMes(mes)} {ano} ({(_aba == "vnb" ? "NB" : "AFM")}) {T("gravado", "saved")}.";
             return;
         }
         var reg = _brutos.FirstOrDefault(x => x.Ano == ano && x.Mes == mes) ?? new MesDeVendas { Ano = ano, Mes = mes };
@@ -2127,20 +2169,20 @@
         VendasRepo.GravarMeses(new[] { reg });
         Carregar();
         _msgOk = true;
-        _msg = $"{NomeDoMes(mes)} {ano} gravado.";
+        _msg = $"{NomeDoMes(mes)} {ano} {T("gravado", "saved")}.";
     }
 
     private void MudarBudget(int ano, bool hsa, ChangeEventArgs e)
     {
         var texto = (e.Value?.ToString() ?? "").Trim();
         var v = texto.Length == 0 ? null : VendasMensaisRepository.Numero(texto);
-        if (texto.Length > 0 && v is null) { _msgOk = false; _msg = $"\"{texto}\" não é um número."; return; }
+        if (texto.Length > 0 && v is null) { _msgOk = false; _msg = T($"\"{texto}\" não é um número.", $"\"{texto}\" is not a number."); return; }
         var b = _budgets.FirstOrDefault(x => x.Ano == ano) ?? new BudgetDoAno { Ano = ano };
         if (hsa) b.Hsa = v; else b.Grupo = v;
         VendasRepo.GravarBudgets(new[] { b });
         Carregar();
         _msgOk = true;
-        _msg = $"Budget {(hsa ? "HSA" : "Grupo")} {ano} gravado.";
+        _msg = En ? $"{(hsa ? "HSA" : "Group")} budget {ano} saved." : $"Budget {(hsa ? "HSA" : "Grupo")} {ano} gravado.";
     }
 
     private void AcrescentarAno() => _anosEditor.Add(_anosEditor.DefaultIfEmpty(AnoIni - 1).Max() + 1);
@@ -2162,10 +2204,11 @@
             Carregar();
             _msgOk = meses + budgets > 0;
             _msg = _msgOk
-                ? $"{e.File.Name}: {meses} mês(es)" + (budgets > 0 ? $" e {budgets} budget(s)" : "") + " gravado(s)." + (avisos.Count > 0 ? " " + string.Join(" ", avisos.Take(3)) : "")
-                : $"Nada importado de {e.File.Name}. {string.Join(" ", avisos.Take(3))}";
+                ? (En ? $"{e.File.Name}: {meses} month(s)" + (budgets > 0 ? $" and {budgets} budget(s)" : "") + " saved."
+                      : $"{e.File.Name}: {meses} mês(es)" + (budgets > 0 ? $" e {budgets} budget(s)" : "") + " gravado(s).") + (avisos.Count > 0 ? " " + string.Join(" ", avisos.Take(3)) : "")
+                : T($"Nada importado de {e.File.Name}. {string.Join(" ", avisos.Take(3))}", $"Nothing imported from {e.File.Name}. {string.Join(" ", avisos.Take(3))}");
         }
-        catch (Exception ex) { _msgOk = false; _msg = "Não deu para ler a planilha: " + ex.Message; }
+        catch (Exception ex) { _msgOk = false; _msg = T("Não deu para ler a planilha: ", "Could not read the spreadsheet: ") + ex.Message; }
     }
 
     // ================= apresentação (PowerPoint) =================
@@ -2176,25 +2219,37 @@
     {
         var partes = new List<string>();
         void Add(string rot, HashSet<string> set) { if (set.Count > 0) partes.Add($"{rot}: {string.Join(", ", set.Take(4))}{(set.Count > 4 ? $" +{set.Count - 4}" : "")}"); }
-        Add("Ano", _fil.Anos); Add("Mês", _fil.Meses); Add("Setor", _fil.Origens); Add("Vendedor", _fil.Vendedores); Add("BU", _fil.Bus);
-        Add("BU Intercompany", _fil.BuIcs); Add("Mercado", _fil.Mercados); Add("País", _fil.Paises); Add("Produto", _fil.Produtos);
-        return partes.Count == 0 ? "Sem filtros (todas as propostas)" : string.Join(" · ", partes);
+        Add(T("Ano", "Year"), _fil.Anos);
+        if (_fil.Meses.Count > 0)   // os valores do filtro Mês são os nomes em português: na tela em inglês, mostra o nome em inglês
+            partes.Add($"{T("Mês", "Month")}: {string.Join(", ", _fil.Meses.Take(4).Select(MesDoFiltroTxt))}{(_fil.Meses.Count > 4 ? $" +{_fil.Meses.Count - 4}" : "")}");
+        Add(T("Setor", "Sector"), _fil.Origens); Add(T("Vendedor", "Salesperson"), _fil.Vendedores); Add("BU", _fil.Bus);
+        Add("BU Intercompany", _fil.BuIcs); Add(T("Mercado", "Market"), _fil.Mercados); Add(T("País", "Country"), _fil.Paises); Add(T("Produto", "Product"), _fil.Produtos);
+        return partes.Count == 0 ? T("Sem filtros (todas as propostas)", "No filters (all proposals)") : string.Join(" · ", partes);
+    }
+
+    /// <summary>Um valor do filtro Mês (nome em português, Fmt.MonthLong) como aparece na tela: em inglês, o nome em inglês.</summary>
+    private string MesDoFiltroTxt(string valor)
+    {
+        if (!En) return valor;
+        var m = Enumerable.Range(1, 12).FirstOrDefault(i => Fmt.MonthLong(i) == valor);
+        return m > 0 ? NomeDoMes(m) : valor;
     }
 
     private object DadosApresentacao() => new
     {
-        arquivo = $"Performance_Comercial_{DateTime.Now:yyyy-MM-dd}.pptx",
-        titulo = "Performance Comercial | Howden South America",
-        subtitulo = "Resultados, indicadores e oportunidades de crescimento",
-        periodo = $"{Periodo} · valores em {Sim} · ano em foco: {AnoDoFoco.Ano}",
-        geradoEm = DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm"),
+        arquivo = $"{T("Performance_Comercial", "Sales_Performance")}_{DateTime.Now:yyyy-MM-dd}.pptx",
+        titulo = T("Performance Comercial | Howden South America", "Sales Performance | Howden South America"),
+        subtitulo = T("Resultados, indicadores e oportunidades de crescimento", "Results, indicators and growth opportunities"),
+        periodo = T($"{Periodo} · valores em {Sim} · ano em foco: {AnoDoFoco.Ano}", $"{Periodo} · values in {Sim} · focus year: {AnoDoFoco.Ano}"),
+        geradoEm = En ? DateTime.Now.ToString("MM/dd/yyyy 'at' h:mm tt", EnUs) : DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm"),
         filtros = FiltrosTxt(),
-        regra = $"Taxa de conversão {(PorValor ? "por valor" : "por quantidade")}: {RegraTxt}.",
-        baseCurta = BaseTodas ? "todas as propostas" : "decididas",
-        fonte = $"Propostas: {_fonte}. Vendas e budgets: histórico da equipe (empresa toda, não seguem os filtros).",
+        regra = En ? $"Conversion rate {(PorValor ? "by value" : "by count")}: {RegraTxt}." : $"Taxa de conversão {(PorValor ? "por valor" : "por quantidade")}: {RegraTxt}.",
+        baseCurta = BaseTodas ? T("todas as propostas", "all proposals") : T("decididas", "decided"),
+        fonte = T($"Propostas: {_fonte}. Vendas e budgets: histórico da equipe (empresa toda, não seguem os filtros).", $"Proposals: {_fonte}. Sales and budgets: team history (company-wide, not affected by the filters)."),
         foco = AnoDoFoco.Ano,
         moeda = Sim,
         usuario = string.IsNullOrWhiteSpace(_usuario) ? "Howden South America" : _usuario,
+        ingles = En,
     };
 
     private async Task ExportarPowerPoint()
@@ -2231,9 +2286,9 @@
             await Foto("acumulado", "#budget .cvx-card");
             await Foto("mes-ano", "#mes-ano .cvx-card");
             await JS.InvokeVoidAsync("vpPptx.gerar", DadosApresentacao());
-            _msgOk = true; _msg = "Apresentação gerada: veja o arquivo .pptx nos downloads do navegador.";
+            _msgOk = true; _msg = T("Apresentação gerada: veja o arquivo .pptx nos downloads do navegador.", "Presentation generated: find the .pptx file in your browser downloads.");
         }
-        catch (Exception ex) { _msgOk = false; _msg = "Não deu para gerar a apresentação: " + ex.Message; }
+        catch (Exception ex) { _msgOk = false; _msg = T("Não deu para gerar a apresentação: ", "Could not generate the presentation: ") + ex.Message; }
         finally
         {
             try { await JS.InvokeVoidAsync("vpPptx.fim"); } catch { }
@@ -2259,9 +2314,9 @@
             await JS.InvokeVoidAsync("vpPdfMulti.inicio");
             foreach (var (setores, rotulo) in new[]
             {
-                (Array.Empty<string>(), "Gráfico 1 de 3 · Aftermarket + NB juntos (AFM + NB)"),
-                (new[] { ConversaoService.Afm }, "Gráfico 2 de 3 · Só Aftermarket (AFM)"),
-                (new[] { ConversaoService.Nb }, "Gráfico 3 de 3 · Só New Business (NB)"),
+                (Array.Empty<string>(), T("Gráfico 1 de 3 · Aftermarket + NB juntos (AFM + NB)", "Chart 1 of 3 · Aftermarket + NB together (AFM + NB)")),
+                (new[] { ConversaoService.Afm }, T("Gráfico 2 de 3 · Só Aftermarket (AFM)", "Chart 2 of 3 · Aftermarket only (AFM)")),
+                (new[] { ConversaoService.Nb }, T("Gráfico 3 de 3 · Só New Business (NB)", "Chart 3 of 3 · New Business only (NB)")),
             })
             {
                 _fil.Origens.Clear();
@@ -2273,7 +2328,7 @@
             }
             ok = true;
         }
-        catch (Exception ex) { _msgOk = false; _msg = "Não deu para gerar o PDF: " + ex.Message; }
+        catch (Exception ex) { _msgOk = false; _msg = T("Não deu para gerar o PDF: ", "Could not generate the PDF: ") + ex.Message; }
         finally
         {
             _fil.Origens.Clear();
@@ -2284,7 +2339,7 @@
         }
         try
         {
-            if (ok) await JS.InvokeVoidAsync("vpPdfMulti.imprimir", "Vendas por setor - AFM + NB, AFM e NB");
+            if (ok) await JS.InvokeVoidAsync("vpPdfMulti.imprimir", T("Vendas por setor - AFM + NB, AFM e NB", "Sales by sector - AFM + NB, AFM and NB"));
             else await JS.InvokeVoidAsync("vpPdfMulti.cancelar");
         }
         catch { }
