@@ -3590,3 +3590,8 @@ body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box
     body.vp-pdf-multi .vp-pdf-pg .vpm-sm-grid > * { break-inside: avoid; }
     body.vp-pdf-multi * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Resumo comparativo: venda total do ano (todos os meses lançados), separada do período comparável */
+.vpm-ano-l.vpm-ano-tot { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--cx-line); }
+.vpm-ano-l.vpm-ano-tot b { color: var(--ac, #172B43); }
+.vpm-ano-l.vpm-ano-tot small { font-size: 11px; color: var(--cx-mut); }

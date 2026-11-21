@@ -1408,6 +1408,12 @@
         double? dTv = A.TaxaV is double tva && B.TaxaV is double tvb ? tva - tvb : null;
         var temV = A.MesesV > 0 && B.MesesV > 0;
         var temP = A.MesesP > 0 && B.MesesP > 0;
+        // venda total do ano: todos os meses lançados, sem o corte do período comparável (o ano corrente vai até o último mês lançado)
+        (decimal Soma, int Ult) TotalAno(int a)
+        {
+            var l = Enumerable.Range(1, 12).Select(m => (m, c: CelVenda(a, m))).Where(x => x.c.Tem).ToList();
+            return (l.Sum(x => x.c.Valor), l.Count > 0 ? l.Max(x => x.m) : 0);
+        }
         <aside class="vpm-resumo cmp">
             <div class="vpm-rtit">Resumo comparativo</div>
             <div class="vpm-rper">Vendas@(_mmS ? $" ({VendasDeMm})" : ""): @MesesTxt(mv) · propostas e conversão: @MesesTxt(mp)</div>
@@ -1427,6 +1433,12 @@
                         {
                             <div class="vpm-ano-l"><span>Conversão@(PorValor ? " (valor)" : "")</span><b title="@(PorValor ? RegraMm : $"{N0(L.G)} ganhas de {N0(L.Base)} {DenRot}")">@(L.Taxa is double t ? P1(t) : "—")</b></div>
                         }
+                        @{ var (totAno, ultAno) = TotalAno(L.Ano); var andamento = ultAno is > 0 and < 12 && L.Ano >= DateTime.Today.Year; }
+                        <div class="vpm-ano-l vpm-ano-tot" title="@(ultAno > 0 ? $"{Reais(totAno)} · {MesesTxtSemFiltro(ultAno)}" : "")">
+                            <span>Venda total do ano</span>
+                            <b>@(ultAno > 0 ? Mi(totAno) : "n/d")</b>
+                            @if (ultAno > 0) { <small>@MesesTxtSemFiltro(ultAno)@(andamento ? " · ano em andamento" : "")</small> }
+                        </div>
                     </div>
                 }
             </div>

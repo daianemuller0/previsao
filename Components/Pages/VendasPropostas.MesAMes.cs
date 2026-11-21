@@ -259,6 +259,9 @@ public partial class VendasPropostas
         return string.Join(", ", faixas);
     }
 
+    /// <summary>De janeiro até "ate", sem o filtro "Mês": "jan–dez", "jan–out".</summary>
+    private static string MesesTxtSemFiltro(int ate) => ate <= 1 ? "jan" : $"jan–{MesCurto(Math.Min(12, ate)).ToLowerInvariant()}";
+
     /// <summary>Variação % (null quando a base é zero ou negativa: a conta não tem sentido).</summary>
     private static double? VarMm(decimal atual, decimal baseAnt) => baseAnt > 0 ? (double)((atual - baseAnt) / baseAnt * 100) : null;
 
