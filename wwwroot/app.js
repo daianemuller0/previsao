@@ -1035,3 +1035,54 @@ window.vpPdf = function (id, titulo) {
         try { window.print(); } finally { fim(); document.title = tituloAntes; }
     }, 200);
 };
+
+// Performance Comercial, quadro "Vendas por setor": PDF com três páginas (NB + AFM, só NB, só AFM).
+// A página passa o filtro de Setor por cada caso e, depois de cada desenho, copia o quadro como está
+// na tela para um contêiner fora da vista; no fim, imprime só as cópias, uma por folha A4 deitada.
+window.vpPdfMulti = {
+    inicio() {
+        document.getElementById('vp-pdf-multi')?.remove();
+        const c = document.createElement('div');
+        c.id = 'vp-pdf-multi';
+        document.body.appendChild(c);
+    },
+    copiar(id, rotulo) {
+        const alvo = document.getElementById(id), c = document.getElementById('vp-pdf-multi');
+        if (!alvo || !c) return;
+        window.vpmAjustar && window.vpmAjustar();
+        const r = alvo.getBoundingClientRect();
+        const varios = !!alvo.querySelector('.vpm-sm-grid');
+        const escala = varios ? Math.min(1, 1060 / r.width) * 0.93 : Math.min(1, 1060 / r.width, 690 / (r.height + 34));
+        const pg = document.createElement('section');
+        pg.className = 'vp-pdf-pg';
+        pg.style.setProperty('--vp-pdf-zoom', escala.toFixed(4));
+        const cab = document.createElement('div');
+        cab.className = 'vp-pdf-pg-tit';
+        cab.textContent = rotulo;
+        const copia = alvo.cloneNode(true);
+        copia.removeAttribute('id');
+        copia.classList.remove('tela-cheia');
+        copia.style.width = r.width + 'px';
+        pg.append(cab, copia);
+        c.appendChild(pg);
+    },
+    imprimir(titulo) {
+        const c = document.getElementById('vp-pdf-multi');
+        if (!c || !c.children.length) return;
+        const tituloAntes = document.title;
+        if (titulo) document.title = titulo + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+        let st = document.getElementById('vp-pdf-pagina');
+        if (!st) { st = document.createElement('style'); st.id = 'vp-pdf-pagina'; document.head.appendChild(st); }
+        st.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+        document.body.classList.add('vp-pdf-multi');
+        setTimeout(() => {
+            try { window.print(); }
+            finally {
+                document.body.classList.remove('vp-pdf-multi');
+                document.title = tituloAntes;
+                st.remove(); c.remove();
+            }
+        }, 200);
+    },
+    cancelar() { document.getElementById('vp-pdf-multi')?.remove(); },
+};

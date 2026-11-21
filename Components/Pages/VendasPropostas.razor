@@ -1110,9 +1110,19 @@
             <button type="button" class="btn-ghost vpm-tela" onclick="@($"vpTelaCheia('{idq}')")" title="Mostrar este quadro na tela inteira (Esc para sair)">
                 <span class="vpm-tela-on">⛶ Tela cheia</span><span class="vpm-tela-off">✕ Sair da tela cheia</span>
             </button>
-            <button type="button" class="btn-ghost vpm-pdf" onclick="@($"vpPdf('{idq}', '{tituloPdf}')")" title="Gerar um PDF deste quadro, como está na tela (no diálogo de impressão, escolha “Salvar como PDF”)">
-                ⤓ Gerar PDF
-            </button>
+            @if (setor)
+            {
+                <button type="button" class="btn-ghost vpm-pdf" disabled="@_gerandoPdfSetores" @onclick="PdfSetores"
+                        title="Gera um PDF com três páginas, como na tela: NB + AFM, só NB e só AFM (no diálogo de impressão, escolha “Salvar como PDF”)">
+                    @(_gerandoPdfSetores ? "Gerando…" : "⤓ Gerar PDF (3 páginas)")
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn-ghost vpm-pdf" onclick="@($"vpPdf('{idq}', '{tituloPdf}')")" title="Gerar um PDF deste quadro, como está na tela (no diálogo de impressão, escolha “Salvar como PDF”)">
+                    ⤓ Gerar PDF
+                </button>
+            }
             @if (modo != "historico")
             {
                 <div class="vpm-sel"><span>Ano principal</span>
@@ -2174,6 +2184,54 @@
             _met = metOriginal;
             _gerandoPpt = false;
         }
+    }
+
+    private bool _gerandoPdfSetores;
+
+    /// <summary>
+    /// PDF do quadro "Vendas por setor" com três páginas: NB + AFM, só NB e só AFM. Passa o filtro de Setor por
+    /// cada caso (vendas, propostas e conversão do setor), copia o quadro desenhado e, no fim, volta o filtro
+    /// como estava e imprime as três cópias (wwwroot/app.js, vpPdfMulti). Os outros filtros continuam valendo.
+    /// </summary>
+    private async Task PdfSetores()
+    {
+        _gerandoPdfSetores = true;
+        var antes = _fil.Origens.ToList();
+        var ok = false;
+        try
+        {
+            await JS.InvokeVoidAsync("vpPdfMulti.inicio");
+            foreach (var (setores, rotulo) in new[]
+            {
+                (Array.Empty<string>(), "Total · New Business + Aftermarket (NB + AFM)"),
+                (new[] { ConversaoService.Nb }, "New Business (NB)"),
+                (new[] { ConversaoService.Afm }, "Aftermarket (AFM)"),
+            })
+            {
+                _fil.Origens.Clear();
+                foreach (var x in setores) _fil.Origens.Add(x);
+                Carregar();
+                StateHasChanged();
+                await Task.Delay(500);   // a página redesenha o quadro (e as linhas, em vpmAjustar) antes da cópia
+                await JS.InvokeVoidAsync("vpPdfMulti.copiar", "mes-a-mes-setor", rotulo);
+            }
+            ok = true;
+        }
+        catch (Exception ex) { _msgOk = false; _msg = "Não deu para gerar o PDF: " + ex.Message; }
+        finally
+        {
+            _fil.Origens.Clear();
+            foreach (var x in antes) _fil.Origens.Add(x);
+            Carregar();
+            _gerandoPdfSetores = false;
+            StateHasChanged();
+        }
+        try
+        {
+            if (ok) await JS.InvokeVoidAsync("vpPdfMulti.imprimir", "Vendas por setor - NB + AFM, NB e AFM");
+            else await JS.InvokeVoidAsync("vpPdfMulti.cancelar");
+        }
+        catch { }
     }
 
     private async Task Exportar()

@@ -3574,3 +3574,19 @@ body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box
 .vpm-graf.combo .vpm-meses > div { position: relative; }
 .vpm-graf.combo .vpm-meses { padding-top: 0; }
 .vpm-graf.combo .vpm-meses > div { padding-top: 5px; }
+
+/* PDF de três páginas do quadro "Vendas por setor" (app.js, vpPdfMulti): as cópias ficam fora da vista na tela */
+#vp-pdf-multi { position: absolute; left: -30000px; top: 0; background: #fff; }
+.vp-pdf-pg-tit { font-size: 15px; font-weight: 800; color: #12355b; margin: 0 0 6px; }
+.vp-pdf-pg .vpm { max-width: none !important; margin: 0 !important; box-shadow: none !important; }
+@media print {
+    body.vp-pdf-multi > *:not(#vp-pdf-multi) { display: none !important; }
+    body.vp-pdf-multi { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+    body.vp-pdf-multi #vp-pdf-multi { position: static; left: auto; }
+    body.vp-pdf-multi .vp-pdf-pg { zoom: var(--vp-pdf-zoom, 1); break-after: page; page-break-after: always; }
+    body.vp-pdf-multi .vp-pdf-pg:last-child { break-after: auto; page-break-after: auto; }
+    body.vp-pdf-multi .vp-pdf-pg .vpm { border: 0 !important; }
+    body.vp-pdf-multi .vp-pdf-pg .vpm-ctl, body.vp-pdf-multi .vp-pdf-pg .vpm-pal-wrap, body.vp-pdf-multi .vp-pdf-pg .vpm-detalhe-bar { display: none !important; }
+    body.vp-pdf-multi .vp-pdf-pg .vpm-sm-grid > * { break-inside: avoid; }
+    body.vp-pdf-multi * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
