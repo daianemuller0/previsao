@@ -27,29 +27,29 @@ else
 {
 <div class="cvx">
 
-    <div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span>Conversão de Propostas</span></div>
+    <div class="breadcrumbs"><span>@T("Comercial", "Commercial")</span><span class="sep">/</span><span>@T("Conversão de Propostas", "Proposal Conversion")</span></div>
     <div class="page-head">
         <div>
-            <h1>Conversão de Propostas</h1>
+            <h1>@T("Conversão de Propostas", "Proposal Conversion")</h1>
             <p class="subtitle">
-                @PeriodoTxt() · Howden Brasil · valores em @Sim<br />
-                Última atualização @(Conv.AtualizadoEm is { } quando ? quando.ToString("dd/MM/yyyy 'às' HH:mm") : "—") · CRM, planilha de propostas · @N0(Conv.Atual.Propostas.Count) registros
+                @PeriodoTxt() · Howden Brasil · @T("valores em", "values in") @Sim<br />
+                @T("Última atualização", "Last updated") @(Conv.AtualizadoEm is { } quando ? (_emIngles ? quando.ToString("MM/dd/yyyy 'at' HH:mm", _enRz) : quando.ToString("dd/MM/yyyy 'às' HH:mm")) : "—") · @T("CRM, planilha de propostas", "CRM, proposals spreadsheet") · @N0(Conv.Atual.Propostas.Count) @T("registros", "records")
             </p>
         </div>
         <div class="page-actions">
             @if (_isAdmin)
             {
-                <button class="btn-ghost" title="Taxa USD/BRL de cada ano" @onclick="AbrirTaxas">@Icons.Svg("layers")Taxas de câmbio</button>
+                <button class="btn-ghost" title="@T("Taxa USD/BRL de cada ano", "USD/BRL rate for each year")" @onclick="AbrirTaxas">@Icons.Svg("layers")@T("Taxas de câmbio", "Exchange rates")</button>
             }
-            <button class="btn-ghost" title="Reler a planilha agora" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
+            <button class="btn-ghost" title="@T("Reler a planilha agora", "Reload the spreadsheet now")" disabled="@_carregando" @onclick="Atualizar">@Icons.Svg("import")@(_carregando ? T("Atualizando…", "Refreshing…") : T("Atualizar", "Refresh"))</button>
             <div class="cvx-menu">
-                <button type="button" class="btn-primary" aria-expanded="@(_menuExp ? "true" : "false")" @onclick="() => _menuExp = !_menuExp">@Icons.Svg("download")Exportar</button>
+                <button type="button" class="btn-primary" aria-expanded="@(_menuExp ? "true" : "false")" @onclick="() => _menuExp = !_menuExp">@Icons.Svg("download")@T("Exportar", "Export")</button>
                 @if (_menuExp)
                 {
                     <div class="flt-multi-backdrop" @onclick="() => _menuExp = false"></div>
                     <div class="cvx-menu-p">
-                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return AbrirRelatorio(); }">Relatório executivo (PDF)</button>
-                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return ExportarBase(); }">Base de propostas (Excel)</button>
+                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return AbrirRelatorio(); }">@T("Relatório executivo (PDF)", "Executive report (PDF)")</button>
+                        <button type="button" disabled="@(!_temDados)" @onclick="() => { _menuExp = false; return ExportarBase(); }">@T("Base de propostas (Excel)", "Proposals data (Excel)")</button>
                     </div>
                 }
             </div>
@@ -58,7 +58,7 @@ else
 
     @if (!Conv.Ok && _temDados)
     {
-        <div class="cvx-alert erro"><strong>Dados possivelmente desatualizados.</strong> @Conv.Mensagem <button class="btn-link" disabled="@_carregando" @onclick="Atualizar">Tentar de novo</button></div>
+        <div class="cvx-alert erro"><strong>@T("Dados possivelmente desatualizados.", "Data possibly out of date.")</strong> @Conv.Mensagem <button class="btn-link" disabled="@_carregando" @onclick="Atualizar">@T("Tentar de novo", "Try again")</button></div>
     }
 
     @if (_carregando && !_temDados)
@@ -76,22 +76,22 @@ else
         @if (_r.SemTaxa > 0)
         {
             <div class="cvx-alert">
-                <strong>@N0(_r.SemTaxa) proposta(s) (US$ @_r.UsdSemTaxa.ToString("N0", _pt)) sem taxa de câmbio</strong> para @string.Join(", ", AnosSemTaxa()).
-                Esses valores ficam <strong>fora dos totais em R$</strong> — as quantidades estão completas.
-                @if (_isAdmin) { <span> <button class="btn-link" @onclick="AbrirTaxas">Cadastrar taxas</button></span> }
-                else { <span> Peça ao administrador para cadastrar a taxa.</span> }
+                <strong>@N0(_r.SemTaxa) @T("proposta(s)", "proposal(s)") (US$ @_r.UsdSemTaxa.ToString("N0", CulRz)) @T("sem taxa de câmbio", "without an exchange rate")</strong> @T("para", "for") @string.Join(", ", AnosSemTaxa()).
+                @T("Esses valores ficam", "These values are") <strong>@T("fora dos totais em R$", "left out of the R$ totals")</strong> @T("— as quantidades estão completas.", "— the counts are complete.")
+                @if (_isAdmin) { <span> <button class="btn-link" @onclick="AbrirTaxas">@T("Cadastrar taxas", "Register rates")</button></span> }
+                else { <span> @T("Peça ao administrador para cadastrar a taxa.", "Ask the administrator to register the rate.")</span> }
             </div>
         }
         @if (_r.SemData > 0)
         {
             <div class="cvx-alert">
-                <strong>@N0(_r.SemData) proposta(s) sem data de envio (US$ @_r.UsdSemData.ToString("N0", _pt))</strong> não entram nos valores em R$: sem data não há ano, logo não há taxa de câmbio. As quantidades estão completas.
+                <strong>@N0(_r.SemData) @T("proposta(s) sem data de envio", "proposal(s) without a sent date") (US$ @_r.UsdSemData.ToString("N0", CulRz))</strong> @T("não entram nos valores em R$: sem data não há ano, logo não há taxa de câmbio. As quantidades estão completas.", "are not included in the R$ values: without a date there is no year, so there is no exchange rate. The counts are complete.")
             </div>
         }
 
         @if (_f.Count == 0)
         {
-            <div class="cvx-card"><div class="empty" style="padding:34px 12px">Nenhuma proposta com os filtros atuais. <button class="btn-link" @onclick="Limpar">Limpar filtros</button></div></div>
+            <div class="cvx-card"><div class="empty" style="padding:34px 12px">@T("Nenhuma proposta com os filtros atuais.", "No proposals match the current filters.") <button class="btn-link" @onclick="Limpar">@T("Limpar filtros", "Clear filters")</button></div></div>
         }
         else { @Pagina() }
     }
@@ -111,36 +111,36 @@ else
     <div class="drawer">
         <div class="page-head">
             <div>
-                <h2 style="color:var(--primary)">Taxas de câmbio</h2>
-                <p class="subtitle">USD/BRL de cada ano · aplicada nas propostas enviadas naquele ano</p>
+                <h2 style="color:var(--primary)">@T("Taxas de câmbio", "Exchange rates")</h2>
+                <p class="subtitle">@T("USD/BRL de cada ano · aplicada nas propostas enviadas naquele ano", "USD/BRL for each year · applied to the proposals sent in that year")</p>
             </div>
             <button class="icon-btn" @onclick="() => _taxasAberto = false">@Icons.Svg("x")</button>
         </div>
-        <p class="muted" style="font-size:12px">Valor em R$ = valor em US$ × taxa do ano da data de envio. Sem taxa cadastrada, a proposta <strong>não é convertida</strong> e a tela avisa. As taxas ficam guardadas e não precisam ser digitadas de novo.</p>
+        <p class="muted" style="font-size:12px">@T("Valor em R$ = valor em US$ × taxa do ano da data de envio. Sem taxa cadastrada, a proposta", "Value in R$ = value in US$ × rate for the year of the sent date. Without a registered rate, the proposal") <strong>@T("não é convertida", "is not converted")</strong> @T("e a tela avisa. As taxas ficam guardadas e não precisam ser digitadas de novo.", "and the screen warns you. Rates are saved and don't need to be typed again.")</p>
         <table class="grid-tbl tbl-compact">
-            <thead><tr><th>Ano</th><th class="right">Taxa USD/BRL</th><th>Situação</th></tr></thead>
+            <thead><tr><th>@T("Ano", "Year")</th><th class="right">@T("Taxa USD/BRL", "USD/BRL rate")</th><th>@T("Situação", "Status")</th></tr></thead>
             <tbody>
                 @foreach (var ano in _taxasAnos)
                 {
                     var a = ano;
                     <tr>
                         <td class="col-strong">@a</td>
-                        <td class="right"><input class="field num" style="max-width:120px;text-align:right" placeholder="ex.: 5,2000" value="@_taxasTxt.GetValueOrDefault(a, "")" @onchange="e => SetTaxa(a, e)" /></td>
-                        @if (Cambio.Taxa(a) is { } t) { <td class="muted" style="font-size:12px">salva: @t.ToString("0.0000", _pt)</td> }
-                        else if (TaxaPendente(a)) { <td style="font-size:12px;color:var(--neg);font-weight:700" title="Há propostas deste ano com valor em US$ que não estão sendo convertidas">pendente</td> }
-                        else { <td class="muted" style="font-size:12px">sem taxa</td> }
+                        <td class="right"><input class="field num" style="max-width:120px;text-align:right" placeholder="@T("ex.: 5,2000", "e.g. 5.2000")" value="@_taxasTxt.GetValueOrDefault(a, "")" @onchange="e => SetTaxa(a, e)" /></td>
+                        @if (Cambio.Taxa(a) is { } t) { <td class="muted" style="font-size:12px">@T("salva:", "saved:") @t.ToString("0.0000", CulRz)</td> }
+                        else if (TaxaPendente(a)) { <td style="font-size:12px;color:var(--neg);font-weight:700" title="@T("Há propostas deste ano com valor em US$ que não estão sendo convertidas", "There are proposals from this year with a US$ value that are not being converted")">@T("pendente", "pending")</td> }
+                        else { <td class="muted" style="font-size:12px">@T("sem taxa", "no rate")</td> }
                     </tr>
                 }
             </tbody>
         </table>
         <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
-            <input class="field num" style="max-width:110px" placeholder="novo ano" @bind="_novoAno" />
-            <button class="btn-ghost sm" @onclick="AdicionarAno">Adicionar ano</button>
+            <input class="field num" style="max-width:110px" placeholder="@T("novo ano", "new year")" @bind="_novoAno" />
+            <button class="btn-ghost sm" @onclick="AdicionarAno">@T("Adicionar ano", "Add year")</button>
         </div>
         @if (_taxasErro != "") { <div class="confirm-err">@_taxasErro</div> }
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _taxasAberto = false">Cancelar</button>
-            <button class="btn-primary" @onclick="SalvarTaxas">@Icons.Svg("check")Salvar taxas</button>
+            <button class="btn-ghost" @onclick="() => _taxasAberto = false">@T("Cancelar", "Cancel")</button>
+            <button class="btn-primary" @onclick="SalvarTaxas">@Icons.Svg("check")@T("Salvar taxas", "Save rates")</button>
         </div>
     </div>
 }
@@ -149,10 +149,47 @@ else
     // Exportar do topo: o recorte global inteiro, sem a busca e a classificação da Base (essas valem no botão da própria Base).
     private Task ExportarBase() { var t = Colunas(); return Exportar(_f.OrderByDescending(i => i.P.Data).ToList(), t); }
 
+    // ---- idioma da tela: cultura dos números escritos nesta marcação, mês e rótulos traduzidos ----
+    private static readonly System.Globalization.CultureInfo _enRz = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    private System.Globalization.CultureInfo CulRz => _emIngles ? _enRz : _pt;
+    /// <summary>Formato de data e hora do relatório no idioma da tela.</summary>
+    private string FmtQuando => _emIngles ? "MM/dd/yyyy 'at' HH:mm" : "dd/MM/yyyy 'às' HH:mm";
+
+    /// <summary>Rótulo do mês no filtro: o valor guardado continua em português ("Janeiro"); em inglês mostra "January".</summary>
+    private string MesRotulo(string v)
+    {
+        if (!_emIngles) return v;
+        for (var m = 1; m <= 12; m++)
+            if (Fmt.MonthLong(m) == v) return _enRz.DateTimeFormat.GetMonthName(m);
+        return v;
+    }
+
+    /// <summary>Rótulo da classificação no filtro da Base: o valor guardado continua em português.</summary>
+    private string ClasseRotulo(string v) => !_emIngles ? v : v switch
+    {
+        "Ganha" => "Won", "Perdida" => "Lost", "Aberta" => "Open", "Não classificada" => "Unclassified", _ => v,
+    };
+
+    /// <summary>Nome de um filtro (chips) no idioma da tela.</summary>
+    private string FiltroRot(string rot) => !_emIngles ? rot : rot switch
+    {
+        "Ano" => "Year", "Mês" => "Month", "Setor" => "Sector", "Vendedor" => "Salesperson", "Mercado" => "Market",
+        "País" => "Country", "Produto" => "Product", _ => rot,
+    };
+
+    /// <summary>Atalho do índice no idioma da tela (as listas de âncoras ficam em português).</summary>
+    private string AncoraRot(string t) => !_emIngles ? t : t switch
+    {
+        "Resumo" => "Summary", "Evolução" => "Trend", "Vendedores" => "Sales team", "Mercado" => "Market", "Produto" => "Product",
+        "País" => "Country", "Valor por unidade" => "Value by unit", "Valor mensal" => "Monthly value", "Perdas" => "Losses",
+        "Base" => "Data", "Qualidade" => "Quality", "Mês a mês" => "Month by month", "Ano × ano" => "Year × year",
+        "Vendas × metas" => "Sales × targets", "Acumulado" => "Year to date", "Mês × ano" => "Month × year", _ => t,
+    };
+
     private string TaxasTexto()
     {
-        var l = RastroCambio().Where(x => x.Taxa is not null).Select(x => "(" + x.Ano + ": " + x.Taxa!.Value.ToString("0.0000", _pt) + ")").ToList();
-        return l.Count == 0 ? "(nenhuma taxa cadastrada)" : string.Join(" ", l);
+        var l = RastroCambio().Where(x => x.Taxa is not null).Select(x => "(" + x.Ano + ": " + x.Taxa!.Value.ToString("0.0000", CulRz) + ")").ToList();
+        return l.Count == 0 ? T("(nenhuma taxa cadastrada)", "(no rate registered)") : string.Join(" ", l);
     }
 
     // =====================================================================
@@ -162,27 +199,27 @@ else
     private RenderFragment BarraFiltros(IEnumerable<(string Id, string Titulo)> ancoras) => __builder =>
     {
         <div class="filterbar filterbar-sticky cvx-fb">
-            <MultiFilter Label="Ano" AllText="Todos" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
-            <MultiFilter Label="Mês" AllText="Todos" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
-            <MultiFilter Label="Setor" AllText="Ambos" Options="OpOrigens" Selected="_origens" OnChanged="StateHasChanged" />
-            <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
-            <MultiFilter Label="BU" AllText="Todas" Options="OpBus" Selected="_bus" OnChanged="StateHasChanged" />
-            <MultiFilter Label="BU Intercompany" AllText="Todas" Options="OpBuIcs" Selected="_buIcs" OnChanged="StateHasChanged" />
-            <MultiFilter Label="Mercado" AllText="Todos" Searchable="true" Options="OpMercados" Selected="_mercados" OnChanged="StateHasChanged" />
-            <MultiFilter Label="País" AllText="Todos" Searchable="true" Options="OpPaises" Selected="_paises" OnChanged="StateHasChanged" />
-            <MultiFilter Label="Produto" AllText="Todos" Searchable="true" Options="OpProdutos" Selected="_produtos" OnChanged="StateHasChanged" />
-            <div class="cvx-base-taxa" title="Base da taxa de conversão. Decididas: ganhas ÷ (ganhas + perdidas). Todas as propostas: ganhas ÷ tudo o que foi enviado, abertas inclusive.">
-                <span class="flt-label">Taxa sobre</span>
+            <MultiFilter Label="@T("Ano", "Year")" AllText="@T("Todos", "All")" Ingles="_emIngles" Options="OpAnos" Selected="_anos" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("Mês", "Month")" AllText="@T("Todos", "All")" Ingles="_emIngles" Rotulo="MesRotulo" Options="OpMeses" Selected="_meses" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("Setor", "Sector")" AllText="@T("Ambos", "Both")" Ingles="_emIngles" Options="OpOrigens" Selected="_origens" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("Vendedor", "Salesperson")" AllText="@T("Todos", "All")" Ingles="_emIngles" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Searchable="true" Options="OpVendedores" Selected="_vend" OnChanged="StateHasChanged" />
+            <MultiFilter Label="BU" AllText="@T("Todas", "All")" Ingles="_emIngles" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Options="OpBus" Selected="_bus" OnChanged="StateHasChanged" />
+            <MultiFilter Label="BU Intercompany" AllText="@T("Todas", "All")" Ingles="_emIngles" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Options="OpBuIcs" Selected="_buIcs" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("Mercado", "Market")" AllText="@T("Todos", "All")" Ingles="_emIngles" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Searchable="true" Options="OpMercados" Selected="_mercados" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("País", "Country")" AllText="@T("Todos", "All")" Ingles="_emIngles" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Searchable="true" Options="OpPaises" Selected="_paises" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("Produto", "Product")" AllText="@T("Todos", "All")" Ingles="_emIngles" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Searchable="true" Options="OpProdutos" Selected="_produtos" OnChanged="StateHasChanged" />
+            <div class="cvx-base-taxa" title="@T("Base da taxa de conversão. Decididas: ganhas ÷ (ganhas + perdidas). Todas as propostas: ganhas ÷ tudo o que foi enviado, abertas inclusive.", "Conversion rate base. Decided: won ÷ (won + lost). All proposals: won ÷ everything sent, open included.")">
+                <span class="flt-label">@T("Taxa sobre", "Rate base")</span>
                 <div class="cvx-seg-ctl">
-                    <button type="button" class="@(!_baseTodas ? "on" : "")" @onclick="() => _baseTodas = false">Decididas</button>
-                    <button type="button" class="@(_baseTodas ? "on" : "")" @onclick="() => _baseTodas = true">Todas as propostas</button>
+                    <button type="button" class="@(!_baseTodas ? "on" : "")" @onclick="() => _baseTodas = false">@T("Decididas", "Decided")</button>
+                    <button type="button" class="@(_baseTodas ? "on" : "")" @onclick="() => _baseTodas = true">@T("Todas as propostas", "All proposals")</button>
                 </div>
             </div>
-            <div class="cvx-base-taxa" title="Como a taxa de conversão é calculada. Quantidade: número de propostas ganhas ÷ base. Valor (R$): valor ganho ÷ valor da base. A base é a do botão &quot;Taxa sobre&quot;.">
-                <span class="flt-label">Conversão por</span>
+            <div class="cvx-base-taxa" title="@T("Como a taxa de conversão é calculada. Quantidade: número de propostas ganhas ÷ base. Valor (R$): valor ganho ÷ valor da base. A base é a do botão \"Taxa sobre\".", "How the conversion rate is calculated. Count: number of won proposals ÷ base. Value (R$): won value ÷ base value. The base is set by the \"Rate base\" button.")">
+                <span class="flt-label">@T("Conversão por", "Conversion by")</span>
                 <div class="cvx-seg-ctl">
-                    <button type="button" class="@(!_porValor ? "on" : "")" @onclick="() => _porValor = false">Quantidade</button>
-                    <button type="button" class="@(_porValor ? "on" : "")" @onclick="() => _porValor = true">Valor (@Sim)</button>
+                    <button type="button" class="@(!_porValor ? "on" : "")" @onclick="() => _porValor = false">@T("Quantidade", "Count")</button>
+                    <button type="button" class="@(_porValor ? "on" : "")" @onclick="() => _porValor = true">@T("Valor", "Value") (@Sim)</button>
                 </div>
             </div>
             <div class="cvx-base-taxa" title="Idioma da tela · Screen language">
@@ -192,8 +229,8 @@ else
                     <button type="button" class="@(_emIngles ? "on" : "")" @onclick="() => _emIngles = true">EN</button>
                 </div>
             </div>
-            <div class="cvx-base-taxa" title="Moeda de todos os valores da tela. US$: o AFM usa o valor original da planilha; o NB, as vendas e os budgets (em R$) são divididos pela taxa USD/BRL do ano (guia Conversão → Taxas de câmbio).">
-                <span class="flt-label">Moeda</span>
+            <div class="cvx-base-taxa" title="@T("Moeda de todos os valores da tela. US$: o AFM usa o valor original da planilha; o NB, as vendas e os budgets (em R$) são divididos pela taxa USD/BRL do ano (guia Conversão → Taxas de câmbio).", "Currency for all values on screen. US$: AFM uses the original spreadsheet value; NB, sales and budgets (in R$) are divided by the year's USD/BRL rate (Conversion tab → Exchange rates).")">
+                <span class="flt-label">@T("Moeda", "Currency")</span>
                 <div class="cvx-seg-ctl">
                     <button type="button" class="@(!_emDolar ? "on" : "")" @onclick="() => _emDolar = false">R$</button>
                     <button type="button" class="@(_emDolar ? "on" : "")" @onclick="() => _emDolar = true">US$</button>
@@ -204,22 +241,22 @@ else
             {
                 @foreach (var (rot, set) in ConjuntosAtivos())
                 {
-                    <span class="cvx-chip" style="@ChipStyle(rot, set)" title="@rot: @string.Join(", ", set)"><b>@ChipRot(rot)</b><span class="t">@ChipTxt(set)</span><button title="Remover filtro @rot" @onclick="() => { set.Clear(); _pag = 0; }">✕</button></span>
+                    <span class="cvx-chip" style="@ChipStyle(rot, set)" title="@FiltroRot(rot): @string.Join(", ", rot == "Mês" ? set.Select(MesRotulo) : set)"><b>@FiltroRot(ChipRot(rot))</b><span class="t">@(rot == "Mês" && _emIngles ? ChipTxt(new HashSet<string>(set.Select(MesRotulo))) : ChipTxt(set))</span><button title="@T("Remover filtro", "Remove filter") @FiltroRot(rot)" @onclick="() => { set.Clear(); _pag = 0; }">✕</button></span>
                 }
                 @if (_seg is { } sg)
                 {
-                    <span class="cvx-chip seg" style="--sc:@Cor(sg)"><b>Segmento</b> @NomeEn(sg) <button title="Remover o segmento" @onclick="() => _seg = null">✕</button></span>
+                    <span class="cvx-chip seg" style="--sc:@Cor(sg)"><b>@T("Segmento", "Segment")</b> @NomeEn(sg) <button title="@T("Remover o segmento", "Remove the segment")" @onclick="() => _seg = null">✕</button></span>
                 }
-                <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")Limpar filtros</button>
+                <button class="btn-link" @onclick="Limpar">@Icons.Svg("x")@T("Limpar filtros", "Clear filters")</button>
             }
             </div>
             @if (_f.Count > 0)
             {
-                <nav class="cvx-index" aria-label="Índice da página">
+                <nav class="cvx-index" aria-label="@T("Índice da página", "Page index")">
                     @foreach (var (id, t) in ancoras)
                     {
                         var ii = id;
-                        <button type="button" @onclick="() => Ir(ii)">@t</button>
+                        <button type="button" @onclick="() => Ir(ii)">@AncoraRot(t)</button>
                     }
                 </nav>
             }
@@ -238,19 +275,19 @@ else
         if (Parte == "filtros") { @BarraFiltros(AncorasEmbutido) return; }
         if (_f.Count == 0)
         {
-            <div class="cvx-card"><div class="empty" style="padding:34px 12px">Nenhuma proposta com os filtros atuais. <button class="btn-link" @onclick="Limpar">Limpar filtros</button></div></div>
+            <div class="cvx-card"><div class="empty" style="padding:34px 12px">@T("Nenhuma proposta com os filtros atuais.", "No proposals match the current filters.") <button class="btn-link" @onclick="Limpar">@T("Limpar filtros", "Clear filters")</button></div></div>
             return;
         }
         <div class="cvx-page">
-            @Secao("unidades", "Conversão por Business Unit", "Taxa e valores por unidade de negócio · clique numa linha para filtrar", BlocoUnidades(i => i.P.Bu, _bus, "bu"))
+            @Secao("unidades", T("Conversão por Business Unit", "Conversion by Business Unit"), T("Taxa e valores por unidade de negócio · clique numa linha para filtrar", "Rate and values by business unit · click a row to filter"), BlocoUnidades(i => i.P.Bu, _bus, "bu"))
             <div class="cvx-lado-a-lado">
-                @Secao("mercado", "Conversão por mercado", "Clique numa linha para filtrar", BlocoUnidades(i => i.P.Mercado, _mercados, "merc", "mercado", "mercados"))
-                @Secao("produto", "Conversão por produto", "Clique numa linha para filtrar", BlocoUnidades(i => i.P.Produto, _produtos, "prod", "produto", "produtos"))
+                @Secao("mercado", T("Conversão por mercado", "Conversion by market"), T("Clique numa linha para filtrar", "Click a row to filter"), BlocoUnidades(i => i.P.Mercado, _mercados, "merc", T("mercado", "market"), T("mercados", "markets")))
+                @Secao("produto", T("Conversão por produto", "Conversion by product"), T("Clique numa linha para filtrar", "Click a row to filter"), BlocoUnidades(i => i.P.Produto, _produtos, "prod", T("produto", "product"), T("produtos", "products")))
             </div>
-            @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão · clique num vendedor para ver o detalhe", Vendedores())
-            @Secao("pais", "Conversão por país", "Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", Paises())
-            @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
-            @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
+            @Secao("vendedores", T("Desempenho dos vendedores", "Sales team performance"), T("Ranking por taxa de conversão · clique num vendedor para ver o detalhe", "Ranking by conversion rate · click a salesperson to see the details"), Vendedores())
+            @Secao("pais", T("Conversão por país", "Conversion by country"), T("Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", "Conversion rate by country · click a country to filter · scroll to zoom · drag to move"), Paises())
+            @Secao("perdas", T("Análise das propostas perdidas", "Lost proposals analysis"), T("Pareto por status no CRM", "Pareto by CRM status"), Perdas())
+            @Secao("base", T("Base de propostas", "Proposals data"), T("Todas as propostas do recorte, com colunas e exportação", "All proposals in the current selection, with columns and export"), Base())
         </div>
     };
 
@@ -271,9 +308,9 @@ else
 
     private string TituloTendencia() => _metTrend switch
     {
-        "volume" => "Propostas enviadas por mês, comparando os anos",
-        "valor" => $"Valor das propostas enviadas por mês ({Sim}), comparando os anos",
-        _ => "Taxa de conversão mensal, comparando os anos",
+        "volume" => T("Propostas enviadas por mês, comparando os anos", "Proposals sent per month, comparing years"),
+        "valor" => T($"Valor das propostas enviadas por mês ({Sim}), comparando os anos", $"Value of proposals sent per month ({Sim}), comparing years"),
+        _ => T("Taxa de conversão mensal, comparando os anos", "Monthly conversion rate, comparing years"),
     };
 
     private static readonly (string Id, string Titulo)[] Ancoras =
@@ -291,22 +328,22 @@ else
     </section>;
 
     private RenderFragment Pagina() => @<div class="cvx-page">
-        @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">Segmento <b>@NomeEn(sg)</b> ativo: ranking, unidades, evolução de volume e valor, valor mensal e perdas seguem o segmento; o Resumo mostra o total do recorte e as taxas de conversão não se aplicam.</div> }
-        @Secao("resumo", "Resumo executivo", "Indicadores principais e composição das propostas", ResumoGeral())
-        @Secao("evolucao", "Evolução mensal", "Tendência por mês de envio, um ano contra o outro", Evolucao())
-        @Secao("vendedores", "Desempenho dos vendedores", "Ranking por taxa de conversão, com o denominador de cada linha", Vendedores())
-        @Secao("unidades", "Conversão por Business Unit", "Taxa e valores por unidade de negócio · clique numa linha para filtrar", BlocoUnidades(i => i.P.Bu, _bus, "bu"))
-        @Secao("unidades-ic", "Conversão por BU Intercompany", "Só AFM · taxa e valores por unidade intercompany · independente da BU", BlocoUnidades(i => i.P.BuIc, _buIcs, "buic"))
-        @Secao("mercado", "Conversão por mercado", "Taxa de conversão e valores por mercado · clique numa linha para filtrar", BlocoUnidades(i => i.P.Mercado, _mercados, "merc", "mercado", "mercados"))
-        @Secao("produto", "Conversão por produto", "Taxa de conversão e valores por produto · clique numa linha para filtrar", BlocoUnidades(i => i.P.Produto, _produtos, "prod", "produto", "produtos"))
-        @Secao("pais", "Conversão por país", "Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", Paises())
-        @Secao("valor-unidades", "Valor por unidade", $"Ganho, perdido e aberto em {Sim}, por BU e por BU Intercompany", ValorUnidades())
-        @Secao("valor-mensal", "Valor mensal das propostas", $"Janeiro a dezembro · por status · {Sim}", ValorMensal())
-        @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
-        @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
+        @if (_seg is { } sg) { <div class="cvx-note" style="margin:0 2px 10px">@T("Segmento", "Segment") <b>@NomeEn(sg)</b> @T("ativo: ranking, unidades, evolução de volume e valor, valor mensal e perdas seguem o segmento; o Resumo mostra o total do recorte e as taxas de conversão não se aplicam.", "active: ranking, units, count and value trend, monthly value and losses follow the segment; the Summary shows the total of the selection and conversion rates do not apply.")</div> }
+        @Secao("resumo", T("Resumo executivo", "Executive summary"), T("Indicadores principais e composição das propostas", "Key indicators and proposal breakdown"), ResumoGeral())
+        @Secao("evolucao", T("Evolução mensal", "Monthly trend"), T("Tendência por mês de envio, um ano contra o outro", "Trend by month sent, one year against another"), Evolucao())
+        @Secao("vendedores", T("Desempenho dos vendedores", "Sales team performance"), T("Ranking por taxa de conversão, com o denominador de cada linha", "Ranking by conversion rate, with each row's denominator"), Vendedores())
+        @Secao("unidades", T("Conversão por Business Unit", "Conversion by Business Unit"), T("Taxa e valores por unidade de negócio · clique numa linha para filtrar", "Rate and values by business unit · click a row to filter"), BlocoUnidades(i => i.P.Bu, _bus, "bu"))
+        @Secao("unidades-ic", T("Conversão por BU Intercompany", "Conversion by BU Intercompany"), T("Só AFM · taxa e valores por unidade intercompany · independente da BU", "AFM only · rate and values by intercompany unit · independent of BU"), BlocoUnidades(i => i.P.BuIc, _buIcs, "buic"))
+        @Secao("mercado", T("Conversão por mercado", "Conversion by market"), T("Taxa de conversão e valores por mercado · clique numa linha para filtrar", "Conversion rate and values by market · click a row to filter"), BlocoUnidades(i => i.P.Mercado, _mercados, "merc", T("mercado", "market"), T("mercados", "markets")))
+        @Secao("produto", T("Conversão por produto", "Conversion by product"), T("Taxa de conversão e valores por produto · clique numa linha para filtrar", "Conversion rate and values by product · click a row to filter"), BlocoUnidades(i => i.P.Produto, _produtos, "prod", T("produto", "product"), T("produtos", "products")))
+        @Secao("pais", T("Conversão por país", "Conversion by country"), T("Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", "Conversion rate by country · click a country to filter · scroll to zoom · drag to move"), Paises())
+        @Secao("valor-unidades", T("Valor por unidade", "Value by unit"), T($"Ganho, perdido e aberto em {Sim}, por BU e por BU Intercompany", $"Won, lost and open in {Sim}, by BU and by BU Intercompany"), ValorUnidades())
+        @Secao("valor-mensal", T("Valor mensal das propostas", "Monthly value of proposals"), T($"Janeiro a dezembro · por status · {Sim}", $"January to December · by status · {Sim}"), ValorMensal())
+        @Secao("perdas", T("Análise das propostas perdidas", "Lost proposals analysis"), T("Pareto por status no CRM", "Pareto by CRM status"), Perdas())
+        @Secao("base", T("Base de propostas", "Proposals data"), T("Todas as propostas do recorte, com colunas e exportação", "All proposals in the current selection, with columns and export"), Base())
         @if (_isAdmin)
         {
-            @Secao("qualidade", "Qualidade e validação dos dados", "Verificações de integridade, câmbio e classificação", Qualidade())
+            @Secao("qualidade", T("Qualidade e validação dos dados", "Data quality and validation"), T("Verificações de integridade, câmbio e classificação", "Integrity, exchange-rate and classification checks"), Qualidade())
         }
     </div>;
 
@@ -314,28 +351,28 @@ else
     private RenderFragment KpisResumo() => @<div>
         <div class="cvx-kpis">
             <article class="cvx-kpi main" style="--kc:@CorTx" title="@TituloRegra">
-                <div class="cvx-lab">Taxa de Conversão</div>
+                <div class="cvx-lab">@T("Taxa de Conversão", "Conversion Rate")</div>
                 <div class="cvx-num big">@TxQtdGlobal(_r)</div>
-                <div class="cvx-ksub">@N0(_r.G) ganhas / @N0(_r.Base) @DenRot</div>
+                <div class="cvx-ksub">@N0(_r.G) @T("ganhas", "won") / @N0(_r.Base) @DenRot</div>
                 @{ var dw = DeltaWin(); }
                 @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
-                <div class="cvx-ksub" title="@TituloValor">@(_porValor ? "Por quantidade" : "Por valor"): <b>@TxOutraGlobal(_r)</b></div>
+                <div class="cvx-ksub" title="@TituloValor">@(_porValor ? T("Por quantidade", "By count") : T("Por valor", "By value")): <b>@TxOutraGlobal(_r)</b></div>
             </article>
-            @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), $"Propostas ganhas, em {Sim}",
-                 (_emDolar ? "Soma em US$ das propostas ganhas. O NB (em R$) é dividido pela taxa do ano de envio." : "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio."), CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
-            @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas",
-                 $"Soma em {Sim} das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta), null)
-            @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
-                 "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", CorG, DeltaPct(_r.G, _prev?.G))
-            @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
-                 "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", CorP, DeltaPct(_r.P, _prev?.P), null, false)
-            @Kpi("Total de Propostas", N0(_r.Total), $"{N0(_r.Decididas)} decididas · {N0(_r.A)} abertas",
-                 "Total no recorte = ganhas + perdidas + abertas + não classificadas.", "#64748b", DeltaPct(_r.Total, _prev?.Total))
+            @Kpi(T("Valor Ganho", "Won Value"), Din(_r, ClasseProposta.Ganha), T($"Propostas ganhas, em {Sim}", $"Won proposals, in {Sim}"),
+                 (_emDolar ? T("Soma em US$ das propostas ganhas. O NB (em R$) é dividido pela taxa do ano de envio.", "Sum in US$ of won proposals. NB (in R$) is divided by the rate of the year sent.") : T("Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", "Sum in R$ of won proposals. Each US$ value is converted at the rate of the year sent.")), CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
+            @Kpi(T("Valor em Aberto", "Open Value"), Din(_r, ClasseProposta.Aberta), T($"{N0(_r.A)} propostas abertas", $"{N0(_r.A)} open proposals"),
+                 T($"Soma em {Sim} das propostas com status Open, convertida pela taxa do ano de envio.", $"Sum in {Sim} of proposals with status Open, converted at the rate of the year sent."), CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta), null)
+            @Kpi(T("Propostas Ganhas", "Won Proposals"), N0(_r.G), T($"{PctDe(_r.G, _r.Total)} do total enviado", $"{PctDe(_r.G, _r.Total)} of total sent"),
+                 T("Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", "Proposals with status Closed - Won or OTP. The share of the total is not the conversion rate."), CorG, DeltaPct(_r.G, _prev?.G))
+            @Kpi(T("Propostas Perdidas", "Lost Proposals"), N0(_r.P), T($"{PctDe(_r.P, _r.Total)} do total enviado", $"{PctDe(_r.P, _r.Total)} of total sent"),
+                 T("Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid e Closed - Unknown.", "Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid and Closed - Unknown."), CorP, DeltaPct(_r.P, _prev?.P), null, false)
+            @Kpi(T("Total de Propostas", "Total Proposals"), N0(_r.Total), T($"{N0(_r.Decididas)} decididas · {N0(_r.A)} abertas", $"{N0(_r.Decididas)} decided · {N0(_r.A)} open"),
+                 T("Total no recorte = ganhas + perdidas + abertas + não classificadas.", "Total in the selection = won + lost + open + unclassified."), "#64748b", DeltaPct(_r.Total, _prev?.Total))
         </div>
 
         <div class="cvx-second">
-            <span title="@DinTip(_r, ClasseProposta.Perdida)">Valor perdido <b>@Din(_r, ClasseProposta.Perdida)</b></span>
-            <span title="@DinTotalTip(_r)">Valor total cotado <b>@DinTotal(_r)</b></span>
+            <span title="@DinTip(_r, ClasseProposta.Perdida)">@T("Valor perdido", "Lost value") <b>@Din(_r, ClasseProposta.Perdida)</b></span>
+            <span title="@DinTotalTip(_r)">@T("Valor total cotado", "Total quoted value") <b>@DinTotal(_r)</b></span>
         </div>
     </div>;
 
@@ -345,10 +382,10 @@ else
         <section class="cvx-card cvx-comp">
             <div class="cvx-ch">
                 <div>
-                    <h3 class="cvx-h3">Composição das propostas</h3>
-                    <p>Participação de cada status no total · clique num segmento para destacá-lo no ranking, nas unidades, nos valores e nas perdas</p>
+                    <h3 class="cvx-h3">@T("Composição das propostas", "Proposal breakdown")</h3>
+                    <p>@T("Participação de cada status no total · clique num segmento para destacá-lo no ranking, nas unidades, nos valores e nas perdas", "Share of each status in the total · click a segment to highlight it in the ranking, units, values and losses")</p>
                 </div>
-                <div class="cvx-total" title="@(_r.NC > 0 ? $"Inclui {N0(_r.NC)} proposta(s) com status fora da lista (não classificadas), detalhadas em Qualidade dos dados." : "Ganhas + perdidas + abertas")"><small>TOTAL DE PROPOSTAS</small><b>@N0(_r.Total)</b></div>
+                <div class="cvx-total" title="@(_r.NC > 0 ? T($"Inclui {N0(_r.NC)} proposta(s) com status fora da lista (não classificadas), detalhadas em Qualidade dos dados.", $"Includes {N0(_r.NC)} proposal(s) with a status outside the list (unclassified), detailed in Data quality.") : T("Ganhas + perdidas + abertas", "Won + lost + open"))"><small>@T("TOTAL DE PROPOSTAS", "TOTAL PROPOSALS")</small><b>@N0(_r.Total)</b></div>
             </div>
             @{ var baseBarra = Math.Max(_r.G + _r.P + _r.A, 1); }
             <div class="cvx-stackbar tall">
@@ -370,7 +407,7 @@ else
                         <i></i>
                         <span class="n">@NomeEn(c)</span>
                         <b>@N0(_r.Qtd(c))</b>
-                        <span class="p">@PctDe(_r.Qtd(c), _r.Total) das propostas</span>
+                        <span class="p">@PctDe(_r.Qtd(c), _r.Total) @T("das propostas", "of proposals")</span>
                         <span class="m">@Din(_r, c)</span>
                     </button>
                 }
@@ -382,18 +419,18 @@ else
         <div class="cvx-ch">
             <div>
                 <h3 class="cvx-h3">@TituloTendencia()</h3>
-                <p>Uma linha por ano · mês de ENVIO da proposta, com o status atual — não é a data de fechamento.</p>
+                <p>@T("Uma linha por ano · mês de ENVIO da proposta, com o status atual — não é a data de fechamento.", "One line per year · month the proposal was SENT, with its current status — not the closing date.")</p>
             </div>
             <div class="cvx-ctrl">
                 <div class="cvx-seg-ctl">
-                    <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Taxa de conversão</button>
-                    <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Quantidade</button>
-                    <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (@Sim)</button>
+                    <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>@T("Taxa de conversão", "Conversion rate")</button>
+                    <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>@T("Quantidade", "Count")</button>
+                    <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>@T("Valor", "Value") (@Sim)</button>
                 </div>
             </div>
         </div>
         @Tendencia(0)
-        <p class="cvx-note">@(_metTrend == "winrate" ? "Taxa do mês = propostas ganhas ÷ todas as propostas enviadas naquele mês. Meses recentes têm mais propostas ainda abertas: a taxa deles tende a subir quando forem decididas." : "O mês em andamento ainda recebe propostas: o número dele pode mudar.") Para comparar anos, deixe o filtro de Ano em "Todos".</p>
+        <p class="cvx-note">@(_metTrend == "winrate" ? T("Taxa do mês = propostas ganhas ÷ todas as propostas enviadas naquele mês. Meses recentes têm mais propostas ainda abertas: a taxa deles tende a subir quando forem decididas.", "Monthly rate = won proposals ÷ all proposals sent that month. Recent months have more proposals still open: their rate tends to rise as they are decided.") : T("O mês em andamento ainda recebe propostas: o número dele pode mudar.", "The month in progress is still receiving proposals: its figure may change.")) @T("Para comparar anos, deixe o filtro de Ano em \"Todos\".", "To compare years, leave the Year filter on \"All\".")</p>
     </div>;
 
     // ---- vendedores -------------------------------------------------------
@@ -403,29 +440,29 @@ else
             <div class="cvx-xh">
                 <span class="xcard-ico">@Icons.Svg("users")</span>
                 <div>
-                    <h2>@(_taxaOk ? "Taxa de conversão por vendedor" : "Propostas por vendedor no segmento selecionado")</h2>
-                    <p>@lista.Count vendedores · @RegraCurta · role para ver todos · a marca vertical é a média do grupo</p>
+                    <h2>@(_taxaOk ? T("Taxa de conversão por vendedor", "Conversion rate by salesperson") : T("Propostas por vendedor no segmento selecionado", "Proposals by salesperson in the selected segment"))</h2>
+                    <p>@lista.Count @T("vendedores", "salespeople") · @RegraCurta · @T("role para ver todos · a marca vertical é a média do grupo", "scroll to see all · the vertical mark is the group average")</p>
                 </div>
             </div>
-            @if (_taxaOk) { <span class="xcard-total"><span>Média do grupo</span><b>@TxQtdGlobal(_rx)</b></span> }
+            @if (_taxaOk) { <span class="xcard-total"><span>@T("Média do grupo", "Group average")</span><b>@TxQtdGlobal(_rx)</b></span> }
             <div class="cvx-ctrl">
-                <label class="cvx-fld">Ordenar por
+                <label class="cvx-fld">@T("Ordenar por", "Sort by")
                     <select @bind="_ordVend">
-                        <option value="wr">Taxa de conversão</option>
-                        <option value="valor">Valor ganho</option>
-                        <option value="ganhas">Propostas ganhas</option>
-                        <option value="decididas">Propostas decididas</option>
-                        <option value="perdidas">Propostas perdidas</option>
+                        <option value="wr">@T("Taxa de conversão", "Conversion rate")</option>
+                        <option value="valor">@T("Valor ganho", "Won value")</option>
+                        <option value="ganhas">@T("Propostas ganhas", "Won proposals")</option>
+                        <option value="decididas">@T("Propostas decididas", "Decided proposals")</option>
+                        <option value="perdidas">@T("Propostas perdidas", "Lost proposals")</option>
                     </select>
                 </label>
-                <label class="cvx-fld" title="Esconde vendedores com poucas propostas decididas: uma única venda não pode virar 100% de conversão no topo.">Mínimo de decididas
+                <label class="cvx-fld" title="@T("Esconde vendedores com poucas propostas decididas: uma única venda não pode virar 100% de conversão no topo.", "Hides salespeople with few decided proposals: a single sale can't become 100% conversion at the top.")">@T("Mínimo de decididas", "Minimum decided")
                     <input type="number" min="0" value="@_minDec" @onchange="SetMinDec" />
                 </label>
             </div>
         </div>
         @if (lista.Count == 0)
         {
-            <div class="empty" style="padding:24px">Nenhum vendedor com @_minDec ou mais propostas decididas. Reduza o mínimo.</div>
+            <div class="empty" style="padding:24px">@T($"Nenhum vendedor com {_minDec} ou mais propostas decididas. Reduza o mínimo.", $"No salesperson with {_minDec} or more decided proposals. Lower the minimum.")</div>
         }
         else
         {
@@ -434,27 +471,27 @@ else
                 {
                     var (nome, r) = lista[i];
                     var vn = nome;
-                    <div class="ibar-item @(i < 3 ? $"top{i + 1}" : "") @(_vendSel == nome ? "xf-on" : "")" title="Clique para ver o detalhe de @nome" @onclick="() => AbrirVendedor(vn)">
+                    <div class="ibar-item @(i < 3 ? $"top{i + 1}" : "") @(_vendSel == nome ? "xf-on" : "")" title="@T("Clique para ver o detalhe de", "Click to see the details for") @nome" @onclick="() => AbrirVendedor(vn)">
                         <div class="ibar-head">
                             <span class="ibar-num">@(i + 1)</span>
                             <span class="ibar-name">@nome</span>
-                            @if (_taxaOk && r.Decididas < AmostraMinima) { <span class="cv-amostra" title="Menos de @AmostraMinima decididas: a taxa oscila muito">amostra pequena</span> }
+                            @if (_taxaOk && r.Decididas < AmostraMinima) { <span class="cv-amostra" title="@T($"Menos de {AmostraMinima} decididas: a taxa oscila muito", $"Fewer than {AmostraMinima} decided: the rate swings a lot")">@T("amostra pequena", "small sample")</span> }
                             <span class="ibar-metrics">
-                                <span class="cvx-ibm g" title="Propostas ganhas">@N0(r.G) <small>ganhas</small></span>
-                                <span class="cvx-ibm p" title="Propostas perdidas">@N0(r.P) <small>perdidas</small></span>
-                                <span class="cvx-ibm a" title="Propostas abertas">@N0(r.A) <small>abertas</small></span>
+                                <span class="cvx-ibm g" title="@T("Propostas ganhas", "Won proposals")">@N0(r.G) <small>@T("ganhas", "won")</small></span>
+                                <span class="cvx-ibm p" title="@T("Propostas perdidas", "Lost proposals")">@N0(r.P) <small>@T("perdidas", "lost")</small></span>
+                                <span class="cvx-ibm a" title="@T("Propostas abertas", "Open proposals")">@N0(r.A) <small>@T("abertas", "open")</small></span>
                                 <span class="ibar-sep"></span>
-                                <span class="cvx-ibm" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
+                                <span class="cvx-ibm" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>@T("ganho", "won")</small></span>
                                 <span class="ibar-sep"></span>
                                 <span class="ibar-val">@TxQtd(r)</span>
-                                <span class="ibar-share" title="Ganhas de decididas">@N0(r.G)/@N0(r.Decididas)</span>
+                                <span class="ibar-share" title="@T("Ganhas de decididas", "Won of decided")">@N0(r.G)/@N0(r.Decididas)</span>
                             </span>
                         </div>
-                        <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do grupo: @P1(gm)"></em> }</div>
+                        <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="@T("Média do grupo", "Group average"): @P1(gm)"></em> }</div>
                     </div>
                 }
             </div>
-            @if (ocultos > 0) { <p class="cvx-note">@ocultos vendedor(es) com menos de @_minDec propostas decididas estão ocultos do ranking (continuam nos totais).</p> }
+            @if (ocultos > 0) { <p class="cvx-note">@T($"{ocultos} vendedor(es) com menos de {_minDec} propostas decididas estão ocultos do ranking (continuam nos totais).", $"{ocultos} salesperson(s) with fewer than {_minDec} decided proposals are hidden from the ranking (still counted in the totals).")</p> }
         }
     </section>;
 
@@ -468,32 +505,32 @@ else
         <div class="drawer-backdrop" @onclick="() => _vendSel = null"></div>
         <div class="drawer cvx-drawer">
             <div class="page-head">
-                <div><h2 style="color:var(--primary)">@nome</h2><p class="subtitle">@(_seg is null ? "Mesmos filtros e período do painel" : "Mesmos filtros e período, sem o segmento") · @N0(rv.Total) propostas</p></div>
+                <div><h2 style="color:var(--primary)">@nome</h2><p class="subtitle">@(_seg is null ? T("Mesmos filtros e período do painel", "Same filters and period as the dashboard") : T("Mesmos filtros e período, sem o segmento", "Same filters and period, without the segment")) · @N0(rv.Total) @T("propostas", "proposals")</p></div>
                 <button class="icon-btn" @onclick="() => _vendSel = null">@Icons.Svg("x")</button>
             </div>
-            @if (_seg is { } sgv) { <div class="cvx-note">Segmento @NomeEn(sgv) ignorado neste detalhamento: a taxa de conversão considera todas as classes.</div> }
+            @if (_seg is { } sgv) { <div class="cvx-note">@T("Segmento", "Segment") @NomeEn(sgv) @T("ignorado neste detalhamento: a taxa de conversão considera todas as classes.", "ignored in this breakdown: the conversion rate considers all classes.")</div> }
             <div class="cvx-dkpis">
-                <div><small>TAXA DE CONVERSÃO</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) de @N0(rv.Base) @DenRot</span></div>
-                <div><small>VALOR GANHO</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>Conversão @(_porValor ? "por quantidade" : "por valor") @TxOutraGlobal(rv)</span></div>
+                <div><small>@T("TAXA DE CONVERSÃO", "CONVERSION RATE")</small><b>@TxQtdGlobal(rv)</b><span>@N0(rv.G) @T("de", "of") @N0(rv.Base) @DenRot</span></div>
+                <div><small>@T("VALOR GANHO", "WON VALUE")</small><b title="@DinTip(rv, ClasseProposta.Ganha)">@Din(rv, ClasseProposta.Ganha)</b><span>@T("Conversão", "Conversion") @(_porValor ? T("por quantidade", "by count") : T("por valor", "by value")) @TxOutraGlobal(rv)</span></div>
             </div>
             <div class="cvx-dcmp">
                 @if (cmp is { } c && rv.Decididas < AmostraMinima)
                 {
-                    <span>Amostra pequena (@N0(rv.Decididas) decididas): comparação com o grupo (@TxQtdGlobal(grp)) apenas indicativa.</span>
+                    <span>@T($"Amostra pequena ({N0(rv.Decididas)} decididas): comparação com o grupo ({TxQtdGlobal(grp)}) apenas indicativa.", $"Small sample ({N0(rv.Decididas)} decided): comparison with the group ({TxQtdGlobal(grp)}) is only indicative.")</span>
                 }
                 else if (cmp is { } c2)
                 {
-                    <span>Taxa de conversão <b>@(c2 >= 0 ? "acima" : "abaixo")</b> da média do grupo em <b>@Pp(c2)</b> (grupo: @TxQtdGlobal(grp), @N0(grp.Decididas) decididas)</span>
+                    <span>@T("Taxa de conversão", "Conversion rate") <b>@(c2 >= 0 ? T("acima", "above") : T("abaixo", "below"))</b> @T("da média do grupo em", "the group average by") <b>@Pp(c2)</b> (@T("grupo", "group"): @TxQtdGlobal(grp), @N0(grp.Decididas) @T("decididas", "decided"))</span>
                 }
-                else { <span>Comparação com o grupo indisponível: sem propostas decididas.</span> }
+                else { <span>@T("Comparação com o grupo indisponível: sem propostas decididas.", "Comparison with the group unavailable: no decided proposals.")</span> }
             </div>
-            <h3 class="cvx-dh">Composição das propostas</h3>
+            <h3 class="cvx-dh">@T("Composição das propostas", "Proposal breakdown")</h3>
             @Html(HtmlComposicao(rv))
-            <h3 class="cvx-dh">Histórico mensal da taxa de conversão</h3>
+            <h3 class="cvx-dh">@T("Histórico mensal da taxa de conversão", "Monthly conversion rate history")</h3>
             @Html(SvgWinRate(itens, 0, true, false, 600))
-            <h3 class="cvx-dh">Distribuição por BU</h3>
+            <h3 class="cvx-dh">@T("Distribuição por BU", "Breakdown by BU")</h3>
             <table class="cvx-mini-tbl">
-                <thead><tr><th>BU</th><th class="r">Propostas</th><th class="r">Decididas</th><th class="r">Conversão</th><th class="r">Valor ganho</th></tr></thead>
+                <thead><tr><th>BU</th><th class="r">@T("Propostas", "Proposals")</th><th class="r">@T("Decididas", "Decided")</th><th class="r">@T("Conversão", "Conversion")</th><th class="r">@T("Valor ganho", "Won value")</th></tr></thead>
                 <tbody>
                     @foreach (var (bn, br) in Grupos(itens, i => i.P.Bu))
                     {
@@ -501,18 +538,18 @@ else
                     }
                 </tbody>
             </table>
-            <h3 class="cvx-dh">Distribuição das perdas (status no CRM)</h3>
+            <h3 class="cvx-dh">@T("Distribuição das perdas (status no CRM)", "Breakdown of losses (CRM status)")</h3>
             @{
                 var perdas = itens.Where(i => i.P.Classe == ClasseProposta.Perdida)
                     .GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal))
                     .Select(g => (Nome: g.First().P.StatusOriginal, Qtd: g.Count(), Valor: g.Sum(i => i.Brl ?? 0), ComUsd: g.Count(i => i.P.ValorUsd is not null), Conv: g.Count(i => i.Brl is not null)))
                     .OrderByDescending(x => x.Qtd).ToList();
             }
-            @if (perdas.Count == 0) { <div class="cvx-note">Nenhuma proposta perdida deste vendedor no recorte.</div> }
+            @if (perdas.Count == 0) { <div class="cvx-note">@T("Nenhuma proposta perdida deste vendedor no recorte.", "No lost proposals for this salesperson in the selection.")</div> }
             else
             {
                 <table class="cvx-mini-tbl">
-                    <thead><tr><th>Status</th><th class="r">Propostas</th><th class="r">Participação</th><th class="r">Valor</th></tr></thead>
+                    <thead><tr><th>Status</th><th class="r">@T("Propostas", "Proposals")</th><th class="r">@T("Participação", "Share")</th><th class="r">@T("Valor", "Value")</th></tr></thead>
                     <tbody>
                         @foreach (var p in perdas)
                         {
@@ -521,7 +558,7 @@ else
                     </tbody>
                 </table>
             }
-            <div class="modal-actions"><button class="btn-ghost" @onclick="() => _vendSel = null">Fechar</button></div>
+            <div class="modal-actions"><button class="btn-ghost" @onclick="() => _vendSel = null">@T("Fechar", "Close")</button></div>
         </div>
     </div>;
 
@@ -532,13 +569,15 @@ else
     private RenderFragment BlocoUnidades(Func<Item, string> sel, HashSet<string> filtro, string exceto, string singular = "unidade", string plural = "unidades") => @<div class="cvx-card">
         @{
             var lista = UnidadesOrdenadas(sel, exceto);
+            var sing = singular == "unidade" ? T("unidade", "unit") : singular;
+            var plu = plural == "unidades" ? T("unidades", "units") : plural;
         }
         <div class="cvx-ch">
             <div class="cvx-xh">
                 <span class="xcard-ico">@Icons.Svg("bar-chart")</span>
-                <div><h2>Taxa de conversão por @singular</h2><p>@lista.Count @plural · @RegraCurta · clique para filtrar o painel · a marca vertical é a média do recorte</p></div>
+                <div><h2>@T("Taxa de conversão por", "Conversion rate by") @sing</h2><p>@lista.Count @plu · @RegraCurta · @T("clique para filtrar o painel · a marca vertical é a média do recorte", "click to filter the dashboard · the vertical mark is the selection average")</p></div>
             </div>
-            @if (_taxaOk) { <span class="xcard-total"><span>Média do recorte</span><b>@TxQtdGlobal(_rx)</b></span> }
+            @if (_taxaOk) { <span class="xcard-total"><span>@T("Média do recorte", "Selection average")</span><b>@TxQtdGlobal(_rx)</b></span> }
         </div>
         <div class="ibar cvx-ibar scroll-y @(filtro.Count > 0 ? "has-active" : "")">
             @{ var pos = 0; }
@@ -546,27 +585,27 @@ else
             {
                 pos++;
                 var un = nome;
-                <div class="ibar-item @(pos <= 3 ? $"top{pos}" : "") @(filtro.Contains(nome) ? "xf-on" : "")" title="Clique para filtrar por @nome" @onclick="() => Alternar(filtro, un)">
+                <div class="ibar-item @(pos <= 3 ? $"top{pos}" : "") @(filtro.Contains(nome) ? "xf-on" : "")" title="@T("Clique para filtrar por", "Click to filter by") @nome" @onclick="() => Alternar(filtro, un)">
                     <div class="ibar-head">
                         <span class="ibar-num">@pos</span>
                         <span class="ibar-name">@nome</span>
                         <span class="ibar-metrics">
-                            <span class="cvx-ibm" title="Propostas enviadas">@N0(r.Total) <small>propostas</small></span>
-                            <span class="cvx-ibm" title="Ganhas + perdidas">@N0(r.Decididas) <small>decididas</small></span>
+                            <span class="cvx-ibm" title="@T("Propostas enviadas", "Proposals sent")">@N0(r.Total) <small>@T("propostas", "proposals")</small></span>
+                            <span class="cvx-ibm" title="@T("Ganhas + perdidas", "Won + lost")">@N0(r.Decididas) <small>@T("decididas", "decided")</small></span>
                             <span class="ibar-sep"></span>
-                            <span class="cvx-ibm g" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>ganho</small></span>
-                            <span class="cvx-ibm p" title="@DinTip(r, ClasseProposta.Perdida)">@Din(r, ClasseProposta.Perdida) <small>perdido</small></span>
-                            <span class="cvx-ibm a" title="@DinTip(r, ClasseProposta.Aberta)">@Din(r, ClasseProposta.Aberta) <small>aberto</small></span>
+                            <span class="cvx-ibm g" title="@DinTip(r, ClasseProposta.Ganha)">@Din(r, ClasseProposta.Ganha) <small>@T("ganho", "won")</small></span>
+                            <span class="cvx-ibm p" title="@DinTip(r, ClasseProposta.Perdida)">@Din(r, ClasseProposta.Perdida) <small>@T("perdido", "lost")</small></span>
+                            <span class="cvx-ibm a" title="@DinTip(r, ClasseProposta.Aberta)">@Din(r, ClasseProposta.Aberta) <small>@T("aberto", "open")</small></span>
                             <span class="ibar-sep"></span>
                             <span class="cvx-ibm" title="@TituloValor">@TxOutra(r) <small>@OutraRot</small></span>
                             <span class="ibar-val @RelCss(r) @(r.Base == 0 ? "cvx-na" : "")">@TxQtd(r)</span>
                         </span>
                     </div>
-                    <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="Média do recorte: @P1(gm)"></em> }</div>
+                    <div class="ibar-track cvx-ib-track"><span class="ibar-fill" style="width:@F(_taxaOk ? r.TaxaQtd ?? 0 : 0)%"></span>@if (_taxaOk && _rx.TaxaQtd is { } gm) { <em class="cvx-ib-mk" style="left:@F(gm)%" title="@T("Média do recorte", "Selection average"): @P1(gm)"></em> }</div>
                 </div>
             }
         </div>
-        <p class="cvx-note">Taxa em verde: pelo menos 5 p.p. acima da média do recorte; em vermelho: 5 p.p. abaixo (só com @AmostraMinima+ decididas). As barras partem do zero e vão até 100%.</p>
+        <p class="cvx-note">@T($"Taxa em verde: pelo menos 5 p.p. acima da média do recorte; em vermelho: 5 p.p. abaixo (só com {AmostraMinima}+ decididas). As barras partem do zero e vão até 100%.", $"Rate in green: at least 5 pp above the selection average; in red: 5 pp below (only with {AmostraMinima}+ decided). Bars start at zero and go up to 100%.")</p>
     </div>;
 
     // ---- países: mapa (cor = taxa de conversão) + lista; clique filtra o painel
@@ -580,17 +619,17 @@ else
         <div class="cvx-ch">
             <div class="cvx-xh">
                 <span class="xcard-ico">@Icons.Svg("target")</span>
-                <div><h2>Taxa de conversão por país</h2><p>@lista.Count países · @RegraCurta · cor mais escura = taxa maior (escala de @P1(_txMin) a @P1(_txMax))@(noMapa < lista.Count ? $" · {lista.Count - noMapa} sem posição no mapa (aparecem só na lista)" : "")</p></div>
+                <div><h2>@T("Taxa de conversão por país", "Conversion rate by country")</h2><p>@lista.Count @T("países", "countries") · @RegraCurta · @T($"cor mais escura = taxa maior (escala de {P1(_txMin)} a {P1(_txMax)})", $"darker color = higher rate (scale from {P1(_txMin)} to {P1(_txMax)})")@(noMapa < lista.Count ? T($" · {lista.Count - noMapa} sem posição no mapa (aparecem só na lista)", $" · {lista.Count - noMapa} with no position on the map (shown only in the list)") : "")</p></div>
             </div>
             <div class="map-zoom">
-                <button class="icon-btn" title="Diminuir" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1/1.3)'>@Icons.Svg("down")</button>
-                <button class="icon-btn" title="Aumentar" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1.3)'>@Icons.Svg("up")</button>
-                <button class="icon-btn" title="Redefinir" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapaId)'>@Icons.Svg("target")</button>
+                <button class="icon-btn" title="@T("Diminuir", "Zoom out")" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1/1.3)'>@Icons.Svg("down")</button>
+                <button class="icon-btn" title="@T("Aumentar", "Zoom in")" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapaId, 1.3)'>@Icons.Svg("up")</button>
+                <button class="icon-btn" title="@T("Redefinir", "Reset")" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapaId)'>@Icons.Svg("target")</button>
             </div>
         </div>
         @if (lista.Count == 0)
         {
-            <div class="empty">Sem dados no recorte.</div>
+            <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div>
         }
         else
         {
@@ -601,7 +640,7 @@ else
                 @foreach (var (nome, r) in lista)
                 {
                     var pn = nome;
-                    <div class="ml-row @(_paises.Contains(nome) ? "xf-on" : "")" @onclick="() => Alternar(_paises, pn)" title="@nome: @N0(r.G) ganhas de @N0(r.Base) @DenRot · @N0(r.Total) propostas · clique para filtrar">
+                    <div class="ml-row @(_paises.Contains(nome) ? "xf-on" : "")" @onclick="() => Alternar(_paises, pn)" title="@nome: @N0(r.G) @T("ganhas de", "won of") @N0(r.Base) @DenRot · @N0(r.Total) @T("propostas · clique para filtrar", "proposals · click to filter")">
                         <span class="ml-dot" style="background:@CorTaxa(r)"></span><span class="ml-name">@nome</span><span class="ml-val">@TxQtd(r)</span><span class="ml-pct">@N0(r.G)/@N0(r.Decididas)</span>
                     </div>
                 }
@@ -611,12 +650,12 @@ else
 
     private RenderFragment ValorUnidades() => @<div class="cvx-two">
         <div class="cvx-card">
-            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por Business Unit</h2><p>Valor total cotado em @Sim · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>@T("Valor por Business Unit", "Value by Business Unit")</h2><p>@T("Valor total cotado em", "Total quoted value in") @Sim · @T("ganho, perdido e aberto embaixo de cada barra", "won, lost and open below each bar")</p></div></div>
                 <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(_rx)">@DinTotal(_rx)</b></span></div>
             @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))
         </div>
         <div class="cvx-card">
-            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Só propostas intercompany · valor total cotado em @Sim · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>@T("Valor por BU Intercompany", "Value by BU Intercompany")</h2><p>@T("Só propostas intercompany · valor total cotado em", "Intercompany proposals only · total quoted value in") @Sim · @T("ganho, perdido e aberto embaixo de cada barra", "won, lost and open below each bar")</p></div></div>
                 <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(ResumoIc())">@DinTotal(ResumoIc())</b></span></div>
             @Html(HtmlValorPorUnidade(Grupos(SoIc(_fx), i => i.P.BuIc)))
         </div>
@@ -625,7 +664,7 @@ else
     private RenderFragment ValorMensal() => @<div>
         <div class="cvx-card">
             <div class="cvx-ch">
-                <div><h2>Valor por mês · @AnoBarrasAtual()</h2><p>Mês de envio e status atual de cada proposta · barras partem do zero</p></div>
+                <div><h2>@T("Valor por mês", "Value by month") · @AnoBarrasAtual()</h2><p>@T("Mês de envio e status atual de cada proposta · barras partem do zero", "Month sent and current status of each proposal · bars start at zero")</p></div>
                 @if (AnosBarras().Count > 1)
                 {
                     <div class="cvx-seg-ctl">
@@ -644,21 +683,21 @@ else
     // ---- perdas ---------------------------------------------------------------
     private RenderFragment Perdas() => @<section class="cvx-card">
         <div class="cvx-ch">
-            <div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("pie")</span><div><h2>Status das perdidas por impacto</h2><p>O status é a classificação no CRM, não a causa comercial · barras partem do zero</p></div></div>
-            <span class="xcard-total cvx-xt-mid"><span>Perdidas</span><b>@(_metPerda == "qtd" ? N0(_rx.P) : Din(_rx, ClasseProposta.Perdida))</b></span>
+            <div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("pie")</span><div><h2>@T("Status das perdidas por impacto", "Status of lost proposals by impact")</h2><p>@T("O status é a classificação no CRM, não a causa comercial · barras partem do zero", "The status is the CRM classification, not the commercial cause · bars start at zero")</p></div></div>
+            <span class="xcard-total cvx-xt-mid"><span>@T("Perdidas", "Lost")</span><b>@(_metPerda == "qtd" ? N0(_rx.P) : Din(_rx, ClasseProposta.Perdida))</b></span>
             <div class="cvx-seg-ctl">
-                <button class="@(_metPerda == "qtd" ? "on" : "")" @onclick='() => _metPerda = "qtd"'>Quantidade</button>
-                <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>Valor financeiro</button>
+                <button class="@(_metPerda == "qtd" ? "on" : "")" @onclick='() => _metPerda = "qtd"'>@T("Quantidade", "Count")</button>
+                <button class="@(_metPerda == "valor" ? "on" : "")" @onclick='() => _metPerda = "valor"'>@T("Valor financeiro", "Financial value")</button>
             </div>
         </div>
         @if (_seg is { } s && s != ClasseProposta.Perdida)
         {
-            @Html(Vazio("Segmento " + NomeEn(s) + " ativo: a análise de perdas considera apenas propostas perdidas."))
+            @Html(Vazio(T("Segmento " + NomeEn(s) + " ativo: a análise de perdas considera apenas propostas perdidas.", "Segment " + NomeEn(s) + " active: the loss analysis considers lost proposals only.")))
         }
         else
         {
             @Html(HtmlPareto(_metPerda == "qtd"))
-            <div class="cvx-insight static"><small>Concentração das perdas</small><span>@TextoInsightPerda()</span></div>
+            <div class="cvx-insight static"><small>@T("Concentração das perdas", "Loss concentration")</small><span>@TextoInsightPerda()</span></div>
         }
     </section>;
 
@@ -678,59 +717,59 @@ else
             var okValor = Math.Abs(indep - geral.VTotal) < 0.01 && Math.Abs(_f.Sum(i => i.Brl ?? 0) - _r.VTotal) < 0.01;
             var okTabela = _f.Count == _r.Total;
         }
-        <h2 class="cvx-h2s">Verificações de integridade</h2>
+        <h2 class="cvx-h2s">@T("Verificações de integridade", "Integrity checks")</h2>
         <ul class="cv-checks cvx-checks">
-            <li class="@(okQtd ? "ok" : "bad")">@(okQtd ? "✔" : "✖") Total de registros (@N0(total)) = ganhas (@N0(geral.G)) + perdidas (@N0(geral.P)) + abertas (@N0(geral.A)) + não classificadas (@N0(geral.NC))</li>
-            <li class="@(okFiltro ? "ok" : "bad")">@(okFiltro ? "✔" : "✖") No recorte atual: @N0(_f.Count) = @N0(_r.G) + @N0(_r.P) + @N0(_r.A) + @N0(_r.NC)</li>
-            <li class="@(okDec ? "ok" : "bad")">@(okDec ? "✔" : "✖") Decididas (@N0(_r.Decididas)) = ganhas + perdidas · abertas e não classificadas fora do denominador da Taxa de conversão</li>
-            <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@(Sim + " " + geral.VTotal.ToString("#,##0", _pt)) na base toda)</li>
-            <li class="@(okTabela ? "ok" : "bad")">@(okTabela ? "✔" : "✖") Base de Propostas e dashboard usam o mesmo recorte: @N0(_f.Count) registros</li>
-            <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") Propostas com valor mas sem taxa de câmbio: @N0(geral.SemTaxa)@(geral.SemTaxa > 0 ? $" (US$ {geral.UsdSemTaxa.ToString("N0", _pt)} fora dos valores em R$)" : "")</li>
+            <li class="@(okQtd ? "ok" : "bad")">@(okQtd ? "✔" : "✖") @T($"Total de registros ({N0(total)}) = ganhas ({N0(geral.G)}) + perdidas ({N0(geral.P)}) + abertas ({N0(geral.A)}) + não classificadas ({N0(geral.NC)})", $"Total records ({N0(total)}) = won ({N0(geral.G)}) + lost ({N0(geral.P)}) + open ({N0(geral.A)}) + unclassified ({N0(geral.NC)})")</li>
+            <li class="@(okFiltro ? "ok" : "bad")">@(okFiltro ? "✔" : "✖") @T("No recorte atual:", "In the current selection:") @N0(_f.Count) = @N0(_r.G) + @N0(_r.P) + @N0(_r.A) + @N0(_r.NC)</li>
+            <li class="@(okDec ? "ok" : "bad")">@(okDec ? "✔" : "✖") @T($"Decididas ({N0(_r.Decididas)}) = ganhas + perdidas · abertas e não classificadas fora do denominador da Taxa de conversão", $"Decided ({N0(_r.Decididas)}) = won + lost · open and unclassified excluded from the Conversion rate denominator")</li>
+            <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") @T("Soma dos valores das categorias = valor total das propostas com conversão válida", "Sum of category values = total value of proposals with a valid conversion") (@(Sim + " " + geral.VTotal.ToString("#,##0", CulRz)) @T("na base toda", "in the whole data set"))</li>
+            <li class="@(okTabela ? "ok" : "bad")">@(okTabela ? "✔" : "✖") @T("Base de Propostas e dashboard usam o mesmo recorte:", "Proposals data and dashboard use the same selection:") @N0(_f.Count) @T("registros", "records")</li>
+            <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") @T("Propostas com valor mas sem taxa de câmbio:", "Proposals with a value but no exchange rate:") @N0(geral.SemTaxa)@(geral.SemTaxa > 0 ? T($" (US$ {geral.UsdSemTaxa.ToString("N0", CulRz)} fora dos valores em R$)", $" (US$ {geral.UsdSemTaxa.ToString("N0", CulRz)} excluded from the R$ values)") : "")</li>
             @if (geral.SemData > 0)
             {
-                <li class="bad">✖ Propostas com valor mas sem data de envio: @N0(geral.SemData) (US$ @geral.UsdSemData.ToString("N0", _pt) fora dos valores em R$)</li>
+                <li class="bad">✖ @T($"Propostas com valor mas sem data de envio: {N0(geral.SemData)} (US$ {geral.UsdSemData.ToString("N0", CulRz)} fora dos valores em R$)", $"Proposals with a value but no sent date: {N0(geral.SemData)} (US$ {geral.UsdSemData.ToString("N0", CulRz)} excluded from the R$ values)")</li>
             }
-            <li class="info">ℹ Propostas sem valor na planilha (US$ no AFM, R$ no NB): @N0(geral.SemValor) — contam nas quantidades, não nos valores</li>
+            <li class="info">ℹ @T($"Propostas sem valor na planilha (US$ no AFM, R$ no NB): {N0(geral.SemValor)} — contam nas quantidades, não nos valores", $"Proposals without a value in the spreadsheet (US$ in AFM, R$ in NB): {N0(geral.SemValor)} — included in the counts, not in the values")</li>
         </ul>
 
-        <h2 class="cvx-h2s" style="margin-top:18px">Conversão cambial rastreável (recorte atual · só AFM, o NB já vem em R$)</h2>
+        <h2 class="cvx-h2s" style="margin-top:18px">@T("Conversão cambial rastreável (recorte atual · só AFM, o NB já vem em R$)", "Traceable currency conversion (current selection · AFM only, NB is already in R$)")</h2>
         <table class="cvx-mini-tbl">
-            <thead><tr><th>Ano de envio</th><th class="r">Taxa USD/BRL</th><th class="r">Propostas</th><th class="r">Valor original (US$)</th><th class="r">Valor convertido (R$)</th><th class="r">Sem taxa</th></tr></thead>
+            <thead><tr><th>@T("Ano de envio", "Year sent")</th><th class="r">@T("Taxa USD/BRL", "USD/BRL rate")</th><th class="r">@T("Propostas", "Proposals")</th><th class="r">@T("Valor original (US$)", "Original value (US$)")</th><th class="r">@T("Valor convertido (R$)", "Converted value (R$)")</th><th class="r">@T("Sem taxa", "No rate")</th></tr></thead>
             <tbody>
                 @foreach (var l in RastroCambio())
                 {
                     <tr>
-                        <td><b>@l.Ano</b></td>
-                        <td class="r">@(l.Taxa is { } tx ? tx.ToString("0.0000", _pt) : l.Ano == "Sem data" ? "sem data de envio" : "não cadastrada")</td>
+                        <td><b>@(l.Ano == "Sem data" ? T("Sem data", "No date") : l.Ano)</b></td>
+                        <td class="r">@(l.Taxa is { } tx ? tx.ToString("0.0000", CulRz) : l.Ano == "Sem data" ? T("sem data de envio", "no sent date") : T("não cadastrada", "not registered"))</td>
                         <td class="r">@N0(l.Propostas)</td>
-                        <td class="r">@l.Usd.ToString("N0", _pt)</td>
-                        <td class="r">@(l.Taxa is null ? (l.Ano == "Sem data" ? "—" : "Não convertido") : Fmt.Brl(l.Brl))</td>
+                        <td class="r">@l.Usd.ToString("N0", CulRz)</td>
+                        <td class="r">@(l.Taxa is null ? (l.Ano == "Sem data" ? "—" : T("Não convertido", "Not converted")) : _emIngles ? "R$ " + l.Brl.ToString("#,##0", _enRz) : Fmt.Brl(l.Brl))</td>
                         <td class="r" style="@(l.SemTaxa > 0 ? "color:var(--neg);font-weight:700" : "")">@N0(l.SemTaxa)</td>
                     </tr>
                 }
             </tbody>
         </table>
-        <p class="cvx-note">Valor em R$ = valor em US$ × taxa do ano da data de envio da proposta. O estado do valor é sempre explícito: R$ 0 (zero real), — (sem informação), Não convertido (sem taxa) e Não calculável (sem denominador).</p>
+        <p class="cvx-note">@T("Valor em R$ = valor em US$ × taxa do ano da data de envio da proposta. O estado do valor é sempre explícito: R$ 0 (zero real), — (sem informação), Não convertido (sem taxa) e Não calculável (sem denominador).", "Value in R$ = value in US$ × rate for the year of the proposal's sent date. The value state is always explicit: R$ 0 (zero), — (no information), Not converted (no rate) and Not calculable (no denominator).")</p>
 
         @if (Conv.Atual.Avisos.Count > 0)
         {
-            <h2 class="cvx-h2s" style="margin-top:18px">Avisos da leitura da planilha</h2>
+            <h2 class="cvx-h2s" style="margin-top:18px">@T("Avisos da leitura da planilha", "Spreadsheet reading warnings")</h2>
             <ul class="cv-checks cvx-checks">@foreach (var a in Conv.Atual.Avisos) { <li class="warn">⚠ @a</li> }</ul>
         }
         @if (_r.NC > 0)
         {
-            <h2 class="cvx-h2s" style="margin-top:18px">Status não classificados (aguardando validação)</h2>
+            <h2 class="cvx-h2s" style="margin-top:18px">@T("Status não classificados (aguardando validação)", "Unclassified statuses (pending validation)")</h2>
             <table class="cvx-mini-tbl">
-                <thead><tr><th>Status na planilha</th><th class="r">Propostas</th></tr></thead>
+                <thead><tr><th>@T("Status na planilha", "Status in the spreadsheet")</th><th class="r">@T("Propostas", "Proposals")</th></tr></thead>
                 <tbody>
-                    @foreach (var g in _f.Where(i => i.P.Classe == ClasseProposta.NaoClassificada).GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal)).Select(x => (Nome: x.First().P.StatusOriginal == "" ? "(vazio)" : x.First().P.StatusOriginal, Qtd: x.Count())).OrderByDescending(x => x.Qtd))
+                    @foreach (var g in _f.Where(i => i.P.Classe == ClasseProposta.NaoClassificada).GroupBy(i => ConversaoService.NormalizarStatus(i.P.StatusOriginal)).Select(x => (Nome: x.First().P.StatusOriginal == "" ? T("(vazio)", "(empty)") : x.First().P.StatusOriginal, Qtd: x.Count())).OrderByDescending(x => x.Qtd))
                     {
                         <tr><td><b>@g.Nome</b></td><td class="r">@N0(g.Qtd)</td></tr>
                     }
                 </tbody>
             </table>
         }
-        <h2 class="cvx-h2s" style="margin-top:18px">Colunas lidas da planilha</h2>
+        <h2 class="cvx-h2s" style="margin-top:18px">@T("Colunas lidas da planilha", "Columns read from the spreadsheet")</h2>
         <ul class="cv-checks cvx-checks">@foreach (var m in Conv.Atual.Mapeamento) { <li class="info">@m</li> }</ul>
     </section>;
 
@@ -750,11 +789,11 @@ else
         }
         <div class="cv-tools filterbar cvx-basebar">
             <BuscaAdiada Value="@_busca" Geracao="_limpezas" OnBuscar="t => { _busca = t; _pag = 0; }" />
-            <MultiFilter Label="Classificação" AllText="Todas" Options="NomesClasse" Selected="_classes" OnChanged="StateHasChanged" />
+            <MultiFilter Label="@T("Classificação", "Classification")" AllText="@T("Todas", "All")" Ingles="_emIngles" Rotulo="ClasseRotulo" EmptyText="@T("Sem opções no recorte.", "No options in the current selection.")" Options="NomesClasse" Selected="_classes" OnChanged="StateHasChanged" />
             <details class="cv-cols">
-                <summary class="btn-ghost sm">@Icons.Svg("layers")Colunas</summary>
+                <summary class="btn-ghost sm">@Icons.Svg("layers")@T("Colunas", "Columns")</summary>
                 <div class="cv-cols-panel">
-                    <button type="button" class="btn-link" style="margin:2px 8px 6px" @onclick="RestaurarOrdem">Restaurar a ordem original</button>
+                    <button type="button" class="btn-link" style="margin:2px 8px 6px" @onclick="RestaurarOrdem">@T("Restaurar a ordem original", "Restore the original order")</button>
                     @foreach (var c in todas)
                     {
                         var k = c.Key;
@@ -763,8 +802,8 @@ else
                 </div>
             </details>
             <div class="filterbar-spacer"></div>
-            <span class="muted" style="font-size:12px" title="@($"Registros na tabela · soma do valor convertido em {Sim}")">@N0(linhas.Count) @(linhas.Count == 1 ? "registro" : "registros") · <b style="color:var(--text)">@DinTotal(rt)</b></span>
-            <button class="btn-primary sm" disabled="@(linhas.Count == 0)" @onclick="() => Exportar(linhas, todas)">@Icons.Svg("download")Exportar Excel</button>
+            <span class="muted" style="font-size:12px" title="@T($"Registros na tabela · soma do valor convertido em {Sim}", $"Records in the table · sum of the converted value in {Sim}")">@N0(linhas.Count) @(linhas.Count == 1 ? T("registro", "record") : T("registros", "records")) · <b style="color:var(--text)">@DinTotal(rt)</b></span>
+            <button class="btn-primary sm" disabled="@(linhas.Count == 0)" @onclick="() => Exportar(linhas, todas)">@Icons.Svg("download")@T("Exportar Excel", "Export Excel")</button>
         </div>
         <div class="table-wrap tbl-compact" style="max-height:62vh;overflow:auto">
             <table class="grid-tbl">
@@ -773,7 +812,7 @@ else
                         @foreach (var c in visiveis)
                         {
                             var k = c.Key;
-                            <th class="@c.Align cv-sort" draggable="true" data-key="@k" title="Clique para ordenar · arraste para mudar a coluna de lugar" @onclick="() => Ordenar(k)">@TituloCol(c)@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
+                            <th class="@c.Align cv-sort" draggable="true" data-key="@k" title="@T("Clique para ordenar · arraste para mudar a coluna de lugar", "Click to sort · drag to move the column")" @onclick="() => Ordenar(k)">@TituloCol(c)@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
                         }
                     </tr>
                 </thead>
@@ -789,7 +828,7 @@ else
                                 }
                                 else if (c.Key == "taxa" && i.Taxa is null)
                                 {
-                                    <td class="right" style="color:var(--neg)" title="Sem taxa de câmbio para este ano">sem taxa</td>
+                                    <td class="right" style="color:var(--neg)" title="@T("Sem taxa de câmbio para este ano", "No exchange rate for this year")">@T("sem taxa", "no rate")</td>
                                 }
                                 else
                                 {
@@ -800,16 +839,16 @@ else
                     }
                     @if (linhas.Count == 0)
                     {
-                        <tr><td colspan="@Math.Max(visiveis.Count, 1)" class="empty">Nenhum registro com os filtros atuais.</td></tr>
+                        <tr><td colspan="@Math.Max(visiveis.Count, 1)" class="empty">@T("Nenhum registro com os filtros atuais.", "No records match the current filters.")</td></tr>
                     }
                 </tbody>
             </table>
         </div>
         <div class="cv-pager">
-            <span class="muted">Mostrando @(linhas.Count == 0 ? 0 : _pag * PorPagina + 1)–@Math.Min((_pag + 1) * PorPagina, linhas.Count) de @N0(linhas.Count)</span>
+            <span class="muted">@T("Mostrando", "Showing") @(linhas.Count == 0 ? 0 : _pag * PorPagina + 1)–@Math.Min((_pag + 1) * PorPagina, linhas.Count) @T("de", "of") @N0(linhas.Count)</span>
             <button class="btn-ghost sm" disabled="@(_pag == 0)" @onclick="() => _pag = 0">«</button>
             <button class="btn-ghost sm" disabled="@(_pag == 0)" @onclick="() => _pag--">‹</button>
-            <span>página @(_pag + 1) de @paginas</span>
+            <span>@T("página", "page") @(_pag + 1) @T("de", "of") @paginas</span>
             <button class="btn-ghost sm" disabled="@(_pag >= paginas - 1)" @onclick="() => _pag++">›</button>
             <button class="btn-ghost sm" disabled="@(_pag >= paginas - 1)" @onclick="() => _pag = paginas - 1">»</button>
         </div>
@@ -820,53 +859,66 @@ else
     // =====================================================================
     private RenderFragment Relatorio() => @<div class="rpt">
         <div class="rpt-bar no-print">
-            <span>Relatório executivo · use <b>Imprimir</b> e escolha <b>Salvar como PDF</b> (A4 horizontal)</span>
-            <div><button class="btn-primary sm" @onclick="Imprimir">@Icons.Svg("download")Imprimir / Salvar PDF</button> <button class="btn-ghost sm" @onclick="FecharRelatorio">Voltar ao painel</button></div>
+            <span>@T("Relatório executivo · use", "Executive report · use") <b>@T("Imprimir", "Print")</b> @T("e escolha", "and choose") <b>@T("Salvar como PDF", "Save as PDF")</b> @T("(A4 horizontal)", "(A4 landscape)")</span>
+            <div><button class="btn-primary sm" @onclick="Imprimir">@Icons.Svg("download")@T("Imprimir / Salvar PDF", "Print / Save PDF")</button> <button class="btn-ghost sm" @onclick="FecharRelatorio">@T("Voltar ao painel", "Back to the dashboard")</button></div>
         </div>
 
         <section class="rpt-page">
             <header class="rpt-head">
-                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de Propostas · Howden Brasil · valores em @Sim</div></div>
-                <div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span><span><b>Dados lidos em</b> @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—")</span><span><b>Emitido em</b> @DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm", _pt) · @_user</span><span><b>Filtros</b> @NotasFiltros()</span></div>
+                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>@T("Inteligência Comercial", "Commercial Intelligence")</div><div class="cvx-sub">@T("Conversão de Propostas · Howden Brasil · valores em", "Proposal Conversion · Howden Brasil · values in") @Sim</div></div>
+                <div class="rpt-meta"><span><b>@T("Período", "Period")</b> @PeriodoTxt()</span><span><b>@T("Dados lidos em", "Data read on")</b> @(Conv.AtualizadoEm is { } q ? q.ToString(FmtQuando, CulRz) : "—")</span><span><b>@T("Emitido em", "Issued on")</b> @DateTime.Now.ToString(FmtQuando, CulRz) · @_user</span><span><b>@T("Filtros", "Filters")</b> @NotasFiltros()</span></div>
             </header>
             @if (!Conv.Ok) { <p class="rpt-alert">@Conv.Mensagem</p> }
-            @if (_seg is not null) { <p class="rpt-small" style="margin:0">O segmento selecionado na tela não se aplica ao relatório.</p> }
+            @if (_seg is not null) { <p class="rpt-small" style="margin:0">@T("O segmento selecionado na tela não se aplica ao relatório.", "The segment selected on screen does not apply to the report.")</p> }
             @KpisResumo()
-            @if (_r.SemTaxa > 0) { <p class="rpt-alert">* Valor parcial: @N0(_r.SemTaxa) proposta(s) (US$ @_r.UsdSemTaxa.ToString("N0", _pt)) de @string.Join(", ", AnosSemTaxa()) sem taxa de câmbio ficaram fora dos totais em R$. As quantidades estão completas.</p> }
+            @if (_r.SemTaxa > 0) { <p class="rpt-alert">@T($"* Valor parcial: {N0(_r.SemTaxa)} proposta(s) (US$ {_r.UsdSemTaxa.ToString("N0", CulRz)}) de {string.Join(", ", AnosSemTaxa())} sem taxa de câmbio ficaram fora dos totais em R$. As quantidades estão completas.", $"* Partial value: {N0(_r.SemTaxa)} proposal(s) (US$ {_r.UsdSemTaxa.ToString("N0", CulRz)}) from {string.Join(", ", AnosSemTaxa())} without an exchange rate were left out of the R$ totals. The counts are complete.")</p> }
             <div class="rpt-row2">
                 <div class="rpt-box">
-                    <h3>Composição das @N0(_r.Total) propostas enviadas</h3>
+                    <h3>@T($"Composição das {N0(_r.Total)} propostas enviadas", $"Breakdown of the {N0(_r.Total)} proposals sent")</h3>
                     @Html(HtmlComposicao(_r))
-                    <h3 style="margin-top:12px">Composição por valor (@Sim)</h3>
+                    <h3 style="margin-top:12px">@T("Composição por valor", "Breakdown by value") (@Sim)</h3>
                     @Html(HtmlComposicaoValor(_r))
                 </div>
                 <div class="rpt-box">
-                    <h3>Taxa de conversão mensal — mês de envio, status atual</h3>
+                    <h3>@T("Taxa de conversão mensal — mês de envio, status atual", "Monthly conversion rate — month sent, current status")</h3>
                     @Html(SvgWinRate(_f, 0, true, true, 640))
                 </div>
             </div>
             <div class="rpt-box">
-                <h3>Taxa de conversão por Business Unit (mínimo de @AmostraMinima decididas)</h3>
+                <h3>@T($"Taxa de conversão por Business Unit (mínimo de {AmostraMinima} decididas)", $"Conversion rate by Business Unit (minimum of {AmostraMinima} decided)")</h3>
                 @Html(HtmlBuBars(Grupos(_f, i => i.P.Bu), 6, AmostraMinima))
             </div>
-            <footer class="rpt-foot">Howden Brasil · Conversão de Propostas · uso interno · página 1 de 2</footer>
+            <footer class="rpt-foot">@T("Howden Brasil · Conversão de Propostas · uso interno · página 1 de 2", "Howden Brasil · Proposal Conversion · internal use · page 1 of 2")</footer>
         </section>
 
         <section class="rpt-page">
-            <header class="rpt-head slim"><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span></div></header>
+            <header class="rpt-head slim"><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>@T("Inteligência Comercial", "Commercial Intelligence")</div><div class="rpt-meta"><span><b>@T("Período", "Period")</b> @PeriodoTxt()</span></div></header>
             <div class="rpt-row2 rev">
                 <div class="rpt-box">
-                    <h3>Vendedores com maior taxa de conversão (mínimo de 10 propostas decididas)</h3>
+                    <h3>@T("Vendedores com maior taxa de conversão (mínimo de 10 propostas decididas)", "Salespeople with the highest conversion rate (minimum of 10 decided proposals)")</h3>
                     @Html(HtmlVendTop(8, 10))
                 </div>
                 <div class="rpt-box">
-                    <h3>Concentração das perdas</h3>
+                    <h3>@T("Concentração das perdas", "Loss concentration")</h3>
                     @Html(HtmlPareto(true, false))
                     <p class="rpt-small">@TextoInsightPerda(false)</p>
                 </div>
             </div>
             <div class="rpt-box">
-                <h3>Definições e notas metodológicas</h3>
+                <h3>@T("Definições e notas metodológicas", "Definitions and methodology notes")</h3>
+                @if (_emIngles)
+                {
+                <ul class="rpt-notes">
+                    <li>@if (_baseTodas) { <span><b>Conversion rate</b> = won ÷ all proposals sent (won, lost, open and unclassified). <b>Conversion by value</b> = won value ÷ total quoted value, in R$.</span> } else { <span><b>Conversion rate</b> = won ÷ (won + lost). Open and unclassified proposals are not in the denominator. <b>Conversion by value</b> = won value ÷ (won value + lost value), in R$.</span> }</li>
+                    <li><b>Classification</b> by CRM status — Won: Closed - Won, OTP · Lost: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid, Closed - Unknown · Open: Open · others: unclassified, outside the three categories.</li>
+                    <li><b>Sent cohort</b>: the time axis is the month the proposal was sent and shows its current status — not the closing date. Recent months have more open proposals, and their rate may change.</li>
+                    <li><b>Values</b> in R$ = value in US$ × USD/BRL rate for the year of the sent date @TaxasTexto(). Proposals without a rate are left out of the values and flagged.</li>
+                    <li><b>BU</b> and <b>BU Intercompany</b> are separate fields; BU Intercompany uses column AG and, if empty, AF. Rate comparisons consider samples of at least @AmostraMinima decided proposals; the report rankings require at least 10 decided per salesperson and @AmostraMinima per BU.</li>
+                    <li><b>Data quality</b>: @N0(_r.SemTaxa) proposal(s) without an exchange rate · @N0(_r.NC) unclassified · @N0(_r.SemValor) without a US$ value · @N0(Conv.Atual.Propostas.Count) records in the data set. Data from the CRM proposals spreadsheet, updated on @(Conv.AtualizadoEm is { } q3 ? q3.ToString(FmtQuando, CulRz) : "—").</li>
+                </ul>
+                }
+                else
+                {
                 <ul class="rpt-notes">
                     <li>@if (_baseTodas) { <span><b>Taxa de conversão</b> = ganhas ÷ todas as propostas enviadas (ganhas, perdidas, abertas e não classificadas). <b>Conversão por valor</b> = valor ganho ÷ valor total cotado, em R$.</span> } else { <span><b>Taxa de conversão</b> = ganhas ÷ (ganhas + perdidas). Abertas e não classificadas não entram no denominador. <b>Conversão por valor</b> = valor ganho ÷ (valor ganho + valor perdido), em R$.</span> }</li>
                     <li><b>Classificação</b> pelo status do CRM — Ganhas: Closed - Won, OTP · Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid, Closed - Unknown · Abertas: Open · demais: não classificadas, fora das três categorias.</li>
@@ -875,8 +927,9 @@ else
                     <li><b>BU</b> e <b>BU Intercompany</b> são campos distintos; a BU Intercompany usa a coluna AG e, se vazia, a AF. Comparações de taxa consideram amostras de pelo menos @AmostraMinima propostas decididas; os rankings do relatório exigem no mínimo 10 decididas por vendedor e @AmostraMinima por BU.</li>
                     <li><b>Qualidade dos dados</b>: @N0(_r.SemTaxa) proposta(s) sem taxa de câmbio · @N0(_r.NC) não classificada(s) · @N0(_r.SemValor) sem valor em US$ · @N0(Conv.Atual.Propostas.Count) registros na base. Dados da planilha de propostas do CRM, atualizados em @(Conv.AtualizadoEm is { } q2 ? q2.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—").</li>
                 </ul>
+                }
             </div>
-            <footer class="rpt-foot">Howden Brasil · Conversão de Propostas · uso interno · página 2 de 2</footer>
+            <footer class="rpt-foot">@T("Howden Brasil · Conversão de Propostas · uso interno · página 2 de 2", "Howden Brasil · Proposal Conversion · internal use · page 2 of 2")</footer>
         </section>
     </div>;
 }
