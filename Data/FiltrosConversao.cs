@@ -39,6 +39,15 @@ public sealed class FiltrosConversao
     /// </summary>
     public bool EmDolar { get; set; }
 
+    /// <summary>
+    /// Em US$: taxa R$/US$ digitada na barra só para esta tela (não grava nada). Com ela, tudo o que a tela
+    /// mostra em R$ (o AFM já convertido pela taxa do ano) é dividido por este número. null = as taxas anuais.
+    /// </summary>
+    public double? TaxaTela { get; set; }
+
+    /// <summary>A taxa da tela vale agora (dólar ligado e taxa digitada).</summary>
+    public bool UsaTaxaTela => EmDolar && TaxaTela is > 0;
+
     /// <summary>Idioma da tela: false = português (o padrão); true = inglês (botão "Idioma" da barra de filtros).</summary>
     public bool EmIngles { get; set; }
 
@@ -59,7 +68,7 @@ public sealed class FiltrosConversao
 
     /// <summary>Retrato dos filtros: muda sempre que algum muda.</summary>
     public string Assinatura() =>
-        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + (EmDolar ? "U|" : "B|") + (EmIngles ? "E|" : "P|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
+        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + (EmDolar ? "U" + (TaxaTela?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "") + "|" : "B|") + (EmIngles ? "E|" : "P|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
 
     /// <summary>
     /// A proposta passa pelos filtros? (as mesmas regras da guia Conversão)

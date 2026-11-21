@@ -129,11 +129,11 @@ public partial class Conversao : IAsyncDisposable
     private Resumo _r = new(), _rx = new();
     private Resumo? _prev;
     private string _prevRotulo = "";                 // rótulo do período comparável: "2025" ou "jan–out/2025"
-    private (int, int, bool) _chave = (-1, -1, false);
+    private (int, int, bool, double) _chave = (-1, -1, false, 0);
 
     private void Recalcular()
     {
-        var chave = (Conv.Version, Cambio.Version, _emDolar);
+        var chave = (Conv.Version, Cambio.Version, _emDolar, _taxaTelaAtiva ?? 0);
         if (chave != _chave) { Reconstruir(); _chave = chave; }
         _f = Aplicar().ToList();
         _fx = _seg is { } s ? _f.Where(i => i.P.Classe == s).ToList() : _f;
@@ -163,7 +163,7 @@ public partial class Conversao : IAsyncDisposable
             int? ano = p.Data?.Year, mes = p.Data?.Month;
             // em R$: NB já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
             // em US$ (botão Moeda): AFM já vem em US$, sem taxa · NB: R$ ÷ taxa do ano de envio
-            if (_emDolar)
+            if (_dolarAnual)
             {
                 double? txu = p.ValorBrl is not null && ano is { } yu && taxas.TryGetValue(yu, out var tu) && tu > 0 ? tu : null;
                 double? usd = p.ValorBrl is { } vb ? (txu is { } t3 ? vb / t3 : null) : p.ValorUsd;
@@ -171,6 +171,8 @@ public partial class Conversao : IAsyncDisposable
             }
             double? tx = p.ValorBrl is null && ano is { } y && taxas.TryGetValue(y, out var t) ? t : null;
             double? brl = p.ValorBrl ?? (p.ValorUsd is { } v && tx is { } t2 ? v * t2 : null);
+            // taxa da tela (digitada ao lado de US$): o valor em R$ da tela dividido por ela
+            if (_taxaTelaAtiva is double tt && brl is double b0) brl = b0 / tt;
             return new Item(p, ano, mes, tx, brl);
         }).ToList();
     }
@@ -208,8 +210,8 @@ public partial class Conversao : IAsyncDisposable
                 default: r.NC++; if (tem) r.VNC += b; break;
             }
             if (!i.P.TemValor) r.SemValor++;
-            else if (_emDolar && i.P.ValorBrl is null) { r.ComUsd[k]++; r.Conv[k]++; }   // em US$: o AFM já vem em US$
-            else if (_emDolar)
+            else if (_dolarAnual && i.P.ValorBrl is null) { r.ComUsd[k]++; r.Conv[k]++; }   // em US$: o AFM já vem em US$
+            else if (_dolarAnual)
             {
                 // em US$: o NB (em R$) precisa da taxa do ano
                 r.ComUsd[k]++;
@@ -1275,6 +1277,26 @@ public partial class Conversao : IAsyncDisposable
     }
     /// <summary>O texto no idioma da tela: T("Propostas enviadas", "Proposals sent").</summary>
     private string T(string pt, string en) => _emIngles ? en : pt;
+
+    // ---- taxa da tela (ao lado de US$): só para converter o que a tela mostra, não grava nada ----
+    private double? _taxaTelaLocal;
+    private double? _taxaTela
+    {
+        get => Filtros is not null ? Filtros.TaxaTela : _taxaTelaLocal;
+        set { if (Filtros is not null) Filtros.TaxaTela = value; else _taxaTelaLocal = value; }
+    }
+    /// <summary>A taxa da tela que vale agora (dólar ligado e taxa digitada); null = as taxas anuais.</summary>
+    private double? _taxaTelaAtiva => _emDolar && _taxaTela is > 0 ? _taxaTela : null;
+    /// <summary>Dólar pelas taxas anuais (sem taxa da tela): AFM no valor original, NB ÷ taxa do ano.</summary>
+    private bool _dolarAnual => _emDolar && _taxaTelaAtiva is null;
+    private string _taxaTelaTexto = "";
+    private void MudarTaxaTela(ChangeEventArgs e)
+    {
+        var t = (e.Value?.ToString() ?? "").Trim().Replace(",", ".");
+        _taxaTelaTexto = e.Value?.ToString() ?? "";
+        _taxaTela = double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+        if (_taxaTela is null) _taxaTelaTexto = "";
+    }
 
     // ---- moeda dos valores (terceiro botão da barra de filtros) ----
     private bool _emDolarLocal;

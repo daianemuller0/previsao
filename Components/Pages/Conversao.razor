@@ -235,6 +235,13 @@ else
                     <button type="button" class="@(!_emDolar ? "on" : "")" @onclick="() => _emDolar = false">R$</button>
                     <button type="button" class="@(_emDolar ? "on" : "")" @onclick="() => _emDolar = true">US$</button>
                 </div>
+                @if (_emDolar)
+                {
+                    <label class="cvx-taxa-tela" title="@T("Taxa R$/US$ só para esta tela: os valores que a tela mostra em R$ são divididos por ela. Não muda a base de dados nem as taxas cadastradas. Vazio = as taxas de cada ano (Taxas de câmbio).", "R$/US$ rate for this screen only: the values shown in R$ are divided by it. It does not change the data or the registered rates. Empty = each year's rate (Exchange rates).")">
+                        <span>@T("Taxa", "Rate")</span>
+                        <input type="text" inputmode="decimal" placeholder="@T("ex.: 5,40", "e.g. 5.40")" value="@(_taxaTela is double tv ? tv.ToString("0.####", _emIngles ? System.Globalization.CultureInfo.GetCultureInfo("en-US") : _pt) : _taxaTelaTexto)" @onchange="MudarTaxaTela" />
+                    </label>
+                }
             </div>
             <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
             @if (Ativos > 0)

@@ -3598,3 +3598,12 @@ body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box
 
 /* Vendas mês × ano: NB e AFM embaixo do total do mês (anos com a divisão por setor) */
 .vp-cel-setor { display: block; font-size: 10.5px; font-weight: 600; opacity: .85; white-space: nowrap; margin-top: 1px; }
+
+/* cartões ano a ano: a conversão por valor, em negrito embaixo da por quantidade, cada uma com o seu rótulo */
+.vp-cc-tipo { font-size: 11.5px; font-weight: 700; color: var(--cx-mut); text-transform: uppercase; letter-spacing: .3px; margin: 1px 0 4px; }
+.vp-page .vp-cc-taxa.valor b { font-size: 26px; letter-spacing: -.5px; }
+.vp-page .vp-cc-taxa.valor em { font-size: 12.5px; }
+
+/* taxa R$/US$ da tela, ao lado do botão US$ */
+.cvx-taxa-tela { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: 12px; font-weight: 700; color: var(--cx-mut, #64748b); text-transform: uppercase; letter-spacing: .4px; }
+.cvx-taxa-tela input { width: 78px; height: 30px; border: 1px solid var(--cx-line, #d6dee8); border-radius: 8px; padding: 0 8px; font-size: 14px; font-weight: 700; color: #172B43; text-align: right; }

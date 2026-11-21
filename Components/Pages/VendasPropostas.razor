@@ -25,7 +25,7 @@
         <div>
             <h1>@T("Performance Comercial", "Sales Performance") | Howden South America</h1>
             <p class="subtitle">
-                @T("Resultados, indicadores e oportunidades de crescimento", "Results, indicators and growth opportunities") · @Periodo · @T("valores em", "values in") @Sim@(_fil.EmDolar ? T(" (R$ ÷ taxa USD/BRL do ano; AFM no valor original em US$)", " (R$ ÷ the year's USD/BRL rate; AFM at its original US$ value)") : "")<br />
+                @T("Resultados, indicadores e oportunidades de crescimento", "Results, indicators and growth opportunities") · @Periodo · @T("valores em", "values in") @Sim@(_fil.UsaTaxaTela ? T($" (valores em R$ ÷ {_fil.TaxaTela!.Value.ToString("0.0000", Br)}, a taxa digitada na tela)", $" (R$ values ÷ {_fil.TaxaTela!.Value.ToString("0.0000", EnUs)}, the rate entered on screen)") : _fil.EmDolar ? T(" (R$ ÷ taxa USD/BRL do ano; AFM no valor original em US$)", " (R$ ÷ the year's USD/BRL rate; AFM at its original US$ value)") : "")<br />
                 @T("Propostas: planilhas da guia Conversão (AFM e NB), pela data de envio", "Proposals: Conversion tab spreadsheets (AFM and NB), by send date")@(Conv.AtualizadoEm is { } quando ? (En ? $" · updated {quando.ToString("MM/dd/yyyy 'at' h:mm tt", EnUs)}" : $" · atualizadas em {quando:dd/MM/yyyy 'às' HH:mm}") : "") · @T("Vendas e budgets: histórico da equipe", "Sales and budgets: team history")
             </p>
         </div>
@@ -191,16 +191,25 @@
                         var ano = a;
                         var c = Composicao(a);
                         var limC = MesLimite(a);
-                        var dC = a - 1 >= AnoIni ? DeltaPp(Taxa(a, limC).Taxa, Taxa(a - 1, limC).Taxa, null) : null;
+                        var tA = Taxa(a, limC); var tB = a - 1 >= AnoIni ? Taxa(a - 1, limC) : default;
+                        var dC = a - 1 >= AnoIni ? DeltaPp(tA.TaxaQtd, tB.TaxaQtd, null) : null;
+                        var dCv = a - 1 >= AnoIni ? DeltaPp(tA.TaxaValor, tB.TaxaValor, null) : null;
                         var baseBarra = Math.Max(1, c.Total);
                         var rv = _anos.FirstOrDefault(x => x.Ano == a);
                         var dV = a - 1 >= AnoIni && rv is { MesesComVendas: > 0 } ? DeltaCurto(rv.Vendas, ConversaoDeVendas.AteOMes(_meses, a - 1, rv.UltimoMes)) : null;
                         <button type="button" class="vp-conv-card @(a == foco.Ano ? "foco" : "")" style="--ac:@CorDoAno(a)" @onclick="() => { _foco = ano; _dica = null; }">
                             <div class="vp-cc-ano">@a@if (a == DateTime.Today.Year) { <small>@T("até", "through") @MesCurtoFrase(limC)</small> }</div>
+                            @* as duas conversões em destaque: por quantidade (grande) e por valor (embaixo, em negrito) *@
                             <div class="vp-cc-taxa">
-                                <b>@(c.Taxa is double t ? P1(t) : "—")</b>
+                                <b>@(c.TaxaQtd is double t ? P1(t) : "—")</b>
                                 @if (dC is not null) { <em class="@DeltaCls(dC)">@Seta(dC)</em> }
                             </div>
+                            <div class="vp-cc-tipo">@T("por quantidade", "by count")</div>
+                            <div class="vp-cc-taxa valor">
+                                <b>@(c.TaxaValor is double tvc ? P1(tvc) : "—")</b>
+                                @if (dCv is not null) { <em class="@DeltaCls(dCv)">@Seta(dCv)</em> }
+                            </div>
+                            <div class="vp-cc-tipo">@T("por valor", "by value") (@Sim @T("ganho ÷", "won ÷") @(BaseTodas ? T("enviado", "sent") : T("decidido", "decided")))</div>
                             <div class="vp-cc-sub">@N0(c.G) @T("ganhas de", "won of") @N0(c.Base) @DenRot</div>
                             <div class="vp-cc-vendas" title="@(T("Vendas do ano (histórico da equipe, empresa toda, por mês de faturamento)", "Sales for the year (team history, company-wide, by billing month)") + (dV is not null ? T(" · variação contra os mesmos meses do ano anterior", " · change vs the same months of the previous year") : ""))">
                                 <span>@T("Vendido no ano", "Sold in the year")@(rv is { UltimoMes: > 0 and < 12 } ? $" ({T("até", "through")} {MesCurtoFrase(rv.UltimoMes)})" : "")</span>
@@ -727,19 +736,24 @@
         // O que se edita e se exporta continua em R$ (_brutos, _budgets, _vSetorBrl); a tela usa as cópias convertidas.
         var dolar = _fil.EmDolar;
         var taxasAno = Cambio.Todas();
-        decimal? Moeda(decimal? v, int ano) => !dolar || v is null ? v : taxasAno.TryGetValue(ano, out var t) && t > 0 ? v / (decimal)t : null;
+        // taxa da tela (digitada ao lado de US$): divide o que a tela mostraria em R$ por um número só
+        var taxaTela = _fil.UsaTaxaTela ? _fil.TaxaTela!.Value : (double?)null;
+        decimal? Moeda(decimal? v, int ano) => !dolar || v is null ? v
+            : taxaTela is double tt ? v / (decimal)tt
+            : taxasAno.TryGetValue(ano, out var t) && t > 0 ? v / (decimal)t : null;
         var brutosTela = !dolar ? _brutos : _brutos.Select(m => new MesDeVendas
             { Ano = m.Ano, Mes = m.Mes, Vendas = Moeda(m.Vendas, m.Ano), Propostas = m.Propostas, ValorProposto = Moeda(m.ValorProposto, m.Ano) }).ToList();
         var budgetsTela = !dolar ? _budgets : _budgets.Select(b => new BudgetDoAno { Ano = b.Ano, Hsa = Moeda(b.Hsa, b.Ano), Grupo = Moeda(b.Grupo, b.Ano) }).ToList();
         _vSetor = !dolar ? _vSetorBrl : _vSetorBrl.ToDictionary(kv => kv.Key, kv => new VendaPorSetor
             { Ano = kv.Value.Ano, Mes = kv.Value.Mes, Nb = Moeda(kv.Value.Nb, kv.Value.Ano), Afm = Moeda(kv.Value.Afm, kv.Value.Ano) });
-        _anosSemCambio = dolar ? _brutos.Where(m => m.Vendas is not null).Select(m => m.Ano).Concat(_budgets.Select(b => b.Ano))
+        _anosSemCambio = dolar && taxaTela is null ? _brutos.Where(m => m.Vendas is not null).Select(m => m.Ano).Concat(_budgets.Select(b => b.Ano))
             .Where(a => !(taxasAno.TryGetValue(a, out var t) && t > 0)).Distinct().OrderBy(a => a).ToList() : new();
         var enviadas = new List<ConversaoDeVendas.PropostaEnviada>();
         try
         {
-            if (Conv.Ok) enviadas = ConversaoDeVendas.PropostasEnviadas(Conv.Atual.Propostas.Where(p => _fil.Passa(p, ignorarAno: true)), taxasAno, dolar)
-                .Where(p => p.Data.Year >= AnoIni && p.Data.Year <= AnoFim).ToList();
+            if (Conv.Ok) enviadas = ConversaoDeVendas.PropostasEnviadas(Conv.Atual.Propostas.Where(p => _fil.Passa(p, ignorarAno: true)), taxasAno, dolar && taxaTela is null)
+                .Where(p => p.Data.Year >= AnoIni && p.Data.Year <= AnoFim)
+                .Select(p => taxaTela is double tt ? p with { ValorReais = Math.Round(p.ValorReais / (decimal)tt, 2) } : p).ToList();
         }
         catch (Exception) { /* sem as propostas, o painel mostra só as vendas */ }
         _enviadas = enviadas;
@@ -758,7 +772,9 @@
             _conv = !Conv.Ok ? new() : Conv.Atual.Propostas.Where(p => _fil.Passa(p, ignorarAno: true))
                 .Where(p => p.Data is DateTime d && d.Year >= AnoIni && d.Year <= AnoFim)
                 .Select(p => new LinhaConv(p.Data!.Value.Year, p.Data.Value.Month, p.Origem, p.Classe,
-                    dolar
+                    taxaTela is double tt2
+                        ? (p.ValorBrl ?? (p.ValorUsd is double u2 && taxas.TryGetValue(p.Data.Value.Year, out var t2) ? u2 * t2 : null)) / tt2
+                    : dolar
                         ? p.ValorUsd ?? (p.ValorBrl is double r && taxas.TryGetValue(p.Data.Value.Year, out var tu) && tu > 0 ? r / tu : null)
                         : p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null),
                     p.ClasseValor))
