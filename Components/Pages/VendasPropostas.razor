@@ -556,6 +556,12 @@
     private List<int> _anosSemCambio = new();
     /// <summary>O símbolo da moeda da tela (botão "Moeda" da barra de filtros).</summary>
     private string Sim => _fil.EmDolar ? "US$" : "R$";
+    /// <summary>Tela em inglês (botão "Idioma" da barra de filtros; guardado por usuário).</summary>
+    private bool En => _fil.EmIngles;
+    /// <summary>O texto no idioma da tela: T("Propostas enviadas", "Proposals sent").</summary>
+    private string T(string pt, string en) => En ? en : pt;
+    private static readonly CultureInfo EnUs = new("en-US");
+    private const string ChaveIdioma = "vendas_propostas_idioma";
     private List<BudgetDoAno> _budgets = new();
     private List<ResumoDoMes> _meses = new();
     private List<ResumoDoAno> _anos = new();
@@ -627,6 +633,8 @@
         _isAdmin = AuthState is not null && (await AuthState).User.IsInRole("admin");
         _coresPadrao = LerCores(ChartPrefs.Get(LoginPadrao, ChaveCores).Ordem);
         _cores = LerCores(ChartPrefs.Get(_login, ChaveCores).Ordem);
+        _fil.EmIngles = ChartPrefs.Get(_login, ChaveIdioma).Ordem == "en";   // o idioma escolhido fica guardado para o login
+        _idiomaSalvo = _fil.EmIngles;
         if (_isAdmin)
         {
             // o administrador não tem cor própria: o que ele escolhe é o padrão. Cores que ele tinha
@@ -717,8 +725,15 @@
         Montar();
     }
 
+    private bool _idiomaSalvo;
+
     private void AoMudarFiltros()
     {
+        if (_fil.EmIngles != _idiomaSalvo && _login != "")
+        {
+            _idiomaSalvo = _fil.EmIngles;
+            try { ChartPrefs.Save(_login, ChaveIdioma, _fil.EmIngles ? "en" : "pt", ChartPrefsRepository.BarraPadrao); } catch { }
+        }
         _dica = null;
         Carregar();
         // o filtro de Ano escolhe os anos da página: ao mudar, o ano em foco passa a ser o mais recente deles

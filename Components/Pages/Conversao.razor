@@ -185,6 +185,13 @@ else
                     <button type="button" class="@(_porValor ? "on" : "")" @onclick="() => _porValor = true">Valor (@Sim)</button>
                 </div>
             </div>
+            <div class="cvx-base-taxa" title="Idioma da tela · Screen language">
+                <span class="flt-label">@T("Idioma", "Language")</span>
+                <div class="cvx-seg-ctl">
+                    <button type="button" class="@(!_emIngles ? "on" : "")" @onclick="() => _emIngles = false">PT</button>
+                    <button type="button" class="@(_emIngles ? "on" : "")" @onclick="() => _emIngles = true">EN</button>
+                </div>
+            </div>
             <div class="cvx-base-taxa" title="Moeda de todos os valores da tela. US$: o AFM usa o valor original da planilha; o NB, as vendas e os budgets (em R$) são divididos pela taxa USD/BRL do ano (guia Conversão → Taxas de câmbio).">
                 <span class="flt-label">Moeda</span>
                 <div class="cvx-seg-ctl">

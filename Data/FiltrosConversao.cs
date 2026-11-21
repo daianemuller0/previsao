@@ -39,6 +39,9 @@ public sealed class FiltrosConversao
     /// </summary>
     public bool EmDolar { get; set; }
 
+    /// <summary>Idioma da tela: false = português (o padrão); true = inglês (botão "Idioma" da barra de filtros).</summary>
+    public bool EmIngles { get; set; }
+
     /// <summary>
     /// Primeiro ano considerado (null = todos). Na guia Performance Comercial é 2022: propostas
     /// mais antigas, do futuro ou sem data de envio ficam fora da barra de filtros e das seções.
@@ -56,7 +59,7 @@ public sealed class FiltrosConversao
 
     /// <summary>Retrato dos filtros: muda sempre que algum muda.</summary>
     public string Assinatura() =>
-        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + (EmDolar ? "U|" : "B|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
+        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + (EmDolar ? "U|" : "B|") + (EmIngles ? "E|" : "P|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
 
     /// <summary>
     /// A proposta passa pelos filtros? (as mesmas regras da guia Conversão)

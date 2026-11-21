@@ -1179,6 +1179,17 @@ public partial class Conversao : IAsyncDisposable
         : "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.";
     private string TituloValor => _baseTodas ? $"Valor ganho ÷ valor total cotado (todas as propostas), em {Sim}" : $"Valor ganho ÷ (valor ganho + valor perdido), em {Sim}";
 
+    // ---- idioma da tela (botão "Idioma" da barra de filtros) ----
+    private bool _emInglesLocal;
+    /// <summary>true = textos em inglês e números no formato americano; false = português (padrão). Embutido: vem dos filtros compartilhados.</summary>
+    private bool _emIngles
+    {
+        get => Filtros?.EmIngles ?? _emInglesLocal;
+        set { if (Filtros is not null) Filtros.EmIngles = value; else _emInglesLocal = value; }
+    }
+    /// <summary>O texto no idioma da tela: T("Propostas enviadas", "Proposals sent").</summary>
+    private string T(string pt, string en) => _emIngles ? en : pt;
+
     // ---- moeda dos valores (terceiro botão da barra de filtros) ----
     private bool _emDolarLocal;
     /// <summary>true = valores em US$; false = em R$ (padrão). Embutido: vem dos filtros compartilhados.</summary>
