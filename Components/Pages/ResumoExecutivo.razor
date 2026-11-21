@@ -252,8 +252,8 @@
 
     private string DenRot => _f.BaseTodas ? "enviadas" : "decididas";
     private string RegraTxt => _f.BaseTodas
-        ? "Conversão sobre todas as propostas enviadas: ganhas ÷ enviadas (por valor: R$ ganho ÷ R$ de todas as enviadas)."
-        : "Conversão sobre as decididas: ganhas ÷ (ganhas + perdidas) (por valor: R$ ganho ÷ R$ ganho + perdido). Abertas fora.";
+        ? "Conversão sobre todas as propostas enviadas: ganhas ÷ enviadas. Por valor: vendas (tabela consolidada) ÷ valor das propostas enviadas, nos mesmos meses (com filtro de dimensão, que não tem vendas: R$ ganho no CRM ÷ R$ enviado)."
+        : "Conversão sobre as decididas: ganhas ÷ (ganhas + perdidas). Abertas fora. Por valor: vendas (tabela consolidada) ÷ valor das propostas enviadas, nos mesmos meses (com filtro de dimensão, que não tem vendas: R$ ganho no CRM ÷ R$ ganho + perdido).";
 
     private string StatusTxt()
     {

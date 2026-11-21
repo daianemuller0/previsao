@@ -209,7 +209,7 @@
                                 <b>@(c.TaxaValor is double tvc ? P1(tvc) : "—")</b>
                                 @if (dCv is not null) { <em class="@DeltaCls(dCv)">@Seta(dCv)</em> }
                             </div>
-                            <div class="vp-cc-tipo">@T("por valor", "by value") (@Sim @T("ganho ÷", "won ÷") @(BaseTodas ? T("enviado", "sent") : T("decidido", "decided")))</div>
+                            <div class="vp-cc-tipo">@T("por valor (vendas ÷ valor enviado)", "by value (sales ÷ value sent)")</div>
                             <div class="vp-cc-sub">@N0(c.G) @T("ganhas de", "won of") @N0(c.Base) @DenRot</div>
                             <div class="vp-cc-vendas" title="@(T("Vendas do ano (histórico da equipe, empresa toda, por mês de faturamento)", "Sales for the year (team history, company-wide, by billing month)") + (dV is not null ? T(" · variação contra os mesmos meses do ano anterior", " · change vs the same months of the previous year") : ""))">
                                 <span>@T("Vendido no ano", "Sold in the year")@(rv is { UltimoMes: > 0 and < 12 } ? $" ({T("até", "through")} {MesCurtoFrase(rv.UltimoMes)})" : "")</span>
@@ -670,11 +670,11 @@
             var (bqC, bqS) = BaseTodas ? (l.Count, l.Count) : (gC + pC, gS + pC);
             var (bvC, bvS) = BaseTodas ? (l.Sum(x => x.Brl ?? 0), l.Sum(x => x.Brl ?? 0)) : (vgC + vpC, vgS + vpC);
             string P(double? x) => x is double d ? P1(d) : "—";
-            efeitos.Add(T($"{ano}: por quantidade {P(Q(gS, bqS))} → {P(Q(gC, bqC))} ({N0(gS)} → {N0(gC)} ganhas); por valor {P(V(vgS, bvS))} → {P(V(vgC, bvC))} (+{Mi((decimal)aj.Sum(x => x.Brl ?? 0))} ganhos)",
-                           $"{ano}: by count {P(Q(gS, bqS))} → {P(Q(gC, bqC))} ({N0(gS)} → {N0(gC)} won); by value {P(V(vgS, bvS))} → {P(V(vgC, bvC))} (+{Mi((decimal)aj.Sum(x => x.Brl ?? 0))} won)"));
+            efeitos.Add(T($"{ano}: por quantidade {P(Q(gS, bqS))} → {P(Q(gC, bqC))} ({N0(gS)} → {N0(gC)} ganhas)",
+                           $"{ano}: by count {P(Q(gS, bqS))} → {P(Q(gC, bqC))} ({N0(gS)} → {N0(gC)} won)"));
         }
-        return T($"{lista} proposta(s) aberta(s) contada(s) como ganha(s) — pedidos que ainda não foram lançados no CRM. Entram na conversão por quantidade e por valor (com o valor de cada proposta). Efeito, sem → com o ajuste: ",
-                 $"{lista} open proposal(s) counted as won — orders not yet entered in the CRM. Included in conversion by count and by value (at each proposal's value). Effect, without → with the adjustment: ")
+        return T($"{lista} proposta(s) aberta(s) contada(s) como ganha(s) — pedidos que ainda não foram lançados no CRM. Entram na conversão por quantidade (a conversão por valor vem das vendas lançadas). Efeito, sem → com o ajuste: ",
+                 $"{lista} open proposal(s) counted as won — orders not yet entered in the CRM. Included in conversion by count (conversion by value comes from recorded sales). Effect, without → with the adjustment: ")
             + string.Join(" · ", efeitos) + ".";
     }
     private string TituloCelMes(int mes, int ano, decimal val, VendaPorSetor? sx) =>
@@ -866,7 +866,7 @@
     /// <summary>Conversão por valor (botão "Conversão por" da barra de filtros): false = por quantidade de propostas.</summary>
     private bool PorValor => _fil.PorValor;
     private string RegraTxt => PorValor
-        ? (BaseTodas ? T("Por valor: valor ganho ÷ valor de todas as propostas enviadas × 100", "By value: won value ÷ value of all proposals sent × 100") : T("Por valor: valor ganho ÷ (valor ganho + valor perdido) × 100", "By value: won value ÷ (won value + lost value) × 100"))
+        ? T("Por valor: vendas (tabela de vendas consolidada) ÷ valor das propostas enviadas, nos mesmos meses × 100", "By value: sales (consolidated sales table) ÷ value of proposals sent, same months × 100")
         : (BaseTodas ? T("Ganhas ÷ todas as propostas enviadas × 100", "Won ÷ all proposals sent × 100") : T("Ganhas ÷ (Ganhas + Perdidas) × 100", "Won ÷ (Won + Lost) × 100"));
 
     /// <summary>
@@ -880,7 +880,7 @@
         int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida);
         double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
-        double? tq = b > 0 ? g * 100.0 / b : null, tv = vb > 0 ? vg / vb * 100 : null;
+        double? tq = b > 0 ? g * 100.0 / b : null, tv = TaxaValorPeriodo(ano, 1, ateMes);   // por valor: vendas ÷ valor enviado
         return (g, p, b, PorValor ? tv : tq, tv, tq);
     }
 
@@ -892,7 +892,7 @@
             a = l.Count(x => x.Classe == ClasseProposta.Aberta), nc = l.Count(x => x.Classe == ClasseProposta.NaoClassificada);
         double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
-        double? tq = b > 0 ? g * 100.0 / b : null, tv = vb > 0 ? vg / vb * 100 : null;
+        double? tq = b > 0 ? g * 100.0 / b : null, tv = TaxaValorPeriodo(ano, 1, 12);   // por valor: vendas ÷ valor enviado
         return (l.Count, g, p, a, nc, b, PorValor ? tv : tq, vg, tv, tq);
     }
 
@@ -909,7 +909,7 @@
         var b = BaseTodas ? l.Count : g + p;
         double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var vb = BaseTodas ? l.Sum(x => x.Brl ?? 0) : vg + vp;
-        double? tx = PorValor ? (vb > 0 ? vg / vb * 100 : null) : (b > 0 ? g * 100.0 / b : null);
+        double? tx = PorValor ? TaxaValorPeriodo(ano, 1, 12, origem) : (b > 0 ? g * 100.0 / b : null);
         var env = _enviadasSetor.Where(x => x.Data.Year == ano && x.Fonte == origem).ToList();
         return (l.Count, g, tx, env.Sum(x => x.ValorReais), env.Count(x => x.SemTaxa));
     }
@@ -1804,7 +1804,7 @@
     };
 
     private string RegraCurtaMm => PorValor && !_mmS
-        ? (BaseTodas ? T($"por valor: {Sim} ganho ÷ {Sim} de todas as enviadas no mês", $"by value: {Sim} won ÷ {Sim} of all sent in the month") : T($"por valor: {Sim} ganho ÷ {Sim} (ganho + perdido) no mês", $"by value: {Sim} won ÷ {Sim} (won + lost) in the month"))
+        ? T("por valor: vendas do mês ÷ valor das propostas enviadas no mês", "by value: month sales ÷ value of proposals sent in the month")
         : (BaseTodas ? T("por quantidade: ganhas ÷ todas as enviadas no mês", "by count: won ÷ all sent in the month") : T("por quantidade: ganhas ÷ decididas no mês", "by count: won ÷ decided in the month"));
     /// <summary>A regra da conversão do quadro mês a mês, por extenso (quantidade ou valor; decididas ou todas).</summary>
     private string RegraMm => _mmS
@@ -1812,9 +1812,7 @@
               : $"por quantidade, {(BaseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ (ganhas + perdidas)")}; por valor, {RegraValorMm}")
         : RegraTxt;
     /// <summary>A conversão por valor do mês (linha pontilhada do quadro por setor), pela base de "Taxa sobre".</summary>
-    private string RegraValorMm => BaseTodas
-        ? T($"{Sim} ganho ÷ {Sim} de todas as enviadas no mês", $"{Sim} won ÷ {Sim} of all sent in the month")
-        : T($"{Sim} ganho ÷ {Sim} (ganho + perdido) no mês", $"{Sim} won ÷ {Sim} (won + lost) in the month");
+    private string RegraValorMm => T("vendas do mês ÷ valor das propostas enviadas no mês", "month sales ÷ value of proposals sent in the month");
 
     /// <summary>Valor em reais, curto: R$ 39.000.000 → "R$ 39 mi"; R$ 54.400.000 → "R$ 54,4 mi"; "R$ 1,2 bi".</summary>
     private string ReaisMi(decimal v)

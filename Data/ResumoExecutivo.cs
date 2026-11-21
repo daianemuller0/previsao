@@ -68,8 +68,19 @@ public sealed class Indicadores
     public double? TaxaValorTodas => VTotal > 0 ? VG / VTotal * 100 : null;
     /// <summary>Conversão por quantidade, pela base escolhida ("Taxa sobre").</summary>
     public double? TaxaQtd => BaseTodas ? TaxaQtdTodas : TaxaQtdDecididas;
-    /// <summary>Conversão por valor, pela base escolhida.</summary>
-    public double? TaxaValor => BaseTodas ? TaxaValorTodas : TaxaValorDecididas;
+    /// <summary>
+    /// Vendas da tabela consolidada e o valor enviado dos mesmos meses (só no total da empresa, sem filtro de dimensão):
+    /// com elas, a conversão por valor é vendas ÷ valor das propostas enviadas (regra da equipe).
+    /// </summary>
+    public decimal Vendido, EnviadoVendas;
+    public bool ComVendas;
+    /// <summary>
+    /// Conversão por valor. No total da empresa: vendas ÷ valor das propostas enviadas, nos meses com as duas.
+    /// Nas dimensões (BU, país, vendedor…), que não têm vendas: valor ganho no CRM ÷ a base escolhida.
+    /// </summary>
+    public double? TaxaValor => ComVendas
+        ? (EnviadoVendas > 0 ? (double)(Vendido / EnviadoVendas * 100) : null)
+        : BaseTodas ? TaxaValorTodas : TaxaValorDecididas;
     public decimal? ValorMedio => ComValor > 0 ? ValorEnviado / ComValor : null;
     /// <summary>Valor médio das propostas ganhas (a base não traz a quantidade de vendas).</summary>
     public decimal? TicketGanhas => G > 0 && VG > 0 ? (decimal)VG / G : null;
@@ -80,6 +91,7 @@ public sealed class Indicadores
         Enviadas += o.Enviadas; ComValor += o.ComValor; SemTaxa += o.SemTaxa; ValorEnviado += o.ValorEnviado;
         Linhas += o.Linhas; G += o.G; P += o.P; A += o.A; NC += o.NC; Canceladas += o.Canceladas;
         VG += o.VG; VP += o.VP; VA += o.VA; VNC += o.VNC;
+        Vendido += o.Vendido; EnviadoVendas += o.EnviadoVendas; ComVendas |= o.ComVendas;
     }
 
     public void Somar(RegistroResumo r)
@@ -260,6 +272,14 @@ public static class ResumoExecutivoCalc
                 if (!m.Mes.TryGetValue((v.Ano, v.Mes), out var i)) m.Mes[(v.Ano, v.Mes)] = i = Nova();
                 i.Enviadas = v.Propostas!.Value; i.ValorEnviado = v.ValorProposto ?? 0m;
                 i.ComValor = v.ValorProposto is > 0 ? v.Propostas.Value : 0; i.SemTaxa = 0;
+            }
+
+        // conversão por valor no total da empresa: vendas do mês ÷ valor enviado no mês (só os meses com as duas)
+        if (!f.TemDimensao)
+            foreach (var (k, i) in m.Mes)
+            {
+                i.ComVendas = true;
+                if (m.VendasMes.TryGetValue(k, out var vend) && i.ValorEnviado > 0) { i.Vendido = vend; i.EnviadoVendas = i.ValorEnviado; }
             }
 
         foreach (var (id, nome) in Dimensoes)

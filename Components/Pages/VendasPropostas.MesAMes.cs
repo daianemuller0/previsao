@@ -61,15 +61,43 @@ public partial class VendasPropostas
     /// <summary>De que vendas o quadro fala: "empresa toda", "NB + AFM", "só NB", "só AFM".</summary>
     private string VendasDeMm => !_mmS ? T("empresa toda", "whole company") : VeNb && VeAfm ? "NB + AFM" : VeNb ? T("só NB", "NB only") : VeAfm ? T("só AFM", "AFM only") : T("nenhum setor", "no sector");
 
-    /// <summary>Por valor: valor ganho ÷ (ganho + perdido), ou ÷ valor de todas as enviadas (mesma regra da guia Conversão).</summary>
-    private double? TaxaValorMes(int ano, int mes)
+    // ---- conversão por valor = vendas ÷ valor das propostas enviadas ----
+    // Regra da equipe: a venda do mês (tabela de vendas consolidada; NB e AFM pelo filtro de Setor) dividida
+    // pelo valor das propostas enviadas no mesmo mês. No ano, somam-se só os meses que têm as duas coisas.
+
+    /// <summary>As vendas não se dividem por vendedor, BU, mercado, país nem produto: com esses filtros, a conversão por valor fica "—".</summary>
+    private bool VendasSeguemFiltro => _fil.Vendedores.Count == 0 && _fil.Bus.Count == 0 && _fil.BuIcs.Count == 0
+        && _fil.Mercados.Count == 0 && _fil.Paises.Count == 0 && _fil.Produtos.Count == 0;
+
+    /// <summary>Venda do mês para a conversão: a do setor pedido, a do filtro de Setor, ou a da empresa toda.</summary>
+    private decimal? VendaTx(int a, int m, string? origem = null)
     {
-        var l = _convSetor.Where(x => x.Ano == ano && x.Mes == mes).ToList();
-        double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0);
-        double vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
-        var vb = BaseTodas ? l.Sum(x => x.Brl ?? 0) : vg + vp;
-        return vb > 0 ? vg / vb * 100 : null;
+        if (!VendasSeguemFiltro) return null;
+        if (origem is not null)
+            return _vSetor.TryGetValue((a, m), out var r) ? (origem == ConversaoService.Nb ? r.Nb : r.Afm) : null;
+        return _fil.Origens.Count > 0 ? VendaSetor(a, m) : _meses.FirstOrDefault(x => x.Ano == a && x.Mes == m)?.Vendas;
     }
+
+    /// <summary>Valor das propostas enviadas no mês (cada número uma vez), da origem pedida ou com os filtros da tela.</summary>
+    private decimal? EnviadoTx(int a, int m, string? origem = null) => origem is null
+        ? Prop(a, m)?.Valor
+        : _enviadasSetor.Where(x => x.Data.Year == a && x.Data.Month == m && x.Fonte == origem).Sum(x => x.ValorReais) is var s && s > 0 ? s : null;
+
+    /// <summary>Conversão por valor de "de" a "ate" (meses do filtro Mês): Σ vendas ÷ Σ valor enviado, nos meses com as duas.</summary>
+    private double? TaxaValorPeriodo(int ano, int de, int ate, string? origem = null)
+    {
+        decimal v = 0, e = 0; var n = 0;
+        for (var m = Math.Max(1, de); m <= Math.Min(12, ate); m++)
+        {
+            if (!MesNoFiltro(m)) continue;
+            if (VendaTx(ano, m, origem) is not decimal s || EnviadoTx(ano, m, origem) is not decimal en || en <= 0) continue;
+            v += s; e += en; n++;
+        }
+        return n > 0 && e > 0 ? (double)(v / e * 100) : null;
+    }
+
+    /// <summary>Conversão por valor do mês: vendas do mês ÷ valor das propostas enviadas no mês.</summary>
+    private double? TaxaValorMes(int ano, int mes) => TaxaValorPeriodo(ano, mes, mes);
     /// <summary>Qual paleta de cores está aberta: "u", "c", "t" (o modo) ou nenhuma.</summary>
     private string? _mmPaleta;
 
