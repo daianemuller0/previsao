@@ -121,11 +121,11 @@ public partial class Conversao : IAsyncDisposable
     private Resumo _r = new(), _rx = new();
     private Resumo? _prev;
     private string _prevRotulo = "";                 // rótulo do período comparável: "2025" ou "jan–out/2025"
-    private (int, int) _chave = (-1, -1);
+    private (int, int, bool) _chave = (-1, -1, false);
 
     private void Recalcular()
     {
-        var chave = (Conv.Version, Cambio.Version);
+        var chave = (Conv.Version, Cambio.Version, _emDolar);
         if (chave != _chave) { Reconstruir(); _chave = chave; }
         _f = Aplicar().ToList();
         _fx = _seg is { } s ? _f.Where(i => i.P.Classe == s).ToList() : _f;
@@ -152,7 +152,14 @@ public partial class Conversao : IAsyncDisposable
         _itens = Conv.Atual.Propostas.Where(p => Filtros?.NoPeriodo(p.Data) ?? true).Select(p =>
         {
             int? ano = p.Data?.Year, mes = p.Data?.Month;
-            // NB: o valor já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
+            // em R$: NB já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
+            // em US$ (botão Moeda): AFM já vem em US$, sem taxa · NB: R$ ÷ taxa do ano de envio
+            if (_emDolar)
+            {
+                double? txu = p.ValorBrl is not null && ano is { } yu && taxas.TryGetValue(yu, out var tu) && tu > 0 ? tu : null;
+                double? usd = p.ValorBrl is { } vb ? (txu is { } t3 ? vb / t3 : null) : p.ValorUsd;
+                return new Item(p, ano, mes, txu, usd);
+            }
             double? tx = p.ValorBrl is null && ano is { } y && taxas.TryGetValue(y, out var t) ? t : null;
             double? brl = p.ValorBrl ?? (p.ValorUsd is { } v && tx is { } t2 ? v * t2 : null);
             return new Item(p, ano, mes, tx, brl);
@@ -192,6 +199,15 @@ public partial class Conversao : IAsyncDisposable
                 default: r.NC++; if (tem) r.VNC += b; break;
             }
             if (!i.P.TemValor) r.SemValor++;
+            else if (_emDolar && i.P.ValorBrl is null) { r.ComUsd[k]++; r.Conv[k]++; }   // em US$: o AFM já vem em US$
+            else if (_emDolar)
+            {
+                // em US$: o NB (em R$) precisa da taxa do ano
+                r.ComUsd[k]++;
+                if (i.Ano is null) r.SemData++;
+                else if (i.Brl is null) r.SemTaxa++;
+                else r.Conv[k]++;
+            }
             else if (i.P.ValorBrl is not null) { r.ComUsd[k]++; r.Conv[k]++; }   // NB: já em R$
             else
             {
@@ -252,7 +268,9 @@ public partial class Conversao : IAsyncDisposable
     }
 
     // ---- formatação ----------------------------------------------------------------
-    private static string R(double v) => "R$ " + Mon(v);
+    private string R(double v) => Sim + " " + Mon(v);
+    /// <summary>O símbolo da moeda da tela (botão "Moeda" da barra de filtros).</summary>
+    private string Sim => _emDolar ? "US$" : "R$";
     /// <summary>Valor com a unidade por extenso: 527,7 mi · 1,06 bi · 850 mil.</summary>
     private static string Mon(double v)
     {
@@ -273,17 +291,17 @@ public partial class Conversao : IAsyncDisposable
     private static string Pp(double v) => Math.Abs(v).ToString("0.0", _pt) + " p.p.";
 
     // Estados dos valores: R$ 0 (zero real) ≠ — (sem informação) ≠ Não convertido (sem taxa) ≠ Não calculável.
-    private static string Estado(int comUsd, int conv, double v) =>
+    private string Estado(int comUsd, int conv, double v) =>
         comUsd == 0 ? "—" : conv == 0 ? "Não convertido" : R(v) + (conv < comUsd ? "*" : "");
-    private static string EstadoTip(int comUsd, int conv, double v) =>
+    private string EstadoTip(int comUsd, int conv, double v) =>
         comUsd == 0 ? "Nenhuma proposta com valor em US$ informado."
         : conv == 0 ? "Há valor em US$, mas falta a taxa de câmbio do ano da proposta (ou a data de envio)."
-        : Fmt.Brl(v) + (conv < comUsd ? $" · parcial: {comUsd - conv} proposta(s) sem taxa de câmbio ou sem data de envio ficaram de fora." : "");
+        : Sim + " " + v.ToString("#,##0", _pt) + (conv < comUsd ? $" · parcial: {comUsd - conv} proposta(s) sem taxa de câmbio ou sem data de envio ficaram de fora." : "");
 
-    private static string Din(Resumo r, ClasseProposta c) => Estado(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
-    private static string DinTip(Resumo r, ClasseProposta c) => EstadoTip(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
-    private static string DinTotal(Resumo r) => Estado(r.TotComUsd, r.TotConv, r.VTotal);
-    private static string DinTotalTip(Resumo r) => EstadoTip(r.TotComUsd, r.TotConv, r.VTotal);
+    private string Din(Resumo r, ClasseProposta c) => Estado(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
+    private string DinTip(Resumo r, ClasseProposta c) => EstadoTip(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
+    private string DinTotal(Resumo r) => Estado(r.TotComUsd, r.TotConv, r.VTotal);
+    private string DinTotalTip(Resumo r) => EstadoTip(r.TotComUsd, r.TotConv, r.VTotal);
 
     /// <summary>A taxa principal (quantidade ou valor, conforme "Conversão por").</summary>
     private string TxQtd(Resumo r) => !_taxaOk ? "—" : TxQtdGlobal(r);
@@ -507,7 +525,7 @@ public partial class Conversao : IAsyncDisposable
 
         var sb = new StringBuilder("<div class='chart-body'>");
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{(qtd ? "Volume" : "Valor")} mensal'>");
-        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='12' font-weight='700' fill='#6b7a90'>R$</text>");
+        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='12' font-weight='700' fill='#6b7a90'>{Sim}</text>");
         for (var k = 0; k <= nTicks; k++)
         {
             var v = step * k;
@@ -622,7 +640,7 @@ public partial class Conversao : IAsyncDisposable
         sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano' preserveAspectRatio='xMidYMid meet'>");
         sb.Append($"<defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cores[0]}' stop-opacity='.18'/><stop offset='100%' stop-color='{cores[0]}' stop-opacity='0'/></linearGradient></defs>");
         // título do eixo: a unidade fica explícita (taxa, quantidade ou R$)
-        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? "Taxa de conversão (% das propostas enviadas no mês)" : met == "volume" ? "Propostas enviadas" : "Valor (R$)")}</text>");
+        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? "Taxa de conversão (% das propostas enviadas no mês)" : met == "volume" ? "Propostas enviadas" : $"Valor ({Sim})")}</text>");
         for (var g = 0; g <= nTicks; g++)
         {
             var v = met == "winrate" ? 25.0 * g : step * g;
@@ -927,6 +945,15 @@ public partial class Conversao : IAsyncDisposable
 
     private sealed record Col(string Key, string Titulo, string Align, Func<Item, string> Texto, Func<Item, object?> Chave);
 
+    /// <summary>Em US$ (botão Moeda), a coluna do valor convertido e a da taxa falam da conversão para dólar.</summary>
+    private string TituloCol(Col c) => _emDolar && c.Key == "brl" ? "Valor convertido (US$)" : c.Titulo;
+    private string TextoCol(Col c, Item i) => !_emDolar ? c.Texto(i) : c.Key switch
+    {
+        "brl" => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (!i.P.TemValor ? (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)") : "Não convertido"),
+        "taxa" => i.P.ValorBrl is null ? "já em US$" : i.Taxa is { } t ? "R$ ÷ " + t.ToString("0.0000", _pt) : "sem taxa",
+        _ => c.Texto(i),
+    };
+
     private List<Col> ColunasPadrao() => new()
     {
         new("origem", "Setor", "center", i => i.P.Origem, i => i.P.Origem),
@@ -1142,7 +1169,7 @@ public partial class Conversao : IAsyncDisposable
     }
     private string DenRot => _baseTodas ? "enviadas" : "decididas";
     private string RegraCurta => _porValor
-        ? (_baseTodas ? "R$ ganho ÷ R$ de todas as enviadas" : "R$ ganho ÷ R$ (ganho + perdido)")
+        ? (_baseTodas ? $"{Sim} ganho ÷ {Sim} de todas as enviadas" : $"{Sim} ganho ÷ {Sim} (ganho + perdido)")
         : (_baseTodas ? "ganhas ÷ todas as propostas enviadas" : "ganhas ÷ decididas");
     private string TituloRegra => _porValor
         ? (_baseTodas ? "Taxa de Conversão por valor = valor ganho ÷ valor de todas as propostas enviadas × 100."
@@ -1150,7 +1177,16 @@ public partial class Conversao : IAsyncDisposable
         : _baseTodas
         ? "Taxa de Conversão = Ganhas ÷ todas as propostas enviadas × 100 (ganhas, perdidas, abertas e não classificadas)."
         : "Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.";
-    private string TituloValor => _baseTodas ? "Valor ganho ÷ valor total cotado (todas as propostas), em R$" : "Valor ganho ÷ (valor ganho + valor perdido), em R$";
+    private string TituloValor => _baseTodas ? $"Valor ganho ÷ valor total cotado (todas as propostas), em {Sim}" : $"Valor ganho ÷ (valor ganho + valor perdido), em {Sim}";
+
+    // ---- moeda dos valores (terceiro botão da barra de filtros) ----
+    private bool _emDolarLocal;
+    /// <summary>true = valores em US$; false = em R$ (padrão). Embutido: vem dos filtros compartilhados.</summary>
+    private bool _emDolar
+    {
+        get => Filtros?.EmDolar ?? _emDolarLocal;
+        set { if (Filtros is not null) Filtros.EmDolar = value; else _emDolarLocal = value; }
+    }
 
     protected override void OnParametersSet()
     {

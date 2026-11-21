@@ -484,14 +484,18 @@ public static class ConversaoDeVendas
     /// e o maior valor); sem ele, cada linha é uma proposta. O AFM vem em US$ e
     /// passa a R$ pela taxa do ano (a mesma da guia Conversão); o NB já vem em R$.
     /// </summary>
-    public static List<PropostaEnviada> PropostasEnviadas(IEnumerable<PropostaConv> propostas, IReadOnlyDictionary<int, double> taxas)
+    /// <param name="emDolar">true = o valor sai em US$: o AFM fica como está e o NB (em R$) é dividido pela taxa do ano</param>
+    public static List<PropostaEnviada> PropostasEnviadas(IEnumerable<PropostaConv> propostas, IReadOnlyDictionary<int, double> taxas, bool emDolar = false)
     {
         var lista = new List<PropostaEnviada>();
         foreach (var p in propostas)
         {
             if (p.Data is not DateTime d) continue;
-            double? brl = p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(d.Year, out var t) ? u * t : null);
-            var semTaxa = p.ValorBrl is null && p.ValorUsd is not null && brl is null;
+            double? brl = emDolar
+                ? p.ValorUsd ?? (p.ValorBrl is double r && taxas.TryGetValue(d.Year, out var tu) && tu > 0 ? r / tu : null)
+                : p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(d.Year, out var t) ? u * t : null);
+            var semTaxa = emDolar ? p.ValorUsd is null && p.ValorBrl is not null && brl is null
+                : p.ValorBrl is null && p.ValorUsd is not null && brl is null;
             lista.Add(new PropostaEnviada(p.Codigo,
                 d.Date, (decimal)Math.Round(brl ?? 0, 2), p.Origem, p.Vendedor.Trim().Length > 0 ? p.Vendedor.Trim() : ConversaoService.NaoInformado,
                 p.Classe, semTaxa));

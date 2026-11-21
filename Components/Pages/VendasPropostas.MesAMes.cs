@@ -236,7 +236,7 @@ public partial class VendasPropostas
     private static string MiCurto(decimal v) => (v < 0 ? "−" : "") + (Math.Abs(v) / 1_000_000m).ToString("#,##0.0", Br);
 
     /// <summary>Valor exato, com centavos: "R$ 31.412.345,67".</summary>
-    private static string Reais(decimal v) => (v < 0 ? "−" : "") + "R$ " + Math.Abs(v).ToString("#,##0.00", Br);
+    private string Reais(decimal v) => (v < 0 ? "−" : "") + Sim + " " + Math.Abs(v).ToString("#,##0.00", Br);
 
     /// <summary>O mês está no filtro "Mês" da barra de filtros (sem filtro, todos estão).</summary>
     private bool MesNoFiltro(int m) => _fil.Meses.Count == 0 || _fil.Meses.Contains(Fmt.MonthLong(m));
@@ -267,7 +267,7 @@ public partial class VendasPropostas
 
     private static string PctSinal(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", Br) + "%";
     private static string PpSinal(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", Br) + " p.p.";
-    private static string DifReais(decimal d) => (d > 0 ? "+" : d < 0 ? "−" : "") + "R$ " + Compacto(Math.Abs(d));
+    private string DifReais(decimal d) => (d > 0 ? "+" : d < 0 ? "−" : "") + Sim + " " + Compacto(Math.Abs(d));
     private static string DifQtd(int d) => (d > 0 ? "+" : d < 0 ? "−" : "") + Math.Abs(d).ToString("#,##0", Br);
 
     /// <summary>Classe de cor da variação: vendas e conversão sobem = bom; propostas são neutras (mais propostas não é, por si, melhor).</summary>

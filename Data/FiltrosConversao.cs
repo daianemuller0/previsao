@@ -34,6 +34,12 @@ public sealed class FiltrosConversao
     public bool PorValor { get; set; }
 
     /// <summary>
+    /// Moeda dos valores na tela: false = R$ (o padrão); true = US$. Em US$, o AFM usa o valor original
+    /// da planilha e o NB, as vendas e os budgets (em R$) são divididos pela taxa USD/BRL do ano.
+    /// </summary>
+    public bool EmDolar { get; set; }
+
+    /// <summary>
     /// Primeiro ano considerado (null = todos). Na guia Performance Comercial é 2022: propostas
     /// mais antigas, do futuro ou sem data de envio ficam fora da barra de filtros e das seções.
     /// </summary>
@@ -50,7 +56,7 @@ public sealed class FiltrosConversao
 
     /// <summary>Retrato dos filtros: muda sempre que algum muda.</summary>
     public string Assinatura() =>
-        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
+        (BaseTodas ? "T|" : "D|") + (PorValor ? "V|" : "Q|") + (EmDolar ? "U|" : "B|") + string.Join("|", Todos.Select(s => string.Join(",", s.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))));
 
     /// <summary>
     /// A proposta passa pelos filtros? (as mesmas regras da guia Conversão)

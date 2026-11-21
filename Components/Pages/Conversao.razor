@@ -32,7 +32,7 @@ else
         <div>
             <h1>Conversão de Propostas</h1>
             <p class="subtitle">
-                @PeriodoTxt() · Howden Brasil · valores em R$<br />
+                @PeriodoTxt() · Howden Brasil · valores em @Sim<br />
                 Última atualização @(Conv.AtualizadoEm is { } quando ? quando.ToString("dd/MM/yyyy 'às' HH:mm") : "—") · CRM, planilha de propostas · @N0(Conv.Atual.Propostas.Count) registros
             </p>
         </div>
@@ -182,7 +182,14 @@ else
                 <span class="flt-label">Conversão por</span>
                 <div class="cvx-seg-ctl">
                     <button type="button" class="@(!_porValor ? "on" : "")" @onclick="() => _porValor = false">Quantidade</button>
-                    <button type="button" class="@(_porValor ? "on" : "")" @onclick="() => _porValor = true">Valor (R$)</button>
+                    <button type="button" class="@(_porValor ? "on" : "")" @onclick="() => _porValor = true">Valor (@Sim)</button>
+                </div>
+            </div>
+            <div class="cvx-base-taxa" title="Moeda de todos os valores da tela. US$: o AFM usa o valor original da planilha; o NB, as vendas e os budgets (em R$) são divididos pela taxa USD/BRL do ano (guia Conversão → Taxas de câmbio).">
+                <span class="flt-label">Moeda</span>
+                <div class="cvx-seg-ctl">
+                    <button type="button" class="@(!_emDolar ? "on" : "")" @onclick="() => _emDolar = false">R$</button>
+                    <button type="button" class="@(_emDolar ? "on" : "")" @onclick="() => _emDolar = true">US$</button>
                 </div>
             </div>
             <div class="cvx-chips" style="@(Ativos > 0 ? $"min-width:min(100%, {ChipsMin()}px)" : "")">
@@ -258,7 +265,7 @@ else
     private string TituloTendencia() => _metTrend switch
     {
         "volume" => "Propostas enviadas por mês, comparando os anos",
-        "valor" => "Valor das propostas enviadas por mês (R$), comparando os anos",
+        "valor" => $"Valor das propostas enviadas por mês ({Sim}), comparando os anos",
         _ => "Taxa de conversão mensal, comparando os anos",
     };
 
@@ -286,8 +293,8 @@ else
         @Secao("mercado", "Conversão por mercado", "Taxa de conversão e valores por mercado · clique numa linha para filtrar", BlocoUnidades(i => i.P.Mercado, _mercados, "merc", "mercado", "mercados"))
         @Secao("produto", "Conversão por produto", "Taxa de conversão e valores por produto · clique numa linha para filtrar", BlocoUnidades(i => i.P.Produto, _produtos, "prod", "produto", "produtos"))
         @Secao("pais", "Conversão por país", "Taxa de conversão por país · clique num país para filtrar · roda p/ zoom · arraste p/ mover", Paises())
-        @Secao("valor-unidades", "Valor por unidade", "Ganho, perdido e aberto em R$, por BU e por BU Intercompany", ValorUnidades())
-        @Secao("valor-mensal", "Valor mensal das propostas", "Janeiro a dezembro · por status · R$", ValorMensal())
+        @Secao("valor-unidades", "Valor por unidade", $"Ganho, perdido e aberto em {Sim}, por BU e por BU Intercompany", ValorUnidades())
+        @Secao("valor-mensal", "Valor mensal das propostas", $"Janeiro a dezembro · por status · {Sim}", ValorMensal())
         @Secao("perdas", "Análise das propostas perdidas", "Pareto por status no CRM", Perdas())
         @Secao("base", "Base de propostas", "Todas as propostas do recorte, com colunas e exportação", Base())
         @if (_isAdmin)
@@ -307,10 +314,10 @@ else
                 @if (dw.Texto != "") { <div class="cvx-delta @dw.Css">@dw.Texto</div> }
                 <div class="cvx-ksub" title="@TituloValor">@(_porValor ? "Por quantidade" : "Por valor"): <b>@TxOutraGlobal(_r)</b></div>
             </article>
-            @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), "Propostas ganhas, em R$",
-                 "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio.", CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
+            @Kpi("Valor Ganho", Din(_r, ClasseProposta.Ganha), $"Propostas ganhas, em {Sim}",
+                 (_emDolar ? "Soma em US$ das propostas ganhas. O NB (em R$) é dividido pela taxa do ano de envio." : "Soma em R$ das propostas ganhas. Cada valor em US$ é convertido pela taxa do ano de envio."), CorG, DeltaVal(ClasseProposta.Ganha), DinTip(_r, ClasseProposta.Ganha))
             @Kpi("Valor em Aberto", Din(_r, ClasseProposta.Aberta), $"{N0(_r.A)} propostas abertas",
-                 "Soma em R$ das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta), null)
+                 $"Soma em {Sim} das propostas com status Open, convertida pela taxa do ano de envio.", CorA, null /* aberto do ano anterior já foi decidido: variação não é comparável */, DinTip(_r, ClasseProposta.Aberta), null)
             @Kpi("Propostas Ganhas", N0(_r.G), $"{PctDe(_r.G, _r.Total)} do total enviado",
                  "Propostas com status Closed - Won ou OTP. A participação no total não é a taxa de conversão.", CorG, DeltaPct(_r.G, _prev?.G))
             @Kpi("Propostas Perdidas", N0(_r.P), $"{PctDe(_r.P, _r.Total)} do total enviado",
@@ -374,7 +381,7 @@ else
                 <div class="cvx-seg-ctl">
                     <button class="@(_metTrend == "winrate" ? "on" : "")" @onclick='() => _metTrend = "winrate"'>Taxa de conversão</button>
                     <button class="@(_metTrend == "volume" ? "on" : "")" @onclick='() => _metTrend = "volume"'>Quantidade</button>
-                    <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (R$)</button>
+                    <button class="@(_metTrend == "valor" ? "on" : "")" @onclick='() => _metTrend = "valor"'>Valor (@Sim)</button>
                 </div>
             </div>
         </div>
@@ -597,12 +604,12 @@ else
 
     private RenderFragment ValorUnidades() => @<div class="cvx-two">
         <div class="cvx-card">
-            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por Business Unit</h2><p>Valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por Business Unit</h2><p>Valor total cotado em @Sim · ganho, perdido e aberto embaixo de cada barra</p></div></div>
                 <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(_rx)">@DinTotal(_rx)</b></span></div>
             @Html(HtmlValorPorUnidade(Grupos(_fx, i => i.P.Bu)))
         </div>
         <div class="cvx-card">
-            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Só propostas intercompany · valor total cotado em R$ · ganho, perdido e aberto embaixo de cada barra</p></div></div>
+            <div class="cvx-ch"><div class="cvx-xh"><span class="xcard-ico">@Icons.Svg("layers")</span><div><h2>Valor por BU Intercompany</h2><p>Só propostas intercompany · valor total cotado em @Sim · ganho, perdido e aberto embaixo de cada barra</p></div></div>
                 <span class="xcard-total"><span>Total</span><b title="@DinTotalTip(ResumoIc())">@DinTotal(ResumoIc())</b></span></div>
             @Html(HtmlValorPorUnidade(Grupos(SoIc(_fx), i => i.P.BuIc)))
         </div>
@@ -669,7 +676,7 @@ else
             <li class="@(okQtd ? "ok" : "bad")">@(okQtd ? "✔" : "✖") Total de registros (@N0(total)) = ganhas (@N0(geral.G)) + perdidas (@N0(geral.P)) + abertas (@N0(geral.A)) + não classificadas (@N0(geral.NC))</li>
             <li class="@(okFiltro ? "ok" : "bad")">@(okFiltro ? "✔" : "✖") No recorte atual: @N0(_f.Count) = @N0(_r.G) + @N0(_r.P) + @N0(_r.A) + @N0(_r.NC)</li>
             <li class="@(okDec ? "ok" : "bad")">@(okDec ? "✔" : "✖") Decididas (@N0(_r.Decididas)) = ganhas + perdidas · abertas e não classificadas fora do denominador da Taxa de conversão</li>
-            <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@Fmt.Brl(geral.VTotal) na base toda)</li>
+            <li class="@(okValor ? "ok" : "bad")">@(okValor ? "✔" : "✖") Soma dos valores das categorias = valor total das propostas com conversão válida (@(Sim + " " + geral.VTotal.ToString("#,##0", _pt)) na base toda)</li>
             <li class="@(okTabela ? "ok" : "bad")">@(okTabela ? "✔" : "✖") Base de Propostas e dashboard usam o mesmo recorte: @N0(_f.Count) registros</li>
             <li class="@(geral.SemTaxa == 0 ? "ok" : "bad")">@(geral.SemTaxa == 0 ? "✔" : "✖") Propostas com valor mas sem taxa de câmbio: @N0(geral.SemTaxa)@(geral.SemTaxa > 0 ? $" (US$ {geral.UsdSemTaxa.ToString("N0", _pt)} fora dos valores em R$)" : "")</li>
             @if (geral.SemData > 0)
@@ -744,12 +751,12 @@ else
                     @foreach (var c in todas)
                     {
                         var k = c.Key;
-                        <label class="flt-check"><input type="checkbox" checked="@(_ocultas is null || !_ocultas.Contains(k))" @onchange="() => AlternarColuna(k)" /><span>@c.Titulo</span></label>
+                        <label class="flt-check"><input type="checkbox" checked="@(_ocultas is null || !_ocultas.Contains(k))" @onchange="() => AlternarColuna(k)" /><span>@TituloCol(c)</span></label>
                     }
                 </div>
             </details>
             <div class="filterbar-spacer"></div>
-            <span class="muted" style="font-size:12px" title="Registros na tabela · soma do valor convertido em R$">@N0(linhas.Count) @(linhas.Count == 1 ? "registro" : "registros") · <b style="color:var(--text)">@DinTotal(rt)</b></span>
+            <span class="muted" style="font-size:12px" title="@($"Registros na tabela · soma do valor convertido em {Sim}")">@N0(linhas.Count) @(linhas.Count == 1 ? "registro" : "registros") · <b style="color:var(--text)">@DinTotal(rt)</b></span>
             <button class="btn-primary sm" disabled="@(linhas.Count == 0)" @onclick="() => Exportar(linhas, todas)">@Icons.Svg("download")Exportar Excel</button>
         </div>
         <div class="table-wrap tbl-compact" style="max-height:62vh;overflow:auto">
@@ -759,7 +766,7 @@ else
                         @foreach (var c in visiveis)
                         {
                             var k = c.Key;
-                            <th class="@c.Align cv-sort" draggable="true" data-key="@k" title="Clique para ordenar · arraste para mudar a coluna de lugar" @onclick="() => Ordenar(k)">@c.Titulo@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
+                            <th class="@c.Align cv-sort" draggable="true" data-key="@k" title="Clique para ordenar · arraste para mudar a coluna de lugar" @onclick="() => Ordenar(k)">@TituloCol(c)@(_ordCol == k ? (_ordAsc ? " ▲" : " ▼") : "")</th>
                         }
                     </tr>
                 </thead>
@@ -779,7 +786,7 @@ else
                                 }
                                 else
                                 {
-                                    <td class="@c.Align">@c.Texto(i)</td>
+                                    <td class="@c.Align">@TextoCol(c, i)</td>
                                 }
                             }
                         </tr>
@@ -812,7 +819,7 @@ else
 
         <section class="rpt-page">
             <header class="rpt-head">
-                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de Propostas · Howden Brasil · valores em R$</div></div>
+                <div><div class="cvx-title"><span class="cvx-mark">HOWDEN</span><span class="cvx-dash">|</span>Inteligência Comercial</div><div class="cvx-sub">Conversão de Propostas · Howden Brasil · valores em @Sim</div></div>
                 <div class="rpt-meta"><span><b>Período</b> @PeriodoTxt()</span><span><b>Dados lidos em</b> @(Conv.AtualizadoEm is { } q ? q.ToString("dd/MM/yyyy 'às' HH:mm", _pt) : "—")</span><span><b>Emitido em</b> @DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm", _pt) · @_user</span><span><b>Filtros</b> @NotasFiltros()</span></div>
             </header>
             @if (!Conv.Ok) { <p class="rpt-alert">@Conv.Mensagem</p> }
@@ -823,7 +830,7 @@ else
                 <div class="rpt-box">
                     <h3>Composição das @N0(_r.Total) propostas enviadas</h3>
                     @Html(HtmlComposicao(_r))
-                    <h3 style="margin-top:12px">Composição por valor (R$)</h3>
+                    <h3 style="margin-top:12px">Composição por valor (@Sim)</h3>
                     @Html(HtmlComposicaoValor(_r))
                 </div>
                 <div class="rpt-box">
