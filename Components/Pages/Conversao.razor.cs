@@ -202,7 +202,7 @@ public partial class Conversao : IAsyncDisposable
             var tem = i.Brl is not null; var b = i.Brl ?? 0;
             switch (i.P.Classe)
             {
-                case ClasseProposta.Ganha: r.G++; if (tem) r.VG += b; break;
+                case ClasseProposta.Ganha: r.G++; if (tem) { if (i.P.AjusteManual) r.VA += b; else r.VG += b; } break;   // ajuste manual: ganha na quantidade, aberta no valor
                 case ClasseProposta.Perdida: r.P++; if (tem) r.VP += b; break;
                 case ClasseProposta.Aberta: r.A++; if (tem) r.VA += b; break;
                 default: r.NC++; if (tem) r.VNC += b; break;

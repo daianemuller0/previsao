@@ -65,7 +65,7 @@ public partial class VendasPropostas
     private double? TaxaValorMes(int ano, int mes)
     {
         var l = _convSetor.Where(x => x.Ano == ano && x.Mes == mes).ToList();
-        double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0);
+        double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0);
         double vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var vb = BaseTodas ? l.Sum(x => x.Brl ?? 0) : vg + vp;
         return vb > 0 ? vg / vb * 100 : null;

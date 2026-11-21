@@ -58,6 +58,15 @@ public sealed record PropostaConv(
     /// <summary>Tem valor numérico (em US$ no AFM ou já em R$ no NB).</summary>
     public bool TemValor => ValorUsd is not null || ValorBrl is not null;
 
+    /// <summary>
+    /// Ajuste manual (appsettings "Conversao:AjustesGanhas"): proposta aberta que já virou pedido mas ainda não foi
+    /// lançada no CRM. Conta como ganha na conversão por quantidade; no valor, continua em aberto.
+    /// </summary>
+    public bool AjusteManual { get; init; }
+
+    /// <summary>A classe para as contas por valor: a do ajuste manual continua aberta (o valor ganho não é conhecido).</summary>
+    public ClasseProposta ClasseValor => AjusteManual ? ClasseProposta.Aberta : Classe;
+
     /// <summary>A planilha de onde veio ("AFM", "NB" ou "NB_Historico"); vazio = a da própria origem.</summary>
     public string Fonte { get; init; } = "";
 
@@ -88,6 +97,8 @@ public sealed class DadosConversao
     /// <summary>"K · título na planilha" de cada coluna usada, para conferência na tela.</summary>
     public List<string> Mapeamento { get; } = new();
     public int LinhasLidas { get; set; }
+    /// <summary>Os ajustes manuais aplicados (texto para as notas); vazio = nenhum.</summary>
+    public string Ajuste { get; set; } = "";
     public int SemData { get; set; }
     public int DatasInvalidas { get; set; }
     public int SemValor { get; set; }
@@ -202,6 +213,7 @@ public sealed class ConversaoService
                 CorteNbHistorico(dados);
                 UnificarVendedores(dados);
                 UltimaRevisao(dados);
+                AjustesGanhas(dados);
                 Conferir(dados, arquivos.Select(a => a.Fonte).ToList());
 
                 _atual = dados; _marca = marca;
@@ -554,6 +566,42 @@ public sealed class ConversaoService
     ///    há UM nome completo possível — se houver dois, não junta (seriam pessoas diferentes) e avisa.
     /// O nome que fica é o mais completo (mais partes); empate, o que aparece mais vezes.
     /// </summary>
+    /// <summary>Texto do ajuste manual aplicado (vazio = nenhum), para as notas das telas e da apresentação.</summary>
+    public string AjusteTexto => Atual.Ajuste;
+
+    /// <summary>
+    /// Ajustes manuais de propostas ganhas ainda não lançadas no CRM (appsettings "Conversao:AjustesGanhas":
+    /// Origem, Ano, Mes, Quantidade, Nota). As N propostas abertas mais recentes daquela origem e mês passam a
+    /// contar como ganhas (se o mês tiver menos, completa com os meses anteriores do mesmo ano). O status original
+    /// fica registrado e a marca AjusteManual mantém o valor delas fora do valor ganho.
+    /// </summary>
+    private void AjustesGanhas(DadosConversao d)
+    {
+        var textos = new List<string>();
+        foreach (var c in _cfg.GetSection("Conversao:AjustesGanhas").GetChildren())
+        {
+            var origem = (c["Origem"] ?? "").Trim().ToUpperInvariant();
+            int ano = c.GetValue("Ano", 0), mes = c.GetValue("Mes", 0), qtd = c.GetValue("Quantidade", 0);
+            if (origem == "" || ano == 0 || mes is < 1 or > 12 || qtd <= 0) continue;
+            var candidatas = d.Propostas.Select((p, i) => (p, i))
+                .Where(x => x.p.Origem == origem && x.p.Classe == ClasseProposta.Aberta && !x.p.AjusteManual
+                            && x.p.Data is DateTime dt && dt.Year == ano && dt.Month <= mes)
+                .OrderByDescending(x => x.p.Data!.Value.Month == mes).ThenByDescending(x => x.p.Data).ThenByDescending(x => x.p.Linha)
+                .Take(qtd).ToList();
+            foreach (var (p, i) in candidatas)
+                d.Propostas[i] = p with { Classe = ClasseProposta.Ganha, StatusOriginal = p.StatusOriginal + " → ganha (ajuste manual)" } with { AjusteManual = true };
+            var noMes = candidatas.Count(x => x.p.Data!.Value.Month == mes);
+            var t = $"{origem}: {candidatas.Count} proposta(s) aberta(s) de {mes:00}/{ano} contada(s) como ganha(s) — ajuste manual, ainda não lançadas no CRM"
+                + (noMes < candidatas.Count ? $" ({noMes} do mês; {candidatas.Count - noMes} dos meses anteriores, porque o mês não tinha abertas suficientes)" : "")
+                + (candidatas.Count < qtd ? $"; pedidas {qtd}, só havia {candidatas.Count} aberta(s)" : "")
+                + ". Contam na conversão por quantidade; no valor continuam em aberto."
+                + (string.IsNullOrWhiteSpace(c["Nota"]) ? "" : " " + c["Nota"]!.Trim());
+            d.Mapeamento.Add("Ajuste manual · " + t);
+            textos.Add(t);
+        }
+        d.Ajuste = string.Join(" ", textos);
+    }
+
     private void UnificarVendedores(DadosConversao d)
     {
         var fixas = VendedoresPadrao.ToDictionary(kv => Chave(kv.Key), kv => kv.Value);

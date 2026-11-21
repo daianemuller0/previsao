@@ -59,7 +59,27 @@ public sealed class VendasMensaisRepository
     private readonly ParquetStore _s;
     public VendasMensaisRepository(ParquetStore s) => _s = s;
 
+    /// <summary>
+    /// As vendas mês a mês de toda a empresa. Onde há vendas por setor (NB e AFM, 2025 em diante), o total do
+    /// mês é a soma das duas (é a mesma base para todos os gráficos); nos outros meses, o total gravado.
+    /// </summary>
     public List<MesDeVendas> Meses()
+    {
+        var gravados = MesesGravados();
+        var setor = PorSetor().Where(x => x.Nb is not null && x.Afm is not null).ToDictionary(x => x.Id);
+        if (setor.Count == 0) return gravados;
+        var porId = gravados.ToDictionary(m => m.Id);
+        foreach (var (id, x) in setor)
+        {
+            var m = porId.GetValueOrDefault(id);
+            if (m is null) porId[id] = m = new MesDeVendas { Ano = x.Ano, Mes = x.Mes };
+            m.Vendas = x.Nb!.Value + x.Afm!.Value;
+        }
+        return porId.Values.OrderBy(x => x.Ano).ThenBy(x => x.Mes).ToList();
+    }
+
+    /// <summary>Os meses como gravados em "vendas_mensais" (sem a soma por setor).</summary>
+    public List<MesDeVendas> MesesGravados()
     {
         if (_s.IsEmpty(EntidadeMeses)) GravarMeses(HistoricoDaPlanilha.Meses());
         return _s.ReadLatest(EntidadeMeses, "id, vendas, propostas, valor_proposto", r =>
@@ -94,6 +114,14 @@ public sealed class VendasMensaisRepository
     public List<VendaPorSetor> PorSetor()
     {
         if (_s.IsEmpty(EntidadeSetor)) GravarPorSetor(HistoricoDaPlanilha.PorSetor());
+        // vendas fechadas que chegaram depois da primeira carga: entram uma vez só (se depois forem
+        // editadas ou apagadas na tela, a edição vale; a marca impede de gravar de novo)
+        foreach (var (marca, novos) in HistoricoDaPlanilha.AcrescimosPorSetor)
+        {
+            if (!_s.IsEmpty(marca)) continue;
+            GravarPorSetor(novos);
+            _s.WriteBatch(marca, new List<IReadOnlyList<KeyValuePair<string, object?>>> { new KeyValuePair<string, object?>[] { new("id", "ok") } });
+        }
         return _s.ReadLatest(EntidadeSetor, "id, nb, afm", r =>
             {
                 var id = Txt(r, 0);
@@ -248,7 +276,7 @@ public sealed class VendasMensaisRepository
             if (int.TryParse((todas[iCab][c] ?? "").Trim().Split('.')[0], out var a) && a is > 2000 and < 2100) anos[c] = a;
         if (anos.Count == 0) return (0, 0, new List<string> { "O cabeçalho não tem os anos (2022, 2023…)." });
 
-        var meses = Meses().ToDictionary(m => m.Id);
+        var meses = MesesGravados().ToDictionary(m => m.Id);
         var budgets = Budgets().ToDictionary(b => b.Ano);
         var mudados = new Dictionary<string, MesDeVendas>();
         var budgetsMudados = new Dictionary<int, BudgetDoAno>();
@@ -416,6 +444,12 @@ public static class HistoricoDaPlanilha
                   new decimal?[] { 17_527_000, 11_761_000, 35_829_000, 15_474_000, 20_031_000, 18_086_000, 46_545_000, 24_539_000, 21_319_000, 55_589_000, 10_656_000, 6_499_000 }),
         [2026] = (new decimal?[] { 2_619_000, 5_460_000, 5_267_000, 7_566_000, 5_140_000, 37_528_000, -1_108_000, 11_739_000, 21_449_000, 11_609_000, null, null },
                   new decimal?[] { 28_748_000, 25_260_000, 16_645_000, 35_633_000, 36_540_000, 6_499_000, -4_996_000, 32_532_000, 31_527_000, 21_644_000, null, null }),
+    };
+
+    /// <summary>Vendas por setor que chegaram depois (marca da entidade → meses): novembro/2026 fechado em 21/11/2026.</summary>
+    public static readonly (string Marca, List<VendaPorSetor> Meses)[] AcrescimosPorSetor =
+    {
+        ("vendas_setor_acrescimo_202611", new() { new VendaPorSetor { Ano = 2026, Mes = 11, Nb = 136_314_700.00m, Afm = 24_254_737.57m } }),
     };
 
     public static List<VendaPorSetor> PorSetor() =>

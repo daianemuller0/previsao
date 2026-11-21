@@ -3595,3 +3595,6 @@ body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box
 .vpm-ano-l.vpm-ano-tot { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--cx-line); }
 .vpm-ano-l.vpm-ano-tot b { color: var(--ac, #172B43); }
 .vpm-ano-l.vpm-ano-tot small { font-size: 11px; color: var(--cx-mut); }
+
+/* Vendas mês × ano: NB e AFM embaixo do total do mês (anos com a divisão por setor) */
+.vp-cel-setor { display: block; font-size: 10.5px; font-weight: 600; opacity: .85; white-space: nowrap; margin-top: 1px; }

@@ -88,7 +88,7 @@ public sealed class Indicadores
         var v = r.Brl ?? 0;
         switch (r.P.Classe)
         {
-            case ClasseProposta.Ganha: G++; VG += v; break;
+            case ClasseProposta.Ganha: G++; if (r.P.AjusteManual) VA += v; else VG += v; break;   // ajuste manual: ganha na quantidade, aberta no valor
             case ClasseProposta.Perdida: P++; VP += v; break;
             case ClasseProposta.Aberta: A++; VA += v; break;
             default: NC++; VNC += v; break;

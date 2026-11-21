@@ -85,6 +85,10 @@
     else
     {
         <div class="rx-status rx-tela">@StatusTxt()</div>
+        @if (Conv.Ok && Conv.AjusteTexto != "")
+        {
+            <div class="cvx-alert vp-ok rx-tela"><strong>Ajuste manual na conversão:</strong> @Conv.AjusteTexto</div>
+        }
         <nav class="rx-abas rx-tela" aria-label="Seções do resumo">
             @foreach (var (id, nome) in Abas)
             {

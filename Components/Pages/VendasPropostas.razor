@@ -80,6 +80,10 @@
                 @T("as vendas e os budgets desses anos (em R$) ficam \"n/d\" em dólar. Cadastre a taxa USD/BRL na guia Conversão (botão “Taxas de câmbio”).", "sales and budgets for those years (in R$) show \"n/a\" in dollars. Add the USD/BRL rate in the Conversion tab (“Exchange rates” button).")
             </div>
         }
+        @if (Conv.Ok && Conv.AjusteTexto != "")
+        {
+            <div class="cvx-alert vp-ok"><strong>@T("Ajuste manual na conversão:", "Manual conversion adjustment:")</strong> @AjusteTxt()</div>
+        }
         @if (AnosSemTaxa() is { Count: > 0 } semTaxa)
         {
             <div class="cvx-alert">
@@ -425,7 +429,14 @@
             <div class="xsec"><span class="xsec-t">@T("Vendas mês × ano", "Sales month × year")</span><span class="xsec-s">@T("Como a planilha da equipe · quanto mais escuro, maior a venda do mês", "Like the team spreadsheet · the darker, the higher the month's sales")</span><span class="xsec-line"></span></div>
             <div class="cvx-card">
                 <div class="cvx-ch">
-                    <div><p>@T("A média é dos anos fechados", "The average is over closed years") (@(completos.Count > 0 ? $"{completos.Min()}–{completos.Max()}" : "—")).</p></div>
+                    <div><p>@T("A média é dos anos fechados", "The average is over closed years") (@(completos.Count > 0 ? $"{completos.Min()}–{completos.Max()}" : "—")).@(_vSetor.Count > 0 ? T(" Nos anos com NB e AFM, o total do mês é a soma dos dois.", " In years with NB and AFM, the month total is the sum of both.") : "")</p></div>
+                    @if (_vSetor.Count > 0)
+                    {
+                        <div class="cvx-seg-ctl" role="group" aria-label="@T("NB e AFM", "NB and AFM")">
+                            <button class="@(!_mesAnoSep ? "on" : "")" @onclick="() => _mesAnoSep = false">@T("Só o total", "Total only")</button>
+                            <button class="@(_mesAnoSep ? "on" : "")" @onclick="() => _mesAnoSep = true">@T("Separar NB e AFM", "Split NB and AFM")</button>
+                        </div>
+                    }
                     <div class="vp-escala" aria-hidden="true"><span>@T("menor", "lowest")</span>@foreach (var c in Rampa) { <i style="background:@c"></i> }<span>@T("maior", "highest")</span></div>
                 </div>
                 <table class="vp-tabela">
@@ -448,7 +459,9 @@
                                     @if (v is decimal val)
                                     {
                                         var (fundo, tinta) = CorDaCelula(val, maxMes);
-                                        <td class="r vp-cel" style="background:@fundo;color:@tinta" title="@NomeDoMes(mes) @a: @Cheio(val)">@if (val < 0) { <span aria-hidden="true">▼ </span> }@MiEixo(val)</td>
+                                        var sx = _mesAnoSep ? _vSetor.GetValueOrDefault((a, mes)) : null;
+                                        var temSx = sx is { Nb: not null, Afm: not null };
+                                        <td class="r vp-cel" style="background:@fundo;color:@tinta" title="@TituloCelMes(mes, a, val, temSx ? sx : null)">@if (val < 0) { <span aria-hidden="true">▼ </span> }@MiEixo(val)@if (temSx) { <small class="vp-cel-setor">NB @MiEixo(sx!.Nb!.Value) · AFM @MiEixo(sx.Afm!.Value)</small> }</td>
                                     }
                                     else { <td class="r vp-cel vazia">—</td> }
                                 }
@@ -458,7 +471,12 @@
                         }
                     </tbody>
                     <tfoot>
-                        <tr class="vp-tot"><th>Total</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MiEixo(r.Vendas)</td> }<td class="r vp-media">@(completos.Count > 0 ? MiEixo(_anos.Where(x => completos.Contains(x.Ano)).Average(x => x.Vendas)) : "—")</td></tr>
+                        <tr class="vp-tot"><th>Total</th>@foreach (var a in anosTabela)
+                        {
+                            var r = _anos.First(x => x.Ano == a);
+                            var sxa = _mesAnoSep ? _vSetor.Values.Where(x => x.Ano == a && x.Nb is not null && x.Afm is not null).ToList() : new();
+                            <td class="r">@MiEixo(r.Vendas)@if (sxa.Count > 0) { <small class="vp-cel-setor">NB @MiEixo(sxa.Sum(x => x.Nb!.Value)) · AFM @MiEixo(sxa.Sum(x => x.Afm!.Value))</small> }</td>
+                        }<td class="r vp-media">@(completos.Count > 0 ? MiEixo(_anos.Where(x => completos.Contains(x.Ano)).Average(x => x.Vendas)) : "—")</td></tr>
                         <tr><th>@T("Budget HSA", "HSA budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@(r.BudgetHsa is decimal b ? MiEixo(b) : "—")</td> }<td></td></tr>
                         <tr><th>@T("% do budget HSA", "% of HSA budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@MedidorFino(r.PctHsa)</td> }<td></td></tr>
                         <tr><th>@T("Budget Grupo", "Group budget")</th>@foreach (var a in anosTabela) { var r = _anos.First(x => x.Ano == a); <td class="r">@(r.BudgetGrupo is decimal b ? MiEixo(b) : "—")</td> }<td></td></tr>
@@ -523,7 +541,11 @@
                                             };
                                             var dica = reg?.Propostas is null && sist?.FonteDasPropostas == "sistema"
                                                 ? _aba switch { "propostas" => $"{T("planilhas", "spreadsheets")}: {sist.Propostas}", "valor" => sist.ValorProposto is decimal vs ? $"{T("planilhas", "spreadsheets")}: {Campo(Math.Round(vs))}" : "", _ => "" } : "";
-                                            <td class="r"><input class="cell num" value="@valor" placeholder="@dica" @onchange="e => MudarMes(ano, mes, e)" /></td>
+                                            // vendas de mês com NB e AFM: o total é a soma dos dois (edite nas abas Vendas NB / Vendas AFM)
+                                            var somaSetor = _aba == "vendas" && _vSetorBrl.GetValueOrDefault((ano, mes)) is { Nb: not null, Afm: not null };
+                                            <td class="r"><input class="cell num" value="@valor" placeholder="@dica" disabled="@somaSetor"
+                                                title="@(somaSetor ? T("Total = NB + AFM (edite nas abas Vendas NB e Vendas AFM)", "Total = NB + AFM (edit in the NB sales and AFM sales tabs)") : null)"
+                                                @onchange="e => MudarMes(ano, mes, e)" /></td>
                                         }
                                     </tr>
                                 }
@@ -586,7 +608,8 @@
     private List<ConversaoDeVendas.PropostaEnviada> _enviadasSetor = new();
     private Dictionary<(int Ano, int Mes), PropMes> _porMes = new();
     /// <summary>As linhas das planilhas da guia Conversão (sem juntar números repetidos, como na própria guia), para a taxa de conversão.</summary>
-    private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl);
+    /// <param name="ClasseValor">a classe nas contas por valor (ajuste manual: ganha na quantidade, aberta no valor)</param>
+    private sealed record LinhaConv(int Ano, int Mes, string Origem, ClasseProposta Classe, double? Brl, ClasseProposta ClasseValor);
     private List<LinhaConv> _conv = new(), _convSetor = new();
     private bool _gerandoPpt;
     private string _fonte = "";
@@ -615,6 +638,19 @@
         }
     }
     private List<int> _anosEditor = new();
+    /// <summary>Vendas mês × ano: mostra o NB e o AFM embaixo do total, nos anos que têm a divisão.</summary>
+    private bool _mesAnoSep = true;
+    /// <summary>O ajuste manual de ganhas (appsettings "Conversao:AjustesGanhas"), no idioma da tela.</summary>
+    private string AjusteTxt()
+    {
+        var g = Conv.Atual.Propostas.Where(p => p.AjusteManual && p.Data is not null)
+            .GroupBy(p => (p.Origem, p.Data!.Value.Year, p.Data.Value.Month)).OrderBy(x => x.Key).ToList();
+        var lista = string.Join(", ", g.Select(x => $"{x.Count()} {x.Key.Origem} {x.Key.Month:00}/{x.Key.Year}"));
+        return T($"{lista} proposta(s) aberta(s) contada(s) como ganha(s) — pedidos que ainda não foram lançados no CRM. Entram na conversão por quantidade; no valor continuam em aberto.",
+                 $"{lista} open proposal(s) counted as won — orders not yet entered in the CRM. Included in conversion by count; in value they remain open.");
+    }
+    private string TituloCelMes(int mes, int ano, decimal val, VendaPorSetor? sx) =>
+        $"{NomeDoMes(mes)} {ano}: {Cheio(val)}" + (sx is { Nb: decimal nb, Afm: decimal af } ? $" · NB {Cheio(nb)} · AFM {Cheio(af)}" : "");
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
     private string _login = "", _usuario = "";
     private bool _editCores, _editCoresMetas;
@@ -724,7 +760,8 @@
                 .Select(p => new LinhaConv(p.Data!.Value.Year, p.Data.Value.Month, p.Origem, p.Classe,
                     dolar
                         ? p.ValorUsd ?? (p.ValorBrl is double r && taxas.TryGetValue(p.Data.Value.Year, out var tu) && tu > 0 ? r / tu : null)
-                        : p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null)))
+                        : p.ValorBrl ?? (p.ValorUsd is double u && taxas.TryGetValue(p.Data.Value.Year, out var t) ? u * t : null),
+                    p.ClasseValor))
                 .ToList();
         }
         catch { _conv = new(); }
@@ -806,7 +843,7 @@
     {
         var l = _convSetor.Where(x => x.Ano == ano && x.Mes <= ateMes).ToList();
         int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida);
-        double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
+        double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
         double? tq = b > 0 ? g * 100.0 / b : null, tv = vb > 0 ? vg / vb * 100 : null;
         return (g, p, b, PorValor ? tv : tq, tv, tq);
@@ -818,7 +855,7 @@
         var l = _convSetor.Where(x => x.Ano == ano).ToList();
         int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida),
             a = l.Count(x => x.Classe == ClasseProposta.Aberta), nc = l.Count(x => x.Classe == ClasseProposta.NaoClassificada);
-        double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
+        double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var (b, vb) = BaseTodas ? (l.Count, l.Sum(x => x.Brl ?? 0)) : (g + p, vg + vp);
         double? tq = b > 0 ? g * 100.0 / b : null, tv = vb > 0 ? vg / vb * 100 : null;
         return (l.Count, g, p, a, nc, b, PorValor ? tv : tq, vg, tv, tq);
@@ -835,7 +872,7 @@
         var l = _convSetor.Where(x => x.Ano == ano && x.Origem == origem).ToList();
         int g = l.Count(x => x.Classe == ClasseProposta.Ganha), p = l.Count(x => x.Classe == ClasseProposta.Perdida);
         var b = BaseTodas ? l.Count : g + p;
-        double vg = l.Where(x => x.Classe == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
+        double vg = l.Where(x => x.ClasseValor == ClasseProposta.Ganha).Sum(x => x.Brl ?? 0), vp = l.Where(x => x.Classe == ClasseProposta.Perdida).Sum(x => x.Brl ?? 0);
         var vb = BaseTodas ? l.Sum(x => x.Brl ?? 0) : vg + vp;
         double? tx = PorValor ? (vb > 0 ? vg / vb * 100 : null) : (b > 0 ? g * 100.0 / b : null);
         var env = _enviadasSetor.Where(x => x.Data.Year == ano && x.Fonte == origem).ToList();

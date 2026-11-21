@@ -1166,6 +1166,16 @@ internal sealed class ConstrutorApresentacao
             (T("Period and cut-off", "Período e corte"), T($"{PerR} vs {PerC}; all years compared on the same months; cut-off {Data(Corte)}.", $"{PerR} × {PerC}; todos os anos comparados nos mesmos meses; corte {Data(Corte)}.")),
             (T("Currency and targets", "Moeda e metas"), (_o.Usd ? T("USD at the annual rate registered in the app. ", "US$ pela taxa anual cadastrada. ") : T("BRL; AFM USD values converted at the annual rate. ", "R$; valores AFM em US$ convertidos pela taxa anual. ")) + T("Targets: annual HSA and Group budgets.", "Metas: budgets anuais HSA e Grupo.")),
         };
+        // ajuste manual de ganhas (ainda não lançadas no CRM): entra como uma linha a mais das regras
+        var aj = _fonte.Propostas.Where(p => p.AjusteManual && p.Data is not null)
+            .GroupBy(p => (p.Origem, p.Data!.Value.Year, p.Data.Value.Month)).OrderBy(g => g.Key).ToList();
+        if (aj.Count > 0)
+        {
+            var lista = string.Join(", ", aj.Select(g => $"{g.Count()} {g.Key.Origem} {g.Key.Month:00}/{g.Key.Year}"));
+            itens = itens.Append((T("Manual adjustment", "Ajuste manual"),
+                T($"Won proposals not yet entered in the CRM, counted as won: {lista}. Count conversion only; in value they remain open.",
+                  $"Propostas ganhas ainda não lançadas no CRM, contadas como ganhas: {lista}. Só na conversão por quantidade; no valor continuam em aberto."))).ToArray();
+        }
         long h = 512064, g = 45720, y = Y0;
         var k = 0;
         foreach (var (rot, txt) in itens)
