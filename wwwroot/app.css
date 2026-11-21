@@ -3562,3 +3562,15 @@ body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box
     body.vp-pdf .vp-pdf-alvo .vpm-sm-grid > * { break-inside: avoid; }
     body.vp-pdf * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Mês a mês ("Um ano" e "Comparar dois anos", nos dois quadros): divisória tracejada, fina e clara, entre os meses,
+   no meio do espaço entre as colunas (column-gap 6px), atravessando as faixas, as colunas e os nomes dos meses. */
+.vpm-graf.combo .vpm-plot > .vpm-col:not(:first-child)::before,
+.vpm-graf.combo .vpm-banda-g > .vpm-col:not(:first-child)::before,
+.vpm-graf.combo .vpm-meses > div:not(:first-child)::before {
+    content: ""; position: absolute; left: -3.5px; top: 0; bottom: 0; width: 0;
+    border-left: 1px dashed #dfe5ec; pointer-events: none; z-index: 0;
+}
+.vpm-graf.combo .vpm-meses > div { position: relative; }
+.vpm-graf.combo .vpm-meses { padding-top: 0; }
+.vpm-graf.combo .vpm-meses > div { padding-top: 5px; }
