@@ -1,3 +1,4 @@
+using System.Globalization;
 using HowdenSalesForecast.Data;
 
 namespace HowdenSalesForecast.Components.Pages;
@@ -58,7 +59,7 @@ public partial class VendasPropostas
     }
 
     /// <summary>De que vendas o quadro fala: "empresa toda", "NB + AFM", "só NB", "só AFM".</summary>
-    private string VendasDeMm => !_mmS ? "empresa toda" : VeNb && VeAfm ? "NB + AFM" : VeNb ? "só NB" : VeAfm ? "só AFM" : "nenhum setor";
+    private string VendasDeMm => !_mmS ? T("empresa toda", "whole company") : VeNb && VeAfm ? "NB + AFM" : VeNb ? T("só NB", "NB only") : VeAfm ? T("só AFM", "AFM only") : T("nenhum setor", "no sector");
 
     /// <summary>Por valor: valor ganho ÷ (ganho + perdido), ou ÷ valor de todas as enviadas (mesma regra da guia Conversão).</summary>
     private double? TaxaValorMes(int ano, int mes)
@@ -78,9 +79,10 @@ public partial class VendasPropostas
 
     private static string ChaveMm(string modo, char el, int ano) => $"m{modo}{el}{(ano > 0 ? ano.ToString() : "")}";
 
-    private static string NomeElMm(char el) => el switch
+    private string NomeElMm(char el) => el switch
     {
-        'v' => "colunas de vendas", 'p' => "colunas de propostas", 'e' => "linha do valor enviado", 'x' => "linha da conversão", _ => "venda negativa",
+        'v' => T("colunas de vendas", "sales columns"), 'p' => T("colunas de propostas", "proposal columns"), 'e' => T("linha do valor enviado", "value sent line"),
+        'x' => T("linha da conversão", "conversion line"), _ => T("venda negativa", "negative sales"),
     };
 
     /// <summary>A cor do elemento no modo: a escolhida; senão o padrão (derivado da cor do ano).</summary>
@@ -232,11 +234,14 @@ public partial class VendasPropostas
 
     // ---- textos ----
 
+    /// <summary>Cultura dos números do mês a mês: pt-BR, ou en-US com a tela em inglês.</summary>
+    private CultureInfo CulMm => En ? EnUs : Br;
+
     /// <summary>R$ em milhões com uma casa, sem a unidade (o título do gráfico diz "R$ milhões"): "31,4", "−6,1".</summary>
-    private static string MiCurto(decimal v) => (v < 0 ? "−" : "") + (Math.Abs(v) / 1_000_000m).ToString("#,##0.0", Br);
+    private string MiCurto(decimal v) => (v < 0 ? "−" : "") + (Math.Abs(v) / 1_000_000m).ToString("#,##0.0", CulMm);
 
     /// <summary>Valor exato, com centavos: "R$ 31.412.345,67".</summary>
-    private string Reais(decimal v) => (v < 0 ? "−" : "") + Sim + " " + Math.Abs(v).ToString("#,##0.00", Br);
+    private string Reais(decimal v) => (v < 0 ? "−" : "") + Sim + " " + Math.Abs(v).ToString("#,##0.00", CulMm);
 
     /// <summary>O mês está no filtro "Mês" da barra de filtros (sem filtro, todos estão).</summary>
     private bool MesNoFiltro(int m) => _fil.Meses.Count == 0 || _fil.Meses.Contains(Fmt.MonthLong(m));
@@ -244,15 +249,15 @@ public partial class VendasPropostas
     /// <summary>Os meses de jan até "ate" que estão no filtro, em faixas: "jan–mar", "jan–mar, jun", "jan–dez".</summary>
     private string MesesTxt(int ate)
     {
-        if (ate <= 0) return "sem meses fechados";
+        if (ate <= 0) return T("sem meses fechados", "no closed months");
         var l = Enumerable.Range(1, Math.Min(12, ate)).Where(MesNoFiltro).ToList();
-        if (l.Count == 0) return "nenhum mês do filtro";
+        if (l.Count == 0) return T("nenhum mês do filtro", "no month in the filter");
         var faixas = new List<string>();
         for (var i = 0; i < l.Count;)
         {
             var j = i;
             while (j + 1 < l.Count && l[j + 1] == l[j] + 1) j++;
-            var de = MesCurto(l[i]).ToLowerInvariant(); var ate2 = MesCurto(l[j]).ToLowerInvariant();
+            var de = MesMm(l[i]); var ate2 = MesMm(l[j]);
             faixas.Add(i == j ? de : $"{de}–{ate2}");
             i = j + 1;
         }
@@ -260,15 +265,18 @@ public partial class VendasPropostas
     }
 
     /// <summary>De janeiro até "ate", sem o filtro "Mês": "jan–dez", "jan–out".</summary>
-    private static string MesesTxtSemFiltro(int ate) => ate <= 1 ? "jan" : $"jan–{MesCurto(Math.Min(12, ate)).ToLowerInvariant()}";
+    private string MesesTxtSemFiltro(int ate) => ate <= 1 ? MesMm(1) : $"{MesMm(1)}–{MesMm(Math.Min(12, ate))}";
+
+    /// <summary>Mês abreviado das faixas: minúsculo em português ("jan"), com inicial maiúscula em inglês ("Jan").</summary>
+    private string MesMm(int m) => En ? MesCurto(m) : MesCurto(m).ToLowerInvariant();
 
     /// <summary>Variação % (null quando a base é zero ou negativa: a conta não tem sentido).</summary>
     private static double? VarMm(decimal atual, decimal baseAnt) => baseAnt > 0 ? (double)((atual - baseAnt) / baseAnt * 100) : null;
 
-    private static string PctSinal(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", Br) + "%";
-    private static string PpSinal(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", Br) + " p.p.";
+    private string PctSinal(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", CulMm) + "%";
+    private string PpSinal(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", CulMm) + T(" p.p.", " pp");
     private string DifReais(decimal d) => (d > 0 ? "+" : d < 0 ? "−" : "") + Sim + " " + Compacto(Math.Abs(d));
-    private static string DifQtd(int d) => (d > 0 ? "+" : d < 0 ? "−" : "") + Math.Abs(d).ToString("#,##0", Br);
+    private string DifQtd(int d) => (d > 0 ? "+" : d < 0 ? "−" : "") + Math.Abs(d).ToString("#,##0", CulMm);
 
     /// <summary>Classe de cor da variação: vendas e conversão sobem = bom; propostas são neutras (mais propostas não é, por si, melhor).</summary>
     private static string ClsVar(double? v, bool neutra) => v is not double x || Math.Abs(x) < 0.05 ? "neu" : neutra ? "neu" : x > 0 ? "pos" : "neg";
@@ -276,9 +284,9 @@ public partial class VendasPropostas
 
     private string CelTxt(bool vendas, CelMm c, bool exato) => c.Sit switch
     {
-        SitMes.SemDado => "n/d",
-        SitMes.AApurar => "a apurar",
-        _ => vendas ? (exato ? Reais(c.Valor) : MiCurto(c.Valor)) : N0((int)c.Valor) + (c.Parcial && exato ? " (parcial)" : ""),
+        SitMes.SemDado => T("n/d", "n/a"),
+        SitMes.AApurar => T("a apurar", "pending"),
+        _ => vendas ? (exato ? Reais(c.Valor) : MiCurto(c.Valor)) : N0((int)c.Valor) + (c.Parcial && exato ? T(" (parcial)", " (partial)") : ""),
     };
 
     /// <summary>Linha de situação dos dados, no topo da seção.</summary>
@@ -290,9 +298,13 @@ public partial class VendasPropostas
             : _meses.Where(m => m.Vendas is not null).OrderBy(m => m.Ano * 100 + m.Mes).Select(m => ((int, int)?)(m.Ano, m.Mes)).LastOrDefault();
         var partes = new List<string>
         {
-            ultV is not (int ua, int um) ? "Vendas: nenhuma registrada" : $"Vendas{(_mmS ? $" por setor ({VendasDeMm})" : "")} registradas até {NomeDoMes(um).ToLowerInvariant()}/{ua}",
-            Conv.AtualizadoEm is { } q ? $"propostas lidas das planilhas em {q:dd/MM/yyyy 'às' HH:mm}" : "propostas: planilhas ainda não lidas",
-            $"{NomeDoMes(hoje.Month).ToLowerInvariant()}/{hoje.Year} em andamento (propostas parciais)",
+            ultV is not (int ua, int um) ? T("Vendas: nenhuma registrada", "Sales: none recorded")
+                : En ? $"Sales{(_mmS ? $" by sector ({VendasDeMm})" : "")} recorded through {NomeDoMes(um)} {ua}"
+                : $"Vendas{(_mmS ? $" por setor ({VendasDeMm})" : "")} registradas até {NomeDoMes(um).ToLowerInvariant()}/{ua}",
+            Conv.AtualizadoEm is { } q
+                ? (En ? $"proposals read from the spreadsheets on {q.ToString("MM/dd/yyyy 'at' HH:mm", EnUs)}" : $"propostas lidas das planilhas em {q:dd/MM/yyyy 'às' HH:mm}")
+                : T("propostas: planilhas ainda não lidas", "proposals: spreadsheets not read yet"),
+            En ? $"{NomeDoMes(hoje.Month)} {hoje.Year} in progress (partial proposals)" : $"{NomeDoMes(hoje.Month).ToLowerInvariant()}/{hoje.Year} em andamento (propostas parciais)",
         };
         return string.Join(" · ", partes);
     }
