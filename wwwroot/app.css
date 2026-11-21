@@ -3577,7 +3577,7 @@ body.vp-pdf .vp-pdf-alvo { max-width: none !important; margin: 0 !important; box
 
 /* PDF de três páginas do quadro "Vendas por setor" (app.js, vpPdfMulti): as cópias ficam fora da vista na tela */
 #vp-pdf-multi { position: absolute; left: -30000px; top: 0; background: #fff; }
-.vp-pdf-pg-tit { font-size: 15px; font-weight: 800; color: #12355b; margin: 0 0 6px; }
+.vp-pdf-pg-tit { font-size: 22px; font-weight: 800; color: #fff; background: #12355b; border-radius: 8px; padding: 8px 14px; margin: 0 0 10px; display: inline-block; }
 .vp-pdf-pg .vpm { max-width: none !important; margin: 0 !important; box-shadow: none !important; }
 @media print {
     body.vp-pdf-multi > *:not(#vp-pdf-multi) { display: none !important; }

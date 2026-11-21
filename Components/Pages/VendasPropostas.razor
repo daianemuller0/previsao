@@ -1113,8 +1113,8 @@
             @if (setor)
             {
                 <button type="button" class="btn-ghost vpm-pdf" disabled="@_gerandoPdfSetores" @onclick="PdfSetores"
-                        title="Gera um PDF com três páginas, como na tela: NB + AFM, só NB e só AFM (no diálogo de impressão, escolha “Salvar como PDF”)">
-                    @(_gerandoPdfSetores ? "Gerando…" : "⤓ Gerar PDF (3 páginas)")
+                        title="Gera um PDF com o gráfico 3 vezes, uma por página: 1) Aftermarket + NB juntos, 2) só Aftermarket, 3) só NB (no diálogo de impressão, escolha “Salvar como PDF”)">
+                    @(_gerandoPdfSetores ? "Gerando…" : "⤓ Gerar PDF (AFM + NB, AFM, NB)")
                 </button>
             }
             else
@@ -2215,9 +2215,9 @@
             await JS.InvokeVoidAsync("vpPdfMulti.inicio");
             foreach (var (setores, rotulo) in new[]
             {
-                (Array.Empty<string>(), "Total · New Business + Aftermarket (NB + AFM)"),
-                (new[] { ConversaoService.Nb }, "New Business (NB)"),
-                (new[] { ConversaoService.Afm }, "Aftermarket (AFM)"),
+                (Array.Empty<string>(), "Gráfico 1 de 3 · Aftermarket + NB juntos (AFM + NB)"),
+                (new[] { ConversaoService.Afm }, "Gráfico 2 de 3 · Só Aftermarket (AFM)"),
+                (new[] { ConversaoService.Nb }, "Gráfico 3 de 3 · Só New Business (NB)"),
             })
             {
                 _fil.Origens.Clear();
@@ -2240,7 +2240,7 @@
         }
         try
         {
-            if (ok) await JS.InvokeVoidAsync("vpPdfMulti.imprimir", "Vendas por setor - NB + AFM, NB e AFM");
+            if (ok) await JS.InvokeVoidAsync("vpPdfMulti.imprimir", "Vendas por setor - AFM + NB, AFM e NB");
             else await JS.InvokeVoidAsync("vpPdfMulti.cancelar");
         }
         catch { }
