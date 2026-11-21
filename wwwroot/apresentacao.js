@@ -103,33 +103,40 @@ window.vpPptx = (function () {
 
         // ---------- 2. os quadros, cada um numa cópia da página padrão ----------
         const ff = d.filtros;
+        const m = d.moeda || 'R$';
+        // d.ingles: a tela estava em inglês (botão Idioma) — os títulos dos slides seguem o idioma
+        const L = (pt, en) => d.ingles ? en : pt;
         const itens = [
-            ['kpis', 'Indicadores de ' + d.foco, 'Comparações com o mesmo período do ano anterior · ' + ff],
-            ['mes-a-mes', 'Vendas e propostas, mês a mês · ' + d.foco, 'Em cima, quanto foi vendido no mês (' + (d.moeda || 'R$') + ', empresa toda); embaixo, quantas propostas foram enviadas · ' + ff],
-            ['mes-a-mes-setor', 'Vendas por setor (NB e AFM), propostas e conversão · ' + d.foco, 'Vendas do relatório por setor (seguem o filtro de Setor); embaixo, as propostas e a conversão por quantidade e por valor · ' + ff],
-            ['mensal-qtd', 'Propostas enviadas por mês, comparando os anos', 'Uma linha por ano · mês de envio da proposta · ' + ff],
-            ['mensal-valor', 'Valor das propostas enviadas por mês (' + (d.moeda || 'R$') + ')', 'Uma linha por ano · mês de envio da proposta · ' + ff],
-            ['mensal-vendas', 'Vendas por mês (' + (d.moeda || 'R$') + '), comparando os anos', 'Uma linha por ano · vendas da empresa no mês (não seguem os filtros)'],
-            ['mensal-taxa', 'Taxa de conversão por mês, comparando os anos', 'Uma linha por ano · taxa sobre ' + d.baseCurta + ' · ' + ff],
-            ['anos', 'Taxa de conversão e resultados, ano a ano', d.regra],
-            ['setores', 'AFM × NB e valores, ano a ano', 'AFM = Aftermarket · NB = New Business · barra: divisão das propostas enviadas · ' + ff],
-            ['metas', 'Vendas totais × metas, ano a ano', 'Vendas da empresa × Meta Grupo e Meta HSA · ' + (d.moeda || 'R$')],
-            ['bu', 'Conversão por Business Unit', 'Taxa sobre ' + d.baseCurta + ' · ' + ff],
-            ['mercado', 'Conversão por mercado', 'Os 8 primeiros, da maior taxa para a menor · taxa sobre ' + d.baseCurta + ' · ' + ff],
-            ['produto', 'Conversão por produto', 'Os 8 primeiros, da maior taxa para a menor · taxa sobre ' + d.baseCurta + ' · ' + ff],
-            ['vendedores', 'Desempenho dos vendedores', 'Ranking por taxa de conversão · taxa sobre ' + d.baseCurta + ' · ' + ff],
-            ['pais', 'Conversão por país', 'Taxa sobre ' + d.baseCurta + ' · ' + ff],
-            ['perdas', 'Análise das propostas perdidas', 'Pareto por status no CRM (não é a causa comercial) · ' + ff],
-            ['acumulado', 'Vendas acumuladas no ano × budgets', 'O ritmo de ' + d.foco + ' contra os anos anteriores e os budgets HSA e Grupo'],
-            ['mes-ano', 'Vendas mês × ano', 'Como a planilha da equipe · quanto mais escuro, maior a venda do mês'],
+            ['kpis', L('Indicadores de ', 'Indicators · ') + d.foco, L('Comparações com o mesmo período do ano anterior · ', 'Compared with the same period of the previous year · ') + ff],
+            ['mes-a-mes', L('Vendas e propostas, mês a mês · ', 'Sales and proposals, month by month · ') + d.foco, L('Em cima, quanto foi vendido no mês (' + m + ', empresa toda); embaixo, quantas propostas foram enviadas · ', 'Top: sales in the month (' + m + ', whole company); bottom: proposals sent · ') + ff],
+            ['mes-a-mes-setor', L('Vendas por setor (NB e AFM), propostas e conversão · ', 'Sales by sector (NB and AFM), proposals and conversion · ') + d.foco, L('Vendas do relatório por setor (seguem o filtro de Setor); embaixo, as propostas e a conversão por quantidade e por valor · ', 'Sales by sector (follow the Sector filter); below, proposals and conversion by count and by value · ') + ff],
+            ['mensal-qtd', L('Propostas enviadas por mês, comparando os anos', 'Proposals sent per month, comparing years'), L('Uma linha por ano · mês de envio da proposta · ', 'One line per year · month the proposal was sent · ') + ff],
+            ['mensal-valor', L('Valor das propostas enviadas por mês (' + m + ')', 'Value of proposals sent per month (' + m + ')'), L('Uma linha por ano · mês de envio da proposta · ', 'One line per year · month the proposal was sent · ') + ff],
+            ['mensal-vendas', L('Vendas por mês (' + m + '), comparando os anos', 'Sales per month (' + m + '), comparing years'), L('Uma linha por ano · vendas da empresa no mês (não seguem os filtros)', 'One line per year · company sales in the month (filters do not apply)')],
+            ['mensal-taxa', L('Taxa de conversão por mês, comparando os anos', 'Conversion rate per month, comparing years'), L('Uma linha por ano · taxa sobre ', 'One line per year · rate base: ') + d.baseCurta + ' · ' + ff],
+            ['anos', L('Taxa de conversão e resultados, ano a ano', 'Conversion rate and results, year by year'), d.regra],
+            ['setores', L('AFM × NB e valores, ano a ano', 'AFM × NB and values, year by year'), L('AFM = Aftermarket · NB = New Business · barra: divisão das propostas enviadas · ', 'AFM = Aftermarket · NB = New Business · bar: split of proposals sent · ') + ff],
+            ['metas', L('Vendas totais × metas, ano a ano', 'Total sales × targets, year by year'), L('Vendas da empresa × Meta Grupo e Meta HSA · ', 'Company sales × Group target and HSA target · ') + m],
+            ['bu', L('Conversão por Business Unit', 'Conversion by Business Unit'), L('Taxa sobre ', 'Rate base: ') + d.baseCurta + ' · ' + ff],
+            ['mercado', L('Conversão por mercado', 'Conversion by market'), L('Os 8 primeiros, da maior taxa para a menor · taxa sobre ', 'Top 8, highest to lowest rate · rate base: ') + d.baseCurta + ' · ' + ff],
+            ['produto', L('Conversão por produto', 'Conversion by product'), L('Os 8 primeiros, da maior taxa para a menor · taxa sobre ', 'Top 8, highest to lowest rate · rate base: ') + d.baseCurta + ' · ' + ff],
+            ['vendedores', L('Desempenho dos vendedores', 'Sales team performance'), L('Ranking por taxa de conversão · taxa sobre ', 'Ranked by conversion rate · rate base: ') + d.baseCurta + ' · ' + ff],
+            ['pais', L('Conversão por país', 'Conversion by country'), L('Taxa sobre ', 'Rate base: ') + d.baseCurta + ' · ' + ff],
+            ['perdas', L('Análise das propostas perdidas', 'Lost proposals analysis'), L('Pareto por status no CRM (não é a causa comercial) · ', 'Pareto by CRM status (not the commercial cause) · ') + ff],
+            ['acumulado', L('Vendas acumuladas no ano × budgets', 'Year-to-date sales × budgets'), L('O ritmo de ' + d.foco + ' contra os anos anteriores e os budgets HSA e Grupo', d.foco + ' pace against previous years and the HSA and Group budgets')],
+            ['mes-ano', L('Vendas mês × ano', 'Sales month × year'), L('Como a planilha da equipe · quanto mais escuro, maior a venda do mês', 'Like the team spreadsheet · the darker, the higher the month sales')],
         ].filter(([k]) => fotos[k]).map(([k, titulo, sub]) => ({ titulo, sub, foto: fotos[k] }));
         itens.push({
-            titulo: 'Notas e critérios', sub: 'Gerado por ' + d.usuario + ' em ' + d.geradoEm,
+            titulo: L('Notas e critérios', 'Notes and criteria'), sub: L('Gerado por ', 'Generated by ') + d.usuario + L(' em ', ' on ') + d.geradoEm,
             texto: [
-                { titulo: 'Taxa de conversão' }, { linha: d.regra },
-                { titulo: 'Filtros aplicados' }, { linha: d.filtros },
-                { titulo: 'Fontes' }, { linha: d.fonte },
-                { linha: 'Valores em R$: propostas do AFM em US$ convertidas pela taxa do ano de envio (guia Conversão → Taxas de câmbio); NB já em R$. Anos com propostas do AFM sem taxa aparecem como “parcial”.' },
+                { titulo: L('Taxa de conversão', 'Conversion rate') }, { linha: d.regra },
+                { titulo: L('Filtros aplicados', 'Filters applied') }, { linha: d.filtros },
+                { titulo: L('Fontes', 'Sources') }, { linha: d.fonte },
+                { linha: d.moeda === 'US$'
+                    ? L('Valores em US$: propostas do AFM no valor original em US$; NB, vendas e budgets (em R$) divididos pela taxa USD/BRL do ano (guia Conversão → Taxas de câmbio).',
+                        'Values in US$: AFM proposals at their original US$ value; NB, sales and budgets (in R$) divided by the year\'s USD/BRL rate (Conversion tab → Exchange rates).')
+                    : L('Valores em R$: propostas do AFM em US$ convertidas pela taxa do ano de envio (guia Conversão → Taxas de câmbio); NB já em R$. Anos com propostas do AFM sem taxa aparecem como “parcial”.',
+                        'Values in R$: AFM proposals in US$ converted at the rate of the year sent (Conversion tab → Exchange rates); NB already in R$. Years with AFM proposals without a rate show as “partial”.') },
             ],
         });
 
