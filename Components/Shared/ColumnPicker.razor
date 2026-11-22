@@ -6,8 +6,8 @@
 <div class="cols-panel">
     <div class="page-head">
         <div>
-            <h2 style="color:var(--primary)">Colunas da tabela</h2>
-            <p class="subtitle">Marque o que aparece e use as setas para reordenar. Vale só para você.</p>
+            <h2 style="color:var(--primary)">@T("Colunas da tabela", "Table columns")</h2>
+            <p class="subtitle">@T("Marque o que aparece e use as setas para reordenar. Vale só para você.", "Check what is shown and use the arrows to reorder. Applies only to you.")</p>
         </div>
         <button class="icon-btn" @onclick="Fechar">@Icons.Svg("x")</button>
     </div>
@@ -20,21 +20,21 @@
             <div class="cols-item @(c.Visible ? "" : "off")">
                 <label class="cols-chk">
                     <input type="checkbox" checked="@c.Visible" @onchange="e => Alternar(idx, e)" />
-                    <span>@c.Def.Label</span>
+                    <span>@(Ingles ? RotulosEn.Rotulo(c.Def.Label) : c.Def.Label)</span>
                 </label>
                 <div class="cols-move">
-                    <button class="row-act" title="Subir" disabled="@(idx == 0)" @onclick="() => Mover(idx, -1)">@Icons.Svg("up")</button>
-                    <button class="row-act" title="Descer" disabled="@(idx == _work.Count - 1)" @onclick="() => Mover(idx, 1)">@Icons.Svg("down")</button>
+                    <button class="row-act" title="@T("Subir", "Move up")" disabled="@(idx == 0)" @onclick="() => Mover(idx, -1)">@Icons.Svg("up")</button>
+                    <button class="row-act" title="@T("Descer", "Move down")" disabled="@(idx == _work.Count - 1)" @onclick="() => Mover(idx, 1)">@Icons.Svg("down")</button>
                 </div>
             </div>
         }
     </div>
 
     <div class="modal-actions">
-        <button class="btn-ghost" @onclick="Padrao">@Icons.Svg("history")Restaurar padrão</button>
+        <button class="btn-ghost" @onclick="Padrao">@Icons.Svg("history")@T("Restaurar padrão", "Restore default")</button>
         <div class="filterbar-spacer"></div>
-        <button class="btn-ghost" @onclick="Fechar">Cancelar</button>
-        <button class="btn-primary" @onclick="Aplicar">@Icons.Svg("check")Aplicar</button>
+        <button class="btn-ghost" @onclick="Fechar">@T("Cancelar", "Cancel")</button>
+        <button class="btn-primary" @onclick="Aplicar">@Icons.Svg("check")@T("Aplicar", "Apply")</button>
     </div>
 </div>
 
