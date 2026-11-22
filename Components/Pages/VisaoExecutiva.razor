@@ -1232,6 +1232,7 @@
         builder.AddAttribute(1, "Barra", Pref(chave).Barra);
         builder.AddAttribute(2, "OnBarra", EventCallback.Factory.Create<int>(this, px => AjustarBarra(chave, px)));
         builder.AddAttribute(3, "OnReset", EventCallback.Factory.Create(this, () => ResetChart(chave)));
+        builder.AddAttribute(4, "Ingles", _en);
         builder.CloseComponent();
     };
 

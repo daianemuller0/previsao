@@ -17,7 +17,7 @@
         var spec = s;
         <div class="panel studio-card @(spec.Type is "kpi" ? "span1" : "span2")">
             <div class="panel-head">
-                <div class="panel-title">@spec.Title <span class="hint">@DimLabel(spec.Dimension) · @MeasureLabel(spec.Measure)</span></div>
+                <div class="panel-title">@TituloTela(spec.Title) <span class="hint">@DimLabel(spec.Dimension) · @MeasureLabel(spec.Measure)</span></div>
                 <div class="studio-acts">
                     <button class="row-act" title="@T("Editar gráfico", "Edit chart")" @onclick="() => OpenEdit(spec)">@Icons.Svg("edit")</button>
                     <button class="row-act del" title="@T("Excluir gráfico", "Delete chart")" @onclick="() => AskDelete(spec)">@Icons.Svg("trash")</button>
@@ -126,6 +126,15 @@
     /// <summary>Textos do estúdio em inglês.</summary>
     [Parameter] public bool Ingles { get; set; }
     private string T(string pt, string en) => Ingles ? en : pt;
+    /// <summary>Os títulos dos gráficos-padrão (criados em português) aparecem em inglês; os digitados pela pessoa ficam como estão.</summary>
+    private string TituloTela(string t) => !Ingles ? t : t switch
+    {
+        "Valor por mercado" => "Value by market",
+        "Ponderado por KAM" => "Weighted by KAM",
+        "Distribuição por BU" => "Distribution by BU",
+        "Valor por mês" => "Value by month",
+        _ => t,
+    };
     [Parameter] public double Rate { get; set; } = 1;    // USD -> BRL
     [Parameter] public string Sym { get; set; } = "R$";
 
