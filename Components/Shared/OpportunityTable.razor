@@ -15,13 +15,13 @@
 @if (ShowColumnPicker)
 {
     <div class="cols-bar">
-        <button class="btn-link" @onclick="() => _colsOpen = !_colsOpen">@Icons.Svg("layers")Colunas</button>
-        <span class="muted" style="font-size:11.5px">@_cols.Count(c => c.Visible) de @_cols.Count visíveis</span>
+        <button class="btn-link" @onclick="() => _colsOpen = !_colsOpen">@Icons.Svg("layers")@T("Colunas", "Columns")</button>
+        <span class="muted" style="font-size:11.5px">@(T($"{_cols.Count(c => c.Visible)} de {_cols.Count} visíveis", $"{_cols.Count(c => c.Visible)} of {_cols.Count} visible"))</span>
     </div>
 }
 @if (_colsOpen)
 {
-    <ColumnPicker Cols="_cols" OnApply="AplicarColunas" OnReset="ResetarColunas" OnClose="() => _colsOpen = false" />
+    <ColumnPicker Cols="_cols" Ingles="Ingles" OnApply="AplicarColunas" OnReset="ResetarColunas" OnClose="() => _colsOpen = false" />
 }
 
 @* Régua de rolagem horizontal ACIMA da tabela: com dezenas de colunas, a barra
@@ -35,7 +35,7 @@
                 <th class="center actions-col"></th>
                 @foreach (var c in Visiveis)
                 {
-                    <th class="@c.Def.Align" draggable="true" data-key="@c.Def.Key" title="@c.Def.Label — arraste para mover a coluna">@c.Def.Label</th>
+                    <th class="@c.Def.Align" draggable="true" data-key="@c.Def.Key" title="@(Lbl(c.Def.Label) + T(" — arraste para mover a coluna", " — drag to move the column"))">@Lbl(c.Def.Label)</th>
                 }
             </tr>
         </thead>
@@ -46,19 +46,19 @@
                 @* Duplo clique, não clique simples: um toque errado na lista tirava
                    a pessoa da tela e levava embora o recorte que ela montou. *@
                 <tr class="clickable @(o.IndicadaValue ? "row-ind" : "") @(Sim(o.Otp) ? "row-otp" : "") @(o.PerdidaValue ? "row-perdida" : "")"
-                    title="Dois cliques abrem os detalhes desta oportunidade"
+                    title="@T("Dois cliques abrem os detalhes desta oportunidade", "Double-click to open this opportunity's details")"
                     @ondblclick="() => AbrirDetalhe(o)">
                     <td class="center actions-col">
-                        <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? "Remover da Previsão" : "Indicar na Previsão")" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
+                        <button class="row-act ind-btn @(o.IndicadaValue ? "on" : "")" title="@(o.IndicadaValue ? T("Remover da Previsão", "Remove from Forecast") : T("Indicar na Previsão", "Refer to Forecast"))" @onclick="() => ToggleIndicada(o)" @onclick:stopPropagation="true">@Icons.Svg("flag")</button>
                         @if (o.PrevisaoIncompleta)
                         {
-                            <button class="row-act pend" title="Indicada na previsão, mas faltam dados: @string.Join(", ", o.PendenciasPrevisao)" @onclick="() => AbrirPendencias(o)" @onclick:stopPropagation="true">@Icons.Svg("alert")</button>
+                            <button class="row-act pend" title="@(T("Indicada na previsão, mas faltam dados: ", "Referred to the forecast, but data is missing: ") + string.Join(", ", o.PendenciasPrevisao.Select(Lbl)))" @onclick="() => AbrirPendencias(o)" @onclick:stopPropagation="true">@Icons.Svg("alert")</button>
                         }
-                        <button class="row-act crm @(AlteracoesCrm.Alterada(o) ? "on" : "")" title="@(AlteracoesCrm.Alterada(o) ? "Considerar dados do CRM — desfaz as alterações feitas no sistema e volta aos valores do CRM" : "Considerar dados do CRM — nada diferente do CRM nesta oportunidade")" @onclick="() => AskCrm(o)" @onclick:stopPropagation="true">@Icons.Svg("history")</button>
-                        <button class="row-act lost @(o.PerdidaValue ? "on" : "")" title="@(o.PerdidaValue ? "Reabrir — tirar a marca de perdida" : "Indicar perdido — a oportunidade fica onde está, só ganha a marca")" @onclick="() => AskPerdida(o)" @onclick:stopPropagation="true">@Icons.Svg("x")</button>
-                        <button class="row-act" title="Editar oportunidade" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
-                        <button class="row-act" title="Duplicar oportunidade" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
-                        <button class="row-act del" title="Excluir oportunidade" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
+                        <button class="row-act crm @(AlteracoesCrm.Alterada(o) ? "on" : "")" title="@(AlteracoesCrm.Alterada(o) ? T("Considerar dados do CRM — desfaz as alterações feitas no sistema e volta aos valores do CRM", "Use CRM data — undoes the changes made in the system and goes back to the CRM values") : T("Considerar dados do CRM — nada diferente do CRM nesta oportunidade", "Use CRM data — nothing differs from the CRM in this opportunity"))" @onclick="() => AskCrm(o)" @onclick:stopPropagation="true">@Icons.Svg("history")</button>
+                        <button class="row-act lost @(o.PerdidaValue ? "on" : "")" title="@(o.PerdidaValue ? T("Reabrir — tirar a marca de perdida", "Reopen — remove the lost mark") : T("Indicar perdido — a oportunidade fica onde está, só ganha a marca", "Mark as lost — the opportunity stays where it is, it only gets the mark"))" @onclick="() => AskPerdida(o)" @onclick:stopPropagation="true">@Icons.Svg("x")</button>
+                        <button class="row-act" title="@T("Editar oportunidade", "Edit opportunity")" @onclick="() => OpenEdit(o)" @onclick:stopPropagation="true">@Icons.Svg("edit")</button>
+                        <button class="row-act" title="@T("Duplicar oportunidade", "Duplicate opportunity")" @onclick="() => Duplicate(o)" @onclick:stopPropagation="true">@Icons.Svg("copy")</button>
+                        <button class="row-act del" title="@T("Excluir oportunidade", "Delete opportunity")" @onclick="() => AskDelete(o)" @onclick:stopPropagation="true">@Icons.Svg("trash")</button>
                     </td>
                     @foreach (var c in Visiveis)
                     {
@@ -74,14 +74,14 @@
                             case "market":    <td>@Cat.MarketName(o.MarketId)</td> break;
                             case "product":   <td>@Cat.ProductName(o.ProductId)</td> break;
                             case "kam":       <td>@Cat.KamName(o.KamId)</td> break;
-                            case "customer":  <td class="col-strong">@Cat.CustomerName(o.CustomerId)@if (o.PerdidaValue) { <span class="perdida-tag">Perdido</span> }</td> break;
+                            case "customer":  <td class="col-strong">@Cat.CustomerName(o.CustomerId)@if (o.PerdidaValue) { <span class="perdida-tag">@T("Perdido", "Lost")</span> }</td> break;
                             case "plantname": <td>@Dash(o.EndUserSite)</td> break;
                             case "proposta":  <td>@o.ProposalNumber</td> break;
-                            case "netvalue":  <td class="right num @Alt(o, nameof(Opportunity.AmountOriginal))" title="@AltTip(o, nameof(Opportunity.AmountOriginal))">@Fmt.Brl(o.AmountBrl)</td> break;
-                            case "pm":        <td class="right num @Alt(o, nameof(Opportunity.GmPercent))" title="@AltTip(o, nameof(Opportunity.GmPercent))">@Fmt.Pct(o.GmPercentValue)</td> break;
-                            case "ganho":     <td class="right num @Alt(o, nameof(Opportunity.WinProbability))" title="@AltTip(o, nameof(Opportunity.WinProbability))">@Fmt.Pct(o.WinProbabilityValue)</td> break;
-                            case "sairmes":   <td class="right num @Alt(o, nameof(Opportunity.CloseInPeriodProbability))" title="@AltTip(o, nameof(Opportunity.CloseInPeriodProbability))">@Fmt.Pct(o.CloseProbabilityValue)</td> break;
-                            case "conversao": <td class="right num">@Fmt.Brl(ForecastCalc.ConversionBrl(o))</td> break;
+                            case "netvalue":  <td class="right num @Alt(o, nameof(Opportunity.AmountOriginal))" title="@AltTip(o, nameof(Opportunity.AmountOriginal))">@Brl(o.AmountBrl)</td> break;
+                            case "pm":        <td class="right num @Alt(o, nameof(Opportunity.GmPercent))" title="@AltTip(o, nameof(Opportunity.GmPercent))">@Pct(o.GmPercentValue)</td> break;
+                            case "ganho":     <td class="right num @Alt(o, nameof(Opportunity.WinProbability))" title="@AltTip(o, nameof(Opportunity.WinProbability))">@Pct(o.WinProbabilityValue)</td> break;
+                            case "sairmes":   <td class="right num @Alt(o, nameof(Opportunity.CloseInPeriodProbability))" title="@AltTip(o, nameof(Opportunity.CloseInPeriodProbability))">@Pct(o.CloseProbabilityValue)</td> break;
+                            case "conversao": <td class="right num">@Brl(ForecastCalc.ConversionBrl(o))</td> break;
                             case "nbafm":     <td class="center">@Dash(o.CategoriaNbAfm)</td> break;
                             case "servico":   <td>@Dash(o.ServicoPrevisto)</td> break;
                             case "onestream": <td>@Dash(o.MarketOnestream)</td> break;
@@ -90,8 +90,8 @@
                             case "obs":       <td class="@Alt(o, nameof(Opportunity.Notes))" title="@AltTip(o, nameof(Opportunity.Notes))">@Dash(o.Notes)</td> break;
                             case "pv":        <td>@Dash(o.PvNumber)</td> break;
                             case "ramp":      <td class="@Alt(o, nameof(Opportunity.Ramp))" title="@AltTip(o, nameof(Opportunity.Ramp))">@Dash(o.Ramp)</td> break;
-                            case "usd":       <td class="right num">@Fmt.Usd(o.AmountUsd)</td> break;
-                            case "taxa":      <td class="right num">@o.ExchangeRateValue.ToString("0.00", _pt)</td> break;
+                            case "usd":       <td class="right num">@Usd(o.AmountUsd)</td> break;
+                            case "taxa":      <td class="right num">@o.ExchangeRateValue.ToString("0.00", Cul)</td> break;
                             case "coluna1":   <td>@Dash(o.Coluna1)</td> break;
                             case "otp":       <td class="center @Alt(o, nameof(Opportunity.Otp))" title="@AltTip(o, nameof(Opportunity.Otp))">@Mark(o.Otp)</td> break;
                             case "top10":     <td class="center">@Mark(o.Top10)</td> break;
@@ -99,7 +99,7 @@
                             case "buorigem":  <td>@Dash(o.BuOrigem)</td> break;
                             case "crmorigem": <td class="nowrap">@Dash(o.CrmOrigem)</td> break;
                             case "moedaorigem": <td class="center">@Dash(o.MoedaOrigem)</td> break;
-                            case "valororigem": <td class="right num">@(string.IsNullOrWhiteSpace(o.ValorOrigem) ? "—" : o.ValorOrigemValue.ToString("#,##0.00", _pt))</td> break;
+                            case "valororigem": <td class="right num">@(string.IsNullOrWhiteSpace(o.ValorOrigem) ? "—" : o.ValorOrigemValue.ToString("#,##0.00", Cul))</td> break;
                             case "refname":       <td>@Dash(o.Refname)</td> break;
                             case "refno":         <td>@Dash(o.Refno)</td> break;
                             case "productcompany":<td>@Dash(o.Productcompany)</td> break;
@@ -115,7 +115,7 @@
             }
             @if (Rows.Count == 0)
             {
-                <tr><td colspan="@(Visiveis.Count + 1)" class="empty">@EmptyText</td></tr>
+                <tr><td colspan="@(Visiveis.Count + 1)" class="empty">@(Ingles && EmptyText == EmptyPadrao ? "No opportunities in this selection." : EmptyText)</td></tr>
             }
         </tbody>
     </table>
@@ -134,22 +134,32 @@
 {
     <div class="drawer-backdrop" @onclick="FecharPendencias"></div>
     <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
-        <div class="confirm-head" style="color:var(--warn, #b7791f)">@Icons.Svg("alert")<span>Complete os dados da previsão</span></div>
+        <div class="confirm-head" style="color:var(--warn, #b7791f)">@Icons.Svg("alert")<span>@T("Complete os dados da previsão", "Complete the forecast data")</span></div>
+        @if (Ingles)
+        {
+            <p class="confirm-text">
+                <strong>@_pend.Name</strong> was added to the forecast. Still missing:
+                <strong>@string.Join(", ", _pendFaltam.Select(Lbl))</strong>.
+            </p>
+        }
+        else
+        {
         <p class="confirm-text">
             <strong>@_pend.Name</strong> entrou na previsão. Falta preencher:
             <strong>@string.Join(", ", _pendFaltam)</strong>.
         </p>
+        }
         <div class="form-grid">
-            <label class="fld">% de Ganho<input class="field num" @bind="_pend.WinProbability" /></label>
-            <label class="fld">% de Sair no Mês<input class="field num" @bind="_pend.CloseInPeriodProbability" /></label>
+            <label class="fld">@Lbl("% de Ganho")<input class="field num" @bind="_pend.WinProbability" /></label>
+            <label class="fld">@Lbl("% de Sair no Mês")<input class="field num" @bind="_pend.CloseInPeriodProbability" /></label>
             <label class="fld">RAMP<input class="field" @bind="_pend.Ramp" /></label>
-            <label class="fld">OTP<select class="field" @bind="_pend.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
-            <label class="fld">TOP 10<select class="field" @bind="_pend.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
-            <label class="fld">KYC<select class="field" @bind="_pend.Kyc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
+            <label class="fld">OTP<select class="field" @bind="_pend.Otp"><option value="">—</option><option value="Sim">@T("Sim", "Yes")</option><option value="Não">@T("Não", "No")</option></select></label>
+            <label class="fld">TOP 10<select class="field" @bind="_pend.Top10"><option value="">—</option><option value="Sim">@T("Sim", "Yes")</option><option value="Não">@T("Não", "No")</option></select></label>
+            <label class="fld">KYC<select class="field" @bind="_pend.Kyc"><option value="">—</option><option value="Sim">@T("Sim", "Yes")</option><option value="Não">@T("Não", "No")</option></select></label>
         </div>
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="FecharPendencias">Preencher depois</button>
-            <button class="btn-primary" @onclick="SalvarPendencias">@Icons.Svg("check")Salvar</button>
+            <button class="btn-ghost" @onclick="FecharPendencias">@T("Preencher depois", "Fill in later")</button>
+            <button class="btn-primary" @onclick="SalvarPendencias">@Icons.Svg("check")@T("Salvar", "Save")</button>
         </div>
     </div>
 }
@@ -159,11 +169,18 @@
 {
     <div class="drawer-backdrop" @onclick="() => _delTarget = null"></div>
     <div class="confirm-box">
-        <div class="confirm-head">@Icons.Svg("alert")<span>Excluir oportunidade</span></div>
+        <div class="confirm-head">@Icons.Svg("alert")<span>@T("Excluir oportunidade", "Delete opportunity")</span></div>
+        @if (Ingles)
+        {
+            <p class="confirm-text">Are you sure you want to delete <strong>@_delTarget.Name</strong> (@_delTarget.ProposalNumber)? This action cannot be undone.</p>
+        }
+        else
+        {
         <p class="confirm-text">Tem certeza que deseja excluir <strong>@_delTarget.Name</strong> (@_delTarget.ProposalNumber)? Esta ação não pode ser desfeita.</p>
+        }
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _delTarget = null">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete">@Icons.Svg("trash")Excluir</button>
+            <button class="btn-ghost" @onclick="() => _delTarget = null">@T("Cancelar", "Cancel")</button>
+            <button class="btn-danger" @onclick="ConfirmDelete">@Icons.Svg("trash")@T("Excluir", "Delete")</button>
         </div>
     </div>
 }
@@ -173,8 +190,16 @@
 {
     <div class="drawer-backdrop" @onclick="() => _perdida = null"></div>
     <div class="confirm-box">
-        <div class="confirm-head">@Icons.Svg("x")<span>@(_perdida.PerdidaValue ? "Reabrir oportunidade" : "Indicar perdido")</span></div>
-        @if (_perdida.PerdidaValue)
+        <div class="confirm-head">@Icons.Svg("x")<span>@(_perdida.PerdidaValue ? T("Reabrir oportunidade", "Reopen opportunity") : T("Indicar perdido", "Mark as lost"))</span></div>
+        @if (_perdida.PerdidaValue && Ingles)
+        {
+            <p class="confirm-text">Remove the lost mark from <strong>@_perdida.Name</strong> (@_perdida.ProposalNumber)? It will show as open again.</p>
+        }
+        else if (Ingles)
+        {
+            <p class="confirm-text">Mark <strong>@_perdida.Name</strong> (@_perdida.ProposalNumber) as <strong>lost</strong>? It stays in the list, with the same values — it only gets the mark and the row turns red. You can undo it with the same button.</p>
+        }
+        else if (_perdida.PerdidaValue)
         {
             <p class="confirm-text">Tirar a marca de perdida de <strong>@_perdida.Name</strong> (@_perdida.ProposalNumber)? Ela volta a aparecer como em aberto.</p>
         }
@@ -183,14 +208,14 @@
             <p class="confirm-text">Marcar <strong>@_perdida.Name</strong> (@_perdida.ProposalNumber) como <strong>perdida</strong>? Ela continua na listagem, com os mesmos valores — só ganha a marca e a linha fica vermelha. Dá para desfazer pelo mesmo botão.</p>
         }
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _perdida = null">Cancelar</button>
+            <button class="btn-ghost" @onclick="() => _perdida = null">@T("Cancelar", "Cancel")</button>
             @if (_perdida.PerdidaValue)
             {
-                <button class="btn-primary" @onclick="ConfirmPerdida">@Icons.Svg("check")Reabrir</button>
+                <button class="btn-primary" @onclick="ConfirmPerdida">@Icons.Svg("check")@T("Reabrir", "Reopen")</button>
             }
             else
             {
-                <button class="btn-danger" @onclick="ConfirmPerdida">@Icons.Svg("x")Indicar perdido</button>
+                <button class="btn-danger" @onclick="ConfirmPerdida">@Icons.Svg("x")@T("Indicar perdido", "Mark as lost")</button>
             }
         </div>
     </div>
@@ -202,28 +227,42 @@
     var difs = AlteracoesCrm.Alterados(_crm).Where(c => !AlteracoesCrm.SemInfo(c.ValorCrm)).ToList();
     <div class="drawer-backdrop" @onclick="() => _crm = null"></div>
     <div class="confirm-box" style="width:min(560px,calc(100vw - 32px))">
-        <div class="confirm-head">@Icons.Svg("history")<span>Considerar dados do CRM</span></div>
+        <div class="confirm-head">@Icons.Svg("history")<span>@T("Considerar dados do CRM", "Use CRM data")</span></div>
         @if (difs.Count == 0)
         {
+            @if (Ingles)
+            {
+            <p class="confirm-text">Nothing to undo in <strong>@_crm.Name</strong> (@_crm.ProposalNumber): the fields already match what the CRM brought — or the CRM brought no value for the fields that were changed.</p>
+            }
+            else
+            {
             <p class="confirm-text">Nada a desfazer em <strong>@_crm.Name</strong> (@_crm.ProposalNumber): os campos já estão iguais ao que o CRM trouxe — ou o CRM não trouxe valor para os campos que foram alterados.</p>
-            <div class="modal-actions"><button class="btn-ghost" @onclick="() => _crm = null">Fechar</button></div>
+            }
+            <div class="modal-actions"><button class="btn-ghost" @onclick="() => _crm = null">@T("Fechar", "Close")</button></div>
         }
         else
         {
+            @if (Ingles)
+            {
+            <p class="confirm-text">In <strong>@_crm.Name</strong> (@_crm.ProposalNumber), the fields below go back to the CRM value. What was entered in the system in these fields no longer applies.</p>
+            }
+            else
+            {
             <p class="confirm-text">Em <strong>@_crm.Name</strong> (@_crm.ProposalNumber), os campos abaixo voltam ao valor do CRM. O que foi preenchido no sistema nesses campos deixa de valer.</p>
+            }
             <table class="alt-lista">
-                <thead><tr><th>Campo</th><th class="num">No sistema</th><th class="num">Volta para (CRM)</th></tr></thead>
+                <thead><tr><th>@T("Campo", "Field")</th><th class="num">@T("No sistema", "In the system")</th><th class="num">@T("Volta para (CRM)", "Goes back to (CRM)")</th></tr></thead>
                 <tbody>
                     @foreach (var c in difs)
                     {
-                        <tr><td>@c.Rotulo</td><td class="num crm">@AlteracoesCrm.Mostrar(c.Nome, c.ValorSistema)</td><td class="num sis">@AlteracoesCrm.Mostrar(c.Nome, c.ValorCrm)</td></tr>
+                        <tr><td>@Lbl(c.Rotulo)</td><td class="num crm">@Mostrar(c.Nome, c.ValorSistema)</td><td class="num sis">@Mostrar(c.Nome, c.ValorCrm)</td></tr>
                     }
                 </tbody>
             </table>
-            <p class="confirm-text" style="font-size:12px;color:var(--muted);margin-top:10px">Campos que o CRM trouxe vazios ficam como estão.</p>
+            <p class="confirm-text" style="font-size:12px;color:var(--muted);margin-top:10px">@T("Campos que o CRM trouxe vazios ficam como estão.", "Fields the CRM brought empty stay as they are.")</p>
             <div class="modal-actions">
-                <button class="btn-ghost" @onclick="() => _crm = null">Cancelar</button>
-                <button class="btn-primary" @onclick="ConfirmCrm">@Icons.Svg("history")Considerar dados do CRM</button>
+                <button class="btn-ghost" @onclick="() => _crm = null">@T("Cancelar", "Cancel")</button>
+                <button class="btn-primary" @onclick="ConfirmCrm">@Icons.Svg("history")@T("Considerar dados do CRM", "Use CRM data")</button>
             </div>
         }
     </div>
@@ -236,26 +275,26 @@
     <div class="drawer drawer-wide">
         <div class="page-head">
             <div>
-                <h2 style="color:var(--primary)">@(_editDup ? "Duplicar oportunidade" : "Editar oportunidade")</h2>
-                <p class="subtitle">@(_editDup ? "Cópia — ajuste só o que muda e salve como nova" : $"{_edit.ProposalNumber} · altere qualquer campo")</p>
+                <h2 style="color:var(--primary)">@(_editDup ? T("Duplicar oportunidade", "Duplicate opportunity") : T("Editar oportunidade", "Edit opportunity"))</h2>
+                <p class="subtitle">@(_editDup ? T("Cópia — ajuste só o que muda e salve como nova", "Copy — adjust only what changes and save as new") : $"{_edit.ProposalNumber} · {T("altere qualquer campo", "change any field")}")</p>
             </div>
             <button class="icon-btn" @onclick="() => _edit = null">@Icons.Svg("x")</button>
         </div>
         <div class="form-grid">
-            <label class="fld full">Nome da oportunidade<input class="field" @bind="_edit.Name" /></label>
+            <label class="fld full">@T("Nome da oportunidade", "Opportunity name")<input class="field" @bind="_edit.Name" /></label>
 
-            <label class="fld">Mês da previsão @MarcaCrm(nameof(Opportunity.ExpectedDate))
-                <select class="field" @bind="_editMonthNum">@for (var m = 1; m <= 12; m++){<option value="@m">@Fmt.MonthLong(m)</option>}</select>
+            <label class="fld">@T("Mês da previsão", "Forecast month") @MarcaCrm(nameof(Opportunity.ExpectedDate))
+                <select class="field" @bind="_editMonthNum">@for (var m = 1; m <= 12; m++){<option value="@m">@(Ingles ? RotulosEn.MonthLong(m) : Fmt.MonthLong(m))</option>}</select>
             </label>
-            <label class="fld">Ano da previsão
+            <label class="fld">@T("Ano da previsão", "Forecast year")
                 <select class="field" @bind="_editYear">@for (var y = DateTime.Today.Year - 2; y <= DateTime.Today.Year + 3; y++){<option value="@y">@y</option>}</select>
             </label>
-            <label class="fld">Proposta<input class="field" @bind="_edit.ProposalNumber" /></label>
+            <label class="fld">@T("Proposta", "Proposal")<input class="field" @bind="_edit.ProposalNumber" /></label>
             <label class="fld">PV<input class="field" @bind="_edit.PvNumber" /></label>
 
-            <label class="fld">País<input class="field" list="dl-pais" @bind="_edit.CountryId" /></label>
+            <label class="fld">@T("País", "Country")<input class="field" list="dl-pais" @bind="_edit.CountryId" /></label>
             <label class="fld">Market<input class="field" list="dl-market" @bind="_edit.MarketId" /></label>
-            <label class="fld">Market Variável<input class="field" list="dl-market_var" @bind="_edit.SubMarketId" /></label>
+            <label class="fld">@T("Market Variável", "Sub-market")<input class="field" list="dl-market_var" @bind="_edit.SubMarketId" /></label>
             <label class="fld">Product<input class="field" list="dl-product" @bind="_edit.ProductId" /></label>
             <label class="fld">Key Account<input class="field" list="dl-key_account" @bind="_edit.KamId" /></label>
             <label class="fld">Customer<input class="field" list="dl-customer" @bind="_edit.CustomerId" /></label>
@@ -267,21 +306,21 @@
                e a escolha alimenta a coluna Setor. *@
             @if (_edit.VeioDePlanilha)
             {
-                <label class="fld">Categoria (NB/AFM) <span class="hint">vem do setor de origem</span>
+                <label class="fld">@T("Categoria (NB/AFM)", "Category (NB/AFM)") <span class="hint">@T("vem do setor de origem", "comes from the source sector")</span>
                     <input class="field" value="@_edit.CategoriaNbAfm" readonly />
                 </label>
             }
             else
             {
-                <label class="fld">Categoria (NB/AFM) <span class="hint">define a coluna Setor</span>
+                <label class="fld">@T("Categoria (NB/AFM)", "Category (NB/AFM)") <span class="hint">@T("define a coluna Setor", "sets the Sector column")</span>
                     <select class="field" @bind="_edit.Setor">
                         <option value="">—</option>
                         @foreach (var st in Opportunity.SetoresManuais){<option value="@st">@st</option>}
                     </select>
                 </label>
             }
-            <label class="fld">Serviço previsto<input class="field" list="dl-servico" @bind="_edit.ServicoPrevisto" /></label>
-            <label class="fld">Etapa do funil
+            <label class="fld">@T("Serviço previsto", "Planned service")<input class="field" list="dl-servico" @bind="_edit.ServicoPrevisto" /></label>
+            <label class="fld">@T("Etapa do funil", "Funnel stage")
                 <select class="field" @bind="_edit.Stage">
                     <option value="">—</option>
                     @if (Unknown(_edit.Stage, Cat.Stages.Select(x => x.Name))) { <option value="@_edit.Stage" selected>@_edit.Stage</option> }
@@ -289,20 +328,20 @@
                 </select>
             </label>
 
-            <label class="fld">Moeda
+            <label class="fld">@T("Moeda", "Currency")
                 <select class="field" @bind="_edit.CurrencyCode">@foreach (var c in Cat.Currencies) { <option value="@c.Code">@c.Code</option> }</select>
             </label>
-            <label class="fld">Net Value (valor) @MarcaCrm(nameof(Opportunity.AmountOriginal))<input class="field num" @bind="_edit.AmountOriginal" /></label>
-            <label class="fld">Taxa (BRL/USD)<input class="field num" @bind="_edit.ExchangeRate" /></label>
-            <label class="fld">Valor USD (calculado)<input class="field num" value="@Fmt.Usd(_edit.AmountUsd)" readonly /></label>
+            <label class="fld">@T("Net Value (valor)", "Net Value (amount)") @MarcaCrm(nameof(Opportunity.AmountOriginal))<input class="field num" @bind="_edit.AmountOriginal" /></label>
+            <label class="fld">@T("Taxa (BRL/USD)", "Rate (BRL/USD)")<input class="field num" @bind="_edit.ExchangeRate" /></label>
+            <label class="fld">@T("Valor USD (calculado)", "USD value (calculated)")<input class="field num" value="@Usd(_edit.AmountUsd)" readonly /></label>
 
             <label class="fld">PM % (GM) @MarcaCrm(nameof(Opportunity.GmPercent))<input class="field num" @bind="_edit.GmPercent" /></label>
-            <label class="fld">% de Ganho @MarcaCrm(nameof(Opportunity.WinProbability))<input class="field num" @bind="_edit.WinProbability" /></label>
-            <label class="fld">% de Sair no Mês @MarcaCrm(nameof(Opportunity.CloseInPeriodProbability))<input class="field num" @bind="_edit.CloseInPeriodProbability" /></label>
+            <label class="fld">@Lbl("% de Ganho") @MarcaCrm(nameof(Opportunity.WinProbability))<input class="field num" @bind="_edit.WinProbability" /></label>
+            <label class="fld">@Lbl("% de Sair no Mês") @MarcaCrm(nameof(Opportunity.CloseInPeriodProbability))<input class="field num" @bind="_edit.CloseInPeriodProbability" /></label>
 
-            <label class="fld">Unidade de Venda<input class="field" list="dl-unidade" @bind="_edit.PvBusinessUnitId" /></label>
+            <label class="fld">@T("Unidade de Venda", "Sales unit")<input class="field" list="dl-unidade" @bind="_edit.PvBusinessUnitId" /></label>
             <label class="fld">BU Intercompany<input class="field" list="dl-bu_inter" @bind="_edit.IntercompanyBu" /></label>
-            <label class="fld">Is Inter Company <span class="hint">vem da planilha</span><input class="field" @bind="_edit.IsInterCompany" /></label>
+            <label class="fld">Is Inter Company <span class="hint">@T("vem da planilha", "comes from the spreadsheet")</span><input class="field" @bind="_edit.IsInterCompany" /></label>
 
             @* Colunas do funil que vêm da planilha e não tinham lugar no formulário. *@
             <label class="fld">Commercial Segment<input class="field" @bind="_edit.CommercialSegment" /></label>
@@ -314,11 +353,11 @@
 
             <label class="fld">RAMP @MarcaCrm(nameof(Opportunity.Ramp))<input class="field" @bind="_edit.Ramp" /></label>
             <label class="fld">Coluna1<input class="field" @bind="_edit.Coluna1" /></label>
-            <label class="fld">OTP @MarcaCrm(nameof(Opportunity.Otp))<select class="field" @bind="_edit.Otp"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
-            <label class="fld">TOP 10<select class="field" @bind="_edit.Top10"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
-            <label class="fld">KYC<select class="field" @bind="_edit.Kyc"><option value="">—</option><option value="Sim">Sim</option><option value="Não">Não</option></select></label>
-            <label class="fld full">Observação @MarcaCrm(nameof(Opportunity.Notes))<input class="field" @bind="_edit.Notes" /></label>
-            <label class="fld full">Próxima ação<input class="field" @bind="_edit.NextAction" /></label>
+            <label class="fld">OTP @MarcaCrm(nameof(Opportunity.Otp))<select class="field" @bind="_edit.Otp"><option value="">—</option><option value="Sim">@T("Sim", "Yes")</option><option value="Não">@T("Não", "No")</option></select></label>
+            <label class="fld">TOP 10<select class="field" @bind="_edit.Top10"><option value="">—</option><option value="Sim">@T("Sim", "Yes")</option><option value="Não">@T("Não", "No")</option></select></label>
+            <label class="fld">KYC<select class="field" @bind="_edit.Kyc"><option value="">—</option><option value="Sim">@T("Sim", "Yes")</option><option value="Não">@T("Não", "No")</option></select></label>
+            <label class="fld full">@T("Observação", "Notes") @MarcaCrm(nameof(Opportunity.Notes))<input class="field" @bind="_edit.Notes" /></label>
+            <label class="fld full">@T("Próxima ação", "Next action")<input class="field" @bind="_edit.NextAction" /></label>
         </div>
         @if (!string.IsNullOrEmpty(_editConflito))
         {
@@ -327,17 +366,17 @@
                 @if (_editMudou.Count > 0)
                 {
                     <br />
-                    <span>Mudou: @string.Join(", ", _editMudou).</span>
+                    <span>@(T("Mudou: ", "Changed: ") + string.Join(", ", Ingles ? _editMudou.Select(Lbl) : _editMudou) + ".")</span>
                 }
                 <br />
-                <span>Cancele e abra de novo para ver o que está valendo, ou clique em Salvar mais uma vez para gravar a sua versão por cima.</span>
+                <span>@T("Cancele e abra de novo para ver o que está valendo, ou clique em Salvar mais uma vez para gravar a sua versão por cima.", "Cancel and open it again to see the current version, or click Save once more to overwrite it with your version.")</span>
             </div>
         }
         <div class="modal-actions">
-            @if (!_editDup) { <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")Excluir</button> }
+            @if (!_editDup) { <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")@T("Excluir", "Delete")</button> }
             <div class="filterbar-spacer"></div>
-            <button class="btn-ghost" @onclick="() => _edit = null">Cancelar</button>
-            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")@(_editDup ? "Criar cópia" : "Salvar alterações")</button>
+            <button class="btn-ghost" @onclick="() => _edit = null">@T("Cancelar", "Cancel")</button>
+            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")@(_editDup ? T("Criar cópia", "Create copy") : T("Salvar alterações", "Save changes"))</button>
         </div>
     </div>
 }
@@ -347,7 +386,8 @@
     /// <summary>Textos da tabela (cabeçalhos, botões, vazio) em inglês; os dados continuam como estão.</summary>
     [Parameter] public bool Ingles { get; set; }
     private string T(string pt, string en) => Ingles ? en : pt;
-    [Parameter] public string EmptyText { get; set; } = "Nenhuma oportunidade no recorte.";
+    private const string EmptyPadrao = "Nenhuma oportunidade no recorte.";
+    [Parameter] public string EmptyText { get; set; } = EmptyPadrao;
     [Parameter] public string CssClass { get; set; } = "";
     [Parameter] public string Style { get; set; } = "";
     [Parameter] public EventCallback OnChanged { get; set; }
@@ -450,13 +490,19 @@
     private Opportunity? _delTarget;
 
     private static readonly System.Globalization.CultureInfo _pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+    private System.Globalization.CultureInfo Cul => Ingles ? RotulosEn.EnUs : _pt;
+    private string Lbl(string pt) => Ingles ? RotulosEn.Rotulo(pt) : pt;
+    private string Brl(double v) => Ingles ? "R$ " + v.ToString("#,##0", RotulosEn.EnUs) : Fmt.Brl(v);
+    private string Usd(double v) => Ingles ? "US$ " + v.ToString("#,##0", RotulosEn.EnUs) : Fmt.Usd(v);
+    private string Pct(double v) => Ingles ? v.ToString("0", RotulosEn.EnUs) + "%" : Fmt.Pct(v);
+    private string Mostrar(string campo, string? valor) => Ingles ? RotulosEn.CrmMostrar(campo, valor) : AlteracoesCrm.Mostrar(campo, valor);
     private static string Dash(string? s) => string.IsNullOrWhiteSpace(s) || s == "—" ? "—" : s!;
 
     // ---- Alterado no sistema: o valor gravado é diferente do que o CRM trouxe ----
     // Na tabela, a célula ganha um cantinho e a dica com quem/quando/valor do CRM.
     // Null na dica = atributo omitido, para não engolir a dica da linha.
     private static string Alt(Opportunity o, string campo) => AlteracoesCrm.Diferente(o, campo) ? "alt" : "";
-    private static string? AltTip(Opportunity o, string campo) => AlteracoesCrm.Descricao(o, campo);
+    private string? AltTip(Opportunity o, string campo) => Ingles ? RotulosEn.CrmDescricao(o, campo) : AlteracoesCrm.Descricao(o, campo);
 
     // No formulário, a comparação é com o que está sendo digitado (inclusive o
     // mês/ano, que ficam em campos próprios até salvar).
@@ -476,11 +522,13 @@
         if (_edit is null || AlteracoesCrm.ValorCrm(_edit, campo) is not { } crm) return (false, "", "");
         var aqui = ValorEmEdicao(campo);
         if (!AlteracoesCrm.Diferente(campo, crm, aqui)) return (false, "", "");
-        var crmFmt = AlteracoesCrm.Mostrar(campo, crm);
-        return (true, crmFmt, $"No CRM: {crmFmt} · Aqui: {AlteracoesCrm.Mostrar(campo, aqui)}{AlteracoesCrm.QuemQuando(_edit, campo)}");
+        var crmFmt = Mostrar(campo, crm);
+        return (true, crmFmt, Ingles
+            ? $"In CRM: {crmFmt} · Here: {Mostrar(campo, aqui)}{RotulosEn.CrmQuemQuando(_edit, campo)}"
+            : $"No CRM: {crmFmt} · Aqui: {AlteracoesCrm.Mostrar(campo, aqui)}{AlteracoesCrm.QuemQuando(_edit, campo)}");
     }
 
-    private RenderFragment<string> MarcaCrm => campo => @<text>@{ var m = Marca(campo); }@if (m.Mostra) { <span class="alt-row"><span class="alt-tip" title="@m.Dica">≠ CRM</span><button type="button" class="alt-voltar" title="Voltar ao valor do CRM: @m.Crm" @onclick="() => VoltarCrm(campo)">@Icons.Svg("history")Voltar ao CRM</button></span> }</text>;
+    private RenderFragment<string> MarcaCrm => campo => @<text>@{ var m = Marca(campo); }@if (m.Mostra) { <span class="alt-row"><span class="alt-tip" title="@m.Dica">≠ CRM</span><button type="button" class="alt-voltar" title="@(T("Voltar ao valor do CRM: ", "Go back to the CRM value: ") + m.Crm)" @onclick="() => VoltarCrm(campo)">@Icons.Svg("history")@T("Voltar ao CRM", "Back to CRM")</button></span> }</text>;
 
     private void VoltarCrm(string campo)
     {
@@ -496,12 +544,12 @@
     }
     // Marcador "Sim" (OTP, TOP 10, KYC) vindo da planilha ou preenchido na tela.
     private static bool Sim(string? s) => string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase);
-    private static MarkupString Mark(string? s) =>
-        string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase) ? new("<span class='mk yes'>Sim</span>")
-        : (string.Equals(s, "Não", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "Nao", StringComparison.OrdinalIgnoreCase)) ? new MarkupString("<span class='mk no'>Não</span>")
+    private MarkupString Mark(string? s) =>
+        string.Equals(s, "Sim", StringComparison.OrdinalIgnoreCase) ? new(Ingles ? "<span class='mk yes'>Yes</span>" : "<span class='mk yes'>Sim</span>")
+        : (string.Equals(s, "Não", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "Nao", StringComparison.OrdinalIgnoreCase)) ? new MarkupString(Ingles ? "<span class='mk no'>No</span>" : "<span class='mk no'>Não</span>")
         : new MarkupString("—");
-    private static string MonthLabel(Opportunity o) =>
-        o.ExpectedDateValue is { } d ? $"{Fmt.MonthName(d.Month)}/{d.Year}" : "—";
+    private string MonthLabel(Opportunity o) =>
+        o.ExpectedDateValue is { } d ? $"{(Ingles ? RotulosEn.MonthShort(d.Month) : Fmt.MonthName(d.Month))}/{d.Year}" : "—";
     private static bool Unknown(string id, IEnumerable<string> knownIds) =>
         !string.IsNullOrEmpty(id) && !knownIds.Contains(id);
 
@@ -580,7 +628,7 @@
             if (agora is not null && OpportunityRepository.Assinatura(agora) != _editAssinatura)
             {
                 _editMudou = OpportunityRepository.CamposDiferentes(agora, _edit);
-                _editConflito = "Esta oportunidade foi alterada por outra pessoa enquanto você editava.";
+                _editConflito = T("Esta oportunidade foi alterada por outra pessoa enquanto você editava.", "This opportunity was changed by someone else while you were editing.");
                 // A partir daqui a referência passa a ser o estado atual: se a
                 // pessoa insistir, ela sobrescreve sabendo o que está fazendo.
                 _editAssinatura = OpportunityRepository.Assinatura(agora);
