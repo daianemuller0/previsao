@@ -28,6 +28,10 @@
             <button class="@(_currency == "USD" ? "active" : "")" @onclick='() => _currency = "USD"'>USD</button>
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
+        <div class="segmented" style="margin-right:2px" title="Idioma da tela · Screen language">
+            <button class="@(!_en ? "active" : "")" @onclick="() => MudarIdioma(false)">PT</button>
+            <button class="@(_en ? "active" : "")" @onclick="() => MudarIdioma(true)">EN</button>
+        </div>
         @if (_currency == "USD")
         {
             @* taxa R$/US$ só para esta tela: tudo o que a página mostraria em R$ é dividido por ela (não grava nada) *@
@@ -1129,6 +1133,19 @@
 
     // ---- gráficos de barras: ordem (arraste) e espessura, por usuário --------
     private string _login = "";
+
+    // ---- idioma da tela (botão PT/EN ao lado da moeda; guardado por login) ----
+    private bool _en;
+    private const string ChaveIdioma = "visao_executiva_idioma";
+    /// <summary>O texto no idioma da tela: T("Vendas realizadas", "Actual sales").</summary>
+    private string T(string pt, string en) => _en ? en : pt;
+    private static readonly System.Globalization.CultureInfo EnUs = new("en-US");
+    private void MudarIdioma(bool en)
+    {
+        if (_en == en) return;
+        _en = en;
+        if (_login != "") { try { ChartPrefs.Save(_login, ChaveIdioma, en ? "en" : "pt", ChartPrefsRepository.BarraPadrao); } catch { } }
+    }
     private int _chartVersion = -1;
     private readonly Dictionary<string, ChartPrefsRepository.Pref> _chart = new(StringComparer.OrdinalIgnoreCase);
 
@@ -1211,6 +1228,7 @@
                      ?? user.Identity?.Name ?? "";
             _chart.Clear();          // o 1º render acontece antes daqui: recarrega já com o login
         }
+        _en = _login != "" && ChartPrefs.Get(_login, ChaveIdioma).Ordem == "en";   // idioma guardado por login
         RestaurarFiltros();
         _opps = LoadScoped();
         LoadReport();
@@ -1396,6 +1414,7 @@
         }
         sb.Append(_search).Append('|').Append(_onlyIndicated).Append('|').Append(_semOtp).Append('|').Append(_overdue).Append('|')
           .Append(_onlyLost).Append('|').Append(_onlyAltered).Append('|')
+          .Append(_en ? "en" : "pt").Append('|')   // os gráficos montados em texto (SVG/HTML) são refeitos no idioma novo
           .Append(_currency).Append('|').Append(TaxaTelaAtiva?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "").Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
           .Append(_valMin).Append('|').Append(_valMax).Append('|')
           // Identidade dos dados: recarga da base ou edição numa linha invalidam.

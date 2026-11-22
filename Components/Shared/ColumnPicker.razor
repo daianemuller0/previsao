@@ -40,6 +40,9 @@
 
 @code {
     [Parameter] public List<TableColumns.ColState> Cols { get; set; } = new();
+    /// <summary>Textos do seletor de colunas em inglês.</summary>
+    [Parameter] public bool Ingles { get; set; }
+    private string T(string pt, string en) => Ingles ? en : pt;
     [Parameter] public EventCallback<List<TableColumns.ColState>> OnApply { get; set; }
     [Parameter] public EventCallback OnReset { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }

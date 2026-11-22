@@ -344,6 +344,9 @@
 
 @code {
     [Parameter] public List<Opportunity> Rows { get; set; } = new();
+    /// <summary>Textos da tabela (cabeçalhos, botões, vazio) em inglês; os dados continuam como estão.</summary>
+    [Parameter] public bool Ingles { get; set; }
+    private string T(string pt, string en) => Ingles ? en : pt;
     [Parameter] public string EmptyText { get; set; } = "Nenhuma oportunidade no recorte.";
     [Parameter] public string CssClass { get; set; } = "";
     [Parameter] public string Style { get; set; } = "";

@@ -109,6 +109,9 @@
 @code {
     [Parameter] public List<Opportunity> Data { get; set; } = new();
     [Parameter] public string Currency { get; set; } = "BRL";
+    /// <summary>Textos do estúdio em inglês.</summary>
+    [Parameter] public bool Ingles { get; set; }
+    private string T(string pt, string en) => Ingles ? en : pt;
     [Parameter] public double Rate { get; set; } = 1;    // USD -> BRL
     [Parameter] public string Sym { get; set; } = "R$";
 
