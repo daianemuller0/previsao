@@ -19,7 +19,7 @@
     <div>
         <h1>Previsão de Vendas</h1>
         <p class="subtitle">
-            @Fmt.MonthLong(_month) de @_year · @(_quarter)º trimestre · Howden Brasil · @_currency<br />
+            @Fmt.MonthLong(_month) de @_year · @(_quarter)º trimestre · Howden Brasil · @_currency@(TaxaTelaAtiva is double tt ? $" (R$ ÷ {tt.ToString("0.0000", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}, taxa digitada na tela)" : "")<br />
             Última consolidação @_updated.ToString("dd/MM/yyyy 'às' HH:mm")
         </p>
     </div>
@@ -28,6 +28,14 @@
             <button class="@(_currency == "USD" ? "active" : "")" @onclick='() => _currency = "USD"'>USD</button>
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
+        @if (_currency == "USD")
+        {
+            @* taxa R$/US$ só para esta tela: tudo o que a página mostraria em R$ é dividido por ela (não grava nada) *@
+            <label class="cvx-taxa-tela" title="Taxa R$/US$ só para esta tela: os valores que a página mostraria em R$ são divididos por ela. Não muda a base de dados nem a taxa cadastrada. Vazio = a taxa cadastrada (@Rate.ToString("0.0000", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))).">
+                <span>Taxa</span>
+                <input type="text" inputmode="decimal" placeholder="@Rate.ToString("0.00", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))" value="@(_taxaTela is double tv ? tv.ToString("0.####", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "")" @onchange="MudarTaxaTela" />
+            </label>
+        }
         <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (espaço pausa, Esc sai)">@Icons.Svg("play")Apresentação</button>
         <button class="btn-ghost" title="Exportar as oportunidades do recorte atual (respeita os filtros da página)" @onclick="ExportarFiltradas">@Icons.Svg("download")Exportar</button>
         @* Montar a página: arrastar os painéis e escolher a largura de cada um. *@
@@ -675,7 +683,7 @@
 
 @* ===================== 4c · ESTÚDIO DE GRÁFICOS (Power BI) ===================== *@
 <div class="c12" data-pnl="estudio">
-    <ChartStudio Data="_filtered" Currency="_currency" Rate="Rate" Sym="_sym" />
+    <ChartStudio Data="_filtered" Currency="_currency" Rate="@(TaxaTelaAtiva ?? Rate)" Sym="_sym" />
 </div>
 
 @* ===================== 4b · OPORTUNIDADES ===================== *@
@@ -871,7 +879,17 @@
     private string _movePosName = "", _moveNegName = "";
 
     private double Rate => Cat.RateToUsd("USD");
-    private double Cv(double usd) => _currency == "BRL" ? usd * Rate : usd;
+    // taxa R$/US$ digitada ao lado de USD: em dólar, o valor que a página mostraria em R$ dividido por ela
+    private double? _taxaTela;
+    private double? TaxaTelaAtiva => _currency == "USD" && _taxaTela is > 0 ? _taxaTela : null;
+    /// <summary>Em USD com a taxa da tela: o US$ canônico (R$ ÷ taxa cadastrada) passa a R$ ÷ taxa da tela.</summary>
+    private double FatorTela => TaxaTelaAtiva is double t ? Rate / t : 1.0;
+    private void MudarTaxaTela(ChangeEventArgs e)
+    {
+        var t = (e.Value?.ToString() ?? "").Trim().Replace(",", ".");
+        _taxaTela = double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+    }
+    private double Cv(double usd) => _currency == "BRL" ? usd * Rate : usd * FatorTela;
     private string Money(double usd) => _sym + " " + Fmt.Compact(Cv(usd));
     private static string Clamp(double v) => Math.Clamp(v, 3, 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
     private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -897,7 +915,7 @@
     private string OutroNome => TemRealizada ? "Vendas reportadas" : "Vendas realizadas";
 
     // Conversão de valores em R$ (REPORT HSA é nativo em R$) respeitando o toggle.
-    private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
+    private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(TaxaTelaAtiva ?? Rate, 0.0001);
     private string MoneyBrl(double brl) => _sym + " " + Fmt.Compact(CvBrl(brl));
 
     // Métrica exibida nos gráficos, conforme o seletor "Filtrar por":
@@ -1378,7 +1396,7 @@
         }
         sb.Append(_search).Append('|').Append(_onlyIndicated).Append('|').Append(_semOtp).Append('|').Append(_overdue).Append('|')
           .Append(_onlyLost).Append('|').Append(_onlyAltered).Append('|')
-          .Append(_currency).Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
+          .Append(_currency).Append('|').Append(TaxaTelaAtiva?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "").Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
           .Append(_valMin).Append('|').Append(_valMax).Append('|')
           // Identidade dos dados: recarga da base ou edição numa linha invalidam.
           .Append(_opps.Count).Append('|').Append(Repo.LoadedAt.Ticks);
