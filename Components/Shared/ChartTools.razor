@@ -2,18 +2,20 @@
    O reordenar é por arraste na própria barra — aqui fica só o que não cabe
    num gesto. Aparece discreto no cabeçalho do card. *@
 
-<div class="ch-tools" title="Arraste as barras para reordenar">
-    <button class="ch-btn" title="Barra mais fina" disabled="@(Barra <= ChartPrefsRepository.BarraMin)"
+<div class="ch-tools" title="@(Ingles ? "Drag the bars to reorder" : "Arraste as barras para reordenar")">
+    <button class="ch-btn" title="@(Ingles ? "Thinner bar" : "Barra mais fina")" disabled="@(Barra <= ChartPrefsRepository.BarraMin)"
             @onclick="() => OnBarra.InvokeAsync(Barra - Passo)">−</button>
     <span class="ch-size">@Barra px</span>
-    <button class="ch-btn" title="Barra mais grossa" disabled="@(Barra >= ChartPrefsRepository.BarraMax)"
+    <button class="ch-btn" title="@(Ingles ? "Thicker bar" : "Barra mais grossa")" disabled="@(Barra >= ChartPrefsRepository.BarraMax)"
             @onclick="() => OnBarra.InvokeAsync(Barra + Passo)">+</button>
-    <button class="ch-btn" title="Voltar à ordem e à espessura padrão" @onclick="OnReset">@Icons.Svg("history")</button>
+    <button class="ch-btn" title="@(Ingles ? "Back to the default order and thickness" : "Voltar à ordem e à espessura padrão")" @onclick="OnReset">@Icons.Svg("history")</button>
 </div>
 
 @code {
     private const int Passo = 3;
 
+    /// <summary>Dicas em inglês.</summary>
+    [Parameter] public bool Ingles { get; set; }
     [Parameter] public int Barra { get; set; } = ChartPrefsRepository.BarraPadrao;
     [Parameter] public EventCallback<int> OnBarra { get; set; }
     [Parameter] public EventCallback OnReset { get; set; }

@@ -255,7 +255,7 @@
         _nb = Sync.LastNb;
         _afm = Sync.LastAfm;
         _rates = Controle.CurrencyRates();
-        _saude = SaudeDaPrevisao.Calcular(Opps.All().Where(o => !o.MovidaControleValue), DateTime.Today);
+        _saude = SaudeDaPrevisao.Calcular(Opps.Unicas().Where(o => !o.MovidaControleValue), DateTime.Today);
     }
 
     private Task SincronizarNb() => Sincronizar(() => Sync.SyncNb());

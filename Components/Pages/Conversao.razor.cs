@@ -35,20 +35,28 @@ public partial class Conversao : IAsyncDisposable
     {
         ClasseProposta.Ganha => CorG, ClasseProposta.Perdida => CorP, ClasseProposta.Aberta => CorA, _ => CorN,
     };
-    private static string NomeEn(ClasseProposta c) => c switch
+    private string NomeEn(ClasseProposta c) => c switch
     {
-        ClasseProposta.Ganha => "Ganhas", ClasseProposta.Perdida => "Perdidas", ClasseProposta.Aberta => "Abertas", _ => "Não classificadas",
+        ClasseProposta.Ganha => T("Ganhas", "Won"), ClasseProposta.Perdida => T("Perdidas", "Lost"), ClasseProposta.Aberta => T("Abertas", "Open"), _ => T("Não classificadas", "Unclassified"),
     };
-    private static string NomeClasse(ClasseProposta c) => c switch
+    /// <summary>Nome da classe como chave (filtro "Classificação" da Base e exportação Excel): sempre em português.</summary>
+    private static string ChaveClasse(ClasseProposta c) => c switch
     {
         ClasseProposta.Ganha => "Ganha", ClasseProposta.Perdida => "Perdida", ClasseProposta.Aberta => "Aberta", _ => "Não classificada",
     };
-    private static string DefClasse(ClasseProposta c) => c switch
+    /// <summary>Nome da classe como aparece na tela (no idioma escolhido).</summary>
+    private string NomeClasse(ClasseProposta c) => c switch
     {
-        ClasseProposta.Ganha => "Ganhas: status Closed - Won ou OTP.",
-        ClasseProposta.Perdida => "Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid ou Closed - Unknown.",
-        ClasseProposta.Aberta => "Abertas: status Open — ainda sem resultado.",
-        _ => "Não classificadas: status fora da lista combinada, aguardando validação. Ficam fora de ganhas, perdidas e abertas.",
+        ClasseProposta.Ganha => T("Ganha", "Won"), ClasseProposta.Perdida => T("Perdida", "Lost"), ClasseProposta.Aberta => T("Aberta", "Open"), _ => T("Não classificada", "Unclassified"),
+    };
+    private string DefClasse(ClasseProposta c) => c switch
+    {
+        ClasseProposta.Ganha => T("Ganhas: status Closed - Won ou OTP.", "Won: status Closed - Won or OTP."),
+        ClasseProposta.Perdida => T("Perdidas: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid ou Closed - Unknown.",
+                                    "Lost: Cancelled, Closed - Customer Lost, Closed - Lost, Closed - No Bid or Closed - Unknown."),
+        ClasseProposta.Aberta => T("Abertas: status Open — ainda sem resultado.", "Open: status Open — no outcome yet."),
+        _ => T("Não classificadas: status fora da lista combinada, aguardando validação. Ficam fora de ganhas, perdidas e abertas.",
+               "Unclassified: status outside the agreed list, pending validation. Excluded from won, lost and open."),
     };
     /// <summary>Classes mostradas nas barras de composição; as não classificadas ficam só nos totais e em Qualidade dos dados.</summary>
     private static readonly ClasseProposta[] ClassesBarra = { ClasseProposta.Ganha, ClasseProposta.Perdida, ClasseProposta.Aberta };
@@ -71,16 +79,16 @@ public partial class Conversao : IAsyncDisposable
     private bool _taxaOk => _seg is null;                      // taxa de ganho só vale sem segmento
     private int Ativos => new[] { _anos, _meses, _origens, _vend, _bus, _buIcs, _mercados, _paises, _produtos }.Count(s => s.Count > 0) + (_seg is null ? 0 : 1);
     private IEnumerable<(string, HashSet<string>)> ConjuntosAtivos() =>
-        new[] { ("Ano", _anos), ("Mês", _meses), ("Setor", _origens), ("Vendedor", _vend), ("BU", _bus), ("BU Intercompany", _buIcs), ("Mercado", _mercados), ("País", _paises), ("Produto", _produtos) }.Where(x => x.Item2.Count > 0);
+        new[] { (T("Ano", "Year"), _anos), (T("Mês", "Month"), _meses), (T("Setor", "Sector"), _origens), (T("Vendedor", "Salesperson"), _vend), ("BU", _bus), ("BU Intercompany", _buIcs), (T("Mercado", "Market"), _mercados), (T("País", "Country"), _paises), (T("Produto", "Product"), _produtos) }.Where(x => x.Item2.Count > 0);
     // Largura mínima de cada chip (rótulo + "…" + ✕) e da faixa de chips: abaixo disso a faixa
     // desce para a linha de baixo, em vez de os chips se sobreporem aos filtros.
-    private static string ChipTxt(HashSet<string> set) => string.Join(", ", set.Take(2)) + (set.Count > 2 ? $" +{set.Count - 2}" : "");
+    private string ChipTxt(HashSet<string> set) => string.Join(", ", set.Take(2).Select(RotuloValor)) + (set.Count > 2 ? $" +{set.Count - 2}" : "");
     private static string ChipRot(string rot) => rot == "BU Intercompany" ? "BU IC" : rot;
-    private static int ChipMin(string rot, HashSet<string> set) => 58 + 8 * ChipRot(rot).Length + Math.Min(ChipTxt(set).Length, 4) * 8;
+    private int ChipMin(string rot, HashSet<string> set) => 58 + 8 * ChipRot(rot).Length + Math.Min(ChipTxt(set).Length, 4) * 8;
     // Chip curto não encolhe (nada a cortar); o longo pode reduzir até rótulo + 4 letras e "…".
-    private static string ChipStyle(string rot, HashSet<string> set) =>
+    private string ChipStyle(string rot, HashSet<string> set) =>
         ChipTxt(set).Length <= 4 ? "flex:none" : $"min-width:{ChipMin(rot, set)}px";
-    private int ChipsMin() => ConjuntosAtivos().Sum(x => ChipMin(x.Item1, x.Item2) + 6) + (_seg is { } sg ? 64 + 8 * ("Segmento".Length + NomeEn(sg).Length) : 0) + 112;
+    private int ChipsMin() => ConjuntosAtivos().Sum(x => ChipMin(x.Item1, x.Item2) + 6) + (_seg is { } sg ? 64 + 8 * (T("Segmento", "Segment").Length + NomeEn(sg).Length) : 0) + 112;
     private void Limpar() { _anos.Clear(); _meses.Clear(); _vend.Clear(); _bus.Clear(); _buIcs.Clear(); _origens.Clear(); _mercados.Clear(); _paises.Clear(); _produtos.Clear(); _seg = null; _busca = ""; _classes.Clear(); _pag = 0; _limpezas++; }
     private int _limpezas;
     private void AlternarSeg(ClasseProposta c) => _seg = _seg == c ? null : c;
@@ -99,8 +107,17 @@ public partial class Conversao : IAsyncDisposable
         public readonly int[] Conv = new int[4];
         public int Decididas => G + P;
         public double VTotal => VG + VP + VA + VNC;
-        public double? TaxaQtd => Decididas > 0 ? (double)G / Decididas * 100 : null;
-        public double? TaxaValor => (VG + VP) > 0 ? VG / (VG + VP) * 100 : null;
+        /// <summary>Base da taxa: true = todas as propostas enviadas (padrão); false = só as decididas.</summary>
+        public bool Todas;
+        /// <summary>Conversão por valor (botão "Conversão por" da barra de filtros): a taxa principal passa a ser a por valor.</summary>
+        public bool PorValor;
+        /// <summary>Taxa por quantidade de propostas: ganhas ÷ base.</summary>
+        public double? TaxaContagem => Base > 0 ? (double)G / Base * 100 : null;
+        /// <summary>Denominador da taxa: decididas, ou todas as propostas.</summary>
+        public int Base => Todas ? Total : Decididas;
+        /// <summary>A taxa de conversão principal: por quantidade ou por valor, conforme "Conversão por".</summary>
+        public double? TaxaQtd => PorValor ? TaxaValor : TaxaContagem;
+        public double? TaxaValor => Todas ? (VTotal > 0 ? VG / VTotal * 100 : null) : (VG + VP) > 0 ? VG / (VG + VP) * 100 : null;
         public int Qtd(ClasseProposta c) => c switch { ClasseProposta.Ganha => G, ClasseProposta.Perdida => P, ClasseProposta.Aberta => A, _ => NC };
         public double Val(ClasseProposta c) => c switch { ClasseProposta.Ganha => VG, ClasseProposta.Perdida => VP, ClasseProposta.Aberta => VA, _ => VNC };
         public int TotComUsd => ComUsd.Sum();
@@ -112,11 +129,11 @@ public partial class Conversao : IAsyncDisposable
     private Resumo _r = new(), _rx = new();
     private Resumo? _prev;
     private string _prevRotulo = "";                 // rótulo do período comparável: "2025" ou "jan–out/2025"
-    private (int, int) _chave = (-1, -1);
+    private (int, int, bool, double) _chave = (-1, -1, false, 0);
 
     private void Recalcular()
     {
-        var chave = (Conv.Version, Cambio.Version);
+        var chave = (Conv.Version, Cambio.Version, _emDolar, _taxaTelaAtiva ?? 0);
         if (chave != _chave) { Reconstruir(); _chave = chave; }
         _f = Aplicar().ToList();
         _fx = _seg is { } s ? _f.Where(i => i.P.Classe == s).ToList() : _f;
@@ -131,20 +148,31 @@ public partial class Conversao : IAsyncDisposable
             var mesMax = _meses.Count > 0 ? 12 : _itens.Where(i => i.Ano == a && i.Mes is not null).Select(i => i.Mes!.Value).DefaultIfEmpty(12).Max();
             var p = Somar(Aplicar("ano").Where(i => i.Ano == a - 1 && i.Mes is { } m && m <= mesMax));
             if (p.Total > 0) _prev = p;
-            string MesAbrev(int m) => new DateTime(2000, m, 1).ToString("MMM", _pt).TrimEnd('.');
-            _prevRotulo = mesMax >= 12 ? (a - 1).ToString() : mesMax == 1 ? $"jan/{a - 1}" : $"jan\u2060–\u2060{MesAbrev(mesMax)}/{a - 1}"; // word joiner: o rótulo não quebra no traço
+            string MesAbrev(int m) => new DateTime(2000, m, 1).ToString("MMM", CulTela).TrimEnd('.');
+            var jan = T("jan", "Jan");
+            _prevRotulo = mesMax >= 12 ? (a - 1).ToString() : mesMax == 1 ? $"{jan}/{a - 1}" : $"{jan}\u2060–\u2060{MesAbrev(mesMax)}/{a - 1}"; // word joiner: o rótulo não quebra no traço
         }
     }
 
     private void Reconstruir()
     {
         var taxas = Cambio.Todas();
-        _itens = Conv.Atual.Propostas.Select(p =>
+        // embutida na Performance Comercial: só os anos da página (2022 em diante), sem as propostas sem data
+        _itens = Conv.Atual.Propostas.Where(p => Filtros?.NoPeriodo(p.Data) ?? true).Select(p =>
         {
             int? ano = p.Data?.Year, mes = p.Data?.Month;
-            // NB: o valor já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
+            // em R$: NB já vem em R$, sem taxa · AFM: US$ × taxa do ano de envio
+            // em US$ (botão Moeda): AFM já vem em US$, sem taxa · NB: R$ ÷ taxa do ano de envio
+            if (_dolarAnual)
+            {
+                double? txu = p.ValorBrl is not null && ano is { } yu && taxas.TryGetValue(yu, out var tu) && tu > 0 ? tu : null;
+                double? usd = p.ValorBrl is { } vb ? (txu is { } t3 ? vb / t3 : null) : p.ValorUsd;
+                return new Item(p, ano, mes, txu, usd);
+            }
             double? tx = p.ValorBrl is null && ano is { } y && taxas.TryGetValue(y, out var t) ? t : null;
             double? brl = p.ValorBrl ?? (p.ValorUsd is { } v && tx is { } t2 ? v * t2 : null);
+            // taxa da tela (digitada ao lado de US$): o valor em R$ da tela dividido por ela
+            if (_taxaTelaAtiva is double tt && brl is double b0) brl = b0 / tt;
             return new Item(p, ano, mes, tx, brl);
         }).ToList();
     }
@@ -166,9 +194,9 @@ public partial class Conversao : IAsyncDisposable
         return q;
     }
 
-    private static Resumo Somar(IEnumerable<Item> itens)
+    private Resumo Somar(IEnumerable<Item> itens)
     {
-        var r = new Resumo();
+        var r = new Resumo { Todas = _baseTodas, PorValor = _porValor };
         foreach (var i in itens)
         {
             r.Total++;
@@ -182,6 +210,15 @@ public partial class Conversao : IAsyncDisposable
                 default: r.NC++; if (tem) r.VNC += b; break;
             }
             if (!i.P.TemValor) r.SemValor++;
+            else if (_dolarAnual && i.P.ValorBrl is null) { r.ComUsd[k]++; r.Conv[k]++; }   // em US$: o AFM já vem em US$
+            else if (_dolarAnual)
+            {
+                // em US$: o NB (em R$) precisa da taxa do ano
+                r.ComUsd[k]++;
+                if (i.Ano is null) r.SemData++;
+                else if (i.Brl is null) r.SemTaxa++;
+                else r.Conv[k]++;
+            }
             else if (i.P.ValorBrl is not null) { r.ComUsd[k]++; r.Conv[k]++; }   // NB: já em R$
             else
             {
@@ -196,13 +233,16 @@ public partial class Conversao : IAsyncDisposable
         return r;
     }
 
-    private static List<(string Nome, Resumo R)> Grupos(IEnumerable<Item> src, Func<Item, string> chave) =>
+    private List<(string Nome, Resumo R)> Grupos(IEnumerable<Item> src, Func<Item, string> chave) =>
         src.GroupBy(chave, StringComparer.OrdinalIgnoreCase)
            .Select(g => (Nome: g.Key, R: Somar(g)))
            .OrderByDescending(x => x.R.VTotal).ThenByDescending(x => x.R.Total).ToList();
 
     // opções em cascata: cada filtro mostra só o que existe com os OUTROS filtros aplicados
-    private IEnumerable<string> OpAnos => Aplicar("ano").Select(AnoTxt).Distinct().OrderByDescending(x => x == "Sem data" ? "0" : x);
+    // embutida na Performance Comercial: o Ano escolhe os anos da página, então lista todos (2022 até hoje)
+    private IEnumerable<string> OpAnos => Filtros?.AnoMinimo is int min
+        ? Enumerable.Range(min, Math.Max(0, DateTime.Today.Year - min + 1)).Reverse().Select(a => a.ToString())
+        : Aplicar("ano").Select(AnoTxt).Distinct().OrderByDescending(x => x == "Sem data" ? "0" : x);
     private IEnumerable<string> OpMeses => Enumerable.Range(1, 12).Select(Fmt.MonthLong);
     private IEnumerable<string> OpVendedores => Aplicar("vend").Select(i => i.P.Vendedor).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<string> OpBus => Aplicar("bu").Select(i => i.P.Bu).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
@@ -239,49 +279,79 @@ public partial class Conversao : IAsyncDisposable
     }
 
     // ---- formatação ----------------------------------------------------------------
-    private static string R(double v) => "R$ " + Mon(v);
-    /// <summary>Valor com a unidade por extenso: 527,7 mi · 1,06 bi · 850 mil.</summary>
-    private static string Mon(double v)
+    private string R(double v) => Sim + " " + Mon(v);
+    /// <summary>O símbolo da moeda da tela (botão "Moeda" da barra de filtros).</summary>
+    private string Sim => _emDolar ? "US$" : "R$";
+    // ---- idioma: cultura dos números e datas, e valores de filtro na tela ----
+    private static readonly System.Globalization.CultureInfo _enUs = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    /// <summary>Cultura dos números e datas na tela: pt-BR (padrão) ou en-US (botão Idioma).</summary>
+    private System.Globalization.CultureInfo CulTela => _emIngles ? _enUs : _pt;
+    /// <summary>Valor de filtro (guardado em português) como aparece na tela: em inglês, meses e "Sem data" traduzidos.</summary>
+    private string RotuloValor(string v)
     {
-        var a = Math.Abs(v); var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
-        if (a >= 1_000_000_000) return (v / 1_000_000_000).ToString("0.00", pt) + " bi";
-        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", pt) + " mi";
-        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", pt) + " mil";
-        return v.ToString("#,##0", pt);
+        if (!_emIngles) return v;
+        if (v == "Sem data") return "No date";
+        if (v == ConversaoService.NaoIntercompany) return "Not intercompany";
+        for (var m = 1; m <= 12; m++)
+            if (string.Equals(Fmt.MonthLong(m), v, StringComparison.OrdinalIgnoreCase)) return _enUs.DateTimeFormat.GetMonthName(m);
+        return v;
+    }
+
+    /// <summary>Valor com a unidade por extenso: 527,7 mi · 1,06 bi · 850 mil (em inglês: 527.7M · 1.06B · 850K).</summary>
+    private string Mon(double v)
+    {
+        var a = Math.Abs(v); var c = CulTela;
+        if (a >= 1_000_000_000) return (v / 1_000_000_000).ToString("0.00", c) + T(" bi", "B");
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", c) + T(" mi", "M");
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", c) + T(" mil", "K");
+        return v.ToString("#,##0", c);
     }
     /// <summary>Rótulo de eixo: marcas redondas sem a casa decimal vazia ("60 mi", não "60,0 mi").</summary>
-    private static string MonEixo(double v) { var t = Mon(v); return t.EndsWith(",0 mi") ? t[..^5] + " mi" : t.EndsWith(",00 bi") ? t[..^6] + " bi" : t; }
-    private static string P1(double v) => Fmt.Pct(v, 1);
-    private static string N0(int v) => v.ToString("N0", _pt);
-    private static string PctDe(double parte, double todo) => todo > 0 ? Fmt.Pct(parte / todo * 100, 1) : "—";
+    private string MonEixo(double v)
+    {
+        var t = Mon(v);
+        if (_emIngles) return t.EndsWith(".0M") ? t[..^3] + "M" : t.EndsWith(".00B") ? t[..^4] + "B" : t;
+        return t.EndsWith(",0 mi") ? t[..^5] + " mi" : t.EndsWith(",00 bi") ? t[..^6] + " bi" : t;
+    }
+    private string P1(double v) => v.ToString("0.0", CulTela) + "%";
+    private string N0(int v) => v.ToString("N0", CulTela);
+    private string PctDe(double parte, double todo) => todo > 0 ? P1(parte / todo * 100) : "—";
     private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
     private static string EscTip(string s) => Esc(s).Replace("\n", "&#10;");
     private static string F(double v) => v.ToString("0.##", Inv);
-    private static string Pp(double v) => Math.Abs(v).ToString("0.0", _pt) + " p.p.";
+    private string Pp(double v) => Math.Abs(v).ToString("0.0", CulTela) + T(" p.p.", " pp");
 
     // Estados dos valores: R$ 0 (zero real) ≠ — (sem informação) ≠ Não convertido (sem taxa) ≠ Não calculável.
-    private static string Estado(int comUsd, int conv, double v) =>
-        comUsd == 0 ? "—" : conv == 0 ? "Não convertido" : R(v) + (conv < comUsd ? "*" : "");
-    private static string EstadoTip(int comUsd, int conv, double v) =>
-        comUsd == 0 ? "Nenhuma proposta com valor em US$ informado."
-        : conv == 0 ? "Há valor em US$, mas falta a taxa de câmbio do ano da proposta (ou a data de envio)."
-        : Fmt.Brl(v) + (conv < comUsd ? $" · parcial: {comUsd - conv} proposta(s) sem taxa de câmbio ou sem data de envio ficaram de fora." : "");
+    private string Estado(int comUsd, int conv, double v) =>
+        comUsd == 0 ? "—" : conv == 0 ? T("Não convertido", "Not converted") : R(v) + (conv < comUsd ? "*" : "");
+    private string EstadoTip(int comUsd, int conv, double v) =>
+        comUsd == 0 ? T("Nenhuma proposta com valor em US$ informado.", "No proposal with a US$ value entered.")
+        : conv == 0 ? T("Há valor em US$, mas falta a taxa de câmbio do ano da proposta (ou a data de envio).",
+                        "There is a US$ value, but the exchange rate for the proposal's year (or the sent date) is missing.")
+        : Sim + " " + v.ToString("#,##0", CulTela) + (conv < comUsd ? T($" · parcial: {comUsd - conv} proposta(s) sem taxa de câmbio ou sem data de envio ficaram de fora.",
+                                                                       $" · partial: {comUsd - conv} proposal(s) without an exchange rate or sent date were left out.") : "");
 
-    private static string Din(Resumo r, ClasseProposta c) => Estado(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
-    private static string DinTip(Resumo r, ClasseProposta c) => EstadoTip(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
-    private static string DinTotal(Resumo r) => Estado(r.TotComUsd, r.TotConv, r.VTotal);
-    private static string DinTotalTip(Resumo r) => EstadoTip(r.TotComUsd, r.TotConv, r.VTotal);
+    private string Din(Resumo r, ClasseProposta c) => Estado(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
+    private string DinTip(Resumo r, ClasseProposta c) => EstadoTip(r.ComUsd[(int)c], r.Conv[(int)c], r.Val(c));
+    private string DinTotal(Resumo r) => Estado(r.TotComUsd, r.TotConv, r.VTotal);
+    private string DinTotalTip(Resumo r) => EstadoTip(r.TotComUsd, r.TotConv, r.VTotal);
 
-    private string TxQtd(Resumo r) => !_taxaOk ? "—" : r.Decididas == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
-    private static string TxQtdGlobal(Resumo r) => r.Decididas == 0 ? "Não calculável" : P1(r.TaxaQtd!.Value);
+    /// <summary>A taxa principal (quantidade ou valor, conforme "Conversão por").</summary>
+    private string TxQtd(Resumo r) => !_taxaOk ? "—" : TxQtdGlobal(r);
+    private string TxQtdGlobal(Resumo r) => r.PorValor ? TxValorGlobal(r) : TxContagemGlobal(r);
+    private string TxContagemGlobal(Resumo r) => r.Base == 0 ? T("Não calculável", "Not calculable") : P1(r.TaxaContagem!.Value);
+    /// <summary>A outra medida, mostrada ao lado da principal: por valor (se a principal é por quantidade) ou o contrário.</summary>
+    private string TxOutra(Resumo r) => !_taxaOk ? "—" : TxOutraGlobal(r);
+    private string TxOutraGlobal(Resumo r) => r.PorValor ? TxContagemGlobal(r) : TxValorGlobal(r);
+    private string OutraRot => _porValor ? T("em quantidade", "by count") : T("em valor", "by value");
     private string TxValor(Resumo r) => !_taxaOk ? "—" : TxValorGlobal(r);
-    private static string TxValorGlobal(Resumo r)
+    private string TxValorGlobal(Resumo r)
     {
         var usd = r.ComUsd[(int)ClasseProposta.Ganha] + r.ComUsd[(int)ClasseProposta.Perdida];
         var conv = r.Conv[(int)ClasseProposta.Ganha] + r.Conv[(int)ClasseProposta.Perdida];
         if (usd == 0) return "—";
-        if (conv == 0) return "Não convertido";
-        if (r.VG + r.VP <= 0) return "Não calculável";
+        if (conv == 0) return T("Não convertido", "Not converted");
+        if ((r.Todas ? r.VTotal : r.VG + r.VP) <= 0) return T("Não calculável", "Not calculable");
         return P1(r.TaxaValor!.Value) + (conv < usd ? "*" : "");
     }
 
@@ -301,10 +371,10 @@ public partial class Conversao : IAsyncDisposable
     {
         if (_anos.Count != 1 || !int.TryParse(_anos.First(), out var ano))
             return ("", "neu");
-        if (_prev is null) return ($"Sem dados comparáveis em {_prevRotulo}", "neu");
-        if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return ($"Sem propostas decididas para comparar com {_prevRotulo}", "neu");
+        if (_prev is null) return (T($"Sem dados comparáveis em {_prevRotulo}", $"No comparable data in {_prevRotulo}"), "neu");
+        if (_r.TaxaQtd is not { } cur || _prev.TaxaQtd is not { } ant) return (T($"Sem propostas decididas para comparar com {_prevRotulo}", $"No decided proposals to compare with {_prevRotulo}"), "neu");
         var d = cur - ant;
-        if (Math.Abs(d) < 0.05) return ($"Estável vs {_prevRotulo} (0,0 p.p.)", "neu");
+        if (Math.Abs(d) < 0.05) return (T($"Estável vs {_prevRotulo} (0,0 p.p.)", $"Stable vs {_prevRotulo} (0.0 pp)"), "neu");
         return ($"{(d > 0 ? "▲" : "▼")} {Pp(d)} vs {_prevRotulo} ({P1(ant)})", d > 0 ? "pos" : "neg");
     }
 
@@ -317,18 +387,18 @@ public partial class Conversao : IAsyncDisposable
         {
             // sem filtro de ano: mostra o intervalo real de envio do recorte
             var ds = _f.Where(i => i.P.Data is not null).Select(i => i.P.Data!.Value).ToList();
-            anos = ds.Count == 0 ? "Todos os anos" : $"{ds.Min().ToString("MMM/yyyy", _pt)} a {ds.Max().ToString("MMM/yyyy", _pt)}";
+            anos = ds.Count == 0 ? T("Todos os anos", "All years") : $"{ds.Min().ToString("MMM/yyyy", CulTela)}{T(" a ", " to ")}{ds.Max().ToString("MMM/yyyy", CulTela)}";
         }
         // meses em ordem de calendário, não na ordem em que foram marcados
         var ms = Enumerable.Range(1, 12).Select(Fmt.MonthLong).Where(_meses.Contains).ToList();
-        var meses = ms.Count == 0 ? "" : " · " + string.Join(", ", ms.Take(3)) + (ms.Count > 3 ? $" +{ms.Count - 3}" : "");
+        var meses = ms.Count == 0 ? "" : " · " + string.Join(", ", ms.Take(3).Select(RotuloValor)) + (ms.Count > 3 ? $" +{ms.Count - 3}" : "");
         return anos + meses;
     }
 
     private string NotasFiltros()
     {
-        var l = ConjuntosAtivos().Select(x => $"{x.Item1}: {string.Join(", ", x.Item2.Take(3))}{(x.Item2.Count > 3 ? "…" : "")}").ToList();
-        return l.Count == 0 ? "Sem filtros adicionais" : string.Join(" · ", l);
+        var l = ConjuntosAtivos().Select(x => $"{x.Item1}: {string.Join(", ", x.Item2.Take(3).Select(RotuloValor))}{(x.Item2.Count > 3 ? "…" : "")}").ToList();
+        return l.Count == 0 ? T("Sem filtros adicionais", "No additional filters") : string.Join(" · ", l);
     }
 
     private const int AmostraMinima = 20;   // decididas para comparar taxas sem ruído
@@ -359,7 +429,7 @@ public partial class Conversao : IAsyncDisposable
     private string SvgWinRate(IEnumerable<Item> src, int offset, bool compact, bool comparar = true, double largura = 1000)
     {
         var (meses, por) = Janela(src, offset);
-        if (meses.Count == 0) return Vazio("Nenhuma proposta com data de envio no recorte.");
+        if (meses.Count == 0) return Vazio(this.T("Nenhuma proposta com data de envio no recorte.", "No proposals with a sent date in the selection."));
         // O comparativo "mesmo mês do ano anterior" usa o recorte global; num recorte
         // individual (vendedor) ele compararia coisas diferentes e fica desligado.
         var hist = comparar ? SerieBase() : new Dictionary<DateTime, Resumo>();
@@ -376,7 +446,7 @@ public partial class Conversao : IAsyncDisposable
         var baseStrip = T + plotH + gap + strip;
 
         var sb = new StringBuilder("<div class='chart-body'>");
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='taxa de conversão mensal'>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{this.T("taxa de conversão mensal", "monthly conversion rate")}'>");
         foreach (var v in new[] { 0, 25, 50, 75, 100 })
         {
             sb.Append($"<line x1='{F(L)}' y1='{F(Y(v))}' x2='{F(W - Rr)}' y2='{F(Y(v))}' stroke='#e8edf4'/>");
@@ -416,24 +486,26 @@ public partial class Conversao : IAsyncDisposable
                 sb.Append($"<circle cx='{F(x)}' cy='{F(Y(r.TaxaQtd!.Value))}' r='4.5' fill='{(imaturo ? "#FFFFFF" : CorTx)}' stroke='{CorTx}' stroke-width='2'/>");
             }
             hist.TryGetValue(meses[i].AddYears(-1), out var ra);
-            var tip = $"{meses[i].ToString("MMMM/yyyy", _pt)}\n" +
-                      (r is null ? "Sem propostas enviadas" :
-                       $"taxa de conversão: {(r.Decididas > 0 ? P1(r.TaxaQtd!.Value) : "não calculável")} ({N0(r.G)} ganhas de {N0(r.Decididas)} decididas)\n" +
-                       $"Perdidas: {N0(r.P)} · Abertas: {N0(r.A)} ({PctDe(r.A, r.Total)} do mês)" +
-                       (r.NC > 0 ? $" · Não classificadas: {N0(r.NC)}" : "")) +
-                      (ra is not null && ra.Decididas > 0 ? $"\nMesmo mês de {meses[i].Year - 1}: {P1(ra.TaxaQtd!.Value)} ({N0(ra.Decididas)} decididas)" : "");
+            var tip = $"{meses[i].ToString("MMMM/yyyy", CulTela)}\n" +
+                      (r is null ? this.T("Sem propostas enviadas", "No proposals sent") :
+                       this.T($"taxa de conversão: {(r.Decididas > 0 ? P1(r.TaxaQtd!.Value) : "não calculável")} ({N0(r.G)} ganhas de {N0(r.Decididas)} decididas)\n",
+                         $"conversion rate: {(r.Decididas > 0 ? P1(r.TaxaQtd!.Value) : "not calculable")} ({N0(r.G)} won of {N0(r.Decididas)} decided)\n") +
+                       this.T($"Perdidas: {N0(r.P)} · Abertas: {N0(r.A)} ({PctDe(r.A, r.Total)} do mês)", $"Lost: {N0(r.P)} · Open: {N0(r.A)} ({PctDe(r.A, r.Total)} of the month)") +
+                       (r.NC > 0 ? this.T($" · Não classificadas: {N0(r.NC)}", $" · Unclassified: {N0(r.NC)}") : "")) +
+                      (ra is not null && ra.Decididas > 0 ? this.T($"\nMesmo mês de {meses[i].Year - 1}: {P1(ra.TaxaQtd!.Value)} ({N0(ra.Decididas)} decididas)",
+                                                              $"\nSame month of {meses[i].Year - 1}: {P1(ra.TaxaQtd!.Value)} ({N0(ra.Decididas)} decided)") : "");
             sb.Append($"<rect x='{F(L + passo * i)}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B + 6)}' fill='transparent'><title>{EscTip(tip)}</title></rect>");
             if (!soPares || meses[i].Month % 2 == 0)
-                sb.Append($"<text x='{F(x)}' y='{F(H - 8)}' text-anchor='middle' font-size='{F(fs)}' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", _pt))}</text>");
+                sb.Append($"<text x='{F(x)}' y='{F(H - 8)}' text-anchor='middle' font-size='{F(fs)}' fill='#3b4a61'>{Esc(meses[i].ToString("MMM/yy", CulTela))}</text>");
         }
         sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip - strip + 6)}' text-anchor='end' font-size='{F(compact ? 10.5 : 9.5)}' fill='#6b7a90'>{maxD}</text>");
         sb.Append($"<text x='{F(L - 8)}' y='{F(baseStrip)}' text-anchor='end' font-size='{F(compact ? 10.5 : 9.5)}' fill='#6b7a90'>0</text>");
         sb.Append("</svg>");
         sb.Append("<div class='cvx-leg'>");
-        sb.Append($"<span><i class='cvx-ln' style='border-top-color:{CorTx}'></i>Taxa de conversão do mês</span>");
-        if (comparar) sb.Append("<span><i class='cvx-ln dash'></i>Mesmo mês do ano anterior</span>");
-        sb.Append($"<span><i class='cvx-pt' style='border-color:{CorTx}'></i>Mais de 30% das propostas do mês ainda abertas (a taxa pode mudar)</span>");
-        sb.Append("<span><i class='cvx-bx'></i>Propostas decididas (escala própria, embaixo)</span>");
+        sb.Append($"<span><i class='cvx-ln' style='border-top-color:{CorTx}'></i>{this.T("Taxa de conversão do mês", "Conversion rate for the month")}</span>");
+        if (comparar) sb.Append($"<span><i class='cvx-ln dash'></i>{this.T("Mesmo mês do ano anterior", "Same month of the previous year")}</span>");
+        sb.Append($"<span><i class='cvx-pt' style='border-color:{CorTx}'></i>{this.T("Mais de 30% das propostas do mês ainda abertas (a taxa pode mudar)", "More than 30% of the month's proposals still open (the rate may change)")}</span>");
+        sb.Append($"<span><i class='cvx-bx'></i>{this.T("Propostas decididas (escala própria, embaixo)", "Decided proposals (own scale, below)")}</span>");
         sb.Append("</div></div>");
         return sb.ToString();
     }
@@ -462,10 +534,12 @@ public partial class Conversao : IAsyncDisposable
         var ano = AnoBarrasAtual();
         var meses = Enumerable.Range(1, 12).Select(m => new DateTime(ano, m, 1)).ToList();
         var por = src.Where(i => i.Ano == ano && i.Mes is not null).GroupBy(i => new DateTime(ano, i.Mes!.Value, 1)).ToDictionary(g => g.Key, g => Somar(g));
-        if (por.Count == 0) return Vazio("Nenhuma proposta com data de envio em " + ano + ".");
+        if (por.Count == 0) return Vazio(this.T("Nenhuma proposta com data de envio em " + ano + ".", "No proposals with a sent date in " + ano + "."));
         // valor nunca vira zero silencioso: sem taxa do ano, o gráfico diz isso em vez de barras vazias
         if (!qtd && por.Values.All(r => r.TotConv == 0))
-            return Vazio(por.Values.Any(r => r.TotComUsd > 0) ? $"Valores de {ano} não convertidos: falta a taxa USD/BRL do ano." : $"Nenhuma proposta com valor em US$ em {ano}.");
+            return Vazio(por.Values.Any(r => r.TotComUsd > 0)
+                ? this.T($"Valores de {ano} não convertidos: falta a taxa USD/BRL do ano.", $"{ano} values not converted: the USD/BRL rate for the year is missing.")
+                : this.T($"Nenhuma proposta com valor em US$ em {ano}.", $"No proposals with a US$ value in {ano}."));
         var temParcial = false;
 
         double Val(Resumo r, int c) => qtd
@@ -487,8 +561,8 @@ public partial class Conversao : IAsyncDisposable
         string Rot(double v) => qtd ? N0((int)Math.Round(v)) : MonEixo(v);
 
         var sb = new StringBuilder("<div class='chart-body'>");
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{(qtd ? "Volume" : "Valor")} mensal'>");
-        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='12' font-weight='700' fill='#6b7a90'>R$</text>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{(qtd ? this.T("Volume mensal", "Monthly volume") : this.T("Valor mensal", "Monthly value"))}'>");
+        if (!qtd) sb.Append($"<text x='{F(L - 8)}' y='{F(T - 16)}' text-anchor='end' font-size='12' font-weight='700' fill='#6b7a90'>{Sim}</text>");
         for (var k = 0; k <= nTicks; k++)
         {
             var v = step * k;
@@ -505,7 +579,8 @@ public partial class Conversao : IAsyncDisposable
                 {
                     var v = Val(r, c); if (v <= 0) continue;
                     var cls = Classes[c];
-                    var tip = $"{NomeEn(cls)} em {meses[i].ToString("MMM/yyyy", _pt)}\n{N0(r.Qtd(cls))} proposta(s) · {Din(r, cls)}";
+                    var tip = this.T($"{NomeEn(cls)} em {meses[i].ToString("MMM/yyyy", _pt)}\n{N0(r.Qtd(cls))} proposta(s) · {Din(r, cls)}",
+                                     $"{NomeEn(cls)} in {meses[i].ToString("MMM/yyyy", _enUs)}\n{N0(r.Qtd(cls))} proposal(s) · {Din(r, cls)}");
                     sb.Append($"<rect class='cv-seg' x='{F(x)}' y='{F(Y(acum + v))}' width='{F(larg)}' height='{F(Y(acum) - Y(acum + v))}' fill='{Cor(cls)}' rx='2'><title>{EscTip(tip)}</title></rect>");
                     acum += v;
                 }
@@ -514,14 +589,14 @@ public partial class Conversao : IAsyncDisposable
                 if (acum > 0)
                     sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(acum) - 6)}' text-anchor='middle' font-size='12.5' font-weight='700' fill='#3b4a61'>{Esc(qtd ? N0((int)acum) : Mon(acum) + (parcial ? "*" : ""))}</text>");
                 else if (!qtd && r.TotComUsd > 0 && r.TotConv == 0)
-                    sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(0) - 6)}' text-anchor='middle' font-size='11' fill='#c0392b'>n/c<title>Não convertido: falta a taxa de câmbio</title></text>");
+                    sb.Append($"<text x='{F(x + larg / 2)}' y='{F(Y(0) - 6)}' text-anchor='middle' font-size='11' fill='#c0392b'>n/c<title>{this.T("Não convertido: falta a taxa de câmbio", "Not converted: the exchange rate is missing")}</title></text>");
             }
-            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 12)}' text-anchor='middle' font-size='12.5' font-weight='600' fill='#8a97ab' letter-spacing='.06em'>{Esc(meses[i].ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
+            sb.Append($"<text x='{F(x + larg / 2)}' y='{F(H - 12)}' text-anchor='middle' font-size='12.5' font-weight='600' fill='#8a97ab' letter-spacing='.06em'>{Esc(meses[i].ToString("MMM", CulTela).TrimEnd('.').ToUpper(CulTela))}</text>");
         }
         sb.Append("</svg><div class='cvx-leg'>");
         for (var c = 0; c < cats; c++) sb.Append($"<span><i class='cvx-dot' style='background:{Cor(Classes[c])}'></i>{NomeEn(Classes[c])}</span>");
         sb.Append("</div>");
-        if (temParcial) sb.Append("<p class='cvx-note'>* mês com propostas sem taxa de câmbio (valor parcial)</p>");
+        if (temParcial) sb.Append($"<p class='cvx-note'>{this.T("* mês com propostas sem taxa de câmbio (valor parcial)", "* month with proposals without an exchange rate (partial value)")}</p>");
         sb.Append("</div>");
         return sb.ToString();
     }
@@ -531,7 +606,8 @@ public partial class Conversao : IAsyncDisposable
     {
         string html;
         if (_metTrend == "winrate" && !_taxaOk)
-            html = Vazio("taxa de conversão não se aplica com um segmento selecionado na barra de composição. Remova o segmento para ver a taxa.");
+            html = Vazio(T("taxa de conversão não se aplica com um segmento selecionado na barra de composição. Remova o segmento para ver a taxa.",
+                           "The conversion rate does not apply with a segment selected in the composition bar. Remove the segment to see the rate."));
         else html = SvgAnual(_metTrend == "winrate" ? _f : _fx, _metTrend);
         builder.AddMarkupContent(0, html);
     };
@@ -540,7 +616,7 @@ public partial class Conversao : IAsyncDisposable
     private string SvgAnual(IEnumerable<Item> src, string met)
     {
         var com = src.Where(i => i.Ano is not null && i.Mes is not null).ToList();
-        if (com.Count == 0) return Vazio("Nenhuma proposta com data de envio no recorte.");
+        if (com.Count == 0) return Vazio(this.T("Nenhuma proposta com data de envio no recorte.", "No proposals with a sent date in the selection."));
         var por = com.GroupBy(i => (A: i.Ano!.Value, M: i.Mes!.Value)).ToDictionary(g => g.Key, g => Somar(g));
         var anos = por.Keys.Select(k => k.A).Distinct().OrderByDescending(a => a).ToList();
         double? Val(int a, int m)
@@ -551,10 +627,13 @@ public partial class Conversao : IAsyncDisposable
         string Rot(double v) => met == "winrate" ? F(v) + "%" : met == "volume" ? N0((int)Math.Round(v)) : Mon(v);
         string Txt(int a, int m)
         {
-            if (!por.TryGetValue((a, m), out var r)) return "sem propostas";
-            return met == "winrate" ? (r.Total > 0 ? $"{P1(r.G * 100.0 / r.Total)} ({N0(r.G)} ganhas de {N0(r.Total)} enviadas · {N0(r.P)} perdidas, {N0(r.A)} abertas)" : "sem propostas enviadas")
-                 : met == "volume" ? $"{N0(r.Total)} propostas · {N0(r.G)} ganhas, {N0(r.P)} perdidas, {N0(r.A)} abertas"
-                 : (r.TotConv > 0 ? $"{R(r.VTotal)} · ganho {Din(r, ClasseProposta.Ganha)}, perdido {Din(r, ClasseProposta.Perdida)}, aberto {Din(r, ClasseProposta.Aberta)}" : "valor não convertido (sem taxa de câmbio)");
+            if (!por.TryGetValue((a, m), out var r)) return this.T("sem propostas", "no proposals");
+            return met == "winrate" ? (r.Total > 0 ? this.T($"{P1(r.G * 100.0 / r.Total)} ({N0(r.G)} ganhas de {N0(r.Total)} enviadas · {N0(r.P)} perdidas, {N0(r.A)} abertas)",
+                                                            $"{P1(r.G * 100.0 / r.Total)} ({N0(r.G)} won of {N0(r.Total)} sent · {N0(r.P)} lost, {N0(r.A)} open)") : this.T("sem propostas enviadas", "no proposals sent"))
+                 : met == "volume" ? this.T($"{N0(r.Total)} propostas · {N0(r.G)} ganhas, {N0(r.P)} perdidas, {N0(r.A)} abertas", $"{N0(r.Total)} proposals · {N0(r.G)} won, {N0(r.P)} lost, {N0(r.A)} open")
+                 : (r.TotConv > 0 ? this.T($"{R(r.VTotal)} · ganho {Din(r, ClasseProposta.Ganha)}, perdido {Din(r, ClasseProposta.Perdida)}, aberto {Din(r, ClasseProposta.Aberta)}",
+                                           $"{R(r.VTotal)} · won {Din(r, ClasseProposta.Ganha)}, lost {Din(r, ClasseProposta.Perdida)}, open {Din(r, ClasseProposta.Aberta)}")
+                                  : this.T("valor não convertido (sem taxa de câmbio)", "value not converted (no exchange rate)"));
         }
 
         var maxV = 0.0;
@@ -596,14 +675,14 @@ public partial class Conversao : IAsyncDisposable
         for (var k = 0; k < anos.Count; k++)
             sb.Append($"<span><i class='cvx-ln{(k == 1 ? " dash" : k >= 2 ? " dash dot" : "")}' style='border-top-color:{CorAno(k)}'></i>{anos[k]}</span>");
         if (anos.Count > cores.Length)
-            sb.Append($"<span class='cvx-leg-aviso'>{anos.Count} anos no recorte: de {anos[^1]} a {anos[cores.Length - 1]} na mesma cor cinza · filtre por Ano para comparar menos anos</span>");
+            sb.Append($"<span class='cvx-leg-aviso'>{this.T($"{anos.Count} anos no recorte: de {anos[^1]} a {anos[cores.Length - 1]} na mesma cor cinza · filtre por Ano para comparar menos anos", $"{anos.Count} years in the selection: {anos[^1]} to {anos[cores.Length - 1]} in the same grey · filter by Year to compare fewer years")}</span>");
         if (temFraco)
-            sb.Append($"<span><i class='cvx-pt' style='border-color:{cores[0]}'></i>{(met == "winrate" ? "Mês em andamento ou mais de 30% das propostas ainda abertas: a taxa pode subir" : "Mês em andamento: o valor pode mudar")}</span>");
+            sb.Append($"<span><i class='cvx-pt' style='border-color:{cores[0]}'></i>{(met == "winrate" ? this.T("Mês em andamento ou mais de 30% das propostas ainda abertas: a taxa pode subir", "Month in progress or more than 30% of proposals still open: the rate may rise") : this.T("Mês em andamento: o valor pode mudar", "Month in progress: the value may change"))}</span>");
         sb.Append("</div>");
-        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='evolução mensal por ano' preserveAspectRatio='xMidYMid meet'>");
+        sb.Append($"<svg viewBox='0 0 {F(W)} {F(H)}' role='img' aria-label='{this.T("evolução mensal por ano", "monthly trend by year")}' preserveAspectRatio='xMidYMid meet'>");
         sb.Append($"<defs><linearGradient id='cvArea' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='{cores[0]}' stop-opacity='.18'/><stop offset='100%' stop-color='{cores[0]}' stop-opacity='0'/></linearGradient></defs>");
         // título do eixo: a unidade fica explícita (taxa, quantidade ou R$)
-        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? "Taxa de conversão (% das propostas enviadas no mês)" : met == "volume" ? "Propostas enviadas" : "Valor (R$)")}</text>");
+        sb.Append($"<text x='{F(L)}' y='{F(T - 26)}' font-size='12' font-weight='700' fill='#6b7a90'>{(met == "winrate" ? this.T("Taxa de conversão (% das propostas enviadas no mês)", "Conversion rate (% of proposals sent in the month)") : met == "volume" ? this.T("Propostas enviadas", "Proposals sent") : this.T($"Valor ({Sim})", $"Value ({Sim})"))}</text>");
         for (var g = 0; g <= nTicks; g++)
         {
             var v = met == "winrate" ? 25.0 * g : step * g;
@@ -614,7 +693,7 @@ public partial class Conversao : IAsyncDisposable
         if (mesAtual > 0)
             sb.Append($"<rect x='{F(L + passo * (mesAtual - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='{cores[0]}' opacity='.045' rx='6'/>");
         for (var m = 1; m <= 12; m++)
-            sb.Append($"<text x='{F(X(m))}' y='{F(H - 14)}' text-anchor='middle' font-size='12.5' font-weight='{(m == mesAtual ? 700 : 600)}' fill='{(m == mesAtual ? cores[0] : "#8a97ab")}' letter-spacing='.06em'>{Esc(new DateTime(2000, m, 1).ToString("MMM", _pt).TrimEnd('.').ToUpper(_pt))}</text>");
+            sb.Append($"<text x='{F(X(m))}' y='{F(H - 14)}' text-anchor='middle' font-size='12.5' font-weight='{(m == mesAtual ? 700 : 600)}' fill='{(m == mesAtual ? cores[0] : "#8a97ab")}' letter-spacing='.06em'>{Esc(new DateTime(2000, m, 1).ToString("MMM", CulTela).TrimEnd('.').ToUpper(CulTela))}</text>");
 
         // anos antigos primeiro, para o mais recente ficar por cima
         for (var k = anos.Count - 1; k >= 0; k--)
@@ -640,7 +719,7 @@ public partial class Conversao : IAsyncDisposable
             for (var m = 1; m <= 12; m++)
             {
                 var v = Val(a, m); if (v is null) continue;
-                var tip = EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", _pt)}\n{Txt(a, m)}");
+                var tip = EscTip($"{a} · {new DateTime(2000, m, 1).ToString("MMMM", CulTela)}\n{Txt(a, m)}");
                 if (atual)
                 {
                     // ponto cheio = valor consolidado; vazado e tracejado = pode mudar
@@ -664,7 +743,7 @@ public partial class Conversao : IAsyncDisposable
         for (var m = 1; m <= 12; m++)
         {
             var linhas = string.Join("\n", anos.Select(a => $"{a}: {Txt(a, m)}"));
-            sb.Append($"<rect x='{F(L + passo * (m - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='transparent'><title>{EscTip(new DateTime(2000, m, 1).ToString("MMMM", _pt) + "\n" + linhas)}</title></rect>");
+            sb.Append($"<rect x='{F(L + passo * (m - 1))}' y='{F(T)}' width='{F(passo)}' height='{F(H - T - B)}' fill='transparent'><title>{EscTip(new DateTime(2000, m, 1).ToString("MMMM", CulTela) + "\n" + linhas)}</title></rect>");
         }
         sb.Append("</svg></div>");
         return sb.ToString();
@@ -713,7 +792,7 @@ public partial class Conversao : IAsyncDisposable
     {
         var linhas = LinhasPareto(qtd, comSegmento);
         var totQ = linhas.Sum(x => x.Qtd); var totV = linhas.Sum(x => x.Valor);
-        if (totQ == 0) return Vazio("Nenhuma proposta perdida no recorte.");
+        if (totQ == 0) return Vazio(T("Nenhuma proposta perdida no recorte.", "No lost proposals in the selection."));
         var max = Math.Max(linhas.Max(x => qtd ? x.Qtd : x.Valor), 0.0000001);
         var total = qtd ? totQ : totV;
         var sb = new StringBuilder("<div class='ibar cvx-ibar cvx-static'>");
@@ -721,14 +800,15 @@ public partial class Conversao : IAsyncDisposable
         foreach (var l in linhas.Where(x => x.Qtd > 0))
         {
             var v = qtd ? l.Qtd : l.Valor; acum += v; pos++;
-            var valorTxt = qtd ? N0(l.Qtd) + " propostas" : Estado(l.ComUsd, l.Conv, l.Valor);
-            var tip = $"{l.Nome}\n{N0(l.Qtd)} proposta(s) · {EstadoTip(l.ComUsd, l.Conv, l.Valor)}\nAcumulado: {PctDe(acum, total)}";
+            var valorTxt = qtd ? N0(l.Qtd) + T(" propostas", " proposals") : Estado(l.ComUsd, l.Conv, l.Valor);
+            var tip = T($"{l.Nome}\n{N0(l.Qtd)} proposta(s) · {EstadoTip(l.ComUsd, l.Conv, l.Valor)}\nAcumulado: {PctDe(acum, total)}",
+                        $"{l.Nome}\n{N0(l.Qtd)} proposal(s) · {EstadoTip(l.ComUsd, l.Conv, l.Valor)}\nCumulative: {PctDe(acum, total)}");
             sb.Append(IbarItem(pos, l.Nome, Esc(valorTxt), Esc(PctDe(v, total)), v / max * 100, tip,
-                extra: $"<span class='cvx-ibm' title='Participação acumulada (Pareto)'>{Esc(PctDe(acum, total))} <small>acumulado</small></span><span class='ibar-sep'></span>"));
+                extra: $"<span class='cvx-ibm' title='{T("Participação acumulada (Pareto)", "Cumulative share (Pareto)")}'>{Esc(PctDe(acum, total))} <small>{T("acumulado", "cumulative")}</small></span><span class='ibar-sep'></span>"));
         }
         sb.Append("</div>");
         var zeros = linhas.Where(x => x.Qtd == 0).Select(x => x.Nome).ToList();
-        if (zeros.Count > 0) sb.Append($"<p class='cvx-note'>Sem ocorrências no recorte: {Esc(string.Join(", ", zeros))}</p>");
+        if (zeros.Count > 0) sb.Append($"<p class='cvx-note'>{T("Sem ocorrências no recorte: ", "No occurrences in the selection: ")}{Esc(string.Join(", ", zeros))}</p>");
         return sb.ToString();
     }
 
@@ -736,13 +816,16 @@ public partial class Conversao : IAsyncDisposable
     {
         var linhas = LinhasPareto(true, comSegmento);
         var tot = linhas.Sum(x => x.Qtd);
-        if (tot == 0) return "Sem propostas perdidas no recorte atual.";
+        if (tot == 0) return T("Sem propostas perdidas no recorte atual.", "No lost proposals in the current selection.");
         var top = linhas.First();
         var totV = linhas.Sum(x => x.Valor);
-        var s = $"{top.Nome} representa {PctDe(top.Qtd, tot)} das propostas classificadas como perdidas ({N0(top.Qtd)} de {N0(tot)}).";
+        var s = T($"{top.Nome} representa {PctDe(top.Qtd, tot)} das propostas classificadas como perdidas ({N0(top.Qtd)} de {N0(tot)}).",
+                  $"{top.Nome} accounts for {PctDe(top.Qtd, tot)} of the proposals classified as lost ({N0(top.Qtd)} of {N0(tot)}).");
         var topV = LinhasPareto(false, comSegmento).First();
-        if (totV > 0 && topV.Nome != top.Nome) s += $" Em valor, o maior impacto é de {topV.Nome} ({PctDe(topV.Valor, totV)} do valor perdido convertido).";
-        else if (totV > 0) s += $" Em valor, também lidera, com {PctDe(topV.Valor, totV)} do valor perdido convertido.";
+        if (totV > 0 && topV.Nome != top.Nome) s += T($" Em valor, o maior impacto é de {topV.Nome} ({PctDe(topV.Valor, totV)} do valor perdido convertido).",
+                                                     $" By value, the largest impact is {topV.Nome} ({PctDe(topV.Valor, totV)} of the converted lost value).");
+        else if (totV > 0) s += T($" Em valor, também lidera, com {PctDe(topV.Valor, totV)} do valor perdido convertido.",
+                                  $" By value, it also leads, with {PctDe(topV.Valor, totV)} of the converted lost value.");
         return s;
     }
 
@@ -750,8 +833,8 @@ public partial class Conversao : IAsyncDisposable
     {
         var l = Grupos(_f, i => i.P.Vendedor).Where(x => x.R.Decididas >= minDec && x.R.TaxaQtd is not null)
             .OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(n).ToList();
-        if (l.Count == 0) return Vazio($"Nenhum vendedor com {minDec}+ propostas decididas no recorte.");
-        var sb = new StringBuilder("<table class='cvx-mini-tbl'><thead><tr><th>#</th><th>Vendedor</th><th class='r'>Taxa de conversão</th><th class='r'>Ganhas</th><th class='r'>Perdidas</th><th class='r'>Abertas</th><th class='r'>Decididas</th><th class='r'>Valor ganho</th></tr></thead><tbody>");
+        if (l.Count == 0) return Vazio(T($"Nenhum vendedor com {minDec}+ propostas decididas no recorte.", $"No salesperson with {minDec}+ decided proposals in the selection."));
+        var sb = new StringBuilder($"<table class='cvx-mini-tbl'><thead><tr><th>#</th><th>{T("Vendedor", "Salesperson")}</th><th class='r'>{T("Taxa de conversão", "Conversion rate")}</th><th class='r'>{T("Ganhas", "Won")}</th><th class='r'>{T("Perdidas", "Lost")}</th><th class='r'>{T("Abertas", "Open")}</th><th class='r'>{T("Decididas", "Decided")}</th><th class='r'>{T("Valor ganho", "Won value")}</th></tr></thead><tbody>");
         for (var i = 0; i < l.Count; i++)
         {
             var (nome, r) = l[i];
@@ -767,17 +850,17 @@ public partial class Conversao : IAsyncDisposable
         var l = grupos.Where(x => x.R.Decididas >= minDec && x.R.TaxaQtd is not null)
             .OrderByDescending(x => x.R.TaxaQtd).ThenByDescending(x => x.R.Decididas).Take(max).ToList();
         var fora = grupos.Count - l.Count;
-        if (l.Count == 0) return Vazio($"Nenhuma unidade com {minDec}+ propostas decididas.");
+        if (l.Count == 0) return Vazio(T($"Nenhuma unidade com {minDec}+ propostas decididas.", $"No unit with {minDec}+ decided proposals."));
         var sb = new StringBuilder("<div class='ibar cvx-ibar cvx-static'>");
         var pos = 0;
         foreach (var (nome, r) in l)
         {
             pos++;
-            sb.Append(IbarItem(pos, nome, Esc(P1(r.TaxaQtd!.Value)), $"{N0(r.Decididas)} decididas", r.TaxaQtd.Value,
-                $"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas", marca: _r.TaxaQtd));
+            sb.Append(IbarItem(pos, nome, Esc(P1(r.TaxaQtd!.Value)), $"{N0(r.Decididas)}{T(" decididas", " decided")}", r.TaxaQtd.Value,
+                T($"{nome}\n{N0(r.G)} ganhas de {N0(r.Decididas)} decididas", $"{nome}\n{N0(r.G)} won of {N0(r.Decididas)} decided"), marca: _r.TaxaQtd));
         }
         sb.Append("</div>");
-        if (fora > 0) sb.Append($"<p class='rpt-small'>{fora} unidade(s) com menos de {minDec} decididas ou além das {max} primeiras não aparecem.</p>");
+        if (fora > 0) sb.Append($"<p class='rpt-small'>{T($"{fora} unidade(s) com menos de {minDec} decididas ou além das {max} primeiras não aparecem.", $"{fora} unit(s) with fewer than {minDec} decided or beyond the top {max} are not shown.")}</p>");
         return sb.ToString();
     }
 
@@ -804,7 +887,8 @@ public partial class Conversao : IAsyncDisposable
     /// <summary>Distribuição financeira: barra de composição por valor (só do que foi convertido).</summary>
     private string HtmlComposicaoValor(Resumo r)
     {
-        if (r.TotConv == 0) return Vazio(r.TotComUsd == 0 ? "Nenhuma proposta com valor em US$ informado." : "Valores não convertidos: falta a taxa de câmbio do ano das propostas.");
+        if (r.TotConv == 0) return Vazio(r.TotComUsd == 0 ? T("Nenhuma proposta com valor em US$ informado.", "No proposal with a US$ value entered.")
+                                                          : T("Valores não convertidos: falta a taxa de câmbio do ano das propostas.", "Values not converted: the exchange rate for the proposals' year is missing."));
         var tot = Math.Max(r.VTotal, 0.0000001);
         var baseBarra = Math.Max(r.VG + r.VP + r.VA, 0.0000001);
         var sb = new StringBuilder("<div class='cvx-stackbar static'>");
@@ -831,22 +915,24 @@ public partial class Conversao : IAsyncDisposable
         var soma = Math.Max(todos.Sum(x => x.R.VTotal), 1e-7);
         var l = todos.OrderByDescending(x => x.R.VTotal).Take(10).ToList();
         var semConv = grupos.Count(x => x.R.TotComUsd > 0 && x.R.TotConv == 0);
-        if (l.Count == 0) return Vazio(semConv > 0 ? "Valores por unidade não convertidos: falta a taxa USD/BRL do ano." : "Sem valores convertidos por unidade no recorte.");
+        if (l.Count == 0) return Vazio(semConv > 0 ? T("Valores por unidade não convertidos: falta a taxa USD/BRL do ano.", "Values by unit not converted: the USD/BRL rate for the year is missing.")
+                                                   : T("Sem valores convertidos por unidade no recorte.", "No converted values by unit in the selection."));
         var max = Math.Max(l.Max(x => x.R.VTotal), 0.0000001);
         var sb = new StringBuilder("<div class='ibar cvx-ibar cvx-static scroll-y'>");
         var pos = 0;
         foreach (var (nome, r) in l)
         {
             pos++;
-            var tip = $"{nome}\nGanho: {Din(r, ClasseProposta.Ganha)}\nPerdido: {Din(r, ClasseProposta.Perdida)}\nAberto: {Din(r, ClasseProposta.Aberta)}";
-            var det = $"<span class='cvx-ibm g' title='Valor ganho'>{Esc(Din(r, ClasseProposta.Ganha))} <small>ganho</small></span>"
-                    + $"<span class='cvx-ibm p' title='Valor perdido'>{Esc(Din(r, ClasseProposta.Perdida))} <small>perdido</small></span>"
-                    + $"<span class='cvx-ibm a' title='Valor em aberto'>{Esc(Din(r, ClasseProposta.Aberta))} <small>aberto</small></span>";
+            var tip = T($"{nome}\nGanho: {Din(r, ClasseProposta.Ganha)}\nPerdido: {Din(r, ClasseProposta.Perdida)}\nAberto: {Din(r, ClasseProposta.Aberta)}",
+                        $"{nome}\nWon: {Din(r, ClasseProposta.Ganha)}\nLost: {Din(r, ClasseProposta.Perdida)}\nOpen: {Din(r, ClasseProposta.Aberta)}");
+            var det = $"<span class='cvx-ibm g' title='{T("Valor ganho", "Won value")}'>{Esc(Din(r, ClasseProposta.Ganha))} <small>{T("ganho", "won")}</small></span>"
+                    + $"<span class='cvx-ibm p' title='{T("Valor perdido", "Lost value")}'>{Esc(Din(r, ClasseProposta.Perdida))} <small>{T("perdido", "lost")}</small></span>"
+                    + $"<span class='cvx-ibm a' title='{T("Valor em aberto", "Open value")}'>{Esc(Din(r, ClasseProposta.Aberta))} <small>{T("aberto", "open")}</small></span>";
             sb.Append(IbarItem(pos, nome, Esc(DinTotal(r)), Esc(PctDe(r.VTotal, soma)), r.VTotal / max * 100, tip, sub: det));
         }
         sb.Append("</div>");
-        if (semConv > 0) sb.Append($"<p class='cvx-note'>{semConv} unidade(s) com valor em US$ sem taxa de câmbio não aparecem.</p>");
-        if (todos.Count > 10) sb.Append($"<p class='cvx-note'>Top 10 de {todos.Count} unidades; participação sobre o total do recorte.</p>");
+        if (semConv > 0) sb.Append($"<p class='cvx-note'>{T($"{semConv} unidade(s) com valor em US$ sem taxa de câmbio não aparecem.", $"{semConv} unit(s) with a US$ value but no exchange rate are not shown.")}</p>");
+        if (todos.Count > 10) sb.Append($"<p class='cvx-note'>{T($"Top 10 de {todos.Count} unidades; participação sobre o total do recorte.", $"Top 10 of {todos.Count} units; share of the selection total.")}</p>");
         return sb.ToString();
     }
 
@@ -908,6 +994,47 @@ public partial class Conversao : IAsyncDisposable
 
     private sealed record Col(string Key, string Titulo, string Align, Func<Item, string> Texto, Func<Item, object?> Chave);
 
+    /// <summary>Em US$ (botão Moeda), a coluna do valor convertido e a da taxa falam da conversão para dólar.</summary>
+    /// <summary>Em inglês, títulos e textos da tela vêm daqui; Col.Titulo e Col.Texto ficam em português (busca em PT e exportação Excel).</summary>
+    private string TituloCol(Col c)
+    {
+        if (_emDolar && c.Key == "brl") return T("Valor convertido (US$)", "Converted value (US$)");
+        if (!_emIngles) return c.Titulo;
+        return c.Key switch
+        {
+            "origem" => "Sector", "data" => "Sent date", "ano" => "Year", "mes" => "Month", "vend" => "Salesperson",
+            "cliente" => "Client", "mercado" => "Market", "pais" => "Country", "produto" => "Product", "bu" => "BU",
+            "buic" => "BU Intercompany", "status" => "Original status", "classe" => "Classification",
+            "usd" => "Original value (US$)", "taxa" => "Applied rate", "brl" => "Converted value (R$)", "linha" => "Spreadsheet row",
+            _ => c.Titulo,
+        };
+    }
+    private string TextoCol(Col c, Item i)
+    {
+        if (!_emIngles)
+            return !_emDolar ? c.Texto(i) : c.Key switch
+            {
+                "brl" => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (!i.P.TemValor ? (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)") : "Não convertido"),
+                "taxa" => i.P.ValorBrl is null ? "já em US$" : i.Taxa is { } t ? "R$ ÷ " + t.ToString("0.0000", _pt) : "sem taxa",
+                _ => c.Texto(i),
+            };
+        // em inglês: os mesmos valores, com textos em inglês e números no formato americano
+        var cu = _enUs;
+        return c.Key switch
+        {
+            "data" => i.P.Data?.ToString("dd MMM yyyy", cu) ?? (i.P.DataTexto == "" ? "—" : i.P.DataTexto + " (invalid)"),
+            "mes" => i.Mes is { } m ? cu.DateTimeFormat.GetMonthName(m) : "—",
+            "classe" => NomeClasse(i.P.Classe),
+            "buic" => RotuloValor(i.P.BuIc),
+            "usd" => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", cu) : i.P.ValorBrl is not null ? "—" : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (unreadable)"),
+            "taxa" => _emDolar
+                ? (i.P.ValorBrl is null ? "already in US$" : i.Taxa is { } t ? "R$ ÷ " + t.ToString("0.0000", cu) : "no rate")
+                : (i.P.ValorBrl is not null ? "already in R$" : i.Taxa is { } t2 ? t2.ToString("0.0000", cu) : "no rate"),
+            "brl" => i.Brl is { } b ? b.ToString("#,##0.00", cu) : (!i.P.TemValor ? (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (unreadable)") : "Not converted"),
+            _ => c.Texto(i),
+        };
+    }
+
     private List<Col> ColunasPadrao() => new()
     {
         new("origem", "Setor", "center", i => i.P.Origem, i => i.P.Origem),
@@ -922,7 +1049,7 @@ public partial class Conversao : IAsyncDisposable
         new("bu", "BU", "", i => i.P.Bu, i => i.P.Bu),
         new("buic", "BU Intercompany", "", i => i.P.BuIc, i => i.P.BuIc),
         new("status", "Status original", "", i => i.P.StatusOriginal == "" ? "—" : i.P.StatusOriginal, i => i.P.StatusOriginal),
-        new("classe", "Classificação", "center", i => NomeClasse(i.P.Classe), i => (int)i.P.Classe),
+        new("classe", "Classificação", "center", i => ChaveClasse(i.P.Classe), i => (int)i.P.Classe),
         new("usd", "Valor original (US$)", "right", i => i.P.ValorUsd is { } v ? v.ToString("#,##0.00", _pt) : i.P.ValorBrl is not null ? "—" : (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)"), i => i.P.ValorUsd),
         new("taxa", "Taxa aplicada", "right", i => i.P.ValorBrl is not null ? "já em R$" : i.Taxa is { } t ? t.ToString("0.0000", _pt) : "sem taxa", i => i.Taxa),
         new("brl", "Valor convertido (R$)", "right", i => i.Brl is { } b ? b.ToString("#,##0.00", _pt) : (!i.P.TemValor ? (i.P.ValorTexto == "" ? "—" : i.P.ValorTexto + " (ilegível)") : "Não convertido"), i => i.Brl),
@@ -1003,11 +1130,12 @@ public partial class Conversao : IAsyncDisposable
     private List<Item> LinhasTabela(List<Col> cols)
     {
         IEnumerable<Item> q = _f;                                         // o MESMO recorte global
-        if (_classes.Count > 0) q = q.Where(i => _classes.Contains(NomeClasse(i.P.Classe)));
+        if (_classes.Count > 0) q = q.Where(i => _classes.Contains(ChaveClasse(i.P.Classe)));
         if (!string.IsNullOrWhiteSpace(_busca))
         {
             var b = _busca.Trim();
-            q = q.Where(i => cols.Any(c => c.Texto(i).Contains(b, StringComparison.CurrentCultureIgnoreCase)));
+            // em inglês a busca olha o texto mostrado na tela (em português, o de sempre)
+            q = q.Where(i => cols.Any(c => (_emIngles ? TextoCol(c, i) : c.Texto(i)).Contains(b, StringComparison.CurrentCultureIgnoreCase)));
         }
         var col = cols.FirstOrDefault(c => c.Key == _ordCol) ?? cols[0];
         q = _ordAsc ? q.OrderBy(col.Chave, Comparer<object?>.Create(Cmp)) : q.OrderByDescending(col.Chave, Comparer<object?>.Create(Cmp));
@@ -1093,6 +1221,107 @@ public partial class Conversao : IAsyncDisposable
     // ======================================================================
     // O viewBox dos gráficos de evolução e de valor mensal segue a largura real do cartão:
     // o texto sai com o tamanho escrito (12,5 px) a 1366 e a 1920 px, como nos gráficos do Power BI.
+    // ---- modo embutido (guia Performance Comercial) ---------------------------------
+    /// <summary>true = só as seções de BU, mercado, produto, país, perdas e base, sem cabeçalho nem barra de filtros.</summary>
+    [Parameter] public bool Embutido { get; set; }
+    /// <summary>Embutido: filtros compartilhados com a página de fora (a barra e as seções usam os mesmos).</summary>
+    [Parameter] public FiltrosConversao? Filtros { get; set; }
+    /// <summary>Embutido: "filtros" = só a barra de filtros (congelada); "secoes" = só as seções.</summary>
+    [Parameter] public string Parte { get; set; } = "secoes";
+    /// <summary>Embutido: avisa a página de fora quando algum filtro muda (para ela recalcular o que é dela).</summary>
+    [Parameter] public EventCallback FiltrosMudaram { get; set; }
+    /// <summary>Embutido: quantas linhas ficam visíveis nas listas (o resto rola).</summary>
+    [Parameter] public int LinhasVisiveis { get; set; } = 7;
+    private string? _assinNotif;
+
+    // ---- base da taxa de conversão (botão na barra de filtros) --------------------------
+    private bool _baseTodasLocal = true;   // padrão: taxa sobre todas as propostas enviadas
+    /// <summary>true = Ganhas ÷ todas as propostas enviadas (padrão); false = Ganhas ÷ decididas. Embutido: vem dos filtros compartilhados.</summary>
+    private bool _baseTodas
+    {
+        get => Filtros?.BaseTodas ?? _baseTodasLocal;
+        set { if (Filtros is not null) Filtros.BaseTodas = value; else _baseTodasLocal = value; }
+    }
+    // ---- conversão por quantidade ou por valor (segundo botão da barra de filtros) ----
+    private bool _porValorLocal;
+    private bool _porValor
+    {
+        get => Filtros?.PorValor ?? _porValorLocal;
+        set { if (Filtros is not null) Filtros.PorValor = value; else _porValorLocal = value; }
+    }
+    private string DenRot => _baseTodas ? T("enviadas", "sent") : T("decididas", "decided");
+    private string RegraCurta => _porValor
+        ? (_baseTodas ? T($"{Sim} ganho ÷ {Sim} de todas as enviadas", $"{Sim} won ÷ {Sim} of all sent") : T($"{Sim} ganho ÷ {Sim} (ganho + perdido)", $"{Sim} won ÷ {Sim} (won + lost)"))
+        : (_baseTodas ? T("ganhas ÷ todas as propostas enviadas", "won ÷ all proposals sent") : T("ganhas ÷ decididas", "won ÷ decided"));
+    private string TituloRegra => _porValor
+        ? (_baseTodas ? T("Taxa de Conversão por valor = valor ganho ÷ valor de todas as propostas enviadas × 100.",
+                          "Conversion rate by value = won value ÷ value of all proposals sent × 100.")
+                      : T("Taxa de Conversão por valor = valor ganho ÷ (valor ganho + valor perdido) × 100. Abertas e não classificadas fora.",
+                          "Conversion rate by value = won value ÷ (won value + lost value) × 100. Open and unclassified excluded."))
+        : _baseTodas
+        ? T("Taxa de Conversão = Ganhas ÷ todas as propostas enviadas × 100 (ganhas, perdidas, abertas e não classificadas).",
+            "Conversion rate = Won ÷ all proposals sent × 100 (won, lost, open and unclassified).")
+        : T("Taxa de Conversão = Ganhas ÷ (Ganhas + Perdidas) × 100. Propostas abertas e não classificadas não entram no denominador.",
+            "Conversion rate = Won ÷ (Won + Lost) × 100. Open and unclassified proposals are not in the denominator.");
+    private string TituloValor => _baseTodas
+        ? T($"Valor ganho ÷ valor total cotado (todas as propostas), em {Sim}", $"Won value ÷ total quoted value (all proposals), in {Sim}")
+        : T($"Valor ganho ÷ (valor ganho + valor perdido), em {Sim}", $"Won value ÷ (won value + lost value), in {Sim}");
+
+    // ---- idioma da tela (botão "Idioma" da barra de filtros) ----
+    private bool _emInglesLocal;
+    /// <summary>true = textos em inglês e números no formato americano; false = português (padrão). Embutido: vem dos filtros compartilhados.</summary>
+    private bool _emIngles
+    {
+        get => Filtros?.EmIngles ?? _emInglesLocal;
+        set { if (Filtros is not null) Filtros.EmIngles = value; else _emInglesLocal = value; }
+    }
+    /// <summary>O texto no idioma da tela: T("Propostas enviadas", "Proposals sent").</summary>
+    private string T(string pt, string en) => _emIngles ? en : pt;
+
+    // ---- taxa da tela (ao lado de US$): só para converter o que a tela mostra, não grava nada ----
+    private double? _taxaTelaLocal;
+    private double? _taxaTela
+    {
+        get => Filtros is not null ? Filtros.TaxaTela : _taxaTelaLocal;
+        set { if (Filtros is not null) Filtros.TaxaTela = value; else _taxaTelaLocal = value; }
+    }
+    /// <summary>A taxa da tela que vale agora (dólar ligado e taxa digitada); null = as taxas anuais.</summary>
+    private double? _taxaTelaAtiva => _emDolar && _taxaTela is > 0 ? _taxaTela : null;
+    /// <summary>Dólar pelas taxas anuais (sem taxa da tela): AFM no valor original, NB ÷ taxa do ano.</summary>
+    private bool _dolarAnual => _emDolar && _taxaTelaAtiva is null;
+    private string _taxaTelaTexto = "";
+    private void MudarTaxaTela(ChangeEventArgs e)
+    {
+        var t = (e.Value?.ToString() ?? "").Trim().Replace(",", ".");
+        _taxaTelaTexto = e.Value?.ToString() ?? "";
+        _taxaTela = double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+        if (_taxaTela is null) _taxaTelaTexto = "";
+    }
+
+    // ---- moeda dos valores (terceiro botão da barra de filtros) ----
+    private bool _emDolarLocal;
+    /// <summary>true = valores em US$; false = em R$ (padrão). Embutido: vem dos filtros compartilhados.</summary>
+    private bool _emDolar
+    {
+        get => Filtros?.EmDolar ?? _emDolarLocal;
+        set { if (Filtros is not null) Filtros.EmDolar = value; else _emDolarLocal = value; }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Filtros is not { } f || ReferenceEquals(_anos, f.Anos)) return;
+        _anos = f.Anos; _meses = f.Meses; _vend = f.Vendedores; _bus = f.Bus; _buIcs = f.BuIcs;
+        _origens = f.Origens; _mercados = f.Mercados; _paises = f.Paises; _produtos = f.Produtos;
+    }
+
+    /// <summary>Embutido: os atalhos do índice apontam para as seções da guia Performance Comercial.</summary>
+    private (string Id, string Titulo)[] AncorasEmbutido => new[]
+    {
+        ("propostas", T("Resumo", "Summary")), ("mes-a-mes", T("Mês a mês", "Month by month")), ("mensal", T("Ano × ano", "Year × year")), ("setores", "AFM × NB"), ("metas", T("Vendas × metas", "Sales × targets")), ("unidades", "BU"),
+        ("mercado", T("Mercado", "Market")), ("produto", T("Produto", "Product")), ("vendedores", T("Vendedores", "Sales team")), ("pais", T("País", "Country")),
+        ("perdas", T("Perdas", "Losses")), ("base", T("Base", "Data")), ("budget", T("Acumulado", "Year to date")), ("mes-ano", T("Mês × ano", "Month × year")),
+    };
+
     private double _chartW = 1200;
     private bool _largObs;
     private DotNetObjectReference<Conversao>? _ref;
@@ -1104,6 +1333,14 @@ public partial class Conversao : IAsyncDisposable
         // cabeçalho arrastável da Base e mapa de países (cada chamada só liga o que ainda não está ligado)
         try { await JS.InvokeVoidAsync("colOrder.init", "cv-th-base", _ref, TabelaOrdemPref); } catch { }
         try { await JS.InvokeVoidAsync("worldMap.init", MapaId, _ref); } catch { }
+        if (Embutido) { try { await JS.InvokeVoidAsync("vpLinhas", LinhasVisiveis); } catch { } }
+        if (Embutido && Filtros is not null)
+        {
+            // filtro mudou aqui dentro (barra, clique numa lista, mapa): a página de fora recalcula
+            var assin = Filtros.Assinatura();
+            if (_assinNotif is null) _assinNotif = assin;
+            else if (assin != _assinNotif) { _assinNotif = assin; await FiltrosMudaram.InvokeAsync(); }
+        }
         if (_largObs) return;
         try
         {
@@ -1140,7 +1377,7 @@ public partial class Conversao : IAsyncDisposable
         foreach (var (nome, _) in lista)
         {
             if (WorldMap.Chave(nome) is not { } k) continue;
-            if (!porChave.TryGetValue(k, out var e)) porChave[k] = e = (new Resumo(), new List<string>());
+            if (!porChave.TryGetValue(k, out var e)) porChave[k] = e = (new Resumo { Todas = _baseTodas, PorValor = _porValor }, new List<string>());
             e.Nomes.Add(nome);
         }
         var resumos = porChave.ToDictionary(kv => kv.Key, kv => (R: Somar(_fx.Where(i => kv.Value.Nomes.Contains(i.P.Pais))), kv.Value.Nomes));
@@ -1148,7 +1385,7 @@ public partial class Conversao : IAsyncDisposable
         (_txMin, _txMax) = taxas.Count == 0 ? (0d, 100d) : (taxas.Min(), taxas.Max());
 
         var sb = new StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Taxa de conversão por país'>");
+        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{T("Taxa de conversão por país", "Conversion rate by country")}'>");
         sb.Append($"<rect x='0' y='0' width='{F(WorldMap.ViewW)}' height='{F(WorldMap.ViewH)}' fill='#f7fafc'/>");
         foreach (var (pais, d) in WorldMap.Paths)
         {
@@ -1156,7 +1393,7 @@ public partial class Conversao : IAsyncDisposable
             var ativo = tem && e.Nomes.Any(_paises.Contains);
             var fill = tem ? CorTaxa(e.R) : "#e7edf3";
             var dados = tem
-                ? $" data-xf-val='{Esc(e.Nomes[0])}' data-value='{Esc("Taxa de conversão " + TxQtd(e.R))}' data-pct='{Esc($"{N0(e.R.G)} ganhas de {N0(e.R.Decididas)} decididas")}' data-metric='{Esc($"{N0(e.R.Total)} propostas")}'/>"
+                ? $" data-xf-val='{Esc(e.Nomes[0])}' data-value='{Esc(T("Taxa de conversão ", "Conversion rate ") + TxQtd(e.R))}' data-pct='{Esc(T($"{N0(e.R.G)} ganhas de {N0(e.R.Decididas)} decididas", $"{N0(e.R.G)} won of {N0(e.R.Decididas)} decided"))}' data-metric='{Esc(T($"{N0(e.R.Total)} propostas", $"{N0(e.R.Total)} proposals"))}'/>"
                 : "/>";
             sb.Append($"<path d='{d}' fill='{fill}' stroke='{(ativo ? "#0b4f6f" : "#cdd8e4")}' stroke-width='{(ativo ? "1.2" : "0.4")}' class='wm-path{(ativo ? " wm-active" : "")}' data-country='{Esc(pais)}'{dados}");
         }
@@ -1219,7 +1456,7 @@ public partial class Conversao : IAsyncDisposable
         var max = Math.Max(hojeAno, plausiveis.DefaultIfEmpty(hojeAno).Max());
         _taxasAnos = Enumerable.Range(min, max - min + 1).Union(anosDados).Union(salvas.Keys).Distinct().OrderBy(x => x).ToList();
         _taxasTxt.Clear();
-        foreach (var a in _taxasAnos) _taxasTxt[a] = salvas.TryGetValue(a, out var t) ? t.ToString("0.0000", _pt) : "";
+        foreach (var a in _taxasAnos) _taxasTxt[a] = salvas.TryGetValue(a, out var t) ? t.ToString("0.0000", CulTela) : "";
         _taxasAberto = true;
     }
 
@@ -1230,7 +1467,7 @@ public partial class Conversao : IAsyncDisposable
             if (!_taxasAnos.Contains(a)) { _taxasAnos.Add(a); _taxasAnos.Sort(); _taxasTxt[a] = ""; }
             _novoAno = ""; _taxasErro = "";
         }
-        else _taxasErro = "Informe um ano válido (ex.: 2027).";
+        else _taxasErro = T("Informe um ano válido (ex.: 2027).", "Enter a valid year (e.g. 2027).");
     }
 
     // "5,20" ou "5.20": o separador decimal é o último; nunca "5.20" lido como 520.
@@ -1249,7 +1486,7 @@ public partial class Conversao : IAsyncDisposable
         foreach (var a in _taxasAnos)
         {
             var v = LerTaxa(_taxasTxt.GetValueOrDefault(a, ""));
-            if (v is { } x && (double.IsNaN(x) || x <= 0 || x >= 100)) { _taxasErro = $"Taxa inválida em {a}. Use um número entre 0 e 100 (ex.: 5,2000)."; return; }
+            if (v is { } x && (double.IsNaN(x) || x <= 0 || x >= 100)) { _taxasErro = T($"Taxa inválida em {a}. Use um número entre 0 e 100 (ex.: 5,2000).", $"Invalid rate for {a}. Use a number between 0 and 100 (e.g. 5.2000)."); return; }
             ok[a] = v;
         }
         foreach (var (a, v) in ok)

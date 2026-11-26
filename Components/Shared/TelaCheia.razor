@@ -12,9 +12,14 @@
    O clique é resolvido no navegador (onclick, não @onclick): ampliar um painel
    não justifica uma ida ao servidor. *@
 
-<button type="button" class="fs-btn fs-abrir" title="Ampliar (Esc para voltar)" onclick="appAmpliar(this)">
+<button type="button" class="fs-btn fs-abrir" title="@(Ingles ? "Enlarge (Esc to go back)" : "Ampliar (Esc para voltar)")" onclick="appAmpliar(this)">
     @Icons.Svg("expand")
 </button>
-<button type="button" class="fs-btn fs-voltar" title="Voltar ao tamanho normal" onclick="appAmpliarSair()">
-    @Icons.Svg("chevron-left")<span>Voltar</span>
+<button type="button" class="fs-btn fs-voltar" title="@(Ingles ? "Back to normal size" : "Voltar ao tamanho normal")" onclick="appAmpliarSair()">
+    @Icons.Svg("chevron-left")<span>@(Ingles ? "Back" : "Voltar")</span>
 </button>
+
+@code {
+    /// <summary>Textos do botão em inglês.</summary>
+    [Parameter] public bool Ingles { get; set; }
+}

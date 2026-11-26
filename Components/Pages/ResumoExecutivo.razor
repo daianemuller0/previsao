@@ -1,0 +1,860 @@
+@page "/resumo-executivo"
+@attribute [Authorize(Roles = "admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IAsyncDisposable
+@inject ConversaoService Conv
+@inject CambioAnualRepository Cambio
+@inject VendasMensaisRepository VendasRepo
+@inject IJSRuntime JS
+
+@* ===========================================================================
+   RESUMO EXECUTIVO | GLOBAL COMMERCIAL PERFORMANCE
+   Consolida as fontes que os painéis já usam (planilhas de propostas da guia
+   Conversão, histórico de vendas e budgets da Performance Comercial) num
+   relatório para a liderança. Cálculos em Data/ResumoExecutivo.cs (servidor).
+   Só dados agregados; somente administradores (como Performance e Conversão).
+   =========================================================================== *@
+
+<PageTitle>Resumo Executivo · Howden South America</PageTitle>
+
+<div class="cvx rx-page">
+    <div class="breadcrumbs rx-tela"><span>Executivo</span><span class="sep">/</span><span>Resumo Executivo</span></div>
+    <div class="page-head rx-tela">
+        <div>
+            <h1>Resumo Executivo | Global Commercial Performance</h1>
+            <p class="subtitle">Resultados comerciais consolidados · @_f.AnoDe → @_f.AnoAte · valores em R$ · documento confidencial (dados agregados)</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-ghost" disabled="@_carregando" title="Reler as planilhas de propostas e recalcular" @onclick="Reler">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar indicadores")</button>
+            <a class="btn-ghost" href="/apresentacao-executiva" title="PowerPoint editável no modelo corporativo, com os mesmos cálculos deste resumo">@Icons.Svg("bar-chart")Gerar Apresentação Executiva</a>
+            <button class="btn-primary" disabled="@(_m is null)" @onclick="() => { _exportar = true; _confirmo = false; _msg = null; }">@Icons.Svg("download")Exportar Resumo Executivo</button>
+        </div>
+    </div>
+
+    @if (_msg is not null) { <div class="cvx-alert rx-tela @(_msgOk ? "vp-ok" : "erro")">@_msg</div> }
+
+    @* ---------------- filtros ---------------- *@
+    <div class="filterbar filterbar-sticky cvx-fb rx-fb rx-tela">
+        <div class="flt"><span class="flt-label">Período</span>
+            <select class="rx-sel" value="@_f.AnoDe" @onchange="e => MudarPeriodo(int.Parse(e.Value!.ToString()!), _f.AnoAte)">@foreach (var a in AnosPossiveis) { <option value="@a">@a</option> }</select>
+            <span class="rx-ate">a</span>
+            <select class="rx-sel" value="@_f.AnoAte" @onchange="e => MudarPeriodo(_f.AnoDe, int.Parse(e.Value!.ToString()!))">@foreach (var a in AnosPossiveis) { <option value="@a">@a</option> }</select>
+        </div>
+        <MultiFilter Label="Setor" AllText="Ambos" Options="ConversaoService.Origens" Selected="_f.Setores" OnChanged="Recalcular" />
+        <MultiFilter Label="BU" AllText="Todas" Options="Opcoes(o => o.Bu)" Selected="_f.Bus" OnChanged="Recalcular" />
+        <MultiFilter Label="País" AllText="Todos" Searchable="true" Options="Opcoes(o => o.Pais)" Selected="_f.Paises" OnChanged="Recalcular" />
+        <MultiFilter Label="Segmento" AllText="Todos" Searchable="true" Options="Opcoes(o => o.Mercado)" Selected="_f.Segmentos" OnChanged="Recalcular" />
+        <MultiFilter Label="Produto" AllText="Todos" Searchable="true" Options="Opcoes(o => o.Produto)" Selected="_f.Produtos" OnChanged="Recalcular" />
+        <MultiFilter Label="Vendedor" AllText="Todos" Searchable="true" Options="Opcoes(o => o.Vendedor)" Selected="_f.Vendedores" OnChanged="Recalcular" />
+        @if (_f.TemDimensao) { <button class="btn-link" @onclick="LimparFiltros">Limpar filtros</button> }
+        <div class="rx-fb-linha">
+            <div class="flt"><span class="flt-label">Ano principal</span>
+                <select class="rx-sel" value="@_principal" @onchange="e => MudarAnos(int.Parse(e.Value!.ToString()!), _comparativo)">@foreach (var a in AnosDoPeriodo) { <option value="@a">@a</option> }</select>
+            </div>
+            <div class="flt"><span class="flt-label">Comparar com</span>
+                <select class="rx-sel" value="@_comparativo" @onchange="e => MudarAnos(_principal, int.Parse(e.Value!.ToString()!))">@foreach (var a in AnosDoPeriodo.Where(x => x != _principal)) { <option value="@a">@a</option> }</select>
+            </div>
+            <div class="rx-pares" title="Comparações rápidas">
+                @foreach (var a in AnosDoPeriodo.Skip(1))
+                {
+                    var ano = a;
+                    <button class="rx-par @(_principal == ano && _comparativo == ano - 1 ? "on" : "")" @onclick="() => MudarAnos(ano, ano - 1)">@(ano - 1) × @ano</button>
+                }
+            </div>
+            <div class="cvx-base-taxa" title="Período equivalente: todos os anos de janeiro até o último mês fechado do ano em curso, para comparar meses iguais.">
+                <span class="flt-label">Período</span>
+                <div class="cvx-seg-ctl">
+                    <button class="@(_equivalente ? "on" : "")" @onclick="() => { _equivalente = true; Recalcular(); }">Equivalente@(_m is { AnoIncompleto: > 0, MesCorte: > 0 } ? $" ({_m.PeriodoTxt(_m.MesCorte)})" : "")</button>
+                    <button class="@(!_equivalente ? "on" : "")" @onclick="() => { _equivalente = false; Recalcular(); }">Ano inteiro</button>
+                </div>
+            </div>
+            <div class="cvx-base-taxa" title="Base das taxas de conversão (mesma regra da guia Conversão).">
+                <span class="flt-label">Taxa sobre</span>
+                <div class="cvx-seg-ctl">
+                    <button class="@(!_f.BaseTodas ? "on" : "")" @onclick="() => { _f.BaseTodas = false; Recalcular(); }">Decididas</button>
+                    <button class="@(_f.BaseTodas ? "on" : "")" @onclick="() => { _f.BaseTodas = true; Recalcular(); }">Todas as propostas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_m is null)
+    {
+        <div class="cvx-card"><div class="empty" style="padding:34px 12px">@(_carregando ? "Lendo as planilhas de propostas…" : "Sem dados.")</div></div>
+    }
+    else
+    {
+        <div class="rx-status rx-tela">@StatusTxt()</div>
+        @if (Conv.Ok && Conv.AjusteTexto != "")
+        {
+            <div class="cvx-alert vp-ok rx-tela"><strong>Ajuste manual na conversão:</strong> @Conv.AjusteTexto</div>
+        }
+        <nav class="rx-abas rx-tela" aria-label="Seções do resumo">
+            @foreach (var (id, nome) in Abas)
+            {
+                var aba = id;
+                <button class="@(_aba == aba ? "on" : "")" @onclick="() => _aba = aba">@nome</button>
+            }
+        </nav>
+        <div class="rx-tela">@Secao(_aba, false)</div>
+
+        @if (_imprimindo)
+        {
+            <div class="rx-print">
+                <div class="rx-print-capa">
+                    <h1>Resumo Executivo | Global Commercial Performance</h1>
+                    <p>Howden South America · @_f.AnoDe → @_f.AnoAte · gerado por @_usuario em @DateTime.Now.ToString("dd/MM/yyyy 'às' HH:mm")</p>
+                    <p class="rx-conf">Confidencial · somente dados agregados (sem clientes nem números de proposta)</p>
+                    <p>@FiltrosTxt() · @StatusTxt()</p>
+                    <h3>Conteúdo</h3>
+                    <ol class="rx-print-indice">@foreach (var (id, nome) in Abas.Where(x => SecaoNaExportacao(x.Id))) { <li>@nome</li> }</ol>
+                    <p class="cvx-note">@FonteTxt()</p>
+                </div>
+                @foreach (var (id, _) in Abas.Where(x => SecaoNaExportacao(x.Id)))
+                {
+                    <div class="rx-print-sec">@Secao(id, true)</div>
+                }
+            </div>
+        }
+    }
+
+    @if (_exportar)
+    {
+        <div class="flt-multi-backdrop rx-modal-fundo" @onclick="() => _exportar = false"></div>
+        <div class="rx-modal" role="dialog" aria-label="Exportar Resumo Executivo">
+            <h3>Exportar Resumo Executivo</h3>
+            <p class="cvx-note">O arquivo traz só dados agregados (sem clientes nem números de proposta), com os filtros atuais. Escolha o que entra:</p>
+            <div class="rx-opcoes">
+                @foreach (var (id, nome) in Abas.Where(x => x.Id != "anual"))
+                {
+                    var chave = id;
+                    <label class="@(chave == "vendedor" ? "rx-sensivel" : "")">
+                        <input type="checkbox" checked="@_incluir.Contains(chave)" @onchange="e => { if ((bool)e.Value!) _incluir.Add(chave); else _incluir.Remove(chave); }" />
+                        @nome@if (chave == "vendedor") { <small> · desempenho individual: inclua só se o destinatário estiver autorizado</small> }
+                    </label>
+                }
+            </div>
+            <label class="rx-confirma"><input type="checkbox" checked="@_confirmo" @onchange="e => _confirmo = (bool)e.Value!" /> Confirmo que este relatório é confidencial e será compartilhado apenas com pessoas autorizadas.</label>
+            <div class="rx-modal-pe">
+                <button class="btn-ghost" @onclick="() => _exportar = false">Cancelar</button>
+                <button class="btn-ghost" disabled="@(!_confirmo)" @onclick="ExportarExcel">@Icons.Svg("download")Excel</button>
+                <button class="btn-primary" disabled="@(!_confirmo)" @onclick="ExportarPdf">@Icons.Svg("download")PDF (imprimir)</button>
+            </div>
+            <p class="cvx-note">Os dados não são enviados a nenhum serviço externo: o Excel é gerado aqui e o PDF pela impressão do navegador (“Salvar como PDF”).</p>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private const int AnoMin = 2022;
+
+    private readonly FiltroResumo _f = new();
+    private ModeloResumo? _m;
+    private int _principal = DateTime.Today.Year, _comparativo = DateTime.Today.Year - 1;
+    private bool _equivalente = true, _carregando, _exportar, _confirmo, _imprimindo, _msgOk, _isAdmin;
+    private string _aba = "sumario", _usuario = "";
+    private string? _msg;
+    private readonly Dictionary<string, string> _metrica = new();   // métrica da matriz de cada dimensão
+    private readonly HashSet<string> _todos = new();                // dimensões com "mostrar todos"
+    private int _anoMensal = DateTime.Today.Year;
+    private string _metMensal = "vendas";
+    private readonly HashSet<string> _incluir = new() { "sumario", "mensal", "setor", "bu", "pais", "segmento", "produto", "metas", "funil", "insights" };
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private static readonly (string Id, string Nome)[] Abas =
+    {
+        ("sumario", "Sumário"), ("anual", "Resultados anuais"), ("mensal", "Mês a mês"), ("setor", "Aftermarket × NB"),
+        ("bu", "Business Unit"), ("pais", "País"), ("segmento", "Segmento"), ("produto", "Produto"), ("vendedor", "Vendedor"),
+        ("metas", "Metas"), ("funil", "Funil"), ("insights", "Executive Insights | Principais Conclusões"),
+    };
+
+    private static IEnumerable<int> AnosPossiveis => Enumerable.Range(AnoMin, DateTime.Today.Year - AnoMin + 1);
+    private IEnumerable<int> AnosDoPeriodo => Enumerable.Range(_f.AnoDe, Math.Max(1, _f.AnoAte - _f.AnoDe + 1));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var u = (await AuthState).User;
+            _usuario = u.Identity?.Name ?? "";
+            _isAdmin = u.IsInRole("admin");
+        }
+        Recalcular();
+        _carregando = true;
+        try { await Task.Run(() => Conv.Carregar(false)); } catch { /* sem as planilhas, só as vendas */ }
+        finally { _carregando = false; }
+        Recalcular();
+    }
+
+    private async Task Reler()
+    {
+        _carregando = true; StateHasChanged();
+        try { await Task.Run(() => Conv.Carregar(true)); } catch { }
+        finally { _carregando = false; }
+        Recalcular();
+        _msgOk = Conv.Ok; _msg = Conv.Ok ? $"Indicadores atualizados ({DateTime.Now:HH:mm})." : Conv.Mensagem;
+    }
+
+    private void Recalcular()
+    {
+        if (!_isAdmin) { _m = null; return; }   // defesa extra: os números só são calculados para administradores
+        var props = Conv.Ok ? Conv.Atual.Propostas : (IEnumerable<PropostaConv>)Array.Empty<PropostaConv>();
+        _m = ResumoExecutivoCalc.Montar(props, Cambio.Todas(), VendasRepo.Meses(), VendasRepo.Budgets(), _f, _principal, _comparativo, _equivalente);
+        // primeiro ano com propostas de cada origem no recorte (AFM e NB podem começar em anos diferentes)
+        _inicio = props.Where(p => p.Data is not null && _f.Passa(p)).GroupBy(p => p.Origem).ToDictionary(g => g.Key, g => g.Min(p => p.Data!.Value.Year));
+        _principal = _m.Principal; _comparativo = _m.Comparativo;
+        if (!_m.Anos.Contains(_anoMensal)) _anoMensal = _m.Principal;
+    }
+
+    private void MudarPeriodo(int de, int ate)
+    {
+        if (ate < de) (de, ate) = (ate, de);
+        _f.AnoDe = de; _f.AnoAte = ate;
+        if (_principal < de || _principal > ate) _principal = ate;
+        if (_comparativo < de || _comparativo > ate || _comparativo == _principal) _comparativo = Math.Max(de, _principal - 1);
+        Recalcular();
+    }
+    private void MudarAnos(int principal, int comparativo) { _principal = principal; _comparativo = comparativo == principal ? principal - 1 : comparativo; Recalcular(); }
+    private void LimparFiltros() { _f.Setores.Clear(); _f.Bus.Clear(); _f.Paises.Clear(); _f.Segmentos.Clear(); _f.Produtos.Clear(); _f.Vendedores.Clear(); Recalcular(); }
+
+    private IEnumerable<string> Opcoes(Func<PropostaConv, string> campo) =>
+        !Conv.Ok ? Array.Empty<string>() : Conv.Atual.Propostas.Where(p => p.Data is DateTime d && d.Year >= _f.AnoDe && d.Year <= _f.AnoAte)
+            .Select(p => FiltroResumo.Rot(campo(p))).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList();
+
+    // ================= formatos =================
+
+    private static string F(double v) => v.ToString("0.##", Inv);
+    private static string N0(int v) => v.ToString("#,##0", Br);
+    private static string P1(double? v) => v is double x ? x.ToString("0.0", Br) + "%" : "—";
+    private static string Mi(decimal? v) => v is not decimal x ? "—" : (x < 0 ? "−" : "") + "R$ " + Compacto(Math.Abs(x));
+    private static string Mi(double v) => Mi((decimal)v);
+    private static string Compacto(decimal a) =>
+        a >= 1_000_000_000m ? (a / 1_000_000_000m).ToString("#,##0.00", Br) + " bi" : a >= 1_000_000m ? (a / 1_000_000m).ToString("#,##0.0", Br) + " mi"
+        : a >= 1_000m ? (a / 1_000m).ToString("#,##0", Br) + " mil" : a.ToString("#,##0", Br);
+    private static string Cheio(decimal? v) => v is decimal x ? (x < 0 ? "−" : "") + "R$ " + Math.Abs(x).ToString("#,##0.00", Br) : "";
+    private static double? VarPct(decimal? a, decimal? b) => a is decimal x && b is decimal y && y > 0 ? (double)((x - y) / y * 100) : null;
+    private static double? VarPct(double a, double b) => b > 0 ? (a - b) / b * 100 : null;
+    private static double? VarPp(double? a, double? b) => a is double x && b is double y ? x - y : null;
+    private static string TxtVar(double? v, bool pp = false) => v is not double x ? "—" : (x > 0.05 ? "▲ +" : x < -0.05 ? "▼ −" : "") + Math.Abs(x).ToString("0.0", Br) + (pp ? " p.p." : "%");
+    /// <summary>neutra = a variação não é "boa" nem "ruim" por si (ex.: quantidade de propostas).</summary>
+    private static string ClsVar(double? v, bool neutra = false) => v is not double x || Math.Abs(x) < 0.05 || neutra ? "neu" : x > 0 ? "pos" : "neg";
+
+    private Dictionary<string, int> _inicio = new();
+    /// <summary>Ano em que só uma origem tem propostas (a outra planilha começa depois): "NB", "AFM"… ou null.</summary>
+    private string? SoOrigem(int ano)
+    {
+        if (_inicio.Count < 2 || ano >= _inicio.Values.Max()) return null;
+        var l = _inicio.Where(kv => kv.Value <= ano).Select(kv => kv.Key).ToList();
+        return l.Count == 0 ? null : string.Join(" e ", l);
+    }
+
+    private string DenRot => _f.BaseTodas ? "enviadas" : "decididas";
+    private string RegraTxt => _f.BaseTodas
+        ? "Conversão sobre todas as propostas enviadas: ganhas ÷ enviadas. Por valor: vendas (tabela consolidada) ÷ valor das propostas enviadas, nos mesmos meses (com filtro de dimensão, que não tem vendas: R$ ganho no CRM ÷ R$ enviado)."
+        : "Conversão sobre as decididas: ganhas ÷ (ganhas + perdidas). Abertas fora. Por valor: vendas (tabela consolidada) ÷ valor das propostas enviadas, nos mesmos meses (com filtro de dimensão, que não tem vendas: R$ ganho no CRM ÷ R$ ganho + perdido).";
+
+    private string StatusTxt()
+    {
+        if (_m is null) return "";
+        var partes = new List<string>
+        {
+            _m.AnoIncompleto > 0 ? (_m.Ate < 12 ? $"Período equivalente: todos os anos de {_m.PeriodoTxt(_m.Ate)} ({_m.AnoIncompleto} em curso: vendas até {ModeloResumo.MesCurto(Math.Max(1, _m.UltimoMesVendas(_m.AnoIncompleto)))}, propostas até {ModeloResumo.MesCurto(Math.Max(1, _m.MesCorte))}{(_m.MesCorte == DateTime.Today.Month ? " (mês presente, parcial)" : "")})"
+                                                  : $"Ano inteiro: {_m.AnoIncompleto} está em curso e aparece parcial; as variações com ele usam os mesmos meses ({_m.PeriodoTxt(Math.Max(1, _m.MesCorte))})")
+                                 : "Todos os anos completos",
+            Conv.AtualizadoEm is { } q ? $"propostas lidas em {q:dd/MM/yyyy HH:mm}" : "propostas não lidas",
+            _f.TemDimensao ? "filtros valem para as propostas; vendas e metas são da empresa toda" : "sem filtros (empresa toda)",
+        };
+        if (_inicio.Count >= 2 && _inicio.Values.Distinct().Count() > 1)
+            partes.Add($"propostas: {string.Join(", ", _inicio.OrderBy(kv => kv.Value).Select(kv => $"{kv.Key} desde {kv.Value}"))} — antes de {_inicio.Values.Max()} os totais de propostas não são comparáveis aos seguintes");
+        return string.Join(" · ", partes);
+    }
+
+    private string FiltrosTxt()
+    {
+        var p = new List<string>();
+        void Add(string r, HashSet<string> s) { if (s.Count > 0) p.Add($"{r}: {string.Join(", ", s.Take(5))}{(s.Count > 5 ? $" +{s.Count - 5}" : "")}"); }
+        Add("Setor", _f.Setores); Add("BU", _f.Bus); Add("País", _f.Paises); Add("Segmento", _f.Segmentos); Add("Produto", _f.Produtos); Add("Vendedor", _f.Vendedores);
+        return p.Count == 0 ? "Sem filtros" : string.Join(" · ", p);
+    }
+
+    private string FonteTxt() =>
+        "Fontes: propostas = planilhas AFM e NB da guia Conversão (por data de envio; cada número de proposta conta uma vez nos envios; status e taxas pelas linhas, regra da guia Conversão). " +
+        "Vendas = histórico da equipe (empresa toda, mês de faturamento). Metas = budgets anuais HSA e Grupo. " + RegraTxt +
+        " Valor ganho = soma das propostas ganhas (não é venda faturada). AFM em US$ convertido pela taxa do ano.";
+
+    // ================= seções =================
+
+    private RenderFragment Secao(string id, bool impressao) => __builder =>
+    {
+        if (_m is null) return;
+        var nome = Abas.First(a => a.Id == id).Nome;
+        if (impressao) { <h2 class="rx-print-tit">@nome</h2> }
+        switch (id)
+        {
+            case "sumario": @Sumario() break;
+            case "anual": @Anual() break;
+            case "mensal": @Mensal(impressao) break;
+            case "setor": @Setores() break;
+            case "metas": @Metas() break;
+            case "funil": @Funil() break;
+            case "insights":
+                <div class="rx-card">
+                    <div class="rx-card-tit">Executive Insights | Principais Conclusões <span>fatos calculados dos números (resultado → evidência → ponto de atenção); os pontos de atenção não são explicações de causa</span></div>
+                    @Insights(_m.Insights)
+                </div>
+                break;
+            default: @Dimensao(id, impressao) break;
+        }
+    };
+
+    private bool SecaoNaExportacao(string id) => id == "anual" || _incluir.Contains(id);
+
+    // ---------- Sumário ----------
+    private RenderFragment Sumario() => __builder =>
+    {
+        var m = _m!; var p = m.Principal; var c = m.Comparativo; var ate = m.AteComparavel(p, c); var per = m.PeriodoTxt(ate);
+        var ip = m.Ano(p, ate); var ic = m.Ano(c, ate);
+        var vp = m.Vendas(p, ate); var vc = m.Vendas(c, ate);
+        <div class="rx-card">
+            <div class="rx-card-tit">@p × @c <span>mesmos meses: propostas @per · vendas @m.PeriodoVendasTxt(ate) · @(m.FiltroDimensao ? "propostas com os filtros; vendas e metas da empresa toda" : "empresa toda")</span></div>
+            <div class="rx-kpis">
+                @Kpi("Vendas realizadas", Mi(vp), Mi(vc), VarPct(vp, vc), false, "vendas", "Histórico da equipe, empresa toda")
+                @Kpi("Propostas enviadas", ip.Enviadas > 0 ? N0(ip.Enviadas) : "—", ic.Enviadas > 0 ? N0(ic.Enviadas) : "—", VarPct((double)ip.Enviadas, ic.Enviadas), true, "prop", "Cada número de proposta conta uma vez")
+                @Kpi("Valor enviado", Mi(ip.ValorEnviado), Mi(ic.ValorEnviado), VarPct(ip.ValorEnviado, ic.ValorEnviado), true, "prop", "Soma do valor das propostas enviadas")
+                @Kpi("Conversão por quantidade", P1(ip.TaxaQtd), P1(ic.TaxaQtd), VarPp(ip.TaxaQtd, ic.TaxaQtd), false, "conv", RegraTxt, true)
+                @Kpi("Conversão por valor", P1(ip.TaxaValor), P1(ic.TaxaValor), VarPp(ip.TaxaValor, ic.TaxaValor), false, "conv", RegraTxt, true)
+                @Kpi("Valor ganho", Mi(ip.VG), Mi(ic.VG), VarPct(ip.VG, ic.VG), false, "conv", "Propostas ganhas (não é venda faturada)")
+            </div>
+            @{
+                var metaP = m.Metas.TryGetValue(p, out var mtp) ? mtp.Hsa : null;
+                var vAno = m.Vendas(p, 12);
+            }
+            @if (metaP is decimal mh && vAno is decimal va)
+            {
+                var pct = (double)(va / mh * 100);
+                <div class="rx-meta-linha">
+                    <span>Meta HSA @p</span>
+                    <div class="ibar-track rx-meta-trilha"><span class="ibar-fill" style="width:@F(Math.Min(100, pct))%"></span></div>
+                    <b>@P1(pct)</b><span class="cvx-note">@Mi(va) de @Mi(mh)@(p == m.AnoIncompleto ? $" · até {ModeloResumo.MesCurto(m.UltimoMesVendas(p))} (meta anual)" : "")</span>
+                </div>
+            }
+        </div>
+        <div class="rx-card">
+            <div class="rx-card-tit">Principais conclusões <span>fatos calculados dos números; os pontos de atenção não são explicações</span></div>
+            @Insights(m.Insights.Take(6).ToList())
+        </div>
+        <p class="cvx-note">@FonteTxt()</p>
+    };
+
+    private RenderFragment Kpi(string rot, string valor, string anterior, double? delta, bool neutra, string cor, string dica, bool pp = false) => __builder =>
+    {
+        <article class="rx-kpi @cor" title="@dica">
+            <div class="rx-kpi-rot">@rot</div>
+            <div class="rx-kpi-v">@valor</div>
+            <div class="rx-kpi-c"><span>@_m!.Comparativo: @anterior</span><em class="@ClsVar(delta, neutra)">@TxtVar(delta, pp)</em></div>
+        </article>
+    };
+
+    // ---------- Resultados anuais ----------
+    private RenderFragment Anual() => __builder =>
+    {
+        var m = _m!;
+        var linhas = new (string Nome, Func<int, string> V, Func<int, double?>? Var, bool Neutra, bool Pp, string Grupo)[]
+        {
+            ("Vendas realizadas (empresa toda)", a => Mi(m.Vendas(a)), a => VarAno(a, (x, t) => (double?)(m.Vendas(x, t) is decimal d ? (double)d : null)), false, false, "vendas"),
+            ("Crescimento das vendas vs ano anterior", a => TxtVar(VarAno(a, (x, t) => (double?)(m.Vendas(x, t) is decimal d ? (double)d : null))), null, false, false, "vendas"),
+            ("Propostas enviadas", a => N0(m.Ano(a).Enviadas), a => VarAno(a, (x, t) => m.Ano(x, t).Enviadas), true, false, "prop"),
+            ("Valor total enviado", a => Mi(m.Ano(a).ValorEnviado), a => VarAno(a, (x, t) => (double)m.Ano(x, t).ValorEnviado), true, false, "prop"),
+            ("Valor médio por proposta", a => Mi(m.Ano(a).ValorMedio), null, true, false, "prop"),
+            ("Venda por proposta enviada", a => m.Vendas(a) is decimal v && m.Ano(a).Enviadas > 0 ? Mi(v / m.Ano(a).Enviadas) : "—", null, true, false, "prop"),
+            ("Propostas ganhas", a => N0(m.Ano(a).G), a => VarAno(a, (x, t) => m.Ano(x, t).G), false, false, "status"),
+            ("Propostas perdidas", a => N0(m.Ano(a).P), null, true, false, "status"),
+            ("  das quais canceladas", a => N0(m.Ano(a).Canceladas), null, true, false, "status"),
+            ("Propostas em aberto", a => N0(m.Ano(a).A), null, true, false, "status"),
+            ("Não classificadas", a => N0(m.Ano(a).NC), null, true, false, "status"),
+            ("Conversão por quantidade", a => P1(m.Ano(a).TaxaQtd), a => VarAnoPp(a, (x, t) => m.Ano(x, t).TaxaQtd), false, true, "conv"),
+            ("Conversão por valor", a => P1(m.Ano(a).TaxaValor), a => VarAnoPp(a, (x, t) => m.Ano(x, t).TaxaValor), false, true, "conv"),
+            ("Valor ganho", a => Mi(m.Ano(a).VG), a => VarAno(a, (x, t) => m.Ano(x, t).VG), false, false, "conv"),
+            ("Meta HSA (anual)", a => Mi(m.Metas.TryGetValue(a, out var x) ? x.Hsa : null), null, true, false, "meta"),
+            ("Atingimento Meta HSA", a => Ating(a, true), null, true, false, "meta"),
+            ("Meta Grupo (anual)", a => Mi(m.Metas.TryGetValue(a, out var x) ? x.Grupo : null), null, true, false, "meta"),
+            ("Atingimento Meta Grupo", a => Ating(a, false), null, true, false, "meta"),
+        };
+        <div class="rx-card">
+            <div class="rx-card-tit">Resultados anuais, @m.Anos.First() → @m.Anos.Last() <span>@(m.Ate < 12 ? $"período equivalente: {m.PeriodoTxt(m.Ate)} de cada ano" : "ano inteiro") · ▲▼ = variação contra o ano anterior (mesmos meses)</span></div>
+            <div class="rx-tw">
+                <table class="rx-tab">
+                    <thead><tr><th>Indicador</th>@foreach (var a in m.Anos) { <th class="@(a == m.Principal ? "pri" : "")">@a@if (m.Parcial(a)) { <small>parcial</small> }@if (SoOrigem(a) is string so) { <small title="Neste ano a planilha das outras origens ainda não tem propostas: totais não comparáveis aos anos seguintes">só @so</small> }</th> }</tr></thead>
+                    <tbody>
+                        @foreach (var (nome, v, varf, neutra, pp, grupo) in linhas)
+                        {
+                            <tr class="g-@grupo">
+                                <th>@nome</th>
+                                @foreach (var a in m.Anos)
+                                {
+                                    // ano sem nenhuma proposta registrada: n/d (não é zero)
+                                    var nd = grupo is "prop" or "status" or "conv" && m.Ano(a).Vazio;
+                                    var d = nd ? null : varf?.Invoke(a);
+                                    <td class="@(a == m.Principal ? "pri" : "") @(nd ? "nd" : "")"><b>@(nd ? "n/d" : v(a))</b>@if (varf is not null && !nd) { <em class="@ClsVar(d, neutra)">@TxtVar(d, pp)</em> }</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cvx-note">Meta e atingimento são anuais (vendas do ano inteiro ÷ meta do ano); no ano em curso o atingimento é parcial. @FonteTxt()</p>
+        </div>
+    };
+
+    /// <summary>Variação % contra o ano anterior, nos mesmos meses (se um dos dois está em curso).</summary>
+    private double? VarAno(int a, Func<int, int, double?> f)
+    {
+        if (!_m!.Anos.Contains(a - 1)) return null;
+        var t = _m.AteComparavel(a, a - 1);
+        return f(a, t) is double x && f(a - 1, t) is double y ? VarPct(x, y) : null;
+    }
+    private double? VarAnoPp(int a, Func<int, int, double?> f)
+    {
+        if (!_m!.Anos.Contains(a - 1)) return null;
+        var t = _m.AteComparavel(a, a - 1);
+        return VarPp(f(a, t), f(a - 1, t));
+    }
+    private string Ating(int a, bool hsa)
+    {
+        if (!_m!.Metas.TryGetValue(a, out var x)) return "—";
+        var meta = hsa ? x.Hsa : x.Grupo;
+        return meta is > 0 && _m.Vendas(a, 12) is decimal v ? P1((double)(v / meta.Value * 100)) + (a == _m.AnoIncompleto ? "*" : "") : "—";
+    }
+
+    // ---------- Mês a mês ----------
+    private RenderFragment Mensal(bool impressao) => __builder =>
+    {
+        var m = _m!;
+        var anos = impressao ? new List<int> { m.Principal } : new List<int> { _anoMensal };
+        <div class="rx-card">
+            <div class="rx-card-tit">Vendas e esforço comercial, mês a mês
+                <span>vendas: mês de faturamento (histórico, empresa toda) · propostas: mês de ENVIO, com o status de hoje (coorte)</span></div>
+            <div class="rx-aviso">As propostas enviadas num mês não são as que geraram as vendas daquele mês: a venda costuma vir de propostas de meses anteriores. Por isso as duas medidas ficam lado a lado, sem ligar uma à outra. A base de propostas não tem data de fechamento: não há indicador “por mês de fechamento”.</div>
+            @if (!impressao)
+            {
+                <div class="cvx-seg-ctl rx-anos-sel">@foreach (var a in m.Anos) { var ano = a; <button class="@(ano == _anoMensal ? "on" : "")" @onclick="() => _anoMensal = ano">@ano</button> }</div>
+            }
+            @foreach (var ano in anos)
+            {
+                var tot = m.Soma(Enumerable.Range(1, 12).Select(mes => m.Mes.TryGetValue((ano, mes), out var x) ? x : null).Where(x => x is not null)!);
+                <div class="rx-tw">
+                    <table class="rx-tab rx-mensal">
+                        <thead>
+                            <tr><th rowspan="2">@ano</th><th class="g-vendas">Faturamento</th><th colspan="8" class="g-prop">Propostas pelo mês de envio (coorte)</th><th class="g-conv">Ticket</th></tr>
+                            <tr><th class="g-vendas">Vendas no mês</th><th>Valor enviado</th><th>Enviadas</th><th>Ganhas</th><th>Perdidas</th><th>Abertas</th><th>Conv. qtd</th><th>Conv. valor</th><th>Valor médio</th><th class="g-conv">Médio das ganhas</th></tr>
+                        </thead>
+                        <tbody>
+                            @for (var mes = 1; mes <= 12; mes++)
+                            {
+                                m.Mes.TryGetValue((ano, mes), out var i);
+                                var temV = m.VendasMes.TryGetValue((ano, mes), out var vm);
+                                var futuro = ano == DateTime.Today.Year && mes > DateTime.Today.Month;
+                                var andamento = ano == DateTime.Today.Year && mes == DateTime.Today.Month;
+                                <tr class="@(futuro ? "futuro" : "")">
+                                    <th>@ModeloResumo.MesCurto(mes)@if (andamento) { <small>em andamento</small> }</th>
+                                    <td class="@(temV && vm < 0 ? "neg" : "")" title="@(temV ? Cheio(vm) : "")">@(temV ? Mi(vm) : futuro || andamento ? "a apurar" : "n/d")</td>
+                                    @if (i is null || i.Vazio)
+                                    {
+                                        <td colspan="8" class="vazio">@(futuro ? "a apurar" : andamento ? "mês em andamento (sem propostas registradas ainda)" : "sem propostas registradas (n/d)")</td><td></td>
+                                    }
+                                    else
+                                    {
+                                        <td title="@Cheio(i.ValorEnviado)">@Mi(i.ValorEnviado)</td><td>@N0(i.Enviadas)</td><td>@N0(i.G)</td><td>@N0(i.P)</td><td>@N0(i.A)</td>
+                                        <td>@P1(i.TaxaQtd)</td><td>@P1(i.TaxaValor)</td><td>@Mi(i.ValorMedio)</td><td>@Mi(i.TicketGanhas)</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr><th>Total</th><td>@Mi(m.Vendas(ano, 12))</td><td>@Mi(tot.ValorEnviado)</td><td>@N0(tot.Enviadas)</td><td>@N0(tot.G)</td><td>@N0(tot.P)</td><td>@N0(tot.A)</td><td>@P1(tot.TaxaQtd)</td><td>@P1(tot.TaxaValor)</td><td>@Mi(tot.ValorMedio)</td><td>@Mi(tot.TicketGanhas)</td></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+            <p class="cvx-note">“Médio das ganhas” = valor ganho ÷ propostas ganhas (a base não traz a quantidade de vendas, por isso não há “valor médio da venda”). Mês em andamento: propostas parciais.</p>
+        </div>
+        <div class="rx-card">
+            <div class="rx-card-tit">Todos os anos, mês a mês
+                <span>escolha o indicador · a cor mais forte é o maior valor de cada ano</span></div>
+            @if (!impressao)
+            {
+                <div class="cvx-seg-ctl rx-anos-sel">
+                    @foreach (var (id, nome) in MetricasMensais) { var mt = id; <button class="@(_metMensal == mt ? "on" : "")" @onclick="() => _metMensal = mt">@nome</button> }
+                </div>
+            }
+            @foreach (var met in impressao ? MetricasMensais.Select(x => x.Id).ToList() : new List<string> { _metMensal })
+            {
+                if (impressao) { <h4 class="rx-sub">@MetricasMensais.First(x => x.Id == met).Nome</h4> }
+                <div class="rx-tw">
+                    <table class="rx-tab rx-matriz">
+                        <thead><tr><th>Ano</th>@for (var mes = 1; mes <= 12; mes++) { <th>@ModeloResumo.MesCurto(mes)</th> }<th>Total</th></tr></thead>
+                        <tbody>
+                            @foreach (var ano in m.Anos)
+                            {
+                                var vals = Enumerable.Range(1, 12).Select(mes => ValorMensal(met, ano, mes)).ToList();
+                                var mx = vals.Where(v => v is not null).Select(v => v!.Value).DefaultIfEmpty(0).Max();
+                                <tr>
+                                    <th>@ano</th>
+                                    @for (var mes = 1; mes <= 12; mes++)
+                                    {
+                                        var v = vals[mes - 1];
+                                        var forte = v is double d && mx > 0 ? Math.Clamp(d / mx, 0, 1) : 0;
+                                        <td class="@(v is < 0 ? "neg" : "")" style="@(v is double ? $"background:color-mix(in srgb, {CorMetrica(met)} {F(8 + forte * 42)}%, #fff)" : "")">@FmtMensal(met, v)</td>
+                                    }
+                                    <td class="tot">@FmtMensal(met, TotalMensal(met, ano))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    };
+
+    private static readonly (string Id, string Nome)[] MetricasMensais =
+    {
+        ("vendas", "Vendas"), ("enviado", "Valor enviado"), ("enviadas", "Propostas enviadas"), ("ganhas", "Ganhas"), ("convq", "Conversão qtd"), ("convv", "Conversão valor"),
+    };
+    private static string CorMetrica(string met) => met switch { "vendas" => "#1f8a4c", "enviado" or "enviadas" => "#1d4f91", _ => "#0e7490" };
+    private double? ValorMensal(string met, int ano, int mes)
+    {
+        var m = _m!;
+        if (met == "vendas") return m.VendasMes.TryGetValue((ano, mes), out var v) ? (double)v : null;
+        if (!m.Mes.TryGetValue((ano, mes), out var i) || i.Vazio) return null;
+        return met switch { "enviado" => (double)i.ValorEnviado, "enviadas" => i.Enviadas, "ganhas" => i.G, "convq" => i.TaxaQtd, _ => i.TaxaValor };
+    }
+    private double? TotalMensal(string met, int ano)
+    {
+        var m = _m!;
+        if (met == "vendas") return m.Vendas(ano, 12) is decimal v ? (double)v : null;
+        var i = m.Ano(ano, 12);
+        if (i.Vazio) return null;
+        return met switch { "enviado" => (double)i.ValorEnviado, "enviadas" => i.Enviadas, "ganhas" => i.G, "convq" => i.TaxaQtd, _ => i.TaxaValor };
+    }
+    private static string FmtMensal(string met, double? v) => v is not double d ? "—" : met switch
+    {
+        "vendas" or "enviado" => (d < 0 ? "−" : "") + (Math.Abs(d) / 1e6).ToString("#,##0.0", Br),
+        "enviadas" or "ganhas" => N0((int)Math.Round(d)),
+        _ => P1(d),
+    };
+
+    // ---------- Aftermarket × NB ----------
+    private RenderFragment Setores() => __builder =>
+    {
+        var m = _m!; var p = m.Principal;
+        var afm = m.DimAno("setor", ConversaoService.Afm, p); var nb = m.DimAno("setor", ConversaoService.Nb, p);
+        <div class="rx-card">
+            <div class="rx-card-tit">Aftermarket × New Business em @p <span>volume financeiro e eficiência comercial são medidas diferentes · @(m.Ate < 12 ? m.PeriodoTxt(m.Ate) : "ano inteiro")</span></div>
+            <div class="rx-vs">
+                @VsLinha("Valor ganho (volume)", afm.VG, nb.VG, Mi(afm.VG), Mi(nb.VG))
+                @VsLinha("Valor enviado", (double)afm.ValorEnviado, (double)nb.ValorEnviado, Mi(afm.ValorEnviado), Mi(nb.ValorEnviado))
+                @VsLinha("Propostas enviadas", afm.Enviadas, nb.Enviadas, N0(afm.Enviadas), N0(nb.Enviadas))
+                @VsLinha("Conversão por quantidade (eficiência)", afm.TaxaQtd ?? 0, nb.TaxaQtd ?? 0, P1(afm.TaxaQtd), P1(nb.TaxaQtd))
+                @VsLinha("Conversão por valor", afm.TaxaValor ?? 0, nb.TaxaValor ?? 0, P1(afm.TaxaValor), P1(nb.TaxaValor))
+            </div>
+            <p class="cvx-note">Vendas realizadas por setor não existem na base (o histórico de vendas é da empresa toda): o “volume” aqui é o valor ganho das propostas. Não há metas por setor.</p>
+        </div>
+        @foreach (var s in ConversaoService.Origens)
+        {
+            <div class="rx-card">
+                <div class="rx-card-tit">@(s == ConversaoService.Afm ? "Aftermarket (AFM)" : "New Business (NB)") por ano</div>
+                @TabelaAnos("setor", s)
+            </div>
+        }
+    };
+
+    private RenderFragment VsLinha(string rot, double a, double b, string ta, string tb) => __builder =>
+    {
+        var mx = Math.Max(Math.Max(a, b), 1e-9);
+        <div class="rx-vs-lin">
+            <span class="rx-vs-rot">@rot</span>
+            <div class="rx-vs-bar afm"><span class="rx-vs-n">AFM</span><div class="ibar-track"><span class="ibar-fill" style="width:@F(a / mx * 100)%"></span></div><b class="@(a >= b && a > 0 ? "lider" : "")">@ta</b></div>
+            <div class="rx-vs-bar nb"><span class="rx-vs-n">NB</span><div class="ibar-track"><span class="ibar-fill" style="width:@F(b / mx * 100)%"></span></div><b class="@(b > a ? "lider" : "")">@tb</b></div>
+        </div>
+    };
+
+    /// <summary>Uma chave de uma dimensão, ano a ano (linhas = anos).</summary>
+    private RenderFragment TabelaAnos(string dim, string chave) => __builder =>
+    {
+        var m = _m!;
+        <div class="rx-tw">
+            <table class="rx-tab">
+                <thead><tr><th>Ano</th><th>Valor enviado</th><th>Enviadas</th><th>Ganhas</th><th>Perdidas</th><th>Abertas</th><th>Conv. qtd</th><th>Conv. valor</th><th>Valor ganho</th><th>Part. no valor ganho</th><th>Var. valor ganho</th></tr></thead>
+                <tbody>
+                    @foreach (var a in m.Anos)
+                    {
+                        var i = m.DimAno(dim, chave, a);
+                        var tot = m.Dim[dim].Chaves.Sum(k => m.DimAno(dim, k, a).VG);
+                        var t = m.AteComparavel(a, a - 1);
+                        var dv = m.Anos.Contains(a - 1) ? VarPct(m.DimAno(dim, chave, a, t).VG, m.DimAno(dim, chave, a - 1, t).VG) : null;
+                        <tr class="@(a == m.Principal ? "pri" : "")">
+                            <th>@a@if (m.Parcial(a)) { <small>parcial</small> }@if (SoOrigem(a) is string so) { <small>só @so</small> }</th>
+                            <td>@Mi(i.ValorEnviado)</td><td>@N0(i.Enviadas)</td><td>@N0(i.G)</td><td>@N0(i.P)</td><td>@N0(i.A)</td>
+                            <td><b>@P1(i.TaxaQtd)</b></td><td>@P1(i.TaxaValor)</td><td><b>@Mi(i.VG)</b></td><td>@P1(tot > 0 ? i.VG / tot * 100 : null)</td>
+                            <td><em class="@ClsVar(dv)">@TxtVar(dv)</em></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
+
+    // ---------- BU, país, segmento, produto, vendedor ----------
+    private static readonly (string Id, string Nome)[] MetricasDim =
+    {
+        ("vg", "Valor ganho"), ("env", "Valor enviado"), ("qtd", "Propostas enviadas"), ("txq", "Conversão qtd"), ("txv", "Conversão valor"),
+    };
+    private static double? ValorDim(string met, Indicadores i) => met switch
+    {
+        "vg" => i.VG, "env" => (double)i.ValorEnviado, "qtd" => i.Enviadas, "txq" => i.TaxaQtd, _ => i.TaxaValor,
+    };
+    private static string FmtDim(string met, double? v) => v is not double d ? "—" : met switch
+    {
+        "vg" or "env" => Mi(d), "qtd" => N0((int)Math.Round(d)), _ => P1(d),
+    };
+
+    private RenderFragment Dimensao(string id, bool impressao) => __builder =>
+    {
+        var m = _m!; var d = m.Dim[id]; var p = m.Principal; var c = m.Comparativo;
+        var met = _metrica.TryGetValue(id, out var mm) ? mm : "vg";
+        var todos = _todos.Contains(id) || impressao;
+        var chaves = d.Chaves.Where(k => m.Anos.Any(a => !m.DimAno(id, k, a).Vazio)).ToList();
+        var visiveis = todos ? chaves : chaves.Take(15).ToList();
+        var t = m.AteComparavel(p, c);
+        var minDec = 20;
+        @if (id == "vendedor")
+        {
+            <div class="rx-aviso conf">Desempenho individual: informação confidencial. Use só com quem tem autorização; não compartilhe rankings fora da liderança.</div>
+        }
+        <div class="rx-card">
+            <div class="rx-card-tit">@d.Nome, @p <span>@chaves.Count @(chaves.Count == 1 ? "item" : "itens") · valor ganho = propostas ganhas (não há vendas faturadas por @d.Nome.ToLowerInvariant() na base)@(id == "bu" ? " · não há metas por BU" : "")</span></div>
+            @{
+                var lst = chaves.Select(k => (k, i: m.DimAno(id, k, p))).Where(x => !x.i.Vazio).ToList();
+                var cresc = chaves.Select(k => (k, v: VarPct(m.DimAno(id, k, p, t).VG, m.DimAno(id, k, c, t).VG))).Where(x => x.v is not null).ToList();
+                var conv = lst.Where(x => x.i.Decididas >= minDec && x.i.TaxaQtd is not null).ToList();
+            }
+            @if (lst.Count > 0)
+            {
+                <div class="rx-destaques">
+                    @Destaque("Maior valor ganho", lst.MaxBy(x => x.i.VG), x => Mi(x.i.VG))
+                    @Destaque("Maior valor proposto", lst.MaxBy(x => x.i.ValorEnviado), x => Mi(x.i.ValorEnviado))
+                    @Destaque("Mais propostas", lst.MaxBy(x => x.i.Enviadas), x => N0(x.i.Enviadas))
+                    @if (conv.Count > 0) { @Destaque($"Melhor conversão ({minDec}+ decididas)", conv.MaxBy(x => x.i.TaxaQtd!.Value), x => P1(x.i.TaxaQtd)) }
+                    @if (cresc.Count > 0) { var cx = cresc.MaxBy(x => x.v!.Value); <div class="rx-dest"><small>Maior crescimento do valor ganho (@c → @p)</small><b>@cx.k</b><em class="pos">@TxtVar(cx.v)</em></div> }
+                </div>
+            }
+            <div class="rx-tw">
+                <table class="rx-tab rx-dim">
+                    <thead><tr><th>@d.Nome</th><th>Valor enviado</th><th>Enviadas</th><th>Ganhas</th><th>Perdidas</th><th>Abertas</th><th>Conv. qtd</th><th>Conv. valor</th><th>Valor ganho</th><th>Part. valor ganho</th><th>Valor médio</th><th>Var. valor ganho vs @c</th></tr></thead>
+                    <tbody>
+                        @{ var totVg = lst.Sum(x => x.i.VG); var top = lst.Select(x => x.i.VG).OrderByDescending(x => x).Skip(2).FirstOrDefault(); }
+                        @foreach (var k in visiveis)
+                        {
+                            var i = m.DimAno(id, k, p);
+                            if (i.Vazio) continue;
+                            var dv = VarPct(m.DimAno(id, k, p, t).VG, m.DimAno(id, k, c, t).VG);
+                            <tr>
+                                <th>@k</th>
+                                <td>@Mi(i.ValorEnviado)</td><td>@N0(i.Enviadas)</td><td>@N0(i.G)</td><td>@N0(i.P)</td><td>@N0(i.A)</td>
+                                <td><b>@P1(i.TaxaQtd)</b>@if (i.Decididas < minDec && i.Decididas > 0) { <small class="amostra" title="Menos de @minDec decididas: taxa indicativa">*</small> }</td>
+                                <td>@P1(i.TaxaValor)</td>
+                                <td class="@(i.VG >= top && i.VG > 0 ? "top" : "")"><b>@Mi(i.VG)</b></td>
+                                <td>@P1(totVg > 0 ? i.VG / totVg * 100 : null)</td><td>@Mi(i.ValorMedio)</td>
+                                <td><em class="@ClsVar(dv)">@TxtVar(dv)</em></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (!impressao && chaves.Count > 15)
+            {
+                <button class="btn-link" @onclick="() => { if (!_todos.Remove(id)) _todos.Add(id); }">@(_todos.Contains(id) ? "Mostrar só os 15 primeiros" : $"Mostrar todos ({chaves.Count})")</button>
+            }
+            <p class="cvx-note">Ordem: maior valor ganho em @p. * = menos de @minDec decididas (taxa indicativa). Variação: mesmos meses (@m.PeriodoTxt(t)).</p>
+        </div>
+        <div class="rx-card">
+            <div class="rx-card-tit">Matriz ano a ano <span>escolha o indicador · a cor mais forte é o maior valor de cada ano</span></div>
+            @if (!impressao)
+            {
+                <div class="cvx-seg-ctl rx-anos-sel">
+                    @foreach (var (mid, mnome) in MetricasDim) { var mt = mid; <button class="@(met == mt ? "on" : "")" @onclick="() => _metrica[id] = mt">@mnome</button> }
+                </div>
+            }
+            <div class="rx-tw">
+                <table class="rx-tab rx-matriz">
+                    <thead><tr><th>@d.Nome</th>@foreach (var a in m.Anos) { <th class="@(a == p ? "pri" : "")">@a</th> }<th>@c → @p</th></tr></thead>
+                    <tbody>
+                        @{ var maxAno = m.Anos.ToDictionary(a => a, a => visiveis.Select(k => ValorDim(met, m.DimAno(id, k, a))).Where(v => v is not null).Select(v => v!.Value).DefaultIfEmpty(0).Max()); }
+                        @foreach (var k in visiveis)
+                        {
+                            var dvv = met is "txq" or "txv" ? VarPp(ValorDim(met, m.DimAno(id, k, p, t)), ValorDim(met, m.DimAno(id, k, c, t))) : ValorDim(met, m.DimAno(id, k, c, t)) is double vc0 && ValorDim(met, m.DimAno(id, k, p, t)) is double vp0 ? VarPct(vp0, vc0) : null;
+                            <tr>
+                                <th>@k</th>
+                                @foreach (var a in m.Anos)
+                                {
+                                    var i = m.DimAno(id, k, a);
+                                    var v = i.Vazio ? null : ValorDim(met, i);
+                                    var forte = v is double dd && maxAno[a] > 0 ? Math.Clamp(dd / maxAno[a], 0, 1) : 0;
+                                    <td class="@(a == p ? "pri" : "")" style="@(v is double ? $"background:color-mix(in srgb, #0e7490 {F(6 + forte * 40)}%, #fff)" : "")">@FmtDim(met, v)</td>
+                                }
+                                <td><em class="@ClsVar(dvv, met == "qtd" || met == "env")">@TxtVar(dvv, met is "txq" or "txv")</em></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    };
+
+    private RenderFragment Destaque(string rot, (string k, Indicadores i) x, Func<(string k, Indicadores i), string> fmt) => __builder =>
+    {
+        <div class="rx-dest"><small>@rot</small><b>@x.k</b><em>@fmt(x)</em></div>
+    };
+
+    // ---------- Metas ----------
+    private RenderFragment Metas() => __builder =>
+    {
+        var m = _m!;
+        var max = m.Anos.Select(a => new[] { m.Vendas(a, 12) ?? 0m, m.Metas.TryGetValue(a, out var x) ? x.Hsa ?? 0m : 0m, m.Metas.TryGetValue(a, out var y) ? y.Grupo ?? 0m : 0m }.Max()).DefaultIfEmpty(1m).Max();
+        if (max <= 0) max = 1;
+        double Pc(decimal v) => (double)(Math.Max(0m, v) / max * 100m);
+        <div class="rx-card">
+            <div class="rx-card-tit">Atingimento de metas, @m.Anos.First() → @m.Anos.Last() <span>metas anuais (budgets HSA e Grupo) × vendas do ano · empresa toda</span></div>
+            <div class="ibar cvx-ibar vp-metas-ibar rx-metas">
+                @foreach (var a in m.Anos)
+                {
+                    m.Metas.TryGetValue(a, out var mt); var v = m.Vendas(a, 12);
+                    var t = m.AteComparavel(a, a - 1);
+                    var dv = m.Anos.Contains(a - 1) ? VarPct(m.Vendas(a, t), m.Vendas(a - 1, t)) : null;
+                    <div class="ibar-item @(a == m.Principal ? "xf-on" : "")">
+                        <div class="ibar-head">
+                            <span class="ibar-num vp-mt-ano">@a</span>@if (a == m.AnoIncompleto) { <span class="vp-mt-per">em curso (até @ModeloResumo.MesCurto(Math.Max(1, m.UltimoMesVendas(a))))</span> }
+                            <div class="ibar-metrics">
+                                <span class="vp-mt-v"><small>Vendas</small><b class="ibar-val">@Mi(v)</b></span>
+                                <span class="ibar-sep"></span>
+                                <span class="vp-mt-m"><small>Meta HSA</small><b>@Mi(mt.Hsa)</b><em>@Ating(a, true)</em></span>
+                                <span class="vp-mt-m"><small>dif.</small><b>@(mt.Hsa is decimal h && v is decimal vv ? (vv - h >= 0 ? "+" : "") + Mi(vv - h) : "—")</b></span>
+                                <span class="ibar-sep"></span>
+                                <span class="vp-mt-m"><small>Meta Grupo</small><b>@Mi(mt.Grupo)</b><em>@Ating(a, false)</em></span>
+                                <span class="ibar-sep"></span>
+                                <span class="vp-mt-m"><small>vs ano anterior</small><em class="@ClsVar(dv)">@TxtVar(dv)</em></span>
+                            </div>
+                        </div>
+                        <div class="vp-mt-barra">
+                            <div class="ibar-track"><span class="ibar-fill" style="width:@F(v is decimal x1 ? Pc(x1) : 0)%;--c:#1f8a4c"></span></div>
+                            @if (mt.Hsa is decimal h2) { <em class="vp-mt-mk" style="left:@F(Pc(h2))%;background:#2F855A" title="Meta HSA @Cheio(h2)"></em> }
+                            @if (mt.Grupo is decimal g2) { <em class="vp-mt-mk" style="left:@F(Pc(g2))%;background:#B7791F" title="Meta Grupo @Cheio(g2)"></em> }
+                        </div>
+                    </div>
+                }
+            </div>
+            <p class="cvx-note">Barra = vendas do ano; marcas = Meta HSA (verde) e Meta Grupo (dourado). * ano em curso: atingimento parcial. A base não tem metas mensais, por BU nem por setor; nenhuma meta é distribuída pelos meses. Variação contra o ano anterior nos mesmos meses.</p>
+        </div>
+    };
+
+    // ---------- Funil ----------
+    private RenderFragment Funil() => __builder =>
+    {
+        var m = _m!;
+        <div class="rx-card">
+            <div class="rx-card-tit">Funil comercial por status <span>propostas pelo ano de envio, com o status de hoje · @(m.Ate < 12 ? m.PeriodoTxt(m.Ate) : "ano inteiro")</span></div>
+            <div class="rx-funil">
+                @foreach (var a in m.Anos)
+                {
+                    var i = m.Ano(a);
+                    double t = Math.Max(1, i.Linhas);
+                    if (i.Linhas == 0) { <div class="rx-fun-lin"><span class="rx-fun-ano">@a</span><div class="rx-fun-nd">sem propostas registradas (n/d)</div><span class="rx-fun-tot">n/d</span></div> continue; }
+                    <div class="rx-fun-lin">
+                        <span class="rx-fun-ano">@a@if (m.Parcial(a)) { <small>parcial</small> }@if (SoOrigem(a) is string so) { <small>só @so</small> }</span>
+                        <div class="rx-fun-barra">
+                            @foreach (var (rot, q, cls) in new[] { ("Ganhas", i.G, "g"), ("Perdidas", i.P, "p"), ("Abertas", i.A, "a"), ("Não classif.", i.NC, "n") })
+                            {
+                                var pct = q / t * 100;
+                                if (q == 0) continue;
+                                <i class="@cls" style="width:@F(pct)%" title="@rot: @N0(q) (@P1(pct))">@(pct >= 7 ? $"{N0(q)} · {pct.ToString("0", Br)}%" : "")</i>
+                            }
+                        </div>
+                        <span class="rx-fun-tot">@N0(i.Linhas)</span>
+                    </div>
+                }
+            </div>
+            <div class="rx-fun-leg"><span><i class="g"></i>Ganhas</span><span><i class="p"></i>Perdidas (inclui canceladas)</span><span><i class="a"></i>Abertas</span><span><i class="n"></i>Não classificadas</span></div>
+            <div class="rx-tw">
+                <table class="rx-tab">
+                    <thead><tr><th>Ano</th><th>Total</th><th>Ganhas</th><th>Perdidas</th><th>Canceladas</th><th>Abertas</th><th>Não classif.</th><th>R$ ganho</th><th>R$ perdido</th><th>R$ aberto</th><th>Conv. s/ decididas</th><th>Conv. s/ todas</th><th>Por valor s/ decididas</th><th>Por valor s/ todas</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in m.Anos)
+                        {
+                            var i = m.Ano(a); double t = Math.Max(1, i.Linhas);
+                            if (i.Linhas == 0) { <tr><th>@a</th><td colspan="13" class="vazio">sem propostas registradas (n/d)</td></tr> continue; }
+                            <tr class="@(a == m.Principal ? "pri" : "")">
+                                <th>@a</th><td>@N0(i.Linhas)</td>
+                                <td>@N0(i.G) <small>@P1(i.G / t * 100)</small></td><td>@N0(i.P) <small>@P1(i.P / t * 100)</small></td><td>@N0(i.Canceladas)</td>
+                                <td>@N0(i.A) <small>@P1(i.A / t * 100)</small></td><td>@N0(i.NC)</td>
+                                <td>@Mi(i.VG)</td><td>@Mi(i.VP)</td><td>@Mi(i.VA)</td>
+                                <td><b>@P1(i.TaxaQtdDecididas)</b></td><td><b>@P1(i.TaxaQtdTodas)</b></td><td>@P1(i.TaxaValorDecididas)</td><td>@P1(i.TaxaValorTodas)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cvx-note">Contagem pelas linhas das planilhas (regra da guia Conversão). Canceladas = status “Cancelled” do AFM (já contadas nas perdidas). Conversão sobre decididas = ganhas ÷ (ganhas + perdidas); sobre todas = ganhas ÷ total enviado.</p>
+        </div>
+    };
+
+    // ---------- Insights ----------
+    private RenderFragment Insights(List<InsightResumo> lista) => __builder =>
+    {
+        <div class="rx-insights">
+            @foreach (var i in lista)
+            {
+                <div class="rx-ins @(i.Conclusivo ? "" : "inc")">
+                    <div class="rx-ins-tema">@i.Tema<span>@(i.Conclusivo ? "fato observado" : "dados insuficientes")</span></div>
+                    <div class="rx-ins-res"><b>Resultado:</b> @i.Resultado</div>
+                    <div class="rx-ins-ev"><b>Evidência:</b> @i.Evidencia</div>
+                    @if (i.Atencao != "—") { <div class="rx-ins-at"><b>Ponto de atenção:</b> @i.Atencao</div> }
+                </div>
+            }
+        </div>
+    };
+
+    // ================= exportação =================
+
+    private async Task ExportarExcel()
+    {
+        if (!_isAdmin || !_confirmo || _m is null) return;   // controle de acesso também na exportação
+        try
+        {
+            var o = new ResumoExecutivoCalc.OpcoesExportacao(_incluir.Contains("mensal"), _incluir.Contains("setor"), _incluir.Contains("bu"), _incluir.Contains("pais"),
+                _incluir.Contains("segmento"), _incluir.Contains("produto"), _incluir.Contains("vendedor"), _incluir.Contains("metas"), _incluir.Contains("funil"),
+                _incluir.Contains("insights") || _incluir.Contains("sumario"));
+            var bytes = ResumoExecutivoCalc.Excel(_m, o, FiltrosTxt(), _usuario, FonteTxt());
+            await JS.InvokeVoidAsync("appDownload", $"Resumo_Executivo_{DateTime.Now:yyyy-MM-dd}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
+            _exportar = false; _msgOk = true; _msg = "Resumo executivo exportado em Excel (veja os downloads do navegador).";
+        }
+        catch (Exception ex) { _msgOk = false; _msg = "Não deu para gerar o Excel: " + ex.Message; }
+    }
+
+    private async Task ExportarPdf()
+    {
+        if (!_isAdmin || !_confirmo || _m is null) return;
+        _exportar = false; _imprimindo = true;
+        StateHasChanged();
+        await Task.Delay(300);
+        try { await JS.InvokeVoidAsync("rxImprimir"); } catch { }
+        _imprimindo = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("rxFimImpressao"); } catch { }
+    }
+}

@@ -10,17 +10,36 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
-@{ Build(); }
+@{
+    Build();
+    // Exibição PT/EN só da marcação: em português, exatamente os mesmos helpers de antes.
+    string XCompact(double v)
+    {
+        if (!_en) return Fmt.Compact(v);
+        var a = Math.Abs(v);
+        if (a >= 1_000_000_000) return (v / 1_000_000_000).ToString("0.00", EnUs) + "B";
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", EnUs) + "M";
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", EnUs) + "K";
+        return v.ToString("#,##0", EnUs);
+    }
+    string XMes(int m) => !_en ? Fmt.MonthName(m) : m is >= 1 and <= 12 ? EnUs.DateTimeFormat.GetAbbreviatedMonthName(m).ToUpperInvariant() : "—";
+    string XMesLongo(int m) => !_en ? Fmt.MonthLong(m) : m is >= 1 and <= 12 ? EnUs.DateTimeFormat.GetMonthName(m) : "—";
+    // Opção do filtro de Mês: o valor guardado continua em português; só o rótulo muda.
+    string XMesFiltro(string v) { var m = Enumerable.Range(1, 12).FirstOrDefault(i => Fmt.MonthLong(i) == v); return m > 0 ? XMesLongo(m) : v; }
+    string XDec1(double v) => v.ToString("0.0", _en ? EnUs : _pt);
+    string XDec4(double v) => v.ToString("0.0000", _en ? EnUs : System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+    string XSigned(double v) => !_en ? Fmt.Signed(v) : (v >= 0 ? "+" : "") + v.ToString("0.0", EnUs) + "%";
+}
 
 @* ===================== 1 · CABEÇALHO EXECUTIVO ===================== *@
-<div class="breadcrumbs"><span>Comercial</span><span class="sep">/</span><span>Previsão de Vendas</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">Visão Executiva</span></div>
+<div class="breadcrumbs"><span>@T("Comercial", "Commercial")</span><span class="sep">/</span><span>@T("Previsão de Vendas", "Sales Forecast")</span><span class="sep">/</span><span class="strong" style="color:var(--text-2)">@T("Visão Executiva", "Executive View")</span></div>
 
 <div class="page-head">
     <div>
-        <h1>Previsão de Vendas</h1>
+        <h1>@T("Previsão de Vendas", "Sales Forecast")</h1>
         <p class="subtitle">
-            @Fmt.MonthLong(_month) de @_year · @(_quarter)º trimestre · Howden Brasil · @_currency<br />
-            Última consolidação @_updated.ToString("dd/MM/yyyy 'às' HH:mm")
+            @XMesLongo(_month) @T("de ", "")@_year · @(_en ? $"Q{_quarter}" : $"{_quarter}º trimestre") · Howden Brasil · @_currency@(TaxaTelaAtiva is double tt ? $" (R$ ÷ {XDec4(tt)}, {T("taxa digitada na tela", "rate entered on screen")})" : "")<br />
+            @T("Última consolidação", "Last consolidation") @(_en ? _updated.ToString("MM/dd/yyyy 'at' HH:mm", EnUs) : _updated.ToString("dd/MM/yyyy 'às' HH:mm"))
         </p>
     </div>
     <div class="page-actions">
@@ -28,15 +47,27 @@
             <button class="@(_currency == "USD" ? "active" : "")" @onclick='() => _currency = "USD"'>USD</button>
             <button class="@(_currency == "BRL" ? "active" : "")" @onclick='() => _currency = "BRL"'>BRL</button>
         </div>
-        <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="Modo apresentação — tela cheia + rolagem automática (espaço pausa, Esc sai)">@Icons.Svg("play")Apresentação</button>
-        <button class="btn-ghost" title="Exportar as oportunidades do recorte atual (respeita os filtros da página)" @onclick="ExportarFiltradas">@Icons.Svg("download")Exportar</button>
+        <div class="segmented" style="margin-right:2px" title="Idioma da tela · Screen language">
+            <button class="@(!_en ? "active" : "")" @onclick="() => MudarIdioma(false)">PT</button>
+            <button class="@(_en ? "active" : "")" @onclick="() => MudarIdioma(true)">EN</button>
+        </div>
+        @if (_currency == "USD")
+        {
+            @* taxa R$/US$ só para esta tela: tudo o que a página mostraria em R$ é dividido por ela (não grava nada) *@
+            <label class="cvx-taxa-tela" title="@(T("Taxa R$/US$ só para esta tela: os valores que a página mostraria em R$ são divididos por ela. Não muda a base de dados nem a taxa cadastrada. Vazio = a taxa cadastrada", "R$/US$ rate for this screen only: the values the page would show in R$ are divided by it. It does not change the database or the registered rate. Empty = the registered rate") + " (" + XDec4(Rate) + ").")">
+                <span>@T("Taxa", "Rate")</span>
+                <input type="text" inputmode="decimal" placeholder="@Rate.ToString("0.00", _en ? EnUs : System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))" value="@(_taxaTela is double tv ? tv.ToString("0.####", _en ? EnUs : System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "")" @onchange="MudarTaxaTela" />
+            </label>
+        }
+        <button class="btn-ghost" @onclick='() => JS.InvokeVoidAsync("presentation.start")' title="@T("Modo apresentação — tela cheia + rolagem automática (espaço pausa, Esc sai)", "Presentation mode — full screen + auto scroll (space pauses, Esc exits)")">@Icons.Svg("play")@T("Apresentação", "Presentation")</button>
+        <button class="btn-ghost" title="@T("Exportar as oportunidades do recorte atual (respeita os filtros da página)", "Export the opportunities in the current selection (follows the page filters)")" @onclick="ExportarFiltradas">@Icons.Svg("download")@T("Exportar", "Export")</button>
         @* Montar a página: arrastar os painéis e escolher a largura de cada um. *@
-        <button class="btn-ghost @(_organizando ? "active" : "")" title="Arrastar os painéis para montar a página do seu jeito" @onclick="AlternarOrganizar">@Icons.Svg("layers")@(_organizando ? "Concluir" : "Organizar")</button>
+        <button class="btn-ghost @(_organizando ? "active" : "")" title="@T("Arrastar os painéis para montar a página do seu jeito", "Drag the panels to arrange the page your way")" @onclick="AlternarOrganizar">@Icons.Svg("layers")@(_organizando ? T("Concluir", "Done") : T("Organizar", "Arrange"))</button>
         @if (_organizando)
         {
-            <button class="btn-ghost" title="Voltar à disposição original dos painéis" @onclick="RestaurarLayout">@Icons.Svg("history")Restaurar padrão</button>
+            <button class="btn-ghost" title="@T("Voltar à disposição original dos painéis", "Go back to the original panel layout")" @onclick="RestaurarLayout">@Icons.Svg("history")@T("Restaurar padrão", "Restore default")</button>
         }
-        <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")Abrir Oportunidades</a>
+        <a class="btn-primary" href="/oportunidades">@Icons.Svg("opportunity")@T("Abrir Oportunidades", "Open Opportunities")</a>
     </div>
 </div>
 
@@ -44,47 +75,47 @@
 <div class="filterbar filterbar-sticky">
     @* A busca espera a pessoa parar de digitar (ver BuscarDigitando): a cada tecla
        a página inteira era refeita sobre milhares de oportunidades. *@
-    <div class="flt"><span class="flt-label">Buscar</span><input class="flt-search" placeholder="oportunidade, cliente, proposta…" value="@_search" @oninput="BuscarDigitando" /></div>
+    <div class="flt"><span class="flt-label">@T("Buscar", "Search")</span><input class="flt-search" placeholder="@T("oportunidade, cliente, proposta…", "opportunity, customer, proposal…")" value="@_search" @oninput="BuscarDigitando" /></div>
     @* Ordem pedida: quem usa procura primeiro pelo vendedor, depois estreita o
        período. O intervalo "de tal dia a tal dia" saiu — a previsão é mensal, e
        os filtros de Mês e Ano já dão o recorte que se usa no dia a dia. *@
-    <MultiFilter Label="KAM" AllText="Todos" EmptyText="Nenhum vendedor nos dados." Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
-    <MultiFilter Label="Mês" AllText="Todos" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
-    <MultiFilter Label="Ano" AllText="Todos" Options="YearOptions.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
-    <MultiFilter Label="Mercado" AllText="Todos" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
+    <MultiFilter Ingles="_en" Label="KAM" AllText="@T("Todos", "All")" EmptyText="@T("Nenhum vendedor nos dados.", "No salesperson in the data.")" Options="KamOptions" Selected="_kams" OnChanged="StateHasChanged" />
+    <MultiFilter Ingles="_en" Label="@T("Mês", "Month")" AllText="@T("Todos", "All")" Rotulo="@(_en ? XMesFiltro : null)" Options="MonthOptions" Selected="_months" OnChanged="StateHasChanged" />
+    <MultiFilter Ingles="_en" Label="@T("Ano", "Year")" AllText="@T("Todos", "All")" Options="YearOptions.Select(y => y.ToString())" Selected="_years" OnChanged="StateHasChanged" />
+    <MultiFilter Ingles="_en" Label="@T("Mercado", "Market")" AllText="@T("Todos", "All")" Options="MarketOptions" Selected="_markets" OnChanged="StateHasChanged" />
     @if (_scope.Setor == "")
     {
-        <MultiFilter Label="Setor" AllText="Ambos" Options="SetorOptions" Selected="_setores" OnChanged="StateHasChanged" />
+        <MultiFilter Ingles="_en" Label="@T("Setor", "Sector")" AllText="@T("Ambos", "Both")" Options="SetorOptions" Selected="_setores" OnChanged="StateHasChanged" />
     }
-    <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="Mostrar somente as oportunidades indicadas na previsão"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>Somente indicadas</span></label>
-    <label class="flt-toggle @(_overdue ? "on" : "")" title="Somente as oportunidades com data de fechamento até ontem (já vencidas)"><input type="checkbox" @bind="_overdue" />@Icons.Svg("clock")<span>Overdue</span></label>
-    <label class="flt-toggle @(_semOtp ? "on" : "")" title="Tirar do recorte as oportunidades já marcadas como OTP"><input type="checkbox" @bind="_semOtp" />@Icons.Svg("x")<span>Sem OTP</span></label>
-    <label class="flt-toggle @(_onlyLost ? "on" : "")" title="Mostrar somente as oportunidades indicadas como perdidas"><input type="checkbox" @bind="_onlyLost" />@Icons.Svg("x")<span>Perdidas</span></label>
-    <label class="flt-toggle @(_onlyAltered ? "on" : "")" title="Mostrar somente as oportunidades com algum valor alterado no sistema (diferente do que o CRM trouxe)"><input type="checkbox" @bind="_onlyAltered" />@Icons.Svg("edit")<span>Alteradas no sistema</span></label>
+    <label class="flt-toggle @(_onlyIndicated ? "on" : "")" title="@T("Mostrar somente as oportunidades indicadas na previsão", "Show only the opportunities referred to the forecast")"><input type="checkbox" @bind="_onlyIndicated" />@Icons.Svg("flag")<span>@T("Somente indicadas", "Referred only")</span></label>
+    <label class="flt-toggle @(_overdue ? "on" : "")" title="@T("Somente as oportunidades com data de fechamento até ontem (já vencidas)", "Only the opportunities with a close date up to yesterday (already overdue)")"><input type="checkbox" @bind="_overdue" />@Icons.Svg("clock")<span>Overdue</span></label>
+    <label class="flt-toggle @(_semOtp ? "on" : "")" title="@T("Tirar do recorte as oportunidades já marcadas como OTP", "Remove from the selection the opportunities already marked as OTP")"><input type="checkbox" @bind="_semOtp" />@Icons.Svg("x")<span>@T("Sem OTP", "No OTP")</span></label>
+    <label class="flt-toggle @(_onlyLost ? "on" : "")" title="@T("Mostrar somente as oportunidades indicadas como perdidas", "Show only the opportunities marked as lost")"><input type="checkbox" @bind="_onlyLost" />@Icons.Svg("x")<span>@T("Perdidas", "Lost")</span></label>
+    <label class="flt-toggle @(_onlyAltered ? "on" : "")" title="@T("Mostrar somente as oportunidades com algum valor alterado no sistema (diferente do que o CRM trouxe)", "Show only the opportunities with some value changed in the system (different from what the CRM brought)")"><input type="checkbox" @bind="_onlyAltered" />@Icons.Svg("edit")<span>@T("Alteradas no sistema", "Changed in the system")</span></label>
     @if (_showMore)
     {
-        <MultiFilter Label="País" AllText="Todos" Options="CountryOptions" Selected="_countries" OnChanged="StateHasChanged" />
-        <MultiFilter Label="Produto" AllText="Todos" Options="ProductOptions" Selected="_products" OnChanged="StateHasChanged" />
-        <MultiFilter Label="Cliente" AllText="Todos" Options="CustomerOptions" Selected="_customers" OnChanged="StateHasChanged" />
-        <MultiFilter Label="BU IC" AllText="Todas" EmptyText="Nenhuma oferta com BU de origem no recorte." Options="BuIcOptions" Selected="_buIcs" OnChanged="StateHasChanged" />
-        <MultiFilter Label="Unidade de negócio" AllText="Todas" Options="BuOptions" Selected="_bus" OnChanged="StateHasChanged" />
-        <div class="flt"><span class="flt-label">Filtrar por</span><select @bind="_valMetric"><option value="total">Valor total</option><option value="conv">Chance de conversão</option></select></div>
-        <div class="flt"><span class="flt-label">Mínimo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="0" @bind="_valMin" /></div>
-        <div class="flt"><span class="flt-label">Máximo R$</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="—" @bind="_valMax" /></div>
+        <MultiFilter Ingles="_en" Label="@T("País", "Country")" AllText="@T("Todos", "All")" Options="CountryOptions" Selected="_countries" OnChanged="StateHasChanged" />
+        <MultiFilter Ingles="_en" Label="@T("Produto", "Product")" AllText="@T("Todos", "All")" Options="ProductOptions" Selected="_products" OnChanged="StateHasChanged" />
+        <MultiFilter Ingles="_en" Label="@T("Cliente", "Customer")" AllText="@T("Todos", "All")" Options="CustomerOptions" Selected="_customers" OnChanged="StateHasChanged" />
+        <MultiFilter Ingles="_en" Label="BU IC" AllText="@T("Todas", "All")" EmptyText="@T("Nenhuma oferta com BU de origem no recorte.", "No offer with a source BU in the selection.")" Options="BuIcOptions" Selected="_buIcs" OnChanged="StateHasChanged" />
+        <MultiFilter Ingles="_en" Label="@T("Unidade de negócio", "Business unit")" AllText="@T("Todas", "All")" Options="BuOptions" Selected="_bus" OnChanged="StateHasChanged" />
+        <div class="flt"><span class="flt-label">@T("Filtrar por", "Filter by")</span><select @bind="_valMetric"><option value="total">@T("Valor total", "Total value")</option><option value="conv">@T("Chance de conversão", "Conversion likelihood")</option></select></div>
+        <div class="flt"><span class="flt-label">@T("Mínimo R$", "Minimum R$")</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="0" @bind="_valMin" /></div>
+        <div class="flt"><span class="flt-label">@T("Máximo R$", "Maximum R$")</span><input class="flt-date" style="min-width:90px" type="number" min="0" step="1000" placeholder="—" @bind="_valMax" /></div>
     }
-    <button class="btn-link" @onclick="() => _showMore = !_showMore">@(_showMore ? "Menos filtros" : "Mais filtros")</button>
+    <button class="btn-link" @onclick="() => _showMore = !_showMore">@(_showMore ? T("Menos filtros", "Fewer filters") : T("Mais filtros", "More filters"))</button>
     <div class="filterbar-spacer"></div>
     <div class="fb-summary">
-        <div class="fb-sum"><span class="fb-sum-k">Vendido@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span><span class="fb-sum-v pos">@MoneyBrl(FocoValor)</span></div>
-        <div class="fb-sum"><span class="fb-sum-k">Previsão</span><span class="fb-sum-v">@Money(_fcYear)</span></div>
+        <div class="fb-sum"><span class="fb-sum-k">@T("Vendido", "Sold")@(_monthFilter is >= 1 and <= 12 ? " · " + XMes(_monthFilter) : "")</span><span class="fb-sum-v pos">@MoneyBrl(FocoValor)</span></div>
+        <div class="fb-sum"><span class="fb-sum-k">@T("Previsão", "Forecast")</span><span class="fb-sum-v">@Money(_fcYear)</span></div>
     </div>
     @if (_activeFilters > 0)
     {
-        <span class="tag">@_activeFilters ativo(s)</span>
-        <button class="btn-link" @onclick="ClearFilters">Limpar</button>
+        <span class="tag">@_activeFilters @T("ativo(s)", "active")</span>
+        <button class="btn-link" @onclick="ClearFilters">@T("Limpar", "Clear")</button>
     }
-    <button class="btn-link" @onclick="SaveView">Salvar visualização</button>
-    @if (_savedMsg) { <span class="saved-flag">@Icons.Svg("check")Salvo</span> }
+    <button class="btn-link" @onclick="SaveView">@T("Salvar visualização", "Save view")</button>
+    @if (_savedMsg) { <span class="saved-flag">@Icons.Svg("check")@T("Salvo", "Saved")</span> }
 
     @* ---- Controle da apresentação ----
        Mora DENTRO da barra de filtros de propósito: ela congela abaixo do
@@ -96,12 +127,12 @@
        vez: o estado mora no JS, que é quem manda na rolagem, sem sincronizar
        nada com o Blazor. *@
     <div class="apres-controle">
-        <button type="button" class="apres-btn apres-pausar" title="Pausar a rolagem (espaço)"
-                onclick="presentation.alternarPausa()">@Icons.Svg("pause")<span>Pausar</span></button>
-        <button type="button" class="apres-btn apres-continuar" title="Continuar a rolagem (espaço)"
-                onclick="presentation.alternarPausa()">@Icons.Svg("play")<span>Continuar</span></button>
-        <button type="button" class="apres-btn apres-sair" title="Sair da apresentação (Esc)"
-                onclick="presentation.stop()">@Icons.Svg("x")<span>Sair</span></button>
+        <button type="button" class="apres-btn apres-pausar" title="@T("Pausar a rolagem (espaço)", "Pause scrolling (space)")"
+                onclick="presentation.alternarPausa()">@Icons.Svg("pause")<span>@T("Pausar", "Pause")</span></button>
+        <button type="button" class="apres-btn apres-continuar" title="@T("Continuar a rolagem (espaço)", "Resume scrolling (space)")"
+                onclick="presentation.alternarPausa()">@Icons.Svg("play")<span>@T("Continuar", "Resume")</span></button>
+        <button type="button" class="apres-btn apres-sair" title="@T("Sair da apresentação (Esc)", "Exit presentation (Esc)")"
+                onclick="presentation.stop()">@Icons.Svg("x")<span>@T("Sair", "Exit")</span></button>
     </div>
 </div>
 
@@ -122,27 +153,27 @@
     var _gmPp = _gmAvg - 30.0;
 }
 <div class="xsec lvl1" data-pnl="sec-visao">
-    <span class="xsec-t">Visão Geral Executiva</span>
+    <span class="xsec-t">@T("Visão Geral Executiva", "Executive Overview")</span>
     <span class="xsec-s">how are we performing · @_year · @_currency</span>
     <span class="xsec-line"></span>
 </div>
 <div class="kpi-row" data-pnl="kpis">
     <div class="kpi">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("trend")</span><span class="kpi-label">Previsão</span></div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("trend")</span><span class="kpi-label">@T("Previsão", "Forecast")</span></div>
         <div class="kpi-value">@Money(_fcYear)</div>
-        <div class="kpi-delta @(_fcAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_fcAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_fcAtt) <span class="ctx">da meta</span></div>
+        <div class="kpi-delta @(_fcAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_fcAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_fcAtt) <span class="ctx">@T("da meta", "of target")</span></div>
         <div class="kpi-spark"><Sparkline Values="@_monthAmt" Stroke="#17a2c0" /></div>
     </div>
     <div class="kpi accent-pos">
         <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("check")</span><span class="kpi-label">@FocoNome</span></div>
         <div class="kpi-value">@MoneyBrl(FocoValor)</div>
-        <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">da meta</span></div>
+        <div class="kpi-delta @(_wonAtt >= 100 ? "pos" : "neutral")"><span class="arw">@(_wonAtt >= 100 ? "▲" : "•")</span> @Fmt.Pct(_wonAtt) <span class="ctx">@T("da meta", "of target")</span></div>
         <div class="kpi-spark"><Sparkline Values="@_mReal" Stroke="#1f9254" /></div>
     </div>
     <div class="kpi @(_gmAvg >= 30 ? "accent-pos" : "accent-warn")">
-        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("executive")</span><span class="kpi-label">Margem Bruta</span></div>
+        <div class="kpi-top"><span class="kpi-ico">@Icons.Svg("executive")</span><span class="kpi-label">@T("Margem Bruta", "Gross Margin")</span></div>
         <div class="kpi-value">@Fmt.Pct(_gmAvg)</div>
-        <div class="kpi-delta @(_gmPp >= 0 ? "pos" : "warn")"><span class="arw">@(_gmPp >= 0 ? "▲" : "▼")</span> @Math.Abs(_gmPp).ToString("0.0", _pt) pp <span class="ctx">vs meta de 30%</span></div>
+        <div class="kpi-delta @(_gmPp >= 0 ? "pos" : "warn")"><span class="arw">@(_gmPp >= 0 ? "▲" : "▼")</span> @XDec1(Math.Abs(_gmPp)) pp <span class="ctx">@T("vs meta de 30%", "vs 30% target")</span></div>
         <div class="kpi-bar"><i style="width:@Share(_gmAvg, 40)%"></i></div>
     </div>
 </div>
@@ -150,17 +181,17 @@
 @* ===================== 2 · HERO EXECUTIVO ===================== *@
 <div class="hero" data-pnl="hero">
     <div class="hero-main">
-        <div class="hero-eyebrow">@FocoNome × Meta · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? Fmt.MonthLong(_monthFilter) + " " + _repYear : "Ano " + _repYear)</div>
-        <div class="hero-value"><span class="cur">@_sym</span>@Fmt.Compact(CvBrl(FocoValor))</div>
+        <div class="hero-eyebrow">@FocoNome × @T("Meta", "Target") · REPORT HSA · @(_monthFilter is >= 1 and <= 12 ? XMesLongo(_monthFilter) + " " + _repYear : T("Ano ", "Year ") + _repYear)</div>
+        <div class="hero-value"><span class="cur">@_sym</span>@XCompact(CvBrl(FocoValor))</div>
         <div class="hero-target-line">
-            Meta NB+AFM @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) da meta · gap @MoneyBrl(Math.Max(_heroMeta - FocoValor, 0))<br />
-            Meta Vendas HSA @MoneyBrl(_heroMetaHsa) · @Fmt.Pct(_heroAttainHsa) da meta · gap @MoneyBrl(Math.Max(_heroMetaHsa - FocoValor, 0))
+            @T("Meta NB+AFM", "NB+AFM target") @MoneyBrl(_heroMeta) · @Fmt.Pct(_heroAttain) @T("da meta", "of target") · gap @MoneyBrl(Math.Max(_heroMeta - FocoValor, 0))<br />
+            @T("Meta Vendas HSA", "HSA sales target") @MoneyBrl(_heroMetaHsa) · @Fmt.Pct(_heroAttainHsa) @T("da meta", "of target") · gap @MoneyBrl(Math.Max(_heroMetaHsa - FocoValor, 0))
             @* O outro número fica na linha de baixo, para comparação. Só aparece
                quando existe: uma cifra zerada ali só confundiria a leitura. *@
             @if (OutroValor > 0)
             {
                 <br />
-                <span>@OutroNome @MoneyBrl(OutroValor) · @Fmt.Pct(_heroMeta > 0 ? OutroValor / _heroMeta * 100 : 0) da meta NB+AFM</span>
+                <span>@OutroNome @MoneyBrl(OutroValor) · @Fmt.Pct(_heroMeta > 0 ? OutroValor / _heroMeta * 100 : 0) @T("da meta NB+AFM", "of the NB+AFM target")</span>
             }
         </div>
         @* O foco vem primeiro. O que o CRM reporta e o que de fato se
@@ -168,16 +199,16 @@
         <div class="hero-chips">
             <div class="hero-chip destaque"><div class="k">@FocoNome</div><div class="v">@MoneyBrl(FocoValor)</div></div>
             <div class="hero-chip"><div class="k">@OutroNome</div><div class="v">@(OutroValor > 0 ? MoneyBrl(OutroValor) : "—")</div></div>
-            <div class="hero-chip"><div class="k">Meta NB+AFM</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
-            <div class="hero-chip"><div class="k">Meta Vendas HSA</div><div class="v">@MoneyBrl(_heroMetaHsa)</div></div>
+            <div class="hero-chip"><div class="k">@T("Meta NB+AFM", "NB+AFM target")</div><div class="v">@MoneyBrl(_heroMeta)</div></div>
+            <div class="hero-chip"><div class="k">@T("Meta Vendas HSA", "HSA sales target")</div><div class="v">@MoneyBrl(_heroMetaHsa)</div></div>
         </div>
         <div class="hero-gauge">
             <div class="gt"><div class="gf" style="width:@Clamp(_heroAttain)%"></div></div>
-            <div class="gl"><span>Atingimento · Meta NB+AFM</span><span>@Fmt.Pct(_heroAttain)</span></div>
+            <div class="gl"><span>@T("Atingimento · Meta NB+AFM", "Attainment · NB+AFM target")</span><span>@Fmt.Pct(_heroAttain)</span></div>
         </div>
         <div class="hero-gauge" style="margin-top:8px">
             <div class="gt"><div class="gf" style="width:@Clamp(_heroAttainHsa)%"></div></div>
-            <div class="gl"><span>Atingimento · Meta Vendas HSA</span><span>@Fmt.Pct(_heroAttainHsa)</span></div>
+            <div class="gl"><span>@T("Atingimento · Meta Vendas HSA", "Attainment · HSA sales target")</span><span>@Fmt.Pct(_heroAttainHsa)</span></div>
         </div>
     </div>
 </div>
@@ -185,20 +216,20 @@
 @* ---- Vendas x Meta (NB+AFM) · fonte: Controle · REPORT HSA ---- *@
 <div class="panel" style="margin-top:16px" data-pnl="vendas-meta">
     <div class="panel-head">
-        <div class="panel-title">Vendas x Meta · NB+AFM
-            <span class="hint">realizado x budget mensal · fonte: Controle · REPORT HSA · R$ · @_repYear</span>
+        <div class="panel-title">@T("Vendas x Meta · NB+AFM", "Sales x Target · NB+AFM")
+            <span class="hint">@T("realizado x budget mensal · fonte: Controle · REPORT HSA · R$", "actual x monthly budget · source: Control · REPORT HSA · R$") · @_repYear</span>
         </div>
         <div class="rep-attain-group">
             <div class="rep-attain-box">
-                <span class="ra-label">Atend. Meta NB+AFM (ano)</span>
+                <span class="ra-label">@T("Atend. Meta NB+AFM (ano)", "NB+AFM target attainment (year)")</span>
                 <span class="ra-value" style="color:@AtColor(_repAttain)">@Fmt.Pct(_repAttain)</span>
             </div>
             <div class="rep-attain-box">
-                <span class="ra-label">Atend. Meta Vendas HSA (ano)</span>
+                <span class="ra-label">@T("Atend. Meta Vendas HSA (ano)", "HSA sales target attainment (year)")</span>
                 <span class="ra-value" style="color:@AtColor(_repAttainHsa)">@Fmt.Pct(_repAttainHsa)</span>
             </div>
         </div>
-        <TelaCheia />
+        <TelaCheia Ingles="_en" />
     </div>
     @if (_repReal.Any(v => v > 0) || _repRealizada.Any(v => v > 0) || _repMeta.Any(v => v > 0) || _repMetaHsa.Any(v => v > 0))
     {
@@ -206,23 +237,23 @@
     }
     else
     {
-        <div class="empty">Sem dados no Controle (REPORT HSA) para @_repYear. Preencha os valores na guia <a href="/controle">Controle</a>.</div>
+        <div class="empty">@if (_en) { <text>No data in Control (REPORT HSA) for @_repYear. Fill in the values on the <a href="/controle">Control</a> tab.</text> } else { <text>Sem dados no Controle (REPORT HSA) para @_repYear. Preencha os valores na guia <a href="/controle">Controle</a>.</text> }</div>
     }
 </div>
 
 @* ============ SALES FUNNEL + PREVISÃO INDICADA (lado a lado) ============ *@
 <div class="xsec" data-pnl="sec-funil">
-    <span class="xsec-t">Funil de Vendas por Etapa</span>
-    <span class="xsec-s">sequência do funil · @_currency</span>
+    <span class="xsec-t">@T("Funil de Vendas por Etapa", "Sales Funnel by Stage")</span>
+    <span class="xsec-s">@T("sequência do funil", "funnel sequence") · @_currency</span>
     <span class="xsec-line"></span>
-    @if (_indicadas.Count > 0) { <span class="ind-badge">@Icons.Svg("flag")@_indicadas.Count indicadas · @MoneyBrl(_indTotal)</span> }
-    @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>Limpar Etapa</button> }
+    @if (_indicadas.Count > 0) { <span class="ind-badge">@Icons.Svg("flag")@_indicadas.Count @T("indicadas", "referred") · @MoneyBrl(_indTotal)</span> }
+    @if (_stage != "") { <button class="btn-link" @onclick='() => CrossFilter("stage", _stage)'>@T("Limpar Etapa", "Clear Stage")</button> }
 </div>
 <div class="g12">
     <div class="c6" data-pnl="funil"><div class="xcard pf-card">
     @if (_funnel.Count == 0)
     {
-        <div class="empty">Sem dados no recorte. Importe a base do Funil de Vendas HSA na guia <a href="/oportunidades">Oportunidades</a>.</div>
+        <div class="empty">@if (_en) { <text>No data in the selection. Import the HSA Sales Funnel data on the <a href="/oportunidades">Opportunities</a> tab.</text> } else { <text>Sem dados no recorte. Importe a base do Funil de Vendas HSA na guia <a href="/oportunidades">Oportunidades</a>.</text> }</div>
     }
     else
     {
@@ -230,16 +261,16 @@
         var _fnTop2 = _funnel.Count >= 2 ? _funnel.Take(2).Sum(x => x.Value) / _funnelTotal * 100 : 100;
         <div class="pf-head">
             <div>
-                <div class="xcard-title">@Icons.Svg("pipeline", "pf-ico")Funil de Vendas por Etapa</div>
-                <div class="xcard-sub">Valor · @_currency · @_funnel.Count etapas · sequência do funil</div>
+                <div class="xcard-title">@Icons.Svg("pipeline", "pf-ico")@T("Funil de Vendas por Etapa", "Sales Funnel by Stage")</div>
+                <div class="xcard-sub">@T("Valor", "Value") · @_currency · @_funnel.Count @T("etapas", "stages") · @T("sequência do funil", "funnel sequence")</div>
             </div>
             <div class="pf-totals">
-                <div class="pf-tot"><div class="pf-tot-l">Total do Funil</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
-                <div class="pf-tot"><div class="pf-tot-l">Total de Oportunidades</div><div class="pf-tot-v">@_fnOpps</div></div>
-                <TelaCheia />
+                <div class="pf-tot"><div class="pf-tot-l">@T("Total do Funil", "Funnel Total")</div><div class="pf-tot-v">@MoneyBrl(_funnelTotal)</div></div>
+                <div class="pf-tot"><div class="pf-tot-l">@T("Total de Oportunidades", "Total Opportunities")</div><div class="pf-tot-v">@_fnOpps</div></div>
+                <TelaCheia Ingles="_en" />
             </div>
         </div>
-        <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> do valor do funil está concentrado @(_funnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa").</span></div>
+        <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_fnTop2)</strong> @(_en ? (_funnel.Count >= 2 ? "of the funnel value is concentrated in the first two stages" : "of the funnel value is concentrated in the first stage") : "do valor do funil está concentrado " + (_funnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa")).</span></div>
         <div class="fn5 @(DimActive("stage") ? "has-active" : "")">
             @for (var i = 0; i < _funnel.Count; i++)
             {
@@ -251,19 +282,19 @@
                 var dwN = i < _funnel.Count - 1 ? FnW(i + 1, _funnel.Count) : dw * 0.86;
                 var frac = dwN / dw;
                 var inset = (1 - frac) / 2 * 100;
-                <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) do funil · @f.Count oportunidades@(conv is { } cv ? " · " + Fmt.Pct(cv) + " para a próxima" : "")">
+                <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@(f.Stage + " — " + MoneyBrl(f.Value) + " · " + Fmt.Pct(sh) + T(" do funil · ", " of the funnel · ") + f.Count + T(" oportunidades", " opportunities") + (conv is { } cv ? " · " + Fmt.Pct(cv) + T(" para a próxima", " to the next") : ""))">
                     <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _funnel.Count)"></div>
                     <div class="fn5-text @(FunnelDark(i, _funnel.Count) ? "dark" : "")">
                         <div class="fn5-name">@f.Stage</div>
                         <div class="fn5-amt">@MoneyBrl(f.Value)</div>
-                        <div class="fn5-sub">@Fmt.Pct(sh) do funil · @f.Count oport.@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " para a próxima" : "")</div>
+                        <div class="fn5-sub">@Fmt.Pct(sh) @T("do funil", "of the funnel") · @f.Count @T("oport.", "opp.")@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + (_en ? " to the next" : " para a próxima") : "")</div>
                     </div>
                 </div>
             }
         </div>
         @* Base do funil: valor efetivamente vendido (Realizado · REPORT HSA). *@
         <div class="fn5-bottom">
-            <span class="fn5-bottom-l">@Icons.Svg("check")@FocoNome@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
+            <span class="fn5-bottom-l">@Icons.Svg("check")@FocoNome@(_monthFilter is >= 1 and <= 12 ? " · " + XMes(_monthFilter) : "")</span>
             <span class="fn5-bottom-v">@MoneyBrl(FocoValor)</span>
         </div>
     }
@@ -273,8 +304,16 @@
     {
         <div class="xcard ind-card"><div class="ind-empty">
             <span class="ind-empty-ico">@Icons.Svg("flag")</span>
+            @if (_en)
+            {
+                <div><strong>No opportunity referred yet.</strong><br />
+                Use the <span class="ind-hint">@Icons.Svg("flag")Refer to Forecast</span> button on the <a href="/oportunidades">Opportunities</a> tab or in the Top 10 — referred ones show up here with their own funnel, chart and list.</div>
+            }
+            else
+            {
             <div><strong>Nenhuma oportunidade indicada ainda.</strong><br />
                 Use o botão <span class="ind-hint">@Icons.Svg("flag")Indicar na Previsão</span> na aba <a href="/oportunidades">Oportunidades</a> ou no Top 10 — as indicadas aparecem aqui com funil, gráfico e lista próprios.</div>
+            }
         </div></div>
     }
     else
@@ -290,16 +329,16 @@
             }
             <div class="pf-head">
                 <div>
-                    <div class="xcard-title">@Icons.Svg("flag", "pf-ico")Funil das Indicadas por Etapa</div>
-                    <div class="xcard-sub">Valor · @_currency · @_indFunnel.Count etapas · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) do pipeline</div>
+                    <div class="xcard-title">@Icons.Svg("flag", "pf-ico")@T("Funil das Indicadas por Etapa", "Referred Funnel by Stage")</div>
+                    <div class="xcard-sub">@T("Valor", "Value") · @_currency · @_indFunnel.Count @T("etapas", "stages") · @Fmt.Pct(_indTotal / Math.Max(_funnelTotal, 1) * 100) @T("do pipeline", "of the pipeline")</div>
                 </div>
                 <div class="pf-totals">
-                    <div class="pf-tot"><div class="pf-tot-l">Total do Funil</div><div class="pf-tot-v">@MoneyBrl(_indTotal)</div></div>
-                    <div class="pf-tot"><div class="pf-tot-l">Total de Oportunidades</div><div class="pf-tot-v">@_ifOpps</div></div>
-                    <TelaCheia />
+                    <div class="pf-tot"><div class="pf-tot-l">@T("Total do Funil", "Funnel Total")</div><div class="pf-tot-v">@MoneyBrl(_indTotal)</div></div>
+                    <div class="pf-tot"><div class="pf-tot-l">@T("Total de Oportunidades", "Total Opportunities")</div><div class="pf-tot-v">@_ifOpps</div></div>
+                    <TelaCheia Ingles="_en" />
                 </div>
             </div>
-            <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_ifTop2)</strong> do valor do funil está concentrado @(_indFunnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa").</span></div>
+            <div class="pf-insight">@Icons.Svg("trend")<span><strong>@Fmt.Pct(_ifTop2)</strong> @(_en ? (_indFunnel.Count >= 2 ? "of the funnel value is concentrated in the first two stages" : "of the funnel value is concentrated in the first stage") : "do valor do funil está concentrado " + (_indFunnel.Count >= 2 ? "nas duas primeiras etapas" : "na primeira etapa")).</span></div>
             <div class="fn5 @(DimActive("stage") ? "has-active" : "")">
                 @for (var i = 0; i < _indFunnel.Count; i++)
                 {
@@ -310,19 +349,19 @@
                     var dwN = i < _indFunnel.Count - 1 ? FnW(i + 1, _indFunnel.Count) : dw * 0.86;
                     var frac = dwN / dw;
                     var inset = (1 - frac) / 2 * 100;
-                    <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@f.Stage — @MoneyBrl(f.Value) · @Fmt.Pct(sh) do funil · @f.Count oportunidades@(conv is { } cv ? " · " + Fmt.Pct(cv) + " para a próxima" : "")">
+                    <div class="fn5-seg @(IsActive("stage", f.Stage) ? "xf-on" : "")" style="width:@F(dw)%" @onclick='() => CrossFilter("stage", f.Stage)' title="@(f.Stage + " — " + MoneyBrl(f.Value) + " · " + Fmt.Pct(sh) + T(" do funil · ", " of the funnel · ") + f.Count + T(" oportunidades", " opportunities") + (conv is { } cv ? " · " + Fmt.Pct(cv) + T(" para a próxima", " to the next") : ""))">
                         <div class="fn5-shape" style="clip-path:polygon(0 0, 100% 0, @F(100 - inset)% 100%, @F(inset)% 100%);background:@FunnelBar(i, _indFunnel.Count)"></div>
                         <div class="fn5-text @(FunnelDark(i, _indFunnel.Count) ? "dark" : "")">
                             <div class="fn5-name">@f.Stage</div>
                             <div class="fn5-amt">@MoneyBrl(f.Value)</div>
-                            <div class="fn5-sub">@Fmt.Pct(sh) do funil · @f.Count oport.@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + " para a próxima" : "")</div>
+                            <div class="fn5-sub">@Fmt.Pct(sh) @T("do funil", "of the funnel") · @f.Count @T("oport.", "opp.")@(conv is { } c ? " · ↓ " + Fmt.Pct(c) + (_en ? " to the next" : " para a próxima") : "")</div>
                         </div>
                     </div>
                 }
             </div>
             @* Mesma base do outro funil: o valor efetivamente vendido. *@
             <div class="fn5-bottom">
-                <span class="fn5-bottom-l">@Icons.Svg("check")@FocoNome@(_monthFilter is >= 1 and <= 12 ? " · " + Fmt.MonthName(_monthFilter) : "")</span>
+                <span class="fn5-bottom-l">@Icons.Svg("check")@FocoNome@(_monthFilter is >= 1 and <= 12 ? " · " + XMes(_monthFilter) : "")</span>
                 <span class="fn5-bottom-v">@MoneyBrl(FocoValor)</span>
             </div>
         </div>
@@ -338,7 +377,7 @@
         @* Estava embaixo do funil, na meia coluna: as barras ficavam curtas e
            sobrava a metade esquerda vazia. Linha inteira aproveita o espaço. *@
         <div class="c12" data-pnl="indicadas-vendedor"><div class="xcard ind-card">
-            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Indicadas por Vendedor</div><div class="xcard-sub">@_indByRep.Count vendedor(es) · valor indicado</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indByRep.Sum(x => x.Value))</b></span><TelaCheia /></div>
+            <div class="xcard-head"><span class="xcard-ico ind-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">@T("Indicadas por Vendedor", "Referred by Salesperson")</div><div class="xcard-sub">@_indByRep.Count @T("vendedor(es) · valor indicado", "salesperson(s) · referred value")</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indByRep.Sum(x => x.Value))</b></span><TelaCheia Ingles="_en" /></div>
             @{ var _indRepMax = _indByRep.Count > 0 ? _indByRep.Max(x => x.Value) : 1; }
             <div class="ibar scroll-y" style="max-height:300px">
                 @foreach (var s in _indByRep)
@@ -357,15 +396,15 @@
         <div class="c12" data-pnl="lista-indicadas"><div class="xcard ind-card">
             <div class="xcard-head">
                 <span class="xcard-ico ind-ico">@Icons.Svg("flag")</span>
-                <div><div class="xcard-title">Oportunidades indicadas</div><div class="xcard-sub">@_indicadas.Count · clique para abrir a oportunidade</div></div>
+                <div><div class="xcard-title">@T("Oportunidades indicadas", "Referred opportunities")</div><div class="xcard-sub">@_indicadas.Count · @T("clique para abrir a oportunidade", "click to open the opportunity")</div></div>
                 <span class="xcard-total"><span>Total</span><b>@MoneyBrl(_indTotal)</b></span>
-                <button class="btn-ghost" style="padding:4px 10px;margin-left:12px" title="Exportar só as oportunidades indicadas (.xlsx)" @onclick="ExportarIndicadas">
-                    @Icons.Svg("download")Exportar
+                <button class="btn-ghost" style="padding:4px 10px;margin-left:12px" title="@T("Exportar só as oportunidades indicadas (.xlsx)", "Export only the referred opportunities (.xlsx)")" @onclick="ExportarIndicadas">
+                    @Icons.Svg("download")@T("Exportar", "Export")
                 </button>
-                <TelaCheia />
+                <TelaCheia Ingles="_en" />
             </div>
-            <OpportunityTable Rows="_indicadas" CssClass="tbl-compact" Style="max-height:380px;overflow:auto"
-                              EmptyText="Nenhuma oportunidade indicada no recorte." OnChanged="ReloadOpps"
+            <OpportunityTable Ingles="_en" Rows="_indicadas" CssClass="tbl-compact" Style="max-height:380px;overflow:auto"
+                              EmptyText="@T("Nenhuma oportunidade indicada no recorte.", "No referred opportunity in the selection.")" OnChanged="ReloadOpps"
                               OnAbrirDetalhe="GuardarFiltros" ShowColumnPicker="false" />
         </div></div>
     </div>
@@ -380,17 +419,17 @@
     var _smMax = _bySubMarket.Count > 0 ? _bySubMarket.Max(x => x.Value) : 1;
 }
 <div class="xsec" data-pnl="sec-distribuicao">
-    <span class="xsec-t">Distribuição de Receita &amp; Desempenho</span>
-    <span class="xsec-s">de onde vem a receita · quem está gerando · @_currency</span>
+    <span class="xsec-t">@T("Distribuição de Receita & Desempenho", "Revenue Distribution & Performance")</span>
+    <span class="xsec-s">@T("de onde vem a receita · quem está gerando", "where revenue comes from · who is generating it") · @_currency</span>
     <span class="xsec-line"></span>
-    <span class="xsec-s">clique em qualquer elemento para filtrar</span>
+    <span class="xsec-s">@T("clique em qualquer elemento para filtrar", "click any element to filter")</span>
 </div>
 <div id="xf-charts">
     <div class="g12">
         @* ---- Commercial Segment (donut + lista) ---- *@
         <div class="c6" data-pnl="segmento"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Segmento Comercial</div><div class="xcard-sub">@_bySegment.Count segmentos · arraste para reordenar</div></div>@ChartToolsFor("segment")<TelaCheia /></div>
-            @if (_bySegment.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">@T("Segmento Comercial", "Commercial Segment")</div><div class="xcard-sub">@_bySegment.Count @T("segmentos · arraste para reordenar", "segments · drag to reorder")</div></div>@ChartToolsFor("segment")<TelaCheia Ingles="_en" /></div>
+            @if (_bySegment.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else
             {
                 <div class="seg-wrap">
@@ -417,15 +456,15 @@
 
         @* ---- Forecast by Market (ranking) ---- *@
         <div class="c6" data-pnl="mercado"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">Previsão por Mercado</div><div class="xcard-sub">@_byMarket.Count mercados · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("market")<TelaCheia /></div>
-            @if (_byMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("bar-chart")</span><div><div class="xcard-title">@T("Previsão por Mercado", "Forecast by Market")</div><div class="xcard-sub">@_byMarket.Count @T("mercados · arraste para reordenar", "markets · drag to reorder")</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("market")<TelaCheia Ingles="_en" /></div>
+            @if (_byMarket.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else
             {
                 <div class="ibar @(DimActive("market") ? "has-active" : "") scroll-y ch-drag" id="ch-market" style="max-height:340px;@BarStyle("market")">
                     @foreach (var m in Ord("market", _byMarket, x => x.Name))
                     {
                         var sh = m.Value / _marketTotal * 100;
-                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" draggable="true" data-key="@m.Name" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — Previsão @Money(m.Value) · Participação @Fmt.Pct(sh)">
+                        <div class="ibar-item @(IsActive("market", m.Name) ? "xf-on" : "")" draggable="true" data-key="@m.Name" @onclick='() => CrossFilter("market", m.Name)' title="@m.Name — @T("Previsão", "Forecast") @Money(m.Value) · @T("Participação", "Share") @Fmt.Pct(sh)">
                             <div class="ibar-head">
                                 <span class="ibar-name">@m.Name</span>
                                 <span class="ibar-metrics"><span class="ibar-val">@Money(m.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span></span>
@@ -441,8 +480,8 @@
     @* ---- Sales Rep Performance | Forecast by Product (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c6" data-pnl="vendedor"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">Desempenho por Vendedor</div><div class="xcard-sub">@_byRep.Count vendedores · NB + AFM · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span>@ChartToolsFor("kam")<TelaCheia /></div>
-            @if (_byRep.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("opportunity")</span><div><div class="xcard-title">@T("Desempenho por Vendedor", "Performance by Salesperson")</div><div class="xcard-sub">@_byRep.Count @T("vendedores", "salespeople") · NB + AFM · @T("arraste para reordenar", "drag to reorder")</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_byRep.Sum(x => x.Value))</b></span>@ChartToolsFor("kam")<TelaCheia Ingles="_en" /></div>
+            @if (_byRep.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else
             {
                 <div class="ibar @(DimActive("kam") ? "has-active" : "") scroll-y ch-drag" id="ch-kam" style="max-height:460px;@BarStyle("kam")">
@@ -451,7 +490,7 @@
                     {
                         ri++;
                         var sh = s.Value / _repTot * 100;
-                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" draggable="true" data-key="@s.Label" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — Previsão @MoneyBrl(s.Value) · Participação @Fmt.Pct(sh)">
+                        <div class="ibar-item @(ri <= 3 ? $"top{ri}" : "") @(IsActive("kam", s.Label) ? "xf-on" : "")" draggable="true" data-key="@s.Label" @onclick='() => CrossFilter("kam", s.Label)' title="#@ri @s.Label — @T("Previsão", "Forecast") @MoneyBrl(s.Value) · @T("Participação", "Share") @Fmt.Pct(sh)">
                             <div class="ibar-head">
                                 <span class="ibar-num">@ri</span>
                                 <span class="ibar-name">@s.Label</span>
@@ -464,8 +503,8 @@
             }
         </div></div>
         <div class="c6" data-pnl="produto"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">Previsão por Produto</div><div class="xcard-sub">@_byProduct.Count produtos · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span>@ChartToolsFor("product")<TelaCheia /></div>
-            @if (_byProduct.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("layers")</span><div><div class="xcard-title">@T("Previsão por Produto", "Forecast by Product")</div><div class="xcard-sub">@_byProduct.Count @T("produtos · arraste para reordenar", "products · drag to reorder")</div></div><span class="xcard-total"><span>Total</span><b>@Money(_byProduct.Sum(x => x.Value))</b></span>@ChartToolsFor("product")<TelaCheia Ingles="_en" /></div>
+            @if (_byProduct.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else
             {
                 <div class="ibar @(DimActive("product") ? "has-active" : "") scroll-y ch-drag" id="ch-product" style="max-height:400px;@BarStyle("product")">
@@ -473,7 +512,7 @@
                     {
                         var gmCls = p.Margin >= 28 ? "hi" : (p.Margin <= 18 ? "lo" : "");
                         var sh = p.Value / _productTotal * 100;
-                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" draggable="true" data-key="@p.Name" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — Previsão @Money(p.Value) · Participação @Fmt.Pct(sh) · Margem @Fmt.Pct(p.Margin)">
+                        <div class="ibar-item @(IsActive("product", p.Name) ? "xf-on" : "")" draggable="true" data-key="@p.Name" @onclick='() => CrossFilter("product", p.Name)' title="@p.Name — @T("Previsão", "Forecast") @Money(p.Value) · @T("Participação", "Share") @Fmt.Pct(sh) · @T("Margem", "Margin") @Fmt.Pct(p.Margin)">
                             <div class="ibar-head">
                                 <span class="ibar-name">@p.Name</span>
                                 <span class="ibar-metrics"><span class="ibar-val">@Money(p.Value)</span><span class="ibar-share">@Fmt.Pct(sh)</span><span class="gm-pill @gmCls">GM @Fmt.Pct(p.Margin)</span></span>
@@ -489,8 +528,8 @@
     <div class="g12">
         @* ---- Sub-Market Performance (lollipop) ---- *@
         <div class="c6" data-pnl="submercado"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Desempenho por Sub-Mercado</div><div class="xcard-sub">@_bySubMarket.Count sub-mercados · arraste para reordenar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("submarket")<TelaCheia /></div>
-            @if (_bySubMarket.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">@T("Desempenho por Sub-Mercado", "Performance by Sub-market")</div><div class="xcard-sub">@_bySubMarket.Count @T("sub-mercados · arraste para reordenar", "sub-markets · drag to reorder")</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_bySubMarket.Sum(x => x.Value))</b></span>@ChartToolsFor("submarket")<TelaCheia Ingles="_en" /></div>
+            @if (_bySubMarket.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else
             {
                 <div class="lolli scroll-y ch-drag" id="ch-submarket" style="max-height:380px;@BarStyle("submarket")">
@@ -508,8 +547,8 @@
 
         @* ---- Business Unit Performance (donut + lista) ---- *@
         <div class="c6" data-pnl="unidade"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Desempenho por Unidade de Negócio</div><div class="xcard-sub">@_byBu2.Count unidades · arraste para reordenar</div></div>@ChartToolsFor("bu")<TelaCheia /></div>
-            @if (_byBu2.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">@T("Desempenho por Unidade de Negócio", "Performance by Business Unit")</div><div class="xcard-sub">@_byBu2.Count @T("unidades · arraste para reordenar", "units · drag to reorder")</div></div>@ChartToolsFor("bu")<TelaCheia Ingles="_en" /></div>
+            @if (_byBu2.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else
             {
                 <div class="seg-wrap">
@@ -538,22 +577,22 @@
     @* ---- Valor por trimestre + Aftermarket × New Business (lado a lado) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c6" data-pnl="trimestre"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Valor por trimestre</div><div class="xcard-sub">1º a 4º tri · @_currency</div></div><TelaCheia /></div>
-            @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow($"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
-            @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">@T("Valor por trimestre", "Value by quarter")</div><div class="xcard-sub">@T("1º a 4º tri", "Q1 to Q4") · @_currency</div></div><TelaCheia Ingles="_en" /></div>
+            @{ var qData = Enumerable.Range(0, 4).Select(q => new SliceRow(_en ? $"Q{q + 1}" : $"{q + 1}º tri", _byQuarter[q])).Where(x => x.Value > 0).ToList(); }
+            @if (qData.Count > 0) { <div class="chart-body donut">@RenderDonut(qData)</div> } else { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
         </div></div>
         <div class="c6" data-pnl="afm-nb"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Aftermarket × New Business</div><div class="xcard-sub">participação no pipeline · por setor</div></div><TelaCheia /></div>
-            @if (_bySetor.Count == 0) { <div class="empty">Sem dados no recorte.</div> }
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("pie")</span><div><div class="xcard-title">Aftermarket × New Business</div><div class="xcard-sub">@T("participação no pipeline · por setor", "share of pipeline · by sector")</div></div><TelaCheia Ingles="_en" /></div>
+            @if (_bySetor.Count == 0) { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
             else { <div class="chart-body donut">@RenderDonut(_bySetor)</div> }
-            <div class="muted" style="font-size:11px;margin-top:8px">Divisão do pipeline entre Aftermarket e New Business (origem da oferta).</div>
+            <div class="muted" style="font-size:11px;margin-top:8px">@T("Divisão do pipeline entre Aftermarket e New Business (origem da oferta).", "Pipeline split between Aftermarket and New Business (offer origin).")</div>
         </div></div>
     </div>
 
     @* ---- Forecast by Month (timing) ---- *@
     <div class="g12" style="margin-top:16px">
         <div class="c12" data-pnl="previsao-mensal"><div class="xcard">
-            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">Previsão por Mês</div><div class="xcard-sub">Data de fechamento · clique num mês para filtrar</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_monthAmt.Sum())</b></span><TelaCheia /></div>
+            <div class="xcard-head"><span class="xcard-ico">@Icons.Svg("trend")</span><div><div class="xcard-title">@T("Previsão por Mês", "Forecast by Month")</div><div class="xcard-sub">@T("Data de fechamento · clique num mês para filtrar", "Close date · click a month to filter")</div></div><span class="xcard-total"><span>Total</span><b>@MoneyBrl(_monthAmt.Sum())</b></span><TelaCheia Ingles="_en" /></div>
             <div class="chart-body">@RenderXfColumns(_monthAmt)</div>
         </div></div>
     </div>
@@ -561,8 +600,8 @@
 
 @* ===================== EXECUTIVE INSIGHTS ===================== *@
 <div class="xsec" data-pnl="sec-insights">
-    <span class="xsec-t">Análises Executivas</span>
-    <span class="xsec-s">calculado a partir dos dados reais do recorte</span>
+    <span class="xsec-t">@T("Análises Executivas", "Executive Insights")</span>
+    <span class="xsec-s">@T("calculado a partir dos dados reais do recorte", "calculated from the actual data in the selection")</span>
     <span class="xsec-line"></span>
 </div>
 <div class="exi-grid" data-pnl="insights">
@@ -572,41 +611,41 @@
         var _topSeg = _bySegment.Count > 0 ? _bySegment[0] : null;
     }
     <div class="exi">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("trend")</span><span class="exi-label">Previsão vs Meta</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("trend")</span><span class="exi-label">@T("Previsão vs Meta", "Forecast vs Target")</span></div>
         <div class="exi-value @(_fcAtt >= 100 ? "pos" : "")">@Fmt.Pct(_fcAtt)</div>
-        <div class="exi-text">Previsão de @Money(_fcYear) frente à meta de @MoneyBrl(_metaYear). @_mktTxt lideram a contribuição da previsão.</div>
+        <div class="exi-text">@if (_en) { <text>Forecast of @Money(_fcYear) against a target of @MoneyBrl(_metaYear). @_mktTxt lead the contribution to the forecast.</text> } else { <text>Previsão de @Money(_fcYear) frente à meta de @MoneyBrl(_metaYear). @_mktTxt lideram a contribuição da previsão.</text> }</div>
     </div>
     <div class="exi warn">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("target")</span><span class="exi-label">Distância da Meta</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("target")</span><span class="exi-label">@T("Distância da Meta", "Gap to Target")</span></div>
         <div class="exi-value warn">@MoneyBrl(_gapTgt)</div>
-        <div class="exi-text">Distância da meta anual. Priorizar a conversão das maiores oportunidades do funil (@_openCount abertas).</div>
+        <div class="exi-text">@if (_en) { <text>Gap to the annual target. Prioritize converting the largest opportunities in the funnel (@_openCount open).</text> } else { <text>Distância da meta anual. Priorizar a conversão das maiores oportunidades do funil (@_openCount abertas).</text> }</div>
     </div>
     <div class="exi @(_gmAvg >= 30 ? "pos" : "warn")">
-        <div class="exi-top"><span class="exi-ico">@Icons.Svg("executive")</span><span class="exi-label">Margem Bruta</span></div>
+        <div class="exi-top"><span class="exi-ico">@Icons.Svg("executive")</span><span class="exi-label">@T("Margem Bruta", "Gross Margin")</span></div>
         <div class="exi-value @(_gmAvg >= 30 ? "pos" : "warn")">@Fmt.Pct(_gmAvg)</div>
-        <div class="exi-text">Margem bruta média do recorte (@(_gmPp >= 0 ? "+" : "")@_gmPp.ToString("0.0", _pt) pp vs meta de 30%), sustentada pelo mix de produtos.</div>
+        <div class="exi-text">@if (_en) { <text>Average gross margin of the selection (@(_gmPp >= 0 ? "+" : "")@XDec1(_gmPp) pp vs 30% target), supported by the product mix.</text> } else { <text>Margem bruta média do recorte (@(_gmPp >= 0 ? "+" : "")@_gmPp.ToString("0.0", _pt) pp vs meta de 30%), sustentada pelo mix de produtos.</text> }</div>
     </div>
 </div>
 
 @* ---- Top 10 oportunidades mais quentes (linha completa) ---- *@
 <div class="section-head" data-pnl="sec-top10">
-    <span class="st-title">Oportunidades mais quentes</span>
-    <span class="st-sub">indicadas na previsão + marcadas como TOP 10 · @_top10Opps.Count oport. · @MoneyBrl(_top10Opps.Sum(o => o.AmountBrl))</span>
+    <span class="st-title">@T("Oportunidades mais quentes", "Hottest opportunities")</span>
+    <span class="st-sub">@T("indicadas na previsão + marcadas como TOP 10", "referred to the forecast + marked as TOP 10") · @_top10Opps.Count @T("oport.", "opp.") · @MoneyBrl(_top10Opps.Sum(o => o.AmountBrl))</span>
     <span class="st-line"></span>
-    <a class="btn-link" href="/oportunidades">Ver todas</a>
+    <a class="btn-link" href="/oportunidades">@T("Ver todas", "See all")</a>
 </div>
 <div class="c12" data-pnl="top10">
-    <OpportunityTable Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
-                      EmptyText="Nenhuma oportunidade indicada na previsão ou marcada como TOP 10 no recorte." OnChanged="ReloadOpps"
+    <OpportunityTable Ingles="_en" Rows="_top10Opps" CssClass="tbl-compact" Style="max-height:340px;overflow:auto"
+                      EmptyText="@T("Nenhuma oportunidade indicada na previsão ou marcada como TOP 10 no recorte.", "No opportunity referred to the forecast or marked as TOP 10 in the selection.")" OnChanged="ReloadOpps"
                       OnAbrirDetalhe="GuardarFiltros" ShowColumnPicker="false" />
 </div>
 
 @* ===================== 4 · COMPOSIÇÃO E PERFORMANCE ===================== *@
-<div class="section-head" data-pnl="sec-composicao"><span class="st-title">Composição e desempenho</span><span class="st-line"></span></div>
+<div class="section-head" data-pnl="sec-composicao"><span class="st-title">@T("Composição e desempenho", "Composition and performance")</span><span class="st-line"></span></div>
 <div class="g12">
     <div class="c12" data-pnl="composicao">
         <div class="panel" style="height:100%">
-            <div class="panel-head"><div class="panel-title">Composição da previsão <span class="hint">por % de ganho</span></div><TelaCheia /></div>
+            <div class="panel-head"><div class="panel-title">@T("Composição da previsão", "Forecast composition") <span class="hint">@T("por % de ganho", "by win %")</span></div><TelaCheia Ingles="_en" /></div>
             <div class="comp-bar">
                 @foreach (var c in _comp.Where(x => x.Value > 0))
                 {
@@ -618,35 +657,35 @@
                 {
                     <div class="comp-row">
                         <span class="comp-dot" style="background:@c.Color"></span>
-                        <span><span class="comp-name">@c.Band</span> <span class="comp-sub">· @c.Count op.</span></span>
+                        <span><span class="comp-name">@c.Band</span> <span class="comp-sub">· @c.Count @T("op.", "opp.")</span></span>
                         <span class="comp-share">@Fmt.Pct(c.Share)</span>
                         <span class="comp-num">@Money(c.Value)</span>
-                        <span class="delta @(c.Trend >= 0 ? "up" : "down")" style="font-size:11px">@Fmt.Signed(c.Trend)</span>
+                        <span class="delta @(c.Trend >= 0 ? "up" : "down")" style="font-size:11px">@XSigned(c.Trend)</span>
                     </div>
                 }
             </div>
             <div class="comp-summary">
-                <div class="cs"><div class="cs-l">Pipeline elegível</div><div class="cs-v">@Money(_eligiblePipeline)</div></div>
-                <div class="cs"><div class="cs-l">Meta restante</div><div class="cs-v">@Money(_remainingTarget)</div></div>
-                <div class="cs"><div class="cs-l">Índice de cobertura</div><div class="cs-v">@_coverageLabel</div></div>
+                <div class="cs"><div class="cs-l">@T("Pipeline elegível", "Eligible pipeline")</div><div class="cs-v">@Money(_eligiblePipeline)</div></div>
+                <div class="cs"><div class="cs-l">@T("Meta restante", "Remaining target")</div><div class="cs-v">@Money(_remainingTarget)</div></div>
+                <div class="cs"><div class="cs-l">@T("Índice de cobertura", "Coverage ratio")</div><div class="cs-v">@_coverageLabel</div></div>
             </div>
         </div>
     </div>
 </div>
 
 @* ---- Distribuição da carteira: país · GM ---- *@
-<div class="section-head" data-pnl="sec-carteira"><span class="st-title">Distribuição da carteira</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
+<div class="section-head" data-pnl="sec-carteira"><span class="st-title">@T("Distribuição da carteira", "Portfolio distribution")</span><span class="st-sub">@MetricLabel · @_year · @_currency</span><span class="st-line"></span></div>
 <div class="g12 top">
     <div class="c12" data-pnl="mapa">
         <div class="panel">
             <div class="panel-head">
-                <div class="panel-title">Por país <span class="hint">clique num país p/ filtrar a página · duplo clique no oceano p/ limpar · roda p/ zoom · arraste p/ mover</span></div>
+                <div class="panel-title">@T("Por país", "By country") <span class="hint">@T("clique num país p/ filtrar a página · duplo clique no oceano p/ limpar · roda p/ zoom · arraste p/ mover", "click a country to filter the page · double-click the ocean to clear · scroll to zoom · drag to move")</span></div>
                 <div class="map-zoom">
-                    <button class="icon-btn" title="Diminuir" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1/1.3)'>@Icons.Svg("down")</button>
-                    <button class="icon-btn" title="Aumentar" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1.3)'>@Icons.Svg("up")</button>
-                    <button class="icon-btn" title="Redefinir" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapId)'>@Icons.Svg("target")</button>
+                    <button class="icon-btn" title="@T("Diminuir", "Zoom out")" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1/1.3)'>@Icons.Svg("down")</button>
+                    <button class="icon-btn" title="@T("Aumentar", "Zoom in")" @onclick='() => JS.InvokeVoidAsync("worldMap.zoom", MapId, 1.3)'>@Icons.Svg("up")</button>
+                    <button class="icon-btn" title="@T("Redefinir", "Reset")" @onclick='() => JS.InvokeVoidAsync("worldMap.reset", MapId)'>@Icons.Svg("target")</button>
                 </div>
-                <TelaCheia />
+                <TelaCheia Ingles="_en" />
             </div>
             @if (_byCountry.Count > 0)
             {
@@ -656,18 +695,18 @@
                 <div class="map-legend cols">
                     @foreach (var c in _byCountry.OrderByDescending(x => x.Value))
                     {
-                        <div class="ml-row @XfCss("country", c.Label)" @onclick='() => CrossFilter("country", c.Label)' title="Filtrar por @c.Label"><span class="ml-dot"></span><span class="ml-name">@c.Label</span><span class="ml-val">@Money(c.Value)</span><span class="ml-pct">@Fmt.Pct(c.Value / _countryTotal * 100)</span></div>
+                        <div class="ml-row @XfCss("country", c.Label)" @onclick='() => CrossFilter("country", c.Label)' title="@T("Filtrar por", "Filter by") @c.Label"><span class="ml-dot"></span><span class="ml-name">@c.Label</span><span class="ml-val">@Money(c.Value)</span><span class="ml-pct">@Fmt.Pct(c.Value / _countryTotal * 100)</span></div>
                     }
                 </div>
             }
-            else { <div class="empty">Sem dados no recorte.</div> }
+            else { <div class="empty">@T("Sem dados no recorte.", "No data in the selection.")</div> }
         </div>
     </div>
 </div>
 <div class="g12" style="margin-top:14px">
     <div class="c12" data-pnl="gm-mensal">
         <div class="panel">
-            <div class="panel-head"><div class="panel-title">GM médio mensal <span class="hint">margem bruta média das oportunidades por mês · meta 30%</span></div><TelaCheia /></div>
+            <div class="panel-head"><div class="panel-title">@T("GM médio mensal", "Monthly average GM") <span class="hint">@T("margem bruta média das oportunidades por mês · meta 30%", "average gross margin of the opportunities per month · 30% target")</span></div><TelaCheia Ingles="_en" /></div>
             <div class="chart-body" style="min-height:200px">@RenderGmColumns()</div>
         </div>
     </div>
@@ -675,22 +714,22 @@
 
 @* ===================== 4c · ESTÚDIO DE GRÁFICOS (Power BI) ===================== *@
 <div class="c12" data-pnl="estudio">
-    <ChartStudio Data="_filtered" Currency="_currency" Rate="Rate" Sym="_sym" />
+    <ChartStudio Ingles="_en" Data="_filtered" Currency="_currency" Rate="@(TaxaTelaAtiva ?? Rate)" Sym="_sym" />
 </div>
 
 @* ===================== 4b · OPORTUNIDADES ===================== *@
 <div class="section-head" data-pnl="sec-oportunidades">
-    <span class="st-title">Oportunidades</span>
-    <span class="st-sub">@_filtered.Count no recorte · @MoneyBrl(_filtered.Sum(o => o.AmountBrl)) em valor@(_filtered.Count > TetoTabela ? $" · mostrando as {TetoTabela} maiores" : "")</span>
+    <span class="st-title">@T("Oportunidades", "Opportunities")</span>
+    <span class="st-sub">@_filtered.Count @T("no recorte", "in the selection") · @MoneyBrl(_filtered.Sum(o => o.AmountBrl)) @T("em valor", "in value")@(_filtered.Count > TetoTabela ? (_en ? $" · showing the {TetoTabela} largest" : $" · mostrando as {TetoTabela} maiores") : "")</span>
     <span class="st-line"></span>
-    <a class="btn-link" href="/oportunidades">Abrir listagem completa</a>
+    <a class="btn-link" href="/oportunidades">@T("Abrir listagem completa", "Open full list")</a>
 </div>
 <div class="c12" data-pnl="tabela-oportunidades">
-    <OpportunityTable Rows="_filteredSorted" CssClass="tbl-compact" Style="max-height:780px;overflow:auto" OnChanged="ReloadOpps" OnAbrirDetalhe="GuardarFiltros" />
+    <OpportunityTable Ingles="_en" Rows="_filteredSorted" CssClass="tbl-compact" Style="max-height:780px;overflow:auto" OnChanged="ReloadOpps" OnAbrirDetalhe="GuardarFiltros" />
 </div>
 
 @* ===================== 5 · EXECUTIVE ATTENTION ===================== *@
-<div class="section-head" data-pnl="sec-atencao"><span class="st-title">@Icons.Svg("alert", "nav-ico") Atenção executiva</span><span class="st-sub">sinais que exigem decisão da liderança</span><span class="st-line"></span></div>
+<div class="section-head" data-pnl="sec-atencao"><span class="st-title">@Icons.Svg("alert", "nav-ico") @T("Atenção executiva", "Executive attention")</span><span class="st-sub">@T("sinais que exigem decisão da liderança", "signals that require a leadership decision")</span><span class="st-line"></span></div>
 <div class="attn2" data-pnl="atencao">
     @foreach (var a in _attn)
     {
@@ -698,10 +737,10 @@
             <div class="attn-top">
                 <span class="attn-cat sev-@a.Sev">@Icons.Svg(a.Icon)@a.Category</span>
                 <details class="ctx">
-                    <summary title="Mais ações">@Icons.Svg("more")</summary>
+                    <summary title="@T("Mais ações", "More actions")">@Icons.Svg("more")</summary>
                     <div class="ctx-menu">
-                        @if (!string.IsNullOrEmpty(a.OppId)) { <a href="@($"/oportunidades/{a.OppId}")">Ver oportunidade</a> }
-                        <a href="/oportunidades">Abrir oportunidades</a>
+                        @if (!string.IsNullOrEmpty(a.OppId)) { <a href="@($"/oportunidades/{a.OppId}")">@T("Ver oportunidade", "View opportunity")</a> }
+                        <a href="/oportunidades">@T("Abrir oportunidades", "Open opportunities")</a>
                     </div>
                 </details>
             </div>
@@ -712,11 +751,11 @@
             <div class="attn-actions">
                 @if (!string.IsNullOrEmpty(a.OppId))
                 {
-                    <a class="btn-ghost" href="@($"/oportunidades/{a.OppId}")">Ver oportunidade</a>
+                    <a class="btn-ghost" href="@($"/oportunidades/{a.OppId}")">@T("Ver oportunidade", "View opportunity")</a>
                 }
                 else
                 {
-                    <a class="btn-ghost" href="/oportunidades">Ver oportunidades</a>
+                    <a class="btn-ghost" href="/oportunidades">@T("Ver oportunidades", "View opportunities")</a>
                 }
             </div>
         </div>
@@ -871,8 +910,18 @@
     private string _movePosName = "", _moveNegName = "";
 
     private double Rate => Cat.RateToUsd("USD");
-    private double Cv(double usd) => _currency == "BRL" ? usd * Rate : usd;
-    private string Money(double usd) => _sym + " " + Fmt.Compact(Cv(usd));
+    // taxa R$/US$ digitada ao lado de USD: em dólar, o valor que a página mostraria em R$ dividido por ela
+    private double? _taxaTela;
+    private double? TaxaTelaAtiva => _currency == "USD" && _taxaTela is > 0 ? _taxaTela : null;
+    /// <summary>Em USD com a taxa da tela: o US$ canônico (R$ ÷ taxa cadastrada) passa a R$ ÷ taxa da tela.</summary>
+    private double FatorTela => TaxaTelaAtiva is double t ? Rate / t : 1.0;
+    private void MudarTaxaTela(ChangeEventArgs e)
+    {
+        var t = (e.Value?.ToString() ?? "").Trim().Replace(",", ".");
+        _taxaTela = double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+    }
+    private double Cv(double usd) => _currency == "BRL" ? usd * Rate : usd * FatorTela;
+    private string Money(double usd) => _sym + " " + Compacto(Cv(usd));
     private static string Clamp(double v) => Math.Clamp(v, 3, 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
     private static string Share(double v, double total) => (total <= 0 ? 0 : Math.Round(v / total * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -893,12 +942,12 @@
     private bool TemRealizada => _repRealizada.Any(v => v > 0);
     private double FocoValor => TemRealizada ? _heroRealizada : _heroReal;
     private double OutroValor => TemRealizada ? _heroReal : _heroRealizada;
-    private string FocoNome => TemRealizada ? "Vendas realizadas" : "Vendas reportadas";
-    private string OutroNome => TemRealizada ? "Vendas reportadas" : "Vendas realizadas";
+    private string FocoNome => TemRealizada ? T("Vendas realizadas", "Actual sales") : T("Vendas reportadas", "Reported sales");
+    private string OutroNome => TemRealizada ? T("Vendas reportadas", "Reported sales") : T("Vendas realizadas", "Actual sales");
 
     // Conversão de valores em R$ (REPORT HSA é nativo em R$) respeitando o toggle.
-    private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(Rate, 0.0001);
-    private string MoneyBrl(double brl) => _sym + " " + Fmt.Compact(CvBrl(brl));
+    private double CvBrl(double brl) => _currency == "BRL" ? brl : brl / Math.Max(TaxaTelaAtiva ?? Rate, 0.0001);
+    private string MoneyBrl(double brl) => _sym + " " + Compacto(CvBrl(brl));
 
     // Métrica exibida nos gráficos, conforme o seletor "Filtrar por":
     // "conv" = Chance de conversão (Net Value × %ganho × %sair); senão Valor total.
@@ -906,7 +955,7 @@
     // total em R$ (Money → × Rate) reproduz exatamente o Net Value somado na aba
     // Oportunidades, sem a distorção do câmbio por linha (Net Value ÷ taxa da linha).
     private double Metric(Opportunity o) => MetricBrl(o, _valMetric) / Math.Max(Rate, 0.0001);
-    private string MetricLabel => _valMetric == "conv" ? "chance de conversão" : "valor total";
+    private string MetricLabel => _valMetric == "conv" ? T("chance de conversão", "conversion likelihood") : T("valor total", "total value");
 
     // Agrupa oportunidades pelo VALOR real de um campo (não pelo catálogo),
     // somando a métrica ativa; rótulo via função de nome (com fallback ao texto cru).
@@ -1111,6 +1160,44 @@
 
     // ---- gráficos de barras: ordem (arraste) e espessura, por usuário --------
     private string _login = "";
+
+    // ---- idioma da tela (botão PT/EN ao lado da moeda; guardado por login) ----
+    private bool _en;
+    private const string ChaveIdioma = "visao_executiva_idioma";
+    /// <summary>O texto no idioma da tela: T("Vendas realizadas", "Actual sales").</summary>
+    private string T(string pt, string en) => _en ? en : pt;
+    private static readonly System.Globalization.CultureInfo EnUs = new("en-US");
+    // Formatação no idioma da tela: em português delega ao Fmt (saída idêntica à de
+    // sempre); em inglês usa en-US e as unidades M/B/K.
+    private System.Globalization.CultureInfo CulturaTela => _en ? EnUs : _pt;
+    /// <summary>Número compacto sem símbolo: "212,9 mi" / "212.9M", "850 mil" / "850K", "1.06B".</summary>
+    private string Compacto(double v)
+    {
+        if (!_en) return Fmt.Compact(v);
+        var a = Math.Abs(v);
+        if (a >= 1_000_000_000) return (v / 1_000_000_000).ToString("#,##0.0#", EnUs) + "B";
+        if (a >= 1_000_000) return (v / 1_000_000).ToString("0.0", EnUs) + "M";
+        if (a >= 1_000) return Math.Round(v / 1_000).ToString("#,##0", EnUs) + "K";
+        return v.ToString("#,##0", EnUs);
+    }
+    /// <summary>Percentual: "43,6%" / "43.6%".</summary>
+    private string PctTxt(double v, int dec = 0) =>
+        _en ? v.ToString("0." + new string('0', dec), EnUs) + "%" : Fmt.Pct(v, dec);
+    /// <summary>Variação com sinal: "+4,2%" / "+4.2%".</summary>
+    private string SinalTxt(double v) =>
+        _en ? (v >= 0 ? "+" : "") + v.ToString("0.0", EnUs) + "%" : Fmt.Signed(v);
+    /// <summary>Mês abreviado dos eixos: "FEV" / "FEB".</summary>
+    private string MesNome(int m) => !_en ? Fmt.MonthName(m)
+        : m is >= 1 and <= 12 ? EnUs.DateTimeFormat.GetAbbreviatedMonthName(m).ToUpperInvariant().TrimEnd('.') : "—";
+    /// <summary>Mês por extenso (só exibição; os valores do filtro de mês seguem em português): "Fevereiro" / "February".</summary>
+    private string MesLongo(int m) => !_en ? Fmt.MonthLong(m)
+        : m is >= 1 and <= 12 ? EnUs.DateTimeFormat.GetMonthName(m) : "—";
+    private void MudarIdioma(bool en)
+    {
+        if (_en == en) return;
+        _en = en;
+        if (_login != "") { try { ChartPrefs.Save(_login, ChaveIdioma, en ? "en" : "pt", ChartPrefsRepository.BarraPadrao); } catch { } }
+    }
     private int _chartVersion = -1;
     private readonly Dictionary<string, ChartPrefsRepository.Pref> _chart = new(StringComparer.OrdinalIgnoreCase);
 
@@ -1145,6 +1232,7 @@
         builder.AddAttribute(1, "Barra", Pref(chave).Barra);
         builder.AddAttribute(2, "OnBarra", EventCallback.Factory.Create<int>(this, px => AjustarBarra(chave, px)));
         builder.AddAttribute(3, "OnReset", EventCallback.Factory.Create(this, () => ResetChart(chave)));
+        builder.AddAttribute(4, "Ingles", _en);
         builder.CloseComponent();
     };
 
@@ -1193,6 +1281,7 @@
                      ?? user.Identity?.Name ?? "";
             _chart.Clear();          // o 1º render acontece antes daqui: recarrega já com o login
         }
+        _en = _login != "" && ChartPrefs.Get(_login, ChaveIdioma).Ordem == "en";   // idioma guardado por login
         RestaurarFiltros();
         _opps = LoadScoped();
         LoadReport();
@@ -1201,7 +1290,7 @@
     // Oportunidades recortadas pela carteira permitida do login (controle de acesso).
     // Exclui as que viraram "venda indicada" (movidas para o Controle).
     private List<Opportunity> LoadScoped() =>
-        Repo.All().Where(o => !o.MovidaControleValue).Where(o => _scope.CanSee(o, KeyKam(o))).ToList();
+        Repo.Unicas().Where(o => !o.MovidaControleValue).Where(o => _scope.CanSee(o, KeyKam(o))).ToList();   // número repetido conta uma vez
 
     // Inicializa (idempotente) o mapa interativo depois de renderizar. Passa a
     // referência do componente para o mapa poder disparar o cross-filter ao clicar.
@@ -1378,7 +1467,8 @@
         }
         sb.Append(_search).Append('|').Append(_onlyIndicated).Append('|').Append(_semOtp).Append('|').Append(_overdue).Append('|')
           .Append(_onlyLost).Append('|').Append(_onlyAltered).Append('|')
-          .Append(_currency).Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
+          .Append(_en ? "en" : "pt").Append('|')   // os gráficos montados em texto (SVG/HTML) são refeitos no idioma novo
+          .Append(_currency).Append('|').Append(TaxaTelaAtiva?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "").Append('|').Append(_chartMode).Append('|').Append(_valMetric).Append('|')
           .Append(_valMin).Append('|').Append(_valMax).Append('|')
           // Identidade dos dados: recarga da base ou edição numa linha invalidam.
           .Append(_opps.Count).Append('|').Append(Repo.LoadedAt.Ticks);
@@ -1519,7 +1609,7 @@
         _remainingTarget = Math.Max(_tgtYear - realizedYear, 1);
         _eligiblePipeline = open.Where(o => o.Category is ForecastCategory.Commit or ForecastCategory.BestCase or ForecastCategory.Pipeline).Sum(W);
         _coverage = ForecastCalc.Coverage(_eligiblePipeline, _remainingTarget);
-        _coverageLabel = _coverage.ToString("0.0", _pt) + "x";
+        _coverageLabel = _coverage.ToString("0.0", CulturaTela) + "x";
         _gapYear = ForecastCalc.Gap(_tgtYear, realizedYear, _fcYear);
 
         var risky = open.Where(o => ForecastCalc.Level(o, _today) is RiskLevel.Alto or RiskLevel.Critico).ToList();
@@ -1537,20 +1627,21 @@
         BuildHealth(open);
 
         // Composição por FAIXA DE % DE GANHO (win probability).
-        var bands = new (string Band, string Color, double Lo, double Hi)[]
+        var bands = new (string Band, string BandEn, string Color, double Lo, double Hi)[]
         {
-            ("Muito alta", "#1f9254", 85, 101),
-            ("Alta", "#1665a8", 70, 85),
-            ("Média", "#b7791f", 45, 70),
-            ("Baixa", "#64748b", 0, 45),
+            ("Muito alta", "Very high", "#1f9254", 85, 101),
+            ("Alta", "High", "#1665a8", 70, 85),
+            ("Média", "Medium", "#b7791f", 45, 70),
+            ("Baixa", "Low", "#64748b", 0, 45),
         };
         var compRaw = bands.Select(b =>
         {
             var items = open.Where(o => { var c = o.WinProbabilityValue; return c >= b.Lo && c < b.Hi; }).ToList();
-            return (b.Band, b.Color, Value: items.Sum(Metric), Count: items.Count);
+            return (b.Band, b.BandEn, b.Color, Value: items.Sum(Metric), Count: items.Count);
         }).ToList();
         _compTotal = Math.Max(compRaw.Sum(x => x.Value), 1);
-        _comp = compRaw.Select(x => new CompRow(x.Band, x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
+        // A tendência segue calculada sobre o nome em português (mesmo número nos dois idiomas).
+        _comp = compRaw.Select(x => new CompRow(T(x.Band, x.BandEn), x.Color, x.Value, x.Count, x.Value / _compTotal * 100, PseudoTrend(x.Band, 6))).ToList();
 
         // Distribuição da carteira — agrupa pelos VALORES reais dos campos das
         // oportunidades (com nome do catálogo quando houver), não iterando o
@@ -1603,10 +1694,10 @@
                 var f = g.Sum(Metric);
                 var t = Cat.TargetYear(_year, "kam", g.First().KamId ?? "");
                 var cov = t > 0 ? f / t : 0;
-                var (st, css) = t <= 0 ? ("Sem meta", "st-neutral")
-                    : cov >= 1 ? ("Dentro da meta", "st-pos")
-                    : cov >= 0.75 ? ("Atenção", "st-warn")
-                    : ("Abaixo da meta", "st-neg");
+                var (st, css) = t <= 0 ? (T("Sem meta", "No target"), "st-neutral")
+                    : cov >= 1 ? (T("Dentro da meta", "On target"), "st-pos")
+                    : cov >= 0.75 ? (T("Atenção", "Attention"), "st-warn")
+                    : (T("Abaixo da meta", "Below target"), "st-neg");
                 return new KamRow(name, f, t, t - f, cov, st, css);
             })
             .Where(x => x.Forecast > 0).OrderByDescending(x => x.Forecast).ToList();
@@ -1643,15 +1734,15 @@
 
         _healthMetrics = new()
         {
-            new("Precisão da previsão", accuracy),
-            new("Qualidade dos dados", _dq),
-            new("Cobertura de pipeline", coverageScore),
-            new("Saúde da margem", marginScore),
-            new("Exposição ao risco", riskScore),
-            new("Disciplina de atualização", discipline),
+            new(T("Precisão da previsão", "Forecast accuracy"), accuracy),
+            new(T("Qualidade dos dados", "Data quality"), _dq),
+            new(T("Cobertura de pipeline", "Pipeline coverage"), coverageScore),
+            new(T("Saúde da margem", "Margin health"), marginScore),
+            new(T("Exposição ao risco", "Risk exposure"), riskScore),
+            new(T("Disciplina de atualização", "Update discipline"), discipline),
         };
         _health = (int)Math.Round(accuracy * 0.2 + _dq * 0.15 + coverageScore * 0.2 + marginScore * 0.15 + riskScore * 0.15 + discipline * 0.15);
-        _healthLabel = _health >= 85 ? "Saudável" : _health >= 70 ? "Atenção" : "Em risco";
+        _healthLabel = _health >= 85 ? T("Saudável", "Healthy") : _health >= 70 ? T("Atenção", "Attention") : T("Em risco", "At risk");
         _confidence = (accuracy + discipline) / 2;
     }
 
@@ -1674,14 +1765,14 @@
         var b = _pipelineWeighted;
         _waterfall = new()
         {
-            new("Anterior", b * 0.94, true),
-            new("Novas oport.", b * 0.10, false),
-            new("+ Valor", b * 0.05, false),
+            new(T("Anterior", "Previous"), b * 0.94, true),
+            new(T("Novas oport.", "New opps."), b * 0.10, false),
+            new(T("+ Valor", "+ Value"), b * 0.05, false),
             new("+ Prob.", b * 0.04, false),
             new("− Prob.", -b * 0.04, false),
-            new("Postergadas", -b * 0.05, false),
-            new("Perdidas", -b * 0.04, false),
-            new("Atual", b, true),
+            new(T("Postergadas", "Postponed"), -b * 0.05, false),
+            new(T("Perdidas", "Lost"), -b * 0.04, false),
+            new(T("Atual", "Current"), b, true),
         };
         _moveNet = b - b * 0.94;
         var deltas = _waterfall.Where(x => !x.Total).ToList();
@@ -1695,23 +1786,27 @@
 
         var marginGap = 30 - _gmAvg;
         if (marginGap > 0)
-            _insights.Add(new("Margem", "warn",
-                "Margem prevista abaixo da meta",
-                $"A margem estimada está {marginGap.ToString("0.0", _pt)} p.p. abaixo do objetivo de 30%.",
-                $"-{marginGap.ToString("0.0", _pt)} p.p.", "Revisar preços e condições comerciais", "/oportunidades"));
+            _insights.Add(new(T("Margem", "Margin"), "warn",
+                T("Margem prevista abaixo da meta", "Forecast margin below target"),
+                T($"A margem estimada está {marginGap.ToString("0.0", _pt)} p.p. abaixo do objetivo de 30%.",
+                  $"The estimated margin is {marginGap.ToString("0.0", EnUs)} pp below the 30% goal."),
+                T($"-{marginGap.ToString("0.0", _pt)} p.p.", $"-{marginGap.ToString("0.0", EnUs)} pp"),
+                T("Revisar preços e condições comerciais", "Review pricing and commercial terms"), "/oportunidades"));
 
         var staleCommit = opps.Count(o => o.Category == ForecastCategory.Commit && ForecastCalc.DaysSinceUpdate(o, _today) > 30);
         if (staleCommit > 0)
-            _insights.Add(new("Risco", "neg",
-                "Comprometido sem atualização recente",
-                $"{staleCommit} oportunidade(s) em Comprometido sem atualização há mais de 30 dias.",
-                staleCommit.ToString(), "Validar na revisão comercial", "/oportunidades"));
+            _insights.Add(new(T("Risco", "Risk"), "neg",
+                T("Comprometido sem atualização recente", "Commit with no recent update"),
+                T($"{staleCommit} oportunidade(s) em Comprometido sem atualização há mais de 30 dias.",
+                  $"{staleCommit} opportunity(ies) in Commit with no update for more than 30 days."),
+                staleCommit.ToString(), T("Validar na revisão comercial", "Validate in the commercial review"), "/oportunidades"));
 
         if (_coverage < 3.5)
             _insights.Add(new("Pipeline", "warn",
-                "Cobertura de pipeline abaixo do ideal",
-                $"A cobertura ({_coverageLabel}) está abaixo do nível ideal de 3,5x para o próximo trimestre.",
-                _coverageLabel, "Gerar novo pipeline", "/oportunidades"));
+                T("Cobertura de pipeline abaixo do ideal", "Pipeline coverage below ideal"),
+                T($"A cobertura ({_coverageLabel}) está abaixo do nível ideal de 3,5x para o próximo trimestre.",
+                  $"Coverage ({_coverageLabel}) is below the ideal level of 3.5x for the next quarter."),
+                _coverageLabel, T("Gerar novo pipeline", "Generate new pipeline"), "/oportunidades"));
     }
 
     private void BuildAttention(List<Opportunity> opps, List<Opportunity> open, List<Opportunity> risky)
@@ -1721,40 +1816,53 @@
 
         var bigRisk = risky.OrderByDescending(o => o.AmountUsd).FirstOrDefault();
         if (bigRisk != null)
-            _attn.Add(new("Risco crítico", "neg", "alert", bigRisk.Name, Meta(bigRisk), Money(bigRisk.AmountUsd),
-                $"Sem interação recente e com probabilidade em {bigRisk.WinProbabilityValue:0}% · risco {RiskLevels.Label(ForecastCalc.Level(bigRisk, _today))}.",
-                "Agendar acompanhamento executivo.", bigRisk.Id));
+            _attn.Add(new(T("Risco crítico", "Critical risk"), "neg", "alert", bigRisk.Name, Meta(bigRisk), Money(bigRisk.AmountUsd),
+                T($"Sem interação recente e com probabilidade em {bigRisk.WinProbabilityValue:0}% · risco {RiskLevels.Label(ForecastCalc.Level(bigRisk, _today))}.",
+                  $"No recent interaction and probability at {bigRisk.WinProbabilityValue:0}% · {RiscoEn(ForecastCalc.Level(bigRisk, _today))} risk."),
+                T("Agendar acompanhamento executivo.", "Schedule an executive follow-up."), bigRisk.Id));
 
         var upside = open.Where(o => o.Category is ForecastCategory.Upside or ForecastCategory.BestCase && o.WinProbabilityValue < 60)
             .OrderByDescending(o => o.AmountUsd).FirstOrDefault();
         if (upside != null)
-            _attn.Add(new("Maior oportunidade adicional", "pos", "trend", upside.Name, Meta(upside), Money(upside.AmountUsd),
-                $"Potencial adicional relevante com probabilidade em {upside.WinProbabilityValue:0}%.",
-                "Priorizar recursos técnicos e comerciais.", upside.Id));
+            _attn.Add(new(T("Maior oportunidade adicional", "Largest upside opportunity"), "pos", "trend", upside.Name, Meta(upside), Money(upside.AmountUsd),
+                T($"Potencial adicional relevante com probabilidade em {upside.WinProbabilityValue:0}%.",
+                  $"Relevant additional potential with probability at {upside.WinProbabilityValue:0}%."),
+                T("Priorizar recursos técnicos e comerciais.", "Prioritize technical and commercial resources."), upside.Id));
 
         var stale = open.Where(o => ForecastCalc.DaysSinceUpdate(o, _today) >= 30).OrderByDescending(o => o.AmountUsd).FirstOrDefault();
         if (stale != null)
-            _attn.Add(new("Sem atualização", "warn", "clock", stale.Name, Meta(stale), Money(stale.AmountUsd),
-                $"Sem atualização há {ForecastCalc.DaysSinceUpdate(stale, _today)} dias.",
-                "Solicitar atualização de status ao KAM.", stale.Id));
+            _attn.Add(new(T("Sem atualização", "No update"), "warn", "clock", stale.Name, Meta(stale), Money(stale.AmountUsd),
+                T($"Sem atualização há {ForecastCalc.DaysSinceUpdate(stale, _today)} dias.",
+                  $"No update for {ForecastCalc.DaysSinceUpdate(stale, _today)} days."),
+                T("Solicitar atualização de status ao KAM.", "Ask the KAM for a status update."), stale.Id));
 
         var noAction = open.Where(o => string.IsNullOrWhiteSpace(o.NextAction)).OrderByDescending(o => o.AmountUsd).FirstOrDefault();
         if (noAction != null)
-            _attn.Add(new("Sem próxima ação", "info", "flag", noAction.Name, Meta(noAction), Money(noAction.AmountUsd),
-                "Oportunidade prevista sem próxima ação definida.",
-                "Definir e agendar a próxima ação comercial.", noAction.Id));
+            _attn.Add(new(T("Sem próxima ação", "No next action"), "info", "flag", noAction.Name, Meta(noAction), Money(noAction.AmountUsd),
+                T("Oportunidade prevista sem próxima ação definida.", "Forecast opportunity with no next action defined."),
+                T("Definir e agendar a próxima ação comercial.", "Define and schedule the next commercial action."), noAction.Id));
 
         var lowMargin = open.Where(o => o.GmPercentValue < 18).OrderByDescending(o => o.AmountUsd).FirstOrDefault();
         if (lowMargin != null)
-            _attn.Add(new("Margem baixa", "neg", "dollar", lowMargin.Name, Meta(lowMargin), Money(lowMargin.AmountUsd),
-                $"Margem em {lowMargin.GmPercentValue:0}%, abaixo do limite mínimo.",
-                "Revisar escopo e precificação antes de avançar.", lowMargin.Id));
+            _attn.Add(new(T("Margem baixa", "Low margin"), "neg", "dollar", lowMargin.Name, Meta(lowMargin), Money(lowMargin.AmountUsd),
+                T($"Margem em {lowMargin.GmPercentValue:0}%, abaixo do limite mínimo.",
+                  $"Margin at {lowMargin.GmPercentValue:0}%, below the minimum threshold."),
+                T("Revisar escopo e precificação antes de avançar.", "Review scope and pricing before moving forward."), lowMargin.Id));
 
         if (_concentration > 0.30)
-            _attn.Add(new("Concentração", "warn", "layers", "Concentração excessiva de pipeline", $"Maior cliente: {_topCustomer}", Fmt.Pct(_concentration * 100),
-                $"{Fmt.Pct(_concentration * 100)} do pipeline aberto está em um único cliente.",
-                "Ampliar cobertura para outros clientes/mercados.", ""));
+            _attn.Add(new(T("Concentração", "Concentration"), "warn", "layers", T("Concentração excessiva de pipeline", "Excessive pipeline concentration"),
+                T($"Maior cliente: {_topCustomer}", $"Largest customer: {_topCustomer}"), PctTxt(_concentration * 100),
+                T($"{PctTxt(_concentration * 100)} do pipeline aberto está em um único cliente.",
+                  $"{PctTxt(_concentration * 100)} of the open pipeline is in a single customer."),
+                T("Ampliar cobertura para outros clientes/mercados.", "Expand coverage to other customers/markets."), ""));
     }
+
+    // Nível de risco em inglês (RiskLevels.Label é só português).
+    private static string RiscoEn(RiskLevel r) => r switch
+    {
+        RiskLevel.Baixo => "low", RiskLevel.Moderado => "moderate", RiskLevel.Alto => "high", RiskLevel.Critico => "critical",
+        _ => r.ToString(),
+    };
 
     private static string SevColor(string sev) => sev switch
     {
@@ -1794,7 +1902,7 @@
         double Y(double v) => bot - v / max * (bot - top);
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Previsão x Meta x Realizado'>");
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{T("Previsão x Meta x Realizado", "Forecast x Target x Actual")}'>");
         for (var g = 1; g <= 3; g++) { var gy = top + (bot - top) * g / 4.0; sb.Append($"<line x1='{left}' y1='{gy.ToString("0.#", inv)}' x2='{Wd}' y2='{gy.ToString("0.#", inv)}' stroke='#f0f3f8'/>"); }
         sb.Append($"<line x1='{left}' y1='{bot.ToString(inv)}' x2='{Wd}' y2='{bot.ToString(inv)}' stroke='#e3e9f2'/>");
 
@@ -1808,7 +1916,7 @@
             double cx = left + m * colW + colW / 2;
             double bw = colW * 0.58;
             double realTop = Y(real[m]); double fcTop = Y(real[m] + fc[m]);
-            var tip = $"{Fmt.MonthName(m + 1)} · Realizado {_sym} {Fmt.Compact(real[m])} · Previsão {_sym} {Fmt.Compact(fc[m])} · Meta {_sym} {Fmt.Compact(tgt[m])}";
+            var tip = $"{MesNome(m + 1)} · {T("Realizado", "Actual")} {_sym} {Compacto(real[m])} · {T("Previsão", "Forecast")} {_sym} {Compacto(fc[m])} · {T("Meta", "Target")} {_sym} {Compacto(tgt[m])}";
             sb.Append($"<g><title>{tip}</title>");
             if (real[m] > 0) sb.Append($"<rect x='{(cx - bw / 2).ToString("0.#", inv)}' y='{realTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(bot - realTop).ToString("0.#", inv)}' fill='#0b4f8a' rx='1.5'/>");
             if (fc[m] > 0) sb.Append($"<rect x='{(cx - bw / 2).ToString("0.#", inv)}' y='{fcTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(realTop - fcTop).ToString("0.#", inv)}' fill='#6ba7d6' rx='1.5'/>");
@@ -1818,7 +1926,7 @@
             cumPts.Add($"{cx.ToString("0.#", inv)},{Y(Cv(_mCumul[m])).ToString("0.#", inv)}");
             var lblColor = (m + 1) == _month ? "#0b4f8a" : "#93a1b5";
             var lblWeight = (m + 1) == _month ? "700" : "400";
-            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{lblWeight}' fill='{lblColor}'>{Fmt.MonthName(m + 1)}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{lblWeight}' fill='{lblColor}'>{MesNome(m + 1)}</text>");
         }
         // acumulado (linha cheia até o mês atual, pontilhada na projeção futura)
         var past = cumPts.Take(_month).ToList();
@@ -1849,7 +1957,7 @@
         double Y(double val) => bot - val / max * (bot - top);
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Previsão mensal'>");
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{T("Previsão mensal", "Monthly forecast")}'>");
 
         // gradiente da área
         sb.Append("<defs><linearGradient id='mlarea' x1='0' y1='0' x2='0' y2='1'>");
@@ -1886,10 +1994,10 @@
             sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{cy.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='#007A9E' stroke-width='{(cur ? "3" : "2")}'/>");
             var lblColor = cur ? "#0b4f6f" : "#5b6b82";
             var lblWeight = cur ? "700" : "500";
-            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(cy - 10).ToString("0.#", inv)}' text-anchor='middle' font-size='9.5' font-weight='{lblWeight}' fill='{lblColor}'>{Fmt.Compact(v[m])}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(cy - 10).ToString("0.#", inv)}' text-anchor='middle' font-size='9.5' font-weight='{lblWeight}' fill='{lblColor}'>{Compacto(v[m])}</text>");
             var mColor = cur ? "#007A9E" : "#93a1b5";
             var mWeight = cur ? "700" : "400";
-            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 8).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{mWeight}' fill='{mColor}'>{Fmt.MonthName(m + 1)}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 8).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{mWeight}' fill='{mColor}'>{MesNome(m + 1)}</text>");
         }
 
         sb.Append("</svg>");
@@ -1921,11 +2029,11 @@
         var outraSerie = foco ? _repReal : _repRealizada;
         var cFoco = foco ? cVreal : cReal;
         var cOutra = foco ? cReal : cVreal;
-        var nomeFoco = foco ? "Vendas realizadas" : "Vendas reportadas";
-        var nomeOutra = foco ? "Vendas reportadas" : "Vendas realizadas";
+        var nomeFoco = foco ? T("Vendas realizadas", "Actual sales") : T("Vendas reportadas", "Reported sales");
+        var nomeOutra = foco ? T("Vendas reportadas", "Reported sales") : T("Vendas realizadas", "Actual sales");
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Vendas x Meta NB+AFM'>");
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{T("Vendas x Meta NB+AFM", "Sales x Target NB+AFM")}'>");
 
         sb.Append("<defs><linearGradient id='rlarea' x1='0' y1='0' x2='0' y2='1'>");
         sb.Append($"<stop offset='0%' stop-color='{cFoco}' stop-opacity='0.24'/><stop offset='100%' stop-color='{cFoco}' stop-opacity='0.02'/>");
@@ -1940,15 +2048,15 @@
         }
         Legenda(0, cFoco, "", nomeFoco);
         Legenda(160, cOutra, "", nomeOutra);
-        Legenda(325, cMeta, "5 3", "Meta NB+AFM");
-        Legenda(460, cMhsa, "2 3", "Meta Vendas HSA");
+        Legenda(325, cMeta, "5 3", T("Meta NB+AFM", "Target NB+AFM"));
+        Legenda(460, cMhsa, "2 3", T("Meta Vendas HSA", "HSA Sales Target"));
 
         // grade + rótulos do eixo Y
         for (var g = 0; g <= 4; g++)
         {
             double gy = top + (bot - top) * g / 4.0, gv = max * (4 - g) / 4.0;
             sb.Append($"<line x1='{left.ToString(inv)}' y1='{gy.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{gy.ToString("0.#", inv)}' stroke='#eef2f7'/>");
-            sb.Append($"<text x='{(left - 6).ToString(inv)}' y='{(gy + 3).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(Fmt.Compact(gv))}</text>");
+            sb.Append($"<text x='{(left - 6).ToString(inv)}' y='{(gy + 3).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#93a1b5'>{Esc(Compacto(gv))}</text>");
         }
 
         // destaque do mês atual
@@ -1985,10 +2093,10 @@
             double cx = X(m), yf = Y(focoSerie[m]), yo = Y(outraSerie[m]), ym = Y(_repMeta[m]), yh = Y(_repMetaHsa[m]);
             bool cur = (m + 1) == _month;
             double att = _repMeta[m] > 0 && focoSerie[m] > 0 ? focoSerie[m] / _repMeta[m] * 100 : 0;
-            var tip = $"{Fmt.MonthName(m + 1)} · {nomeFoco} R$ {Fmt.Compact(focoSerie[m])}"
-                    + (outraSerie[m] > 0 ? $" · {nomeOutra} R$ {Fmt.Compact(outraSerie[m])}" : "")
-                    + $" · Meta R$ {Fmt.Compact(_repMeta[m])} · Meta HSA R$ {Fmt.Compact(_repMetaHsa[m])}"
-                    + (att > 0 ? $" · {Fmt.Pct(att)}" : "");
+            var tip = $"{MesNome(m + 1)} · {nomeFoco} R$ {Compacto(focoSerie[m])}"
+                    + (outraSerie[m] > 0 ? $" · {nomeOutra} R$ {Compacto(outraSerie[m])}" : "")
+                    + $" · {T("Meta", "Target")} R$ {Compacto(_repMeta[m])} · {T("Meta HSA", "HSA target")} R$ {Compacto(_repMetaHsa[m])}"
+                    + (att > 0 ? $" · {PctTxt(att)}" : "");
 
             if (_repMetaHsa[m] > 0) sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yh.ToString("0.#", inv)}' r='2.5' fill='{cMhsa}'><title>{Esc(tip)}</title></circle>");
             if (outraSerie[m] > 0) sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yo.ToString("0.#", inv)}' r='2.5' fill='{cOutra}'><title>{Esc(tip)}</title></circle>");
@@ -1996,8 +2104,8 @@
             sb.Append($"<circle cx='{cx.ToString("0.#", inv)}' cy='{yf.ToString("0.#", inv)}' r='{(cur ? "4.5" : "3")}' fill='#fff' stroke='{cFoco}' stroke-width='{(cur ? "3" : "2")}'><title>{Esc(tip)}</title></circle>");
             // O valor escrito acima do ponto é o do número em foco.
             if (focoSerie[m] > 0)
-                sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(yf - 9).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? "#0b4f6f" : "#5b6b82")}'>{Esc(Fmt.Compact(focoSerie[m]))}</text>");
-            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 7).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? cFoco : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
+                sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(yf - 9).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='{(cur ? "#0b4f6f" : "#5b6b82")}'>{Esc(Compacto(focoSerie[m]))}</text>");
+            sb.Append($"<text x='{cx.ToString("0.#", inv)}' y='{(H - 7).ToString(inv)}' text-anchor='middle' font-size='9.5' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? cFoco : "#93a1b5")}'>{MesNome(m + 1)}</text>");
         }
 
         sb.Append("</svg>");
@@ -2052,7 +2160,7 @@
         double maxV = byName.Count > 0 ? byName.Values.Max() : 1;
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='Distribuição por país'>");
+        sb.Append($"<svg viewBox='0 0 {F(WorldMap.ViewW)} {F(WorldMap.ViewH)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{T("Distribuição por país", "Distribution by country")}'>");
         sb.Append($"<rect x='0' y='0' width='{F(WorldMap.ViewW)}' height='{F(WorldMap.ViewH)}' fill='#f7fafc'/>");
         foreach (var (name, d) in WorldMap.Paths)
         {
@@ -2061,7 +2169,7 @@
             var label = mapToLabel.TryGetValue(name, out var lb) ? lb : "";
             var active = label != "" && _countries.Contains(label);
             var data = has
-                ? $" data-value='{Esc(Money(v))}' data-pct='{Esc(Fmt.Pct(v / Math.Max(_countryTotal, 1) * 100))}' data-metric='{Esc(MetricLabel)}' data-xf-val='{Esc(label)}'"
+                ? $" data-value='{Esc(Money(v))}' data-pct='{Esc(PctTxt(v / Math.Max(_countryTotal, 1) * 100))}' data-metric='{Esc(MetricLabel)}' data-xf-val='{Esc(label)}'"
                 : "";
             var cls = "wm-path" + (active ? " wm-active" : "");
             sb.Append($"<path d='{d}' fill='{fill}' stroke='{(active ? "#0b4f6f" : "#cdd8e4")}' stroke-width='{(active ? "1.1" : "0.4")}' data-country='{Esc(name)}'{data} class='{cls}'/>");
@@ -2071,7 +2179,7 @@
         {
             if (!WorldMap.Centroids.TryGetValue(kv.Key, out var pos)) continue;
             bool dark = (maxV > 0 ? kv.Value / maxV : 0) > 0.5;
-            sb.Append($"<text x='{F(pos.X)}' y='{F(pos.Y + 3)}' text-anchor='middle' font-size='9' font-weight='700' fill='{(dark ? "#fff" : "#1e2836")}'>{Esc(Fmt.Compact(Cv(kv.Value)))}</text>");
+            sb.Append($"<text x='{F(pos.X)}' y='{F(pos.Y + 3)}' text-anchor='middle' font-size='9' font-weight='700' fill='{(dark ? "#fff" : "#1e2836")}'>{Esc(Compacto(Cv(kv.Value)))}</text>");
         }
         sb.Append("</svg>");
         builder.AddMarkupContent(0, sb.ToString());
@@ -2094,7 +2202,7 @@
 
         var sb = new System.Text.StringBuilder();
         sb.Append("<div class='donut-wrap'>");
-        sb.Append("<svg viewBox='0 0 128 128' class='donut-svg' role='img' aria-label='Distribuição'>");
+        sb.Append($"<svg viewBox='0 0 128 128' class='donut-svg' role='img' aria-label='{T("Distribuição", "Distribution")}'>");
         sb.Append($"<circle cx='{cx}' cy='{cy}' r='{r.ToString(inv)}' fill='none' stroke='#eef2f7' stroke-width='{sw.ToString(inv)}'/>");
         double off = 0;
         for (var i = 0; i < data.Count; i++)
@@ -2107,7 +2215,7 @@
             off += dash;
         }
         sb.Append($"<text x='{cx}' y='{(cy - 6).ToString(inv)}' text-anchor='middle' font-size='7.5' letter-spacing='.4' fill='#8a97a8'>TOTAL</text>");
-        sb.Append($"<text x='{cx}' y='{(cy + 5).ToString(inv)}' text-anchor='middle' font-size='13.5' font-weight='800' fill='#0f2038'>{Fmt.Compact(total)}</text>");
+        sb.Append($"<text x='{cx}' y='{(cy + 5).ToString(inv)}' text-anchor='middle' font-size='13.5' font-weight='800' fill='#0f2038'>{Compacto(total)}</text>");
         sb.Append($"<text x='{cx}' y='{(cy + 15).ToString(inv)}' text-anchor='middle' font-size='7.5' font-weight='700' fill='#5b6b82'>{_sym}</text>");
         sb.Append("</svg>");
 
@@ -2116,14 +2224,14 @@
         {
             double val = Cv(data[i].Value);
             var col = PieColors[i % PieColors.Length];
-            sb.Append($"<li><span class='dl-dot' style='background:{col}'></span><span class='dl-name'>{Esc(data[i].Label)}</span><span class='dl-val'>{_sym} {Fmt.Compact(val)}</span><span class='dl-pct'>{Fmt.Pct(val / total * 100)}</span></li>");
+            sb.Append($"<li><span class='dl-dot' style='background:{col}'></span><span class='dl-name'>{Esc(data[i].Label)}</span><span class='dl-val'>{_sym} {Compacto(val)}</span><span class='dl-pct'>{PctTxt(val / total * 100)}</span></li>");
         }
         sb.Append("</ul></div>");
         builder.AddMarkupContent(0, sb.ToString());
     };
 
     private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) ? "" : (s.Length <= n ? s : s.Substring(0, n - 1) + "…");
-    private string CompactBrl(double brl) => Fmt.Compact(CvBrl(brl));
+    private string CompactBrl(double brl) => Compacto(CvBrl(brl));
 
     // ---- Gráficos do funil (base nova) · todos com cross-filter (data-xf-*) ----
 
@@ -2131,7 +2239,7 @@
     private RenderFragment RenderXfLine(IReadOnlyList<SliceRow> data, string dim, int topN) => builder =>
     {
         var d = (topN > 0 ? data.Take(topN) : data).ToList();
-        if (d.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
+        if (d.Count == 0) { builder.AddMarkupContent(0, $"<div class='empty'>{T("Sem dados no recorte.", "No data in the current selection.")}</div>"); return; }
         double W = 720, H = 250, top = 24, bot = 205, left = 20, right = 16;
         double plotW = W - left - right, colW = d.Count > 1 ? plotW / (d.Count - 1) : plotW;
         double max = Math.Max(d.Max(x => CvBrl(x.Value)), 1) * 1.18;
@@ -2164,7 +2272,7 @@
     private RenderFragment RenderDonutRing(IReadOnlyList<SliceRow> data, string dim) => builder =>
     {
         var d = data.Where(x => x.Value > 0).ToList();
-        if (d.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados</div>"); return; }
+        if (d.Count == 0) { builder.AddMarkupContent(0, $"<div class='empty'>{T("Sem dados", "No data")}</div>"); return; }
         double total = Math.Max(d.Sum(x => x.Value), 1);
         double cx = 80, cy = 80, r = 62, sw = 22, C = 2 * Math.PI * r, off = 0;
         var sb = new System.Text.StringBuilder();
@@ -2184,7 +2292,7 @@
     // Colunas por mês (Close Date). Cada coluna é clicável (filtra o mês).
     private RenderFragment RenderXfColumns(double[] m) => builder =>
     {
-        if (m.All(v => v <= 0)) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
+        if (m.All(v => v <= 0)) { builder.AddMarkupContent(0, $"<div class='empty'>{T("Sem dados no recorte.", "No data in the current selection.")}</div>"); return; }
         double W = 720, H = 250, top = 22, bot = 205, left = 14, right = 14;
         double plotW = W - left - right, colW = plotW / 12.0;
         double max = Math.Max(m.Select(CvBrl).Max(), 1) * 1.16;
@@ -2197,10 +2305,10 @@
             double v = CvBrl(m[i]), bw = colW * 0.6, cx = left + i * colW + colW / 2, yTop = Y(v);
             var on = _monthFilter == i + 1;
             var col = on ? "#0b4f6f" : "#007A9E";
-            sb.Append($"<g class='xf-mark' data-xf-dim='month' data-xf-val='{i + 1}'><title>{Esc(Fmt.MonthName(i + 1))} · {_sym} {Esc(Fmt.Compact(v))}</title>");
+            sb.Append($"<g class='xf-mark' data-xf-dim='month' data-xf-val='{i + 1}'><title>{Esc(MesNome(i + 1))} · {_sym} {Esc(Compacto(v))}</title>");
             sb.Append($"<rect x='{F(cx - bw / 2)}' y='{F(yTop)}' width='{F(bw)}' height='{F(bot - yTop)}' rx='3' fill='{col}'/></g>");
-            if (v > 0) sb.Append($"<text x='{F(cx)}' y='{F(yTop - 5)}' text-anchor='middle' font-size='8.5' font-weight='600' fill='#5b6b82'>{Esc(Fmt.Compact(v))}</text>");
-            sb.Append($"<text x='{F(cx)}' y='{F(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(Fmt.MonthName(i + 1))}</text>");
+            if (v > 0) sb.Append($"<text x='{F(cx)}' y='{F(yTop - 5)}' text-anchor='middle' font-size='8.5' font-weight='600' fill='#5b6b82'>{Esc(Compacto(v))}</text>");
+            sb.Append($"<text x='{F(cx)}' y='{F(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(MesNome(i + 1))}</text>");
         }
         sb.Append("</svg>");
         builder.AddMarkupContent(0, sb.ToString());
@@ -2210,7 +2318,7 @@
     private RenderFragment RenderXfPie(IReadOnlyList<SliceRow> data, string dim) => builder =>
     {
         var d = data.Where(x => CvBrl(x.Value) > 0).Take(8).ToList();
-        if (d.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
+        if (d.Count == 0) { builder.AddMarkupContent(0, $"<div class='empty'>{T("Sem dados no recorte.", "No data in the current selection.")}</div>"); return; }
         double total = Math.Max(d.Sum(x => CvBrl(x.Value)), 1);
         double cx = 64, cy = 64, r = 50, sw = 20, C = 2 * Math.PI * r, off = 0;
         var sb = new System.Text.StringBuilder();
@@ -2224,14 +2332,14 @@
             off += dash;
         }
         sb.Append($"<text x='{cx}' y='{F(cy - 3)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>Total</text>");
-        sb.Append($"<text x='{cx}' y='{F(cy + 11)}' text-anchor='middle' font-size='12' font-weight='700' fill='#1e2836'>{_sym} {Esc(Fmt.Compact(total))}</text>");
+        sb.Append($"<text x='{cx}' y='{F(cy + 11)}' text-anchor='middle' font-size='12' font-weight='700' fill='#1e2836'>{_sym} {Esc(Compacto(total))}</text>");
         sb.Append("</svg><ul class='donut-legend'>");
         for (var i = 0; i < d.Count; i++)
         {
             double val = CvBrl(d[i].Value);
             var col = PieColors[i % PieColors.Length];
             var on = IsActive(dim, d[i].Label) ? " xf-on" : "";
-            sb.Append($"<li class='xf-mark{on}' data-xf-dim='{dim}' data-xf-val='{Esc(d[i].Label)}'><span class='dl-dot' style='background:{col}'></span><span class='dl-name'>{Esc(d[i].Label)}</span><span class='dl-val'>{_sym} {Esc(Fmt.Compact(val))}</span><span class='dl-pct'>{Esc(Fmt.Pct(val / total * 100))}</span></li>");
+            sb.Append($"<li class='xf-mark{on}' data-xf-dim='{dim}' data-xf-val='{Esc(d[i].Label)}'><span class='dl-dot' style='background:{col}'></span><span class='dl-name'>{Esc(d[i].Label)}</span><span class='dl-val'>{_sym} {Esc(Compacto(val))}</span><span class='dl-pct'>{Esc(PctTxt(val / total * 100))}</span></li>");
         }
         sb.Append("</ul></div>");
         builder.AddMarkupContent(0, sb.ToString());
@@ -2241,7 +2349,7 @@
     private RenderFragment RenderXfHBars(IReadOnlyList<SliceRow> data, string dim, int topN) => builder =>
     {
         var d = (topN > 0 ? data.Take(topN) : data).ToList();
-        if (d.Count == 0) { builder.AddMarkupContent(0, "<div class='empty'>Sem dados no recorte.</div>"); return; }
+        if (d.Count == 0) { builder.AddMarkupContent(0, $"<div class='empty'>{T("Sem dados no recorte.", "No data in the current selection.")}</div>"); return; }
         double max = Math.Max(d.Max(x => CvBrl(x.Value)), 1), total = Math.Max(d.Sum(x => CvBrl(x.Value)), 1);
         var sb = new System.Text.StringBuilder();
         for (var i = 0; i < d.Count; i++)
@@ -2252,7 +2360,7 @@
             sb.Append($"<div class='bar-row xf{on}' data-xf-dim='{dim}' data-xf-val='{Esc(d[i].Label)}' title='{Esc(d[i].Label)}'>");
             sb.Append($"<span class='bar-label'>{Esc(d[i].Label)}</span>");
             sb.Append($"<span class='bar-track'><span class='bar-fill' style='width:{F(v / max * 100)}%;background:{col}'></span></span>");
-            sb.Append($"<span class='bar-value'>{_sym} {Esc(Fmt.Compact(v))} <span class='muted' style='font-weight:400'>· {Esc(Fmt.Pct(v / total * 100))}</span></span>");
+            sb.Append($"<span class='bar-value'>{_sym} {Esc(Compacto(v))} <span class='muted' style='font-weight:400'>· {Esc(PctTxt(v / total * 100))}</span></span>");
             sb.Append("</div>");
         }
         builder.AddMarkupContent(0, sb.ToString());
@@ -2268,7 +2376,7 @@
         double Y(double v) => bot - v / max * (bot - top);
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='GM médio mensal'>");
+        sb.Append($"<svg viewBox='0 0 {Wd.ToString(inv)} {H.ToString(inv)}' width='100%' preserveAspectRatio='xMidYMid meet' role='img' aria-label='{T("GM médio mensal", "Average monthly GM")}'>");
         for (var g = 0; g <= 3; g++)
         {
             var gy = top + (bot - top) * g / 3.0;
@@ -2277,7 +2385,7 @@
         // linha-alvo em 30%
         double ty = Y(30);
         sb.Append($"<line x1='{left.ToString(inv)}' y1='{ty.ToString("0.#", inv)}' x2='{(Wd - right).ToString(inv)}' y2='{ty.ToString("0.#", inv)}' stroke='#b7791f' stroke-width='1' stroke-dasharray='4 3' opacity='0.7'/>");
-        sb.Append($"<text x='{(Wd - right).ToString(inv)}' y='{(ty - 4).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#b7791f'>meta 30%</text>");
+        sb.Append($"<text x='{(Wd - right).ToString(inv)}' y='{(ty - 4).ToString("0.#", inv)}' text-anchor='end' font-size='8.5' fill='#b7791f'>{T("meta 30%", "30% target")}</text>");
 
         for (var m = 0; m < 12; m++)
         {
@@ -2290,7 +2398,7 @@
             if (val > 0)
                 sb.Append($"<rect x='{(cxc - bw / 2).ToString("0.#", inv)}' y='{yTop.ToString("0.#", inv)}' width='{bw.ToString("0.#", inv)}' height='{(bot - yTop).ToString("0.#", inv)}' rx='2' fill='{col}'/>");
             sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(yTop - 5).ToString("0.#", inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "500")}' fill='#5b6b82'>{val.ToString("0", inv)}%</text>");
-            sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? "#007A9E" : "#93a1b5")}'>{Fmt.MonthName(m + 1)}</text>");
+            sb.Append($"<text x='{cxc.ToString("0.#", inv)}' y='{(H - 6).ToString(inv)}' text-anchor='middle' font-size='9' font-weight='{(cur ? "700" : "400")}' fill='{(cur ? "#007A9E" : "#93a1b5")}'>{MesNome(m + 1)}</text>");
         }
         sb.Append("</svg>");
         builder.AddMarkupContent(0, sb.ToString());

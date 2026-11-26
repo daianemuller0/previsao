@@ -840,3 +840,249 @@ addEventListener('pagehide', function (e) {
     });
     raiz.observe(document.body, { childList: true, subtree: true });
 })();
+
+// Performance Comercial: nas listas de mercado e produto (lado a lado), deixa visíveis
+// só as primeiras n linhas; o resto fica na barra de rolagem da própria lista.
+window.vpLinhas = (n) => {
+    document.querySelectorAll('.cvx-embed .cvx-lado-a-lado .cvx-ibar, .cvx-embed #vendedores .cvx-ibar').forEach(el => {
+        const itens = el.querySelectorAll('.ibar-item');
+        if (itens.length > n) {
+            const a = itens[0].getBoundingClientRect().top, b = itens[n].getBoundingClientRect().top;
+            el.style.maxHeight = Math.ceil(b - a) + 'px';
+        } else el.style.maxHeight = 'none';
+    });
+};
+
+
+// Performance Comercial: um quadro na tela inteira (API de tela cheia; se o navegador
+// não deixar, o quadro cobre a janela). O mesmo botão, ou Esc, volta ao normal.
+window.vpTelaCheia = function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const sairJanela = () => { el.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia'); };
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (el.classList.contains('tela-cheia')) { sairJanela(); return; }
+    const cobrir = () => { el.classList.add('tela-cheia'); document.body.classList.add('vp-tela-cheia'); };
+    if (el.requestFullscreen) el.requestFullscreen().catch(cobrir); else cobrir();
+};
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.tela-cheia').forEach(x => { x.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia'); });
+});
+
+// Performance Comercial, "Vendas e propostas, mês a mês": depois de cada render,
+// (1) desenha a linha de cada ano nas faixas de valor enviado e de conversão, ligando
+// os pontos pela posição real deles na tela; (2) sobe os rótulos que se encostariam,
+// para nenhum número ficar por cima de outro.
+window.vpmAjustar = function () {
+    // os dois quadros: "mes-a-mes" (vendas da empresa toda) e "mes-a-mes-setor" (vendas NB e AFM)
+    document.querySelectorAll('.vpm').forEach(raiz => vpmAjustarQuadro(raiz));
+};
+function vpmAjustarQuadro(raiz) {
+    raiz.querySelectorAll('.vpm-banda').forEach(b => {
+        const svg = b.querySelector('svg.vpm-banda-svg');
+        if (!svg) return;
+        const br = b.getBoundingClientRect();
+        if (!br.width) return;
+        svg.setAttribute('viewBox', `0 0 ${br.width.toFixed(1)} ${br.height.toFixed(1)}`);
+        const grupos = new Map();
+        b.querySelectorAll('.vpm-pt').forEach(p => {
+            const a = p.dataset.ano;
+            if (!grupos.has(a)) grupos.set(a, []);
+            grupos.get(a).push(p);
+        });
+        // conversão por quantidade: tracejada; por valor (quadro por setor): pontilhada
+        const tracejada = b.classList.contains('valor') ? ' stroke-dasharray="1.5 3"' : b.classList.contains('conv') ? ' stroke-dasharray="5 3"' : '';
+        let html = '';
+        grupos.forEach(pts => {
+            const cor = pts[0].dataset.cor, larg = pts[0].dataset.pri ? 1.7 : 1.3;
+            let seg = [], ant = null;
+            const fecha = () => {
+                if (seg.length > 1) html += `<polyline points="${seg.join(' ')}" fill="none" stroke="${cor}" stroke-width="${larg}"${tracejada} stroke-linejoin="round" stroke-linecap="round" opacity="${pts[0].dataset.pri ? 1 : .8}"/>`;
+                seg = [];
+            };
+            pts.forEach(p => {
+                const m = +p.dataset.m;
+                if (ant !== null && m !== ant + 1) fecha();
+                const r = p.getBoundingClientRect();
+                seg.push(`${(r.left + r.width / 2 - br.left).toFixed(1)},${(r.top + r.height / 2 - br.top).toFixed(1)}`);
+                ant = m;
+            });
+            fecha();
+        });
+        svg.innerHTML = html;
+    });
+    raiz.querySelectorAll('.vpm-dc').forEach(c => {
+        const rot = [...c.querySelectorAll('.vpm-rot:not(.neg)')];
+        rot.forEach(l => l.style.setProperty('--dy', '0px'));
+        const itens = rot.map(l => ({ l, r: l.getBoundingClientRect() })).filter(x => x.r.width > 0)
+            .sort((x, y) => (y.r.bottom - x.r.bottom) || (x.r.left - y.r.left));
+        const postos = [];
+        itens.forEach(it => {
+            let r = { left: it.r.left, right: it.r.right, top: it.r.top, bottom: it.r.bottom }, dy = 0;
+            for (let k = 0; k < 10; k++) {
+                const h = postos.find(p => r.left < p.right + 2 && p.left < r.right + 2 && r.top < p.bottom && p.top < r.bottom);
+                if (!h) break;
+                const d = r.bottom - h.top + 1;
+                dy += d; r = { left: r.left, right: r.right, top: r.top - d, bottom: r.bottom - d };
+            }
+            if (dy) it.l.style.setProperty('--dy', dy.toFixed(1) + 'px');
+            postos.push(r);
+        });
+    });
+}
+(function () {
+    let t;
+    const de = () => { clearTimeout(t); t = setTimeout(() => window.vpmAjustar && window.vpmAjustar(), 120); };
+    window.addEventListener('resize', de);
+    document.addEventListener('fullscreenchange', de);
+})();
+
+// Resumo Executivo: imprime só o relatório montado (.rx-print), em paisagem; "Salvar como PDF" no navegador.
+// Devolve uma promessa que só termina depois da impressão: a página mantém o relatório montado até lá.
+window.rxImprimir = function () {
+    return new Promise(resolve => {
+        document.body.classList.add('rx-imprimindo');
+        let st = document.getElementById('rx-pagina');
+        if (!st) { st = document.createElement('style'); st.id = 'rx-pagina'; document.head.appendChild(st); }
+        st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+        setTimeout(() => {
+            try { window.print(); } finally { window.rxFimImpressao(); resolve(); }
+        }, 200);
+    });
+};
+window.rxFimImpressao = function () {
+    document.body.classList.remove('rx-imprimindo');
+    const st = document.getElementById('rx-pagina');
+    if (st) st.remove();
+};
+
+// Download de arquivo grande gerado no servidor (ex.: a Apresentação Executiva .pptx):
+// chega como stream (sem passar por base64 na conexão) e vira um Blob local.
+window.appDownloadStream = async (fileName, mime, streamRef) => {
+    const buf = await streamRef.arrayBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+};
+
+// PDF da Apresentação Executiva: imprime a pré-visualização, um slide 16:9 por página.
+// O título da aba vira o nome sugerido do arquivo em "Salvar como PDF".
+window.axImprimir = function (titulo) {
+    return new Promise(resolve => {
+        const tituloAntes = document.title;
+        if (titulo) document.title = titulo;
+        document.body.classList.add('ax-imprimindo');
+        let st = document.getElementById('ax-pagina');
+        if (!st) { st = document.createElement('style'); st.id = 'ax-pagina'; document.head.appendChild(st); }
+        st.textContent = '@page { size: 13.333in 7.5in; margin: 0; }';
+        setTimeout(() => {
+            try { window.print(); }
+            finally {
+                document.body.classList.remove('ax-imprimindo');
+                st.remove();
+                document.title = tituloAntes;
+                resolve();
+            }
+        }, 250);
+    });
+};
+
+// Performance Comercial: PDF de um quadro (ex.: "Vendas e propostas, mês a mês"), como está na tela.
+// O quadro mantém a largura (e o layout) da tela e é reduzido para caber numa folha A4 deitada; no modo
+// "Todos os anos" (12 meses) ele ocupa a largura da folha e quebra entre os meses, nunca no meio de um.
+// O resto da página some só durante a impressão.
+window.vpPdfPreparar = function (id) {
+    const alvo = document.getElementById(id);
+    if (!alvo) return null;
+    if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (e) { } }
+    alvo.classList.remove('tela-cheia'); document.body.classList.remove('vp-tela-cheia');
+    const r = alvo.getBoundingClientRect();
+    const larguraFolha = 1060, alturaFolha = 720;          // A4 deitada, margens de 8 mm (px a 96 dpi)
+    const varios = !!alvo.querySelector('.vpm-sm-grid');
+    // nos 12 meses, um pouco menor que a largura da folha: as linhas de totais não sobram sozinhas numa página
+    const escala = varios ? Math.min(1, larguraFolha / r.width) * 0.93 : Math.min(1, larguraFolha / r.width, alturaFolha / r.height);
+    alvo.style.width = r.width + 'px';
+    alvo.style.setProperty('--vp-pdf-zoom', escala.toFixed(4));
+    const ocultos = [];
+    for (let el = alvo; el && el !== document.body; el = el.parentElement)
+        for (const irmao of el.parentElement ? el.parentElement.children : [])
+            if (irmao !== el && !irmao.classList.contains('vp-pdf-oculto')) { irmao.classList.add('vp-pdf-oculto'); ocultos.push(irmao); }
+    document.body.classList.add('vp-pdf');
+    alvo.classList.add('vp-pdf-alvo');
+    let st = document.getElementById('vp-pdf-pagina');
+    if (!st) { st = document.createElement('style'); st.id = 'vp-pdf-pagina'; document.head.appendChild(st); }
+    st.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+    return () => {
+        document.body.classList.remove('vp-pdf');
+        alvo.classList.remove('vp-pdf-alvo');
+        alvo.style.width = ''; alvo.style.removeProperty('--vp-pdf-zoom');
+        ocultos.forEach(x => x.classList.remove('vp-pdf-oculto'));
+        st.remove();
+        setTimeout(() => window.vpmAjustar && window.vpmAjustar(), 50);
+    };
+};
+window.vpPdf = function (id, titulo) {
+    const tituloAntes = document.title;
+    const fim = window.vpPdfPreparar(id);
+    if (!fim) return;
+    if (titulo) document.title = titulo + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    setTimeout(() => {
+        try { window.print(); } finally { fim(); document.title = tituloAntes; }
+    }, 200);
+};
+
+// Performance Comercial, quadro "Vendas por setor": PDF com três páginas (NB + AFM, só NB, só AFM).
+// A página passa o filtro de Setor por cada caso e, depois de cada desenho, copia o quadro como está
+// na tela para um contêiner fora da vista; no fim, imprime só as cópias, uma por folha A4 deitada.
+window.vpPdfMulti = {
+    inicio() {
+        document.getElementById('vp-pdf-multi')?.remove();
+        const c = document.createElement('div');
+        c.id = 'vp-pdf-multi';
+        document.body.appendChild(c);
+    },
+    copiar(id, rotulo) {
+        const alvo = document.getElementById(id), c = document.getElementById('vp-pdf-multi');
+        if (!alvo || !c) return;
+        window.vpmAjustar && window.vpmAjustar();
+        const r = alvo.getBoundingClientRect();
+        const varios = !!alvo.querySelector('.vpm-sm-grid');
+        const escala = varios ? Math.min(1, 1060 / r.width) * 0.93 : Math.min(1, 1060 / r.width, 690 / (r.height + 34));
+        const pg = document.createElement('section');
+        pg.className = 'vp-pdf-pg';
+        pg.style.setProperty('--vp-pdf-zoom', escala.toFixed(4));
+        const cab = document.createElement('div');
+        cab.className = 'vp-pdf-pg-tit';
+        cab.textContent = rotulo;
+        const copia = alvo.cloneNode(true);
+        copia.removeAttribute('id');
+        copia.classList.remove('tela-cheia');
+        copia.style.width = r.width + 'px';
+        pg.append(cab, copia);
+        c.appendChild(pg);
+    },
+    imprimir(titulo) {
+        const c = document.getElementById('vp-pdf-multi');
+        if (!c || !c.children.length) return;
+        const tituloAntes = document.title;
+        if (titulo) document.title = titulo + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+        let st = document.getElementById('vp-pdf-pagina');
+        if (!st) { st = document.createElement('style'); st.id = 'vp-pdf-pagina'; document.head.appendChild(st); }
+        st.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+        document.body.classList.add('vp-pdf-multi');
+        setTimeout(() => {
+            try { window.print(); }
+            finally {
+                document.body.classList.remove('vp-pdf-multi');
+                document.title = tituloAntes;
+                st.remove(); c.remove();
+            }
+        }, 200);
+    },
+    cancelar() { document.getElementById('vp-pdf-multi')?.remove(); },
+};

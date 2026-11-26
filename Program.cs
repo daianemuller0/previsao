@@ -110,6 +110,8 @@ builder.Services.AddSingleton<AplicacaoService>();
 // Módulo Conversão: planilha de propostas (rede) + taxa USD/BRL por ano.
 builder.Services.AddSingleton<ConversaoService>();
 builder.Services.AddSingleton<CambioAnualRepository>();
+// Guia Vendas × Propostas: vendas mês a mês, budgets e propostas informadas
+builder.Services.AddSingleton<VendasMensaisRepository>();
 // Recorte das telas durante a sessão: abrir uma proposta e voltar não refaz os
 // filtros. Scoped = por circuito, ou seja, por pessoa e por aba do navegador.
 builder.Services.AddScoped<FiltroMemoria>();
@@ -288,7 +290,7 @@ app.MapGet("/forecast/export", (HttpContext http, OpportunityRepository repo, Ca
     sb.AppendLine("Proposta;Oportunidade;Categoria;Status pipeline;Data prevista;Quarter;Pais;Mercado;" +
                   "Produto;KAM;Cliente;Planta;Moeda;Valor USD;Valor BRL;GM%;Prob ganho;Prob periodo;" +
                   "Forecast ponderado USD;Margem USD;Risco;Categoria comercial;Proxima acao;Atualizado em");
-    var exportaveis = repo.All()
+    var exportaveis = repo.Unicas()   // número de proposta repetido conta uma vez
         .Where(o => !o.MovidaControleValue)
         .Where(o => scope.CanSeeVendedor(OpportunityImporter.CanonicalVendedor(cat.KamName(o.KamId))));
     foreach (var o in exportaveis)

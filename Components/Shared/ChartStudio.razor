@@ -5,10 +5,10 @@
    a dimensão (agrupamento) e a medida. Os gráficos respeitam os filtros da
    Visão Executiva (recebidos em Data) e são persistidos. *@
 <div class="section-head">
-    <span class="st-title">@Icons.Svg("trend", "nav-ico") Estúdio de gráficos</span>
-    <span class="st-sub">monte seus próprios gráficos · tipo + dados</span>
+    <span class="st-title">@Icons.Svg("trend", "nav-ico") @T("Estúdio de gráficos", "Chart studio")</span>
+    <span class="st-sub">@T("monte seus próprios gráficos · tipo + dados", "build your own charts · type + data")</span>
     <span class="st-line"></span>
-    <button class="btn-primary sm" @onclick="() => OpenNew()">@Icons.Svg("plus")Adicionar gráfico</button>
+    <button class="btn-primary sm" @onclick="() => OpenNew()">@Icons.Svg("plus")@T("Adicionar gráfico", "Add chart")</button>
 </div>
 
 <div class="studio-grid">
@@ -17,10 +17,10 @@
         var spec = s;
         <div class="panel studio-card @(spec.Type is "kpi" ? "span1" : "span2")">
             <div class="panel-head">
-                <div class="panel-title">@spec.Title <span class="hint">@DimLabel(spec.Dimension) · @MeasureLabel(spec.Measure)</span></div>
+                <div class="panel-title">@TituloTela(spec.Title) <span class="hint">@DimLabel(spec.Dimension) · @MeasureLabel(spec.Measure)</span></div>
                 <div class="studio-acts">
-                    <button class="row-act" title="Editar gráfico" @onclick="() => OpenEdit(spec)">@Icons.Svg("edit")</button>
-                    <button class="row-act del" title="Excluir gráfico" @onclick="() => AskDelete(spec)">@Icons.Svg("trash")</button>
+                    <button class="row-act" title="@T("Editar gráfico", "Edit chart")" @onclick="() => OpenEdit(spec)">@Icons.Svg("edit")</button>
+                    <button class="row-act del" title="@T("Excluir gráfico", "Delete chart")" @onclick="() => AskDelete(spec)">@Icons.Svg("trash")</button>
                 </div>
             </div>
             <div class="chart-body @BodyCls(spec.Type)">@RenderChart(spec)</div>
@@ -29,7 +29,14 @@
     @if (_specs.Count == 0)
     {
         <div class="panel studio-card span2">
+            @if (Ingles)
+            {
+                <div class="empty" style="padding:40px 12px">No charts yet. Click <strong>Add chart</strong> to build the first one.</div>
+            }
+            else
+            {
             <div class="empty" style="padding:40px 12px">Nenhum gráfico ainda. Clique em <strong>Adicionar gráfico</strong> para montar o primeiro.</div>
+            }
         </div>
     }
 </div>
@@ -39,11 +46,18 @@
 {
     <div class="drawer-backdrop" @onclick="() => _del = null"></div>
     <div class="confirm-box">
-        <div class="confirm-head">@Icons.Svg("alert")<span>Excluir gráfico</span></div>
+        <div class="confirm-head">@Icons.Svg("alert")<span>@T("Excluir gráfico", "Delete chart")</span></div>
+        @if (Ingles)
+        {
+            <p class="confirm-text">Delete the chart <strong>@_del.Title</strong>? This action cannot be undone.</p>
+        }
+        else
+        {
         <p class="confirm-text">Excluir o gráfico <strong>@_del.Title</strong>? Esta ação não pode ser desfeita.</p>
+        }
         <div class="modal-actions">
-            <button class="btn-ghost" @onclick="() => _del = null">Cancelar</button>
-            <button class="btn-danger" @onclick="ConfirmDelete">@Icons.Svg("trash")Excluir</button>
+            <button class="btn-ghost" @onclick="() => _del = null">@T("Cancelar", "Cancel")</button>
+            <button class="btn-danger" @onclick="ConfirmDelete">@Icons.Svg("trash")@T("Excluir", "Delete")</button>
         </div>
     </div>
 }
@@ -55,53 +69,53 @@
     <div class="drawer">
         <div class="page-head">
             <div>
-                <h2 style="color:var(--primary)">@(_isNew ? "Novo gráfico" : "Editar gráfico")</h2>
-                <p class="subtitle">Escolha o tipo, a dimensão e a medida</p>
+                <h2 style="color:var(--primary)">@(_isNew ? T("Novo gráfico", "New chart") : T("Editar gráfico", "Edit chart"))</h2>
+                <p class="subtitle">@T("Escolha o tipo, a dimensão e a medida", "Choose the type, the dimension and the measure")</p>
             </div>
             <button class="icon-btn" @onclick="() => _edit = null">@Icons.Svg("x")</button>
         </div>
 
-        <label class="fld full">Título<input class="field" @bind="_edit.Title" placeholder="Ex.: Valor por mercado" /></label>
+        <label class="fld full">@T("Título", "Title")<input class="field" @bind="_edit.Title" placeholder="@T("Ex.: Valor por mercado", "E.g.: Value by market")" /></label>
 
-        <div class="fld full">Tipo de gráfico
+        <div class="fld full">@T("Tipo de gráfico", "Chart type")
             <div class="chart-type-grid">
                 @foreach (var (val, lbl, ico) in ChartTypes)
                 {
                     var v = val;
                     <button type="button" class="chart-type @(_edit.Type == v ? "active" : "")" @onclick="() => _edit.Type = v">
-                        @Icons.Svg(ico)<span>@lbl</span>
+                        @Icons.Svg(ico)<span>@TypeLabel(v, lbl)</span>
                     </button>
                 }
             </div>
         </div>
 
         <div class="form-grid">
-            <label class="fld">Dimensão (eixo / fatias)
+            <label class="fld">@T("Dimensão (eixo / fatias)", "Dimension (axis / slices)")
                 <select class="field" @bind="_edit.Dimension">
-                    @foreach (var (val, lbl) in Dimensions) { <option value="@val">@lbl</option> }
+                    @foreach (var (val, lbl) in Dimensions) { <option value="@val">@DimLabel(val)</option> }
                 </select>
             </label>
-            <label class="fld">Medida (valor)
+            <label class="fld">@T("Medida (valor)", "Measure (value)")
                 <select class="field" @bind="_edit.Measure">
-                    @foreach (var (val, lbl) in Measures) { <option value="@val">@lbl</option> }
+                    @foreach (var (val, lbl) in Measures) { <option value="@val">@MeasureLabel(val)</option> }
                 </select>
             </label>
             @if (_edit.Type is not "kpi" && _edit.Dimension is not "month" and not "quarter")
             {
-                <label class="fld">Top N (0 = todos)<input class="field num" type="number" min="0" max="30" @bind="_edit.TopN" /></label>
+                <label class="fld">@T("Top N (0 = todos)", "Top N (0 = all)")<input class="field num" type="number" min="0" max="30" @bind="_edit.TopN" /></label>
             }
         </div>
 
         <div class="studio-preview">
-            <div class="preview-label">Prévia</div>
+            <div class="preview-label">@T("Prévia", "Preview")</div>
             <div class="chart-body @BodyCls(_edit.Type)">@RenderChart(_edit)</div>
         </div>
 
         <div class="modal-actions">
-            @if (!_isNew) { <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")Excluir</button> }
+            @if (!_isNew) { <button class="btn-danger-ghost" @onclick="DeleteFromEdit">@Icons.Svg("trash")@T("Excluir", "Delete")</button> }
             <div class="filterbar-spacer"></div>
-            <button class="btn-ghost" @onclick="() => _edit = null">Cancelar</button>
-            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")@(_isNew ? "Criar gráfico" : "Salvar")</button>
+            <button class="btn-ghost" @onclick="() => _edit = null">@T("Cancelar", "Cancel")</button>
+            <button class="btn-primary" @onclick="SaveEdit">@Icons.Svg("check")@(_isNew ? T("Criar gráfico", "Create chart") : T("Salvar", "Save"))</button>
         </div>
     </div>
 }
@@ -109,6 +123,18 @@
 @code {
     [Parameter] public List<Opportunity> Data { get; set; } = new();
     [Parameter] public string Currency { get; set; } = "BRL";
+    /// <summary>Textos do estúdio em inglês.</summary>
+    [Parameter] public bool Ingles { get; set; }
+    private string T(string pt, string en) => Ingles ? en : pt;
+    /// <summary>Os títulos dos gráficos-padrão (criados em português) aparecem em inglês; os digitados pela pessoa ficam como estão.</summary>
+    private string TituloTela(string t) => !Ingles ? t : t switch
+    {
+        "Valor por mercado" => "Value by market",
+        "Ponderado por KAM" => "Weighted by KAM",
+        "Distribuição por BU" => "Distribution by BU",
+        "Valor por mês" => "Value by month",
+        _ => t,
+    };
     [Parameter] public double Rate { get; set; } = 1;    // USD -> BRL
     [Parameter] public string Sym { get; set; } = "R$";
 
@@ -135,8 +161,27 @@
         ("valor", "Valor · Net Value (R$)"), ("conversao", "Chance de conversão (derivada)"), ("ponderado", "Ponderado (derivada)"), ("margem", "Margem bruta (derivada)"), ("contagem", "Contagem de oportunidades"),
     };
 
-    private static string DimLabel(string d) => Dimensions.FirstOrDefault(x => x.Val == d).Lbl ?? d;
-    private static string MeasureLabel(string m) => Measures.FirstOrDefault(x => x.Val == m).Lbl ?? m;
+    // Rótulos em inglês (as chaves continuam as mesmas).
+    private static readonly Dictionary<string, string> TypesEn = new()
+    {
+        ["bar"] = "Bars", ["hbar"] = "Horizontal bars", ["line"] = "Line", ["donut"] = "Donut",
+        ["kpi"] = "Card (KPI)", ["table"] = "Table",
+    };
+    private static readonly Dictionary<string, string> DimensionsEn = new()
+    {
+        ["market"] = "Market", ["kam"] = "KAM", ["product"] = "Product", ["country"] = "Country",
+        ["bu"] = "Unit / BU", ["category"] = "Category", ["customer"] = "Customer",
+        ["month"] = "Month", ["quarter"] = "Quarter",
+    };
+    private static readonly Dictionary<string, string> MeasuresEn = new()
+    {
+        ["valor"] = "Value · Net Value (R$)", ["conversao"] = "Conversion likelihood (derived)", ["ponderado"] = "Weighted (derived)",
+        ["margem"] = "Gross margin (derived)", ["contagem"] = "Opportunity count",
+    };
+
+    private string TypeLabel(string t, string pt) => Ingles && TypesEn.TryGetValue(t, out var en) ? en : pt;
+    private string DimLabel(string d) => Ingles && DimensionsEn.TryGetValue(d, out var en) ? en : Dimensions.FirstOrDefault(x => x.Val == d).Lbl ?? d;
+    private string MeasureLabel(string m) => Ingles && MeasuresEn.TryGetValue(m, out var en) ? en : Measures.FirstOrDefault(x => x.Val == m).Lbl ?? m;
 
     protected override void OnInitialized() => _specs = Repo.All();
 
@@ -144,13 +189,13 @@
     private void OpenNew()
     {
         _isNew = true;
-        _edit = new ChartSpec { Title = "Novo gráfico", Type = "bar", Dimension = "market", Measure = "valor", TopN = "8", Sort = (_specs.Count).ToString() };
+        _edit = new ChartSpec { Title = T("Novo gráfico", "New chart"), Type = "bar", Dimension = "market", Measure = "valor", TopN = "8", Sort = (_specs.Count).ToString() };
     }
     private void OpenEdit(ChartSpec s) { _isNew = false; _edit = s.Clone(); }
     private void SaveEdit()
     {
         if (_edit is null) return;
-        if (string.IsNullOrWhiteSpace(_edit.Title)) _edit.Title = MeasureLabel(_edit.Measure) + " por " + DimLabel(_edit.Dimension);
+        if (string.IsNullOrWhiteSpace(_edit.Title)) _edit.Title = MeasureLabel(_edit.Measure) + T(" por ", " by ") + DimLabel(_edit.Dimension);
         Repo.Save(_edit);
         _edit = null;
         _specs = Repo.All();
@@ -185,11 +230,11 @@
 
         if (s.Dimension == "month")
             return Enumerable.Range(1, 12)
-                .Select(m => new Slice(Fmt.MonthName(m), Sum(Data.Where(o => o.ExpectedDateValue?.Month == m))))
+                .Select(m => new Slice(Ingles ? RotulosEn.MonthShort(m) : Fmt.MonthName(m), Sum(Data.Where(o => o.ExpectedDateValue?.Month == m))))
                 .ToList();
         if (s.Dimension == "quarter")
             return Enumerable.Range(1, 4)
-                .Select(q => new Slice($"{q}º tri", Sum(Data.Where(o => o.ExpectedDateValue is { } d && Fmt.QuarterOf(d.Month) == q))))
+                .Select(q => new Slice(Ingles ? $"Q{q}" : $"{q}º tri", Sum(Data.Where(o => o.ExpectedDateValue is { } d && Fmt.QuarterOf(d.Month) == q))))
                 .ToList();
 
         Func<Opportunity, string> key = s.Dimension switch
@@ -213,7 +258,7 @@
         {
             var head = groups.Take(top).ToList();
             var rest = groups.Skip(top).Sum(x => x.Value);
-            if (rest != 0) head.Add(new Slice("Outros", rest));
+            if (rest != 0) head.Add(new Slice(T("Outros", "Others"), rest));
             return head;
         }
         return groups;
@@ -226,10 +271,14 @@
     private double Disp(ChartSpec s, double raw) => s.Measure == "contagem" ? raw : Cv(raw);
     // Formata um valor BRUTO para rótulo (converte moeda, exceto contagem).
     private string Val(ChartSpec s, double v) =>
-        s.Measure == "contagem" ? v.ToString("0", inv) : Sym + " " + Fmt.Compact(Cv(v));
+        s.Measure == "contagem" ? v.ToString("0", inv) : Sym + " " + Compact(Cv(v));
     // Formata um valor JÁ convertido (display) para rótulo.
     private string FmtDisp(ChartSpec s, double disp) =>
-        s.Measure == "contagem" ? disp.ToString("0", inv) : Sym + " " + Fmt.Compact(disp);
+        s.Measure == "contagem" ? disp.ToString("0", inv) : Sym + " " + Compact(disp);
+    // pt-BR (2,4 mi · 850 mil) ou en-US (2.4M · 850K · 1.06B), conforme o idioma.
+    private string Compact(double v) => Ingles ? RotulosEn.Compact(v) : Fmt.Compact(v);
+    private string Pct(double v) => Ingles ? v.ToString("0", RotulosEn.EnUs) + "%" : Fmt.Pct(v);
+    private string SemDados => T("<div class='empty'>Sem dados no recorte.</div>", "<div class='empty'>No data in this selection.</div>");
     private static readonly System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
     private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
     private static readonly string[] PieColors =
@@ -253,7 +302,7 @@
 
     private string Bar(ChartSpec s, List<Slice> data)
     {
-        if (data.Count == 0) return "<div class='empty'>Sem dados no recorte.</div>";
+        if (data.Count == 0) return SemDados;
         double Wd = 720, H = 240, top = 18, bot = 196, left = 12, right = 12;
         double plotW = Wd - left - right, colW = plotW / data.Count;
         double max = Math.Max(data.Max(d => Disp(s, d.Value)), 1) * 1.16;
@@ -266,7 +315,7 @@
             double v = Disp(s, data[i].Value), bw = colW * 0.6, cx = left + i * colW + colW / 2, yTop = Y(v);
             sb.Append($"<g><title>{Esc(data[i].Label)} · {Esc(Val(s, data[i].Value))}</title>");
             sb.Append($"<rect x='{F(cx - bw / 2)}' y='{F(yTop)}' width='{F(bw)}' height='{F(bot - yTop)}' rx='2.5' fill='{PieColors[i % PieColors.Length]}'/></g>");
-            sb.Append($"<text x='{F(cx)}' y='{F(yTop - 5)}' text-anchor='middle' font-size='9' font-weight='600' fill='#5b6b82'>{Esc(Fmt.Compact(v))}</text>");
+            sb.Append($"<text x='{F(cx)}' y='{F(yTop - 5)}' text-anchor='middle' font-size='9' font-weight='600' fill='#5b6b82'>{Esc(Compact(v))}</text>");
             sb.Append($"<text x='{F(cx)}' y='{F(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(Trunc(data[i].Label, 12))}</text>");
         }
         sb.Append("</svg>");
@@ -275,7 +324,7 @@
 
     private string HBar(ChartSpec s, List<Slice> data)
     {
-        if (data.Count == 0) return "<div class='empty'>Sem dados no recorte.</div>";
+        if (data.Count == 0) return SemDados;
         double max = Math.Max(data.Max(d => Disp(s, d.Value)), 1), total = Math.Max(data.Sum(d => Disp(s, d.Value)), 1);
         var sb = new System.Text.StringBuilder();
         for (var i = 0; i < data.Count; i++)
@@ -284,7 +333,7 @@
             sb.Append("<div class='bar-row'>");
             sb.Append($"<span class='bar-label'>{Esc(data[i].Label)}</span>");
             sb.Append($"<span class='bar-track'><span class='bar-fill' style='width:{F(v / max * 100)}%;background:{PieColors[i % PieColors.Length]}'></span></span>");
-            sb.Append($"<span class='bar-value'>{Esc(Val(s, data[i].Value))} <span class='muted' style='font-weight:400'>· {Esc(Fmt.Pct(v / total * 100))}</span></span>");
+            sb.Append($"<span class='bar-value'>{Esc(Val(s, data[i].Value))} <span class='muted' style='font-weight:400'>· {Esc(Pct(v / total * 100))}</span></span>");
             sb.Append("</div>");
         }
         return sb.ToString();
@@ -292,7 +341,7 @@
 
     private string Line(ChartSpec s, List<Slice> data)
     {
-        if (data.Count == 0) return "<div class='empty'>Sem dados no recorte.</div>";
+        if (data.Count == 0) return SemDados;
         double Wd = 720, H = 240, top = 26, bot = 200, left = 24, right = 16;
         double plotW = Wd - left - right, colW = data.Count > 1 ? plotW / (data.Count - 1) : plotW;
         double max = Math.Max(data.Max(d => Disp(s, d.Value)), 1) * 1.18;
@@ -310,7 +359,7 @@
         {
             double cx = X(i), cy = Y(Disp(s, data[i].Value));
             sb.Append($"<circle cx='{F(cx)}' cy='{F(cy)}' r='3' fill='#fff' stroke='#007A9E' stroke-width='2'><title>{Esc(data[i].Label)} · {Esc(Val(s, data[i].Value))}</title></circle>");
-            sb.Append($"<text x='{F(cx)}' y='{F(cy - 9)}' text-anchor='middle' font-size='9' font-weight='500' fill='#5b6b82'>{Esc(Fmt.Compact(Disp(s, data[i].Value)))}</text>");
+            sb.Append($"<text x='{F(cx)}' y='{F(cy - 9)}' text-anchor='middle' font-size='9' font-weight='500' fill='#5b6b82'>{Esc(Compact(Disp(s, data[i].Value)))}</text>");
             sb.Append($"<text x='{F(cx)}' y='{F(H - 6)}' text-anchor='middle' font-size='8.5' fill='#93a1b5'>{Esc(Trunc(data[i].Label, 10))}</text>");
         }
         sb.Append("</svg>");
@@ -320,7 +369,7 @@
     private string Donut(ChartSpec s, List<Slice> data)
     {
         data = data.Where(d => Disp(s, d.Value) > 0).ToList();
-        if (data.Count == 0) return "<div class='empty'>Sem dados no recorte.</div>";
+        if (data.Count == 0) return SemDados;
         double total = Math.Max(data.Sum(d => Disp(s, d.Value)), 1);
         double cx = 64, cy = 64, r = 50, sw = 20, C = 2 * Math.PI * r, off = 0;
         var sb = new System.Text.StringBuilder();
@@ -338,7 +387,7 @@
         for (var i = 0; i < data.Count; i++)
         {
             double val = Disp(s, data[i].Value);
-            sb.Append($"<li><span class='dl-dot' style='background:{PieColors[i % PieColors.Length]}'></span><span class='dl-name'>{Esc(data[i].Label)}</span><span class='dl-val'>{Esc(Val(s, data[i].Value))}</span><span class='dl-pct'>{Esc(Fmt.Pct(val / total * 100))}</span></li>");
+            sb.Append($"<li><span class='dl-dot' style='background:{PieColors[i % PieColors.Length]}'></span><span class='dl-name'>{Esc(data[i].Label)}</span><span class='dl-val'>{Esc(Val(s, data[i].Value))}</span><span class='dl-pct'>{Esc(Pct(val / total * 100))}</span></li>");
         }
         sb.Append("</ul></div>");
         return sb.ToString();
@@ -352,20 +401,20 @@
         sb.Append("<div class='kpi-card'>");
         sb.Append($"<div class='kpi-big'>{Esc(Val(s, total))}</div>");
         sb.Append($"<div class='kpi-sub'>{Esc(MeasureLabel(s.Measure))} · {data.Count} {Esc(DimLabel(s.Dimension).ToLowerInvariant())}(s)</div>");
-        if (top is not null) sb.Append($"<div class='kpi-top'>Maior: <strong>{Esc(top.Label)}</strong> · {Esc(Val(s, top.Value))}</div>");
+        if (top is not null) sb.Append($"<div class='kpi-top'>{T("Maior:", "Highest:")} <strong>{Esc(top.Label)}</strong> · {Esc(Val(s, top.Value))}</div>");
         sb.Append("</div>");
         return sb.ToString();
     }
 
     private string Table(ChartSpec s, List<Slice> data)
     {
-        if (data.Count == 0) return "<div class='empty'>Sem dados no recorte.</div>";
+        if (data.Count == 0) return SemDados;
         double total = Math.Max(data.Sum(d => Disp(s, d.Value)), 1);
         var sb = new System.Text.StringBuilder();
         sb.Append("<table class='grid-tbl mini'><thead><tr>");
         sb.Append($"<th>{Esc(DimLabel(s.Dimension))}</th><th class='right'>{Esc(MeasureLabel(s.Measure))}</th><th class='right'>%</th></tr></thead><tbody>");
         foreach (var d in data)
-            sb.Append($"<tr><td class='col-strong'>{Esc(d.Label)}</td><td class='right num'>{Esc(Val(s, d.Value))}</td><td class='right num'>{Esc(Fmt.Pct(Disp(s, d.Value) / total * 100))}</td></tr>");
+            sb.Append($"<tr><td class='col-strong'>{Esc(d.Label)}</td><td class='right num'>{Esc(Val(s, d.Value))}</td><td class='right num'>{Esc(Pct(Disp(s, d.Value) / total * 100))}</td></tr>");
         sb.Append("</tbody></table>");
         return sb.ToString();
     }
