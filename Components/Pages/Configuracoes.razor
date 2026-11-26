@@ -6,6 +6,8 @@
 @inject ControleRepository Controle
 @inject IConfiguration Cfg
 @inject OpportunityRepository Opps
+@inject BaseCopilotService Copilot
+@inject IJSRuntime JS
 
 @* ===========================================================================
    Configurações de importação — De-Para das colunas das duas origens de dados
@@ -37,6 +39,26 @@
         <strong>Qualidade dos dados</strong>: média, nas oportunidades abertas, de oito itens de cadastro (cliente, produto, data, valor, % de ganho, próxima ação, atualização nos últimos 21 dias e etapa).
         <strong>Confiança da previsão</strong>: média entre a precisão (@_saude.Precisao%, diferença entre o % do vendedor e o do gestor) e a disciplina de atualização (@_saude.Disciplina%, oportunidades atualizadas nos últimos 21 dias).
     </p>
+</div>
+
+@* ---- Base para o agente do Copilot ---- *@
+<div class="section-head"><span class="st-title">Base para o agente do Copilot</span><span class="st-sub">pipeline em aberto NB + AFM × o que foi indicado na previsão</span><span class="st-line"></span></div>
+<div class="panel" style="margin-bottom:12px">
+    <p class="cfg-lead" style="margin-top:0">
+        Um Excel único (<strong>@BaseCopilotService.NomeArquivo</strong>) com todas as oportunidades em aberto das planilhas NB e AFM, já limpas pelo sistema
+        (vendedor com nome unificado, cada número de proposta uma vez), e se cada uma foi <strong>indicada na previsão</strong>. Abas: Leia-me, Oportunidades e
+        Vendedor x Etapa (valor em aberto × valor indicado). É a fonte para o agente responder, por exemplo, "quanto o André tem em Closing e quanto indicou?".
+    </p>
+    <p class="cfg-foot">
+        Pasta de gravação (appsettings <code>Copilot:Pasta</code>): <strong>@(Copilot.Pasta == "" ? "não configurada" : Copilot.Pasta)</strong>.
+        Com a pasta configurada, a base é regravada ao abrir o programa, às 08:00 e às 13:00 e pelo botão abaixo. Use uma pasta do OneDrive/SharePoint
+        sincronizada neste computador e ligue o arquivo ao agente.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <button class="btn-primary" disabled="@(_gerandoCopilot || Copilot.Pasta == "")" @onclick="GravarCopilot">@Icons.Svg("import")Gravar agora na pasta</button>
+        <button class="btn-ghost" disabled="@_gerandoCopilot" @onclick="BaixarCopilot">@Icons.Svg("download")Baixar a base</button>
+        @if (Copilot.UltimaMensagem != "") { <span class="cfg-foot" style="margin:0">@Copilot.UltimaMensagem</span> }
+    </div>
 </div>
 
 @* ---- As duas origens ---- *@
@@ -256,6 +278,24 @@
         _afm = Sync.LastAfm;
         _rates = Controle.CurrencyRates();
         _saude = SaudeDaPrevisao.Calcular(Opps.Unicas().Where(o => !o.MovidaControleValue), DateTime.Today);
+    }
+
+    private bool _gerandoCopilot;
+    private async Task GravarCopilot()
+    {
+        _gerandoCopilot = true;
+        try { await Task.Run(() => Copilot.Gravar()); } finally { _gerandoCopilot = false; }
+    }
+    private async Task BaixarCopilot()
+    {
+        _gerandoCopilot = true;
+        try
+        {
+            var bytes = await Task.Run(() => Copilot.Gerar());
+            await JS.InvokeVoidAsync("appDownload", BaseCopilotService.NomeArquivo,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
+        }
+        finally { _gerandoCopilot = false; }
     }
 
     private Task SincronizarNb() => Sincronizar(() => Sync.SyncNb());
