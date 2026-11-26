@@ -50,7 +50,7 @@ public sealed class AtualizacaoAgendada : BackgroundService
                 _sync.SyncAll();
                 _repo.Refresh();
                 _conversao.Carregar(false);      // planilha de Conversão: só relê se o arquivo mudou
-                if (_copilot.Pasta != "") _copilot.Gravar();   // base do agente do Copilot, já com o que mudou
+                if (_copilot.Pasta != "") _copilot.GravarSeMudou();   // base do agente do Copilot, já com o que mudou
                 _log.LogInformation("Atualização automática das {Hora:HH:mm}: {Nb} · {Afm}",
                     alvo, _sync.LastNb.Message, _sync.LastAfm.Message);
             }
