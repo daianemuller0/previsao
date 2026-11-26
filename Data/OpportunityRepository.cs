@@ -180,6 +180,46 @@ public class OpportunityRepository
         lock (_lock) return EnsureCache().Select(Clone).ToList();
     }
 
+    // ---- números de proposta repetidos ---------------------------------------
+    // Regra: o mesmo número de proposta conta UMA vez no sistema. Fica a ocorrência
+    // original (a criada primeiro; empate → a primeira linha da planilha, sem o
+    // sufixo "-2", "-3"…); as outras são ignoradas nas telas e nas contas.
+    // All() continua com todas (a sincronização e o Controle precisam delas).
+
+    /// <summary>Número de proposta normalizado para comparar ("  ab-12 " = "AB-12"); vazio = sem número.</summary>
+    public static string ChaveNumero(string? n) => string.Concat((n ?? "").Where(c => !char.IsWhiteSpace(c))).ToUpperInvariant();
+
+    /// <summary>Ordem da ocorrência no arquivo pelo sufixo do id ("imp-x" = 1, "imp-x-2" = 2).</summary>
+    private static int SeqDoId(string id)
+    {
+        var i = id.LastIndexOf('-');
+        return i > 0 && int.TryParse(id[(i + 1)..], out var n) && n < 1000 ? n : 1;
+    }
+
+    /// <summary>As ocorrências do mesmo número em ordem: a primeira é a original.</summary>
+    private static IEnumerable<Opportunity> OrdemOriginal(IEnumerable<Opportunity> l) =>
+        l.OrderBy(o => DateTime.TryParse(o.CreatedAt, out var d) ? d : DateTime.MaxValue)
+         .ThenBy(o => SeqDoId(o.Id)).ThenBy(o => o.Id, StringComparer.Ordinal);
+
+    /// <summary>Grupos de oportunidades com o mesmo número de proposta (2 ou mais); a primeira de cada grupo é a original.</summary>
+    public List<List<Opportunity>> Repetidas() =>
+        All().Where(o => ChaveNumero(o.ProposalNumber) != "")
+             .GroupBy(o => ChaveNumero(o.ProposalNumber))
+             .Where(g => g.Count() > 1)
+             .Select(g => OrdemOriginal(g).ToList())
+             .OrderBy(g => g[0].ProposalNumber, StringComparer.OrdinalIgnoreCase)
+             .ToList();
+
+    /// <summary>Todas as oportunidades, com cada número de proposta uma vez só (fica a original). É o que as telas usam.</summary>
+    public List<Opportunity> Unicas()
+    {
+        var todas = All();
+        var ignorar = todas.Where(o => ChaveNumero(o.ProposalNumber) != "")
+            .GroupBy(o => ChaveNumero(o.ProposalNumber)).Where(g => g.Count() > 1)
+            .SelectMany(g => OrdemOriginal(g).Skip(1)).Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
+        return ignorar.Count == 0 ? todas : todas.Where(o => !ignorar.Contains(o.Id)).ToList();
+    }
+
     /// <summary>Relê a base dos Parquet (descarta o cache atual).</summary>
     public void Refresh()
     {

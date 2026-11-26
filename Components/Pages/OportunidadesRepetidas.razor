@@ -1,0 +1,127 @@
+@page "/oportunidades-repetidas"
+@attribute [Authorize(Roles = "admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject OpportunityRepository Repo
+@inject Catalog Cat
+
+@* ===========================================================================
+   OPORTUNIDADES REPETIDAS (só admin)
+   Regra do sistema: o mesmo número de proposta conta UMA vez. Esta aba mostra
+   cada número que aparece mais de uma vez: qual ocorrência ficou (a original) e
+   quais foram ignoradas, de onde cada uma veio (planilha NB, planilha AFM ou
+   criada no sistema) e em que aba ela está (Oportunidades ou Controle).
+   =========================================================================== *@
+
+<PageTitle>Oportunidades repetidas · Howden Sales Forecast</PageTitle>
+
+<div class="cvx">
+    <div class="breadcrumbs"><span>Sistema</span><span class="sep">/</span><span>Oportunidades repetidas</span></div>
+    <div class="page-head">
+        <div>
+            <h1>Oportunidades repetidas</h1>
+            <p class="subtitle">
+                Números de proposta que aparecem mais de uma vez. O sistema conta cada número <b>uma vez só</b>: fica a ocorrência
+                <b>original</b> (a criada primeiro; empate → a primeira linha da planilha) e as outras ficam fora das telas e das contas.
+            </p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-ghost" @onclick="Carregar">@Icons.Svg("import")Atualizar</button>
+        </div>
+    </div>
+
+    <div class="cvx-kpis">
+        <article class="cvx-kpi" style="--kc:#12355B"><div class="cvx-lab">Números repetidos</div><div class="cvx-num">@_grupos.Count.ToString("N0", Br)</div><div class="cvx-ksub">propostas com mais de uma oportunidade</div></article>
+        <article class="cvx-kpi" style="--kc:#b42318"><div class="cvx-lab">Ocorrências ignoradas</div><div class="cvx-num">@_ignoradas.ToString("N0", Br)</div><div class="cvx-ksub">ficam fora das telas e das contas</div></article>
+        <article class="cvx-kpi" style="--kc:#155A96"><div class="cvx-lab">Valor que deixou de ser somado</div><div class="cvx-num">@Mi(_valorIgnorado)</div><div class="cvx-ksub">soma das ignoradas (R$)</div></article>
+    </div>
+
+    <div class="cvx-filters" style="margin:14px 0">
+        <input class="field" style="max-width:320px" placeholder="Buscar número, oportunidade ou cliente…" @bind="_busca" @bind:event="oninput" />
+        <span class="cvx-note">@Filtrados.Count() de @_grupos.Count número(s)</span>
+    </div>
+
+    @if (_grupos.Count == 0)
+    {
+        <div class="cvx-card"><div class="empty" style="padding:34px 12px">Nenhum número de proposta repetido. Cada oportunidade tem o seu número.</div></div>
+    }
+    else
+    {
+        <div class="cvx-card">
+            <table class="cvx-tbl">
+                <thead>
+                    <tr>
+                        <th>Nº da proposta</th><th>Situação</th><th>Aba no sistema</th><th>Origem</th><th>Oportunidade</th>
+                        <th>Cliente</th><th>Vendedor</th><th class="r">Valor (R$)</th><th>Criada em</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var g in Filtrados)
+                    {
+                        for (var i = 0; i < g.Count; i++)
+                        {
+                            var o = g[i];
+                            var original = i == 0;
+                            <tr class="@(original ? "rep-orig" : "rep-ign")" style="@(i == 0 ? "border-top:2px solid var(--cx-line)" : "")">
+                                <td>@(i == 0 ? o.ProposalNumber : "")</td>
+                                <td>@if (original) { <span class="rep-tag ok">Original · conta</span> } else { <span class="rep-tag no">Repetida · ignorada</span> }</td>
+                                <td>@Aba(o)</td>
+                                <td title="@o.Id">@Origem(o)</td>
+                                <td>@o.Name</td>
+                                <td>@Cat.CustomerName(o.CustomerId)</td>
+                                <td>@Cat.KamName(o.KamId)</td>
+                                <td class="r">@o.AmountBrl.ToString("N0", Br)</td>
+                                <td>@Data(o.CreatedAt)</td>
+                                <td><a href="/oportunidades/@Uri.EscapeDataString(o.Id)">abrir</a></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="cvx-note" style="margin-top:10px">
+            Aba no sistema: <b>Oportunidades</b> = está no funil; <b>Controle</b> = virou venda indicada. Origem: de que planilha do CRM a linha veio
+            (New Business ou Aftermarket) ou se foi criada à mão no sistema. Para acabar com a repetição, corrija o número no CRM (ou exclua a
+            ocorrência criada à mão); na próxima sincronização ela some daqui.
+        </p>
+    }
+</div>
+
+<style>
+    .rep-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+    .rep-tag.ok { background: #e7f6ec; color: #1f7a45; }
+    .rep-tag.no { background: #fdecea; color: #b42318; }
+    tr.rep-ign td { color: #6b7a90; }
+</style>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
+    private List<List<Opportunity>> _grupos = new();
+    private int _ignoradas;
+    private double _valorIgnorado;
+    private string _busca = "";
+
+    protected override void OnInitialized() => Carregar();
+
+    private void Carregar()
+    {
+        _grupos = Repo.Repetidas();
+        _ignoradas = _grupos.Sum(g => g.Count - 1);
+        _valorIgnorado = _grupos.SelectMany(g => g.Skip(1)).Sum(o => o.AmountBrl);
+    }
+
+    private IEnumerable<List<Opportunity>> Filtrados => string.IsNullOrWhiteSpace(_busca) ? _grupos
+        : _grupos.Where(g => g.Any(o => (o.ProposalNumber + " " + o.Name + " " + Cat.CustomerName(o.CustomerId))
+            .Contains(_busca.Trim(), StringComparison.CurrentCultureIgnoreCase)));
+
+    private static string Aba(Opportunity o) => o.MovidaControleValue ? "Controle (venda indicada)" : "Oportunidades";
+
+    private static string Origem(Opportunity o) =>
+        o.Id.StartsWith("imp-", StringComparison.Ordinal) ? "Planilha New Business (NB)"
+        : o.Id.StartsWith("afm-", StringComparison.Ordinal) ? "Planilha Aftermarket (AFM)"
+        : o.Id.StartsWith("opp-", StringComparison.Ordinal) ? "Criada no sistema"
+        : "Outra";
+
+    private static string Data(string iso) => DateTime.TryParse(iso, out var d) ? d.ToString("dd/MM/yyyy HH:mm", Br) : "—";
+
+    private static string Mi(double v) => "R$ " + (Math.Abs(v) >= 1_000_000 ? (v / 1_000_000).ToString("#,##0.0", Br) + " mi" : v.ToString("#,##0", Br));
+}

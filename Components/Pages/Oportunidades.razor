@@ -443,7 +443,7 @@
     // Carrega as oportunidades já recortadas pela carteira permitida do login.
     // Exclui as que viraram "venda indicada" (movidas para o Controle).
     private List<Opportunity> LoadScoped() =>
-        Repo.All()
+        Repo.Unicas()   // número de proposta repetido conta uma vez (as repetidas: aba "Oportunidades repetidas")
             .Where(o => !o.MovidaControleValue)
             .Where(o => _scope.CanSee(o, OpportunityImporter.CanonicalVendedor(Cat.KamName(o.KamId))))
             .ToList();

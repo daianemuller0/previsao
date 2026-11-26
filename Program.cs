@@ -290,7 +290,7 @@ app.MapGet("/forecast/export", (HttpContext http, OpportunityRepository repo, Ca
     sb.AppendLine("Proposta;Oportunidade;Categoria;Status pipeline;Data prevista;Quarter;Pais;Mercado;" +
                   "Produto;KAM;Cliente;Planta;Moeda;Valor USD;Valor BRL;GM%;Prob ganho;Prob periodo;" +
                   "Forecast ponderado USD;Margem USD;Risco;Categoria comercial;Proxima acao;Atualizado em");
-    var exportaveis = repo.All()
+    var exportaveis = repo.Unicas()   // número de proposta repetido conta uma vez
         .Where(o => !o.MovidaControleValue)
         .Where(o => scope.CanSeeVendedor(OpportunityImporter.CanonicalVendedor(cat.KamName(o.KamId))));
     foreach (var o in exportaveis)
