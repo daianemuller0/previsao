@@ -103,7 +103,6 @@ builder.Services.AddSingleton<BrandRepository>();
 builder.Services.AddHostedService<CompactionService>();
 // Atualização da base às 08:00 e às 13:00, para quem deixa o programa aberto.
 builder.Services.AddHostedService<AtualizacaoAgendada>();
-builder.Services.AddHostedService<BaseCopilotAgendada>();   // base do Copilot: confere a cada 15 min se chegou listagem nova
 // Sincronização das bases (planilhas do CRM na rede): New Business + Aftermarket.
 builder.Services.AddSingleton<DataSyncService>();
 // Guia Aplicação: planilhas de aplicadores (AFM + NB) unificadas numa tabela.
@@ -193,7 +192,7 @@ _ = Task.Run(() =>
 
         // Base do agente do Copilot (pipeline NB + AFM × indicadas na previsão): grava na pasta configurada.
         var copilot = app.Services.GetRequiredService<BaseCopilotService>();
-        if (copilot.Pasta != "") { Etapa("base do Copilot", () => copilot.GravarSeMudou()); Anota($"[subida] {copilot.UltimaMensagem}"); }
+        if (copilot.Pasta != "") { Etapa("base do Copilot", () => copilot.Gravar()); Anota($"[subida] {copilot.UltimaMensagem}"); }
     }
     catch { /* pasta indisponível ou lenta: o app segue no ar */ }
 });

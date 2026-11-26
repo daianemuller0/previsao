@@ -170,22 +170,6 @@ public sealed class BaseCopilotService
         return ms.ToArray();
     }
 
-    private string _assinaturaGravada = "";
-
-    /// <summary>Retrato do conteúdo da base: muda quando entra/sai oportunidade ou muda valor, etapa, vendedor ou indicação.</summary>
-    private string Assinatura() => string.Join("\n", Linhas().Select(l =>
-        $"{l.O.Id}|{l.Setor}|{l.Vendedor}|{l.Etapa}|{l.Valor.ToString(CultureInfo.InvariantCulture)}|{l.Indicada}|{l.O.ExpectedDate}|{l.O.WinProbability}|{l.O.CloseInPeriodProbability}")).GetHashCode().ToString(CultureInfo.InvariantCulture);
-
-    /// <summary>Grava só se o conteúdo mudou desde a última gravação (para a verificação a cada 15 minutos).</summary>
-    public bool GravarSeMudou()
-    {
-        var a = Assinatura();
-        if (a == _assinaturaGravada && UltimaGravacao is not null) return false;
-        var ok = Gravar();
-        if (ok) _assinaturaGravada = a;
-        return ok;
-    }
-
     /// <summary>
     /// Grava a base na pasta configurada (sobrescreve). Sem pasta, ou pasta que não existe neste
     /// computador, não faz nada. Nunca lança: o resultado fica em UltimaMensagem.
