@@ -160,6 +160,36 @@ using (var scope = app.Services.CreateScope())
     Etapa("usuários", () => scope.ServiceProvider.GetRequiredService<UserRepository>().SeedIfEmpty());
 }
 
+// ---- Modo "só a base do Copilot" (tarefa agendada do Windows) ---------------
+// "Howden Sales Forecast.exe" --BaseCopilot=true --Copilot:Pasta="C:\...\pasta"
+// Importa as listagens NB/AFM da rede, grava o Excel do agente do Copilot na pasta
+// e FECHA — sem tela e sem servidor. É o que deixa a base em dia nos horários das
+// listagens (08:00 e 13:00) mesmo quando ninguém abriu o programa.
+if (builder.Configuration.GetValue("BaseCopilot", false))
+{
+    try
+    {
+        var oppRepo = app.Services.GetRequiredService<OpportunityRepository>();
+        Etapa("leitura da base", () => oppRepo.RemoveDemo());
+        var sync = app.Services.GetRequiredService<DataSyncService>();
+        Etapa("sincronização das planilhas", () => sync.SyncAll());
+        Anota($"[base copilot] {sync.LastNb.Message}");
+        Anota($"[base copilot] {sync.LastAfm.Message}");
+        oppRepo.Refresh();
+        var copilot = app.Services.GetRequiredService<BaseCopilotService>();
+        var ok = false;
+        Etapa("base do Copilot", () => ok = copilot.Gravar());
+        Anota($"[base copilot] {copilot.UltimaMensagem}");
+        Environment.ExitCode = ok ? 0 : 1;
+    }
+    catch (Exception ex)
+    {
+        Anota($"[base copilot] falhou: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
+
 // Aquece o cache em SEGUNDO PLANO (compacta + lê a base). Não bloqueia a subida
 // do app — mesmo com a pasta de rede lenta, a tela de login abre imediatamente.
 _ = Task.Run(() =>

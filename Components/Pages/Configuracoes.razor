@@ -52,7 +52,8 @@
     <p class="cfg-foot">
         Pasta de gravação (appsettings <code>Copilot:Pasta</code>): <strong>@(Copilot.Pasta == "" ? "não configurada" : Copilot.Pasta)</strong>.
         Com a pasta configurada, a base é regravada ao abrir o programa, às 08:00 e às 13:00 e pelo botão abaixo. Use uma pasta do OneDrive/SharePoint
-        sincronizada neste computador e ligue o arquivo ao agente.
+        sincronizada neste computador e ligue o arquivo ao agente. Para gerar a base mesmo com o programa fechado (depois das listagens das 08:00 e das 13:00),
+        rode uma vez, na pasta do programa: <code>base-copilot.cmd instalar "C:\caminho\da\pasta"</code> — cria tarefas do Windows às 08:20 e às 13:20 (seg a sex).
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
         <button class="btn-primary" disabled="@(_gerandoCopilot || Copilot.Pasta == "")" @onclick="GravarCopilot">@Icons.Svg("import")Gravar agora na pasta</button>

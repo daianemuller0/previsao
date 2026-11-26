@@ -72,6 +72,8 @@ REM VPN isso levava minutos, toda vez. A janela do .cmd fica visivel: e por ela
 REM que se acompanha a copia quando sai versao nova.
 copy /y "%~dp0iniciar.ps1" "%TEMPO%\iniciar.ps1" >nul
 copy /y "%~dp0iniciar.cmd" "%TEMPO%\iniciar.cmd" >nul
+REM Base do agente do Copilot sem abrir o programa (tarefa agendada do Windows).
+copy /y "%~dp0base-copilot.cmd" "%TEMPO%\base-copilot.cmd" >nul
 REM O logo vai como arquivo .ico proprio: apontar o atalho para ele e mais
 REM confiavel do que depender do icone embutido no executavel — que muda de
 REM lugar quando o alvo do atalho deixa de ser o .exe.
