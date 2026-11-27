@@ -8,8 +8,7 @@ namespace HowdenSalesForecast.Data;
 // pasta de rede Vendido:Path — a única planilha .xlsm da pasta (se houver mais de
 // uma, a mais recente). Colunas pela LETRA do Excel (Vendido:Colunas sobrepõe):
 //   BU = A · Data do pedido = E · Valor vendido = L · Categoria = R · Produto = S ·
-//   KAM = Y · Segmento = pelo título da coluna ("Segmento"/"Segment"); sem título,
-//   a letra configurada (padrão S, a mesma do Produto, até a equipe confirmar).
+//   Segmento = T · KAM = Y.
 // Linhas sem data do pedido ou sem valor numérico ficam de fora (totais, títulos).
 // Relê só quando o arquivo muda (nome, data de gravação e tamanho).
 // ---------------------------------------------------------------------------
@@ -20,7 +19,7 @@ public sealed class VendidoService
     private static readonly CultureInfo Br = new("pt-BR");
     private static readonly Dictionary<string, string> ColunasPadrao = new()
     {
-        ["Bu"] = "A", ["Data"] = "E", ["Valor"] = "L", ["Categoria"] = "R", ["Produto"] = "S", ["Segmento"] = "S", ["Kam"] = "Y",
+        ["Bu"] = "A", ["Data"] = "E", ["Valor"] = "L", ["Categoria"] = "R", ["Produto"] = "S", ["Segmento"] = "T", ["Kam"] = "Y",
     };
 
     private readonly IConfiguration _cfg;
