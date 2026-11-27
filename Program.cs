@@ -113,6 +113,7 @@ builder.Services.AddSingleton<CambioAnualRepository>();
 // Guia Vendas × Propostas: vendas mês a mês, budgets e propostas informadas
 builder.Services.AddSingleton<VendasMensaisRepository>();
 builder.Services.AddSingleton<BaseCopilotService>();
+builder.Services.AddSingleton<VendidoService>();
 // Recorte das telas durante a sessão: abrir uma proposta e voltar não refaz os
 // filtros. Scoped = por circuito, ou seja, por pessoa e por aba do navegador.
 builder.Services.AddScoped<FiltroMemoria>();

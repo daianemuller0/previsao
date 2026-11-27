@@ -1,0 +1,444 @@
+@page "/vendido"
+@attribute [Authorize(Roles = "admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Globalization
+@inject VendidoService Svc
+@inject IJSRuntime JS
+
+@* ===========================================================================
+   VENDIDO · o valor vendido (pedidos) mês a mês, comparando os anos.
+   Fonte: a planilha de pedidos da pasta Vendido:Path (VendidoService). Mesmo
+   padrão visual do "mês a mês" da Performance Comercial (classes vpm-*):
+   um ano, dois anos comparados (variação de cada mês e resumo do mesmo
+   período) ou todos os anos (matriz ano × mês). Filtros: BU, Categoria,
+   Produto, Segmento, KAM e Mês.
+   =========================================================================== *@
+
+<PageTitle>Vendido · Howden South America</PageTitle>
+
+<div class="cvx vp-page">
+    <div class="breadcrumbs"><span>Executivo</span><span class="sep">/</span><span>Vendido</span></div>
+    <div class="page-head">
+        <div>
+            <h1>Vendido | Howden South America</h1>
+            <p class="subtitle">
+                Valor vendido por data do pedido · mês a mês, comparando os anos · valores em R$<br />
+                Fonte: @(Svc.Arquivo == "" ? "planilha de vendido" : Svc.Arquivo)@(Svc.LidoEm is { } q ? $" · lida em {q:dd/MM/yyyy 'às' HH:mm}" : "")
+            </p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-ghost" disabled="@_carregando" title="Reler a planilha de vendido" @onclick="Reler">@Icons.Svg("import")@(_carregando ? "Atualizando…" : "Atualizar")</button>
+        </div>
+    </div>
+
+    @if (!Svc.Ok || Svc.Pedidos.Count == 0)
+    {
+        <div class="cvx-alert @(Svc.Ok ? "" : "erro")">@(_carregando ? "Lendo a planilha de vendido…" : Svc.Mensagem)</div>
+    }
+    else
+    {
+        <div class="cvx-filters vd-filtros">
+            <MultiFilter Label="BU" AllText="Todas" Options="Opcoes(p => p.Bu, _bus)" Selected="_bus" OnChanged="StateHasChanged" Searchable="true" />
+            <MultiFilter Label="Categoria" AllText="Todas" Options="Opcoes(p => p.Categoria, _cats)" Selected="_cats" OnChanged="StateHasChanged" Searchable="true" />
+            <MultiFilter Label="Produto" AllText="Todos" Options="Opcoes(p => p.Produto, _prods)" Selected="_prods" OnChanged="StateHasChanged" Searchable="true" />
+            <MultiFilter Label="Segmento" AllText="Todos" Options="Opcoes(p => p.Segmento, _segs)" Selected="_segs" OnChanged="StateHasChanged" Searchable="true" />
+            <MultiFilter Label="KAM" AllText="Todos" Options="Opcoes(p => p.Kam, _kams)" Selected="_kams" OnChanged="StateHasChanged" Searchable="true" />
+            <MultiFilter Label="Mês" AllText="Todos" Options="MesesOpcoes" Selected="_meses" OnChanged="StateHasChanged" />
+            @if (Ativos > 0) { <button class="btn-link" @onclick="Limpar">Limpar filtros</button> }
+        </div>
+
+        var anosDisp = AnosDisp;
+        var principal = anosDisp.Contains(_principal) ? _principal : anosDisp.LastOrDefault();
+        var modo = _modo == "comparar" && Comp(principal, anosDisp) is null ? "ano" : _modo;
+        var comp = modo == "comparar" ? Comp(principal, anosDisp) : null;
+        var ate = AteMes(principal);
+        var vP = Soma(principal, ate); var vC = comp is int cc0 ? Soma(cc0, ate) : (double?)null;
+        var nP = Qtd(principal, ate); var nC = comp is int cc1 ? Qtd(cc1, ate) : (int?)null;
+
+        <div class="cvx-kpis" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
+            @Kpi($"Vendido · {principal}", Mi(vP), PeriodoTxt(ate, principal), vC is double c1 && c1 > 0 ? VarTxt(vP, c1, comp!.Value) : null, "#1f9254")
+            @Kpi($"Pedidos · {principal}", N0(nP), PeriodoTxt(ate, principal), nC is int c2 && c2 > 0 ? VarTxt(nP, c2, comp!.Value) : null, "#12355B")
+            @Kpi($"Valor médio por pedido · {principal}", nP > 0 ? Mi(vP / nP) : "—", "vendido ÷ pedidos", nC is int c3 && c3 > 0 && vC is double c4 && nP > 0 ? VarTxt(vP / nP, c4 / c3, comp!.Value) : null, "#155A96")
+            @Kpi($"Vendido no ano · {principal}", Mi(Soma(principal, 12)), principal == DateTime.Today.Year ? "ano em andamento" : "jan–dez", null, "#007A9E")
+        </div>
+
+        <div class="panel vp-principal vpm" id="vd-mes">
+            <div class="panel-head">
+                <div class="panel-title">Valor vendido, mês a mês
+                    <span class="hint">@(modo switch { "comparar" => $"{principal} × {comp}", "historico" => "todos os anos", _ => principal.ToString() }) · por data do pedido · R$@(Ativos > 0 ? " · filtrado" : "")</span>
+                </div>
+            </div>
+            <div class="vpm-ctl">
+                <div class="cvx-seg-ctl vpm-modos" role="tablist" aria-label="Modo de visualização">
+                    <button class="@(modo == "ano" ? "on" : "")" @onclick='() => _modo = "ano"'>Um ano</button>
+                    <button class="@(modo == "comparar" ? "on" : "")" disabled="@(anosDisp.Count < 2)" @onclick='() => _modo = "comparar"'>Comparar dois anos</button>
+                    <button class="@(modo == "historico" ? "on" : "")" @onclick='() => _modo = "historico"'>Todos os anos</button>
+                </div>
+                <button type="button" class="btn-ghost vpm-tela" onclick="vpTelaCheia('vd-mes')" title="Mostrar este quadro na tela inteira (Esc para sair)">
+                    <span class="vpm-tela-on">⛶ Tela cheia</span><span class="vpm-tela-off">✕ Sair da tela cheia</span>
+                </button>
+                <button type="button" class="btn-ghost vpm-pdf" onclick="vpPdf('vd-mes', 'Valor vendido mês a mês')" title="Gerar um PDF deste quadro, como está na tela (no diálogo de impressão, escolha “Salvar como PDF”)">⤓ Gerar PDF</button>
+                @if (modo != "historico")
+                {
+                    <div class="vpm-sel"><span>Ano principal</span>
+                        <div class="cvx-seg-ctl">
+                            @foreach (var a in anosDisp) { var ano = a; <button class="@(ano == principal ? "on" : "")" @onclick="() => { _principal = ano; if (_comp == ano) _comp = null; }">@ano</button> }
+                        </div>
+                    </div>
+                }
+                @if (modo == "comparar")
+                {
+                    <div class="vpm-sel"><span>Comparar com</span>
+                        <div class="cvx-seg-ctl">
+                            @foreach (var a in anosDisp.Where(x => x != principal)) { var ano = a; <button class="@(ano == comp ? "on" : "")" @onclick="() => _comp = ano">@ano</button> }
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="vpm-status">@Svc.Mensagem@(principal == DateTime.Today.Year ? $" · {NomeMes(DateTime.Today.Month).ToLowerInvariant()}/{principal} em andamento (parcial, até hoje)" : "")</div>
+
+            @if (modo == "historico")
+            {
+                @Matriz(anosDisp)
+            }
+            else
+            {
+                var anos = comp is int c ? new List<int> { principal, c } : new List<int> { principal };
+                <div class="vpm-corpo">
+                    <div class="vpm-graficos chart-body">@Grafico(anos, principal)</div>
+                    @Resumo(principal, comp, ate)
+                </div>
+                <div class="vpm-detalhe-bar">
+                    <button class="btn-ghost" aria-expanded="@(_detalhe ? "true" : "false")" @onclick="() => _detalhe = !_detalhe">@(_detalhe ? "▴ Ocultar dados detalhados" : "▾ Ver dados detalhados")</button>
+                    <span class="cvx-note">Valores completos de cada mês, em reais e centavos, e a quantidade de pedidos.</span>
+                </div>
+                @if (_detalhe) { @Tabela(anos, principal) }
+            }
+        </div>
+
+        @* ---- de onde vem o vendido: ranking pela dimensão escolhida ---- *@
+        <div class="panel vp-principal" style="margin-top:14px">
+            <div class="panel-head">
+                <div class="panel-title">Vendido por @NomeDim(_dim)
+                    <span class="hint">@PeriodoTxt(ate, principal) de @principal@(comp is int c5 ? $" × mesmo período de {c5}" : "") · os 15 maiores</span>
+                </div>
+                <div class="cvx-seg-ctl">
+                    @foreach (var d in new[] { "bu", "categoria", "produto", "segmento", "kam" }) { var dd = d; <button class="@(_dim == dd ? "on" : "")" @onclick="() => _dim = dd">@NomeDim(dd)</button> }
+                </div>
+            </div>
+            @Ranking(principal, comp, ate)
+        </div>
+
+        <details class="cvx-note" style="margin-top:10px">
+            <summary>Colunas lidas da planilha</summary>
+            @string.Join(" · ", Svc.Mapeamento)
+        </details>
+    }
+</div>
+
+<style>
+    .vd-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .vd-rank { display: grid; grid-template-columns: minmax(140px, 260px) 1fr 120px 120px 80px; gap: 6px 12px; align-items: center; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+    .vd-rank .cab { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--cx-mut); }
+    .vd-rank .nome { font-weight: 600; color: #172B43; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vd-rank .barra { height: 12px; background: #eef2f7; border-radius: 6px; overflow: hidden; }
+    .vd-rank .barra i { display: block; height: 100%; background: #1f6f8b; border-radius: 6px; }
+    .vd-rank .r { text-align: right; }
+    .vd-rank .pos { color: #17663a; font-weight: 700; } .vd-rank .neg { color: #b42318; font-weight: 700; }
+</style>
+
+@code {
+    private static readonly CultureInfo Br = new("pt-BR");
+    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+    private static readonly string[] MesesNomes = { "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro" };
+    private static readonly string[] MesesCurtos = { "JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ" };
+    private const string CorPri = "#1f6f8b", CorCmp = "#9db4cf";
+
+    private bool _carregando, _detalhe;
+    private string _modo = "comparar", _dim = "bu";
+    private int _principal = DateTime.Today.Year;
+    private int? _comp;
+    private readonly HashSet<string> _bus = Novo(), _cats = Novo(), _prods = Novo(), _segs = Novo(), _kams = Novo(), _meses = Novo();
+    private static HashSet<string> Novo() => new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _carregando = true;
+        try { await Task.Run(() => Svc.Carregar(false)); } finally { _carregando = false; }
+        if (AnosDisp.Count > 0 && !AnosDisp.Contains(_principal)) _principal = AnosDisp.Max();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try { await JS.InvokeVoidAsync("vpmAjustar"); } catch { }
+    }
+
+    private async Task Reler()
+    {
+        _carregando = true;
+        try { await Task.Run(() => Svc.Carregar(true)); } finally { _carregando = false; }
+    }
+
+    private void Limpar() { _bus.Clear(); _cats.Clear(); _prods.Clear(); _segs.Clear(); _kams.Clear(); _meses.Clear(); }
+    private int Ativos => new[] { _bus, _cats, _prods, _segs, _kams, _meses }.Count(s => s.Count > 0);
+
+    // ---- filtros ----
+    private bool Passa(PedidoVendido p, HashSet<string>? exceto = null) =>
+        (exceto == _bus || _bus.Count == 0 || _bus.Contains(p.Bu))
+        && (exceto == _cats || _cats.Count == 0 || _cats.Contains(p.Categoria))
+        && (exceto == _prods || _prods.Count == 0 || _prods.Contains(p.Produto))
+        && (exceto == _segs || _segs.Count == 0 || _segs.Contains(p.Segmento))
+        && (exceto == _kams || _kams.Count == 0 || _kams.Contains(p.Kam));
+
+    private bool MesNoFiltro(int m) => _meses.Count == 0 || _meses.Contains(MesesNomes[m - 1]);
+
+    /// <summary>Opções em cascata: o que existe com os OUTROS filtros aplicados.</summary>
+    private IEnumerable<string> Opcoes(Func<PedidoVendido, string> campo, HashSet<string> proprio) =>
+        Svc.Pedidos.Where(p => Passa(p, proprio)).Select(campo).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+
+    private IEnumerable<string> MesesOpcoes => MesesNomes;
+
+    private IEnumerable<PedidoVendido> Filtrados => Svc.Pedidos.Where(p => Passa(p) && MesNoFiltro(p.Data.Month));
+
+    private List<int> AnosDisp => Svc.Pedidos.Select(p => p.Data.Year).Where(a => a <= DateTime.Today.Year).Distinct().OrderBy(a => a).ToList();
+
+    private int? Comp(int principal, List<int> anos)
+    {
+        var outros = anos.Where(a => a != principal).ToList();
+        if (outros.Count == 0) return null;
+        if (_comp is int c && outros.Contains(c)) return c;
+        return outros.Contains(principal - 1) ? principal - 1 : outros.OrderBy(a => Math.Abs(a - principal)).First();
+    }
+
+    /// <summary>Até que mês somar no período comparável: no ano corrente, o mês de hoje (parcial); nos outros, dezembro.</summary>
+    private static int AteMes(int ano) => ano == DateTime.Today.Year ? DateTime.Today.Month : 12;
+
+    private double Mes(int ano, int mes) => Filtrados.Where(p => p.Data.Year == ano && p.Data.Month == mes).Sum(p => p.Valor);
+    private int QtdMes(int ano, int mes) => Filtrados.Count(p => p.Data.Year == ano && p.Data.Month == mes);
+    private double Soma(int ano, int ate) => Filtrados.Where(p => p.Data.Year == ano && p.Data.Month <= ate).Sum(p => p.Valor);
+    private int Qtd(int ano, int ate) => Filtrados.Count(p => p.Data.Year == ano && p.Data.Month <= ate);
+    private static bool Futuro(int ano, int mes) => ano > DateTime.Today.Year || (ano == DateTime.Today.Year && mes > DateTime.Today.Month);
+    private static bool Parcial(int ano, int mes) => ano == DateTime.Today.Year && mes == DateTime.Today.Month;
+
+    // ---- textos ----
+    private static string NomeMes(int m) => MesesNomes[m - 1];
+    private static string N0(int v) => v.ToString("#,##0", Br);
+    private static string N0(double v) => v.ToString("#,##0", Br);
+    private static string Mi(double v)
+    {
+        var a = Math.Abs(v); var s = v < 0 ? "−" : "";
+        return s + "R$ " + (a >= 1e9 ? (a / 1e9).ToString("#,##0.0#", Br) + " bi" : a >= 1e6 ? (a / 1e6).ToString("#,##0.0", Br) + " mi" : a >= 1e3 ? (a / 1e3).ToString("#,##0", Br) + " mil" : a.ToString("#,##0", Br));
+    }
+    private static string Reais(double v) => (v < 0 ? "−" : "") + "R$ " + Math.Abs(v).ToString("#,##0.00", Br);
+    private static double? Var(double a, double b) => b > 0 ? (a - b) / b * 100 : null;
+    private static string Pct(double v) => (v > 0.05 ? "+" : v < -0.05 ? "−" : "") + Math.Abs(v).ToString("0.0", Br) + "%";
+    private static string Cls(double? v) => v is not double x || Math.Abs(x) < 0.05 ? "neu" : x > 0 ? "pos" : "neg";
+    private static string VarTxt(double a, double b, int anoB) => Var(a, b) is double v ? $"{Pct(v)} vs mesmo período de {anoB}" : "";
+    private string PeriodoTxt(int ate, int ano)
+    {
+        var l = Enumerable.Range(1, ate).Where(MesNoFiltro).ToList();
+        if (l.Count == 0) return "nenhum mês do filtro";
+        var txt = l.Count == 12 ? "jan–dez" : l.Count == l[^1] - l[0] + 1 ? (l.Count == 1 ? MesesCurtos[l[0] - 1].ToLowerInvariant() : $"{MesesCurtos[l[0] - 1].ToLowerInvariant()}–{MesesCurtos[l[^1] - 1].ToLowerInvariant()}") : string.Join(", ", l.Select(m => MesesCurtos[m - 1].ToLowerInvariant()));
+        return txt + (ano == DateTime.Today.Year && l.Contains(DateTime.Today.Month) ? $" ({MesesCurtos[DateTime.Today.Month - 1].ToLowerInvariant()} parcial)" : "");
+    }
+    private static string F(double v) => v.ToString("0.##", Inv);
+    private static string NomeDim(string d) => d switch { "bu" => "BU", "categoria" => "Categoria", "produto" => "Produto", "segmento" => "Segmento", _ => "KAM" };
+    private static Func<PedidoVendido, string> CampoDim(string d) => d switch
+    {
+        "bu" => p => p.Bu, "categoria" => p => p.Categoria, "produto" => p => p.Produto, "segmento" => p => p.Segmento, _ => p => p.Kam,
+    };
+
+    private RenderFragment Kpi(string rotulo, string valor, string sub, string? delta, string cor) =>
+        @<article class="cvx-kpi" style="--kc:@cor">
+            <div class="cvx-lab">@rotulo</div>
+            <div class="cvx-num">@valor</div>
+            <div class="cvx-ksub">@sub</div>
+            @if (!string.IsNullOrEmpty(delta)) { <div class="cvx-delta @(delta.StartsWith("+") ? "pos" : delta.StartsWith("−") ? "neg" : "neu")">@(delta.StartsWith("+") ? "▲ " : delta.StartsWith("−") ? "▼ " : "")@delta</div> }
+        </article>;
+
+    // ---- gráfico mês a mês (mesma estrutura do quadro da Performance Comercial) ----
+    private RenderFragment Grafico(List<int> anos, int principal) => __builder =>
+    {
+        var dois = anos.Count == 2;
+        var vals = anos.ToDictionary(a => a, a => Enumerable.Range(1, 12).Select(m => MesNoFiltro(m) && !Futuro(a, m) ? Mes(a, m) : (double?)null).ToArray());
+        var max = Math.Max(1, vals.Values.SelectMany(x => x).Where(x => x is not null).Select(x => Math.Abs(x!.Value)).DefaultIfEmpty(1).Max());
+        var min = Math.Min(0, vals.Values.SelectMany(x => x).Where(x => x is not null).Select(x => x!.Value).DefaultIfEmpty(0).Min());
+        var topo = max * (dois ? 1.3 : 1.2); var fundo = min < 0 ? min * 1.3 : 0; var faixa = topo - fundo;
+        double Y(double v) => (v - fundo) / faixa * 100;
+        var zero = Y(0);
+        <div class="vpm-graf combo @(dois ? "dois" : "um")">
+            <div class="vpm-gtit">
+                <b>Valor vendido por mês</b>
+                <span>@(dois ? $"{anos[0]} × {anos[1]}" : anos[0].ToString()) · R$ · data do pedido</span>
+                <span class="vpm-gleg">@foreach (var a in anos) { <span><i style="background:@(a == principal ? CorPri : CorCmp)"></i>@a</span> }</span>
+            </div>
+            @if (dois)
+            {
+                <div class="vpm-var-cap">Variação do vendido, @anos[0] × @anos[1]</div>
+                <div class="vpm-var">
+                    @for (var m = 1; m <= 12; m++)
+                    {
+                        var a = vals[anos[0]][m - 1]; var b = vals[anos[1]][m - 1];
+                        var v = a is double x && b is double y ? Var(x, y) : null;
+                        @if (v is double p) { <span class="vpm-pill @Cls(p)" title="@($"{NomeMes(m)}: {Reais(a!.Value - b!.Value)}")">@Pct(p)</span> }
+                        else { <span class="vpm-pill vazio">—</span> }
+                    }
+                </div>
+            }
+            <div class="vpm-plot vpm-dc sobe" style="height:260px">
+                @if (fundo < 0) { <div class="vpm-zero neg" style="bottom:@F(zero)%"></div> }
+                @for (var m = 1; m <= 12; m++)
+                {
+                    var mes = m;
+                    <div class="vpm-col">
+                        @foreach (var a in anos)
+                        {
+                            var v = vals[a][mes - 1];
+                            var parc = Parcial(a, mes);
+                            <div class="vpm-slot" title="@($"{NomeMes(mes)} {a}: {(v is double vv ? Reais(vv) + $" · {QtdMes(a, mes)} pedido(s)" + (parc ? " (parcial)" : "") : Futuro(a, mes) ? "a apurar" : "fora do filtro")}")">
+                                @if (v is double val)
+                                {
+                                    var neg = val < 0;
+                                    var b0 = neg ? Y(val) : zero; var h = Math.Max(Math.Abs(Y(val) - zero), 0.5);
+                                    <i class="vpm-bar @(parc ? "parcial" : "")" style="bottom:@F(b0)%;height:@F(h)%;--c:@(neg ? "#c0392b" : a == principal ? CorPri : CorCmp)"></i>
+                                    <b class="vpm-val vpm-rot @(a == principal ? "pri" : "cmp") @(neg ? "neg" : "")" style="bottom:calc(@F(neg ? b0 : b0 + h)% @(neg ? "- 20px" : "+ 3px"))">@Mi(val)@(parc ? "*" : "")</b>
+                                }
+                                else if (Futuro(a, mes)) { <i class="vpm-bar apurar" style="bottom:@F(zero)%;height:6%"></i> }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="vpm-meses">
+                @for (var m = 1; m <= 12; m++)
+                {
+                    <div><b>@MesesCurtos[m - 1]</b>@if (Parcial(principal, m)) { <small>parcial</small> } else if (Futuro(principal, m)) { <small>a apurar</small> }</div>
+                }
+            </div>
+        </div>
+    };
+
+    private RenderFragment Resumo(int a1, int? a2, int ate) => __builder =>
+    {
+        var v1 = Soma(a1, ate); var n1 = Qtd(a1, ate);
+        <aside class="vpm-resumo @(a2 is null ? "um" : "cmp")">
+            <div class="vpm-rtit">@(a2 is null ? $"Resumo de {a1}" : "Resumo comparativo")</div>
+            <div class="vpm-rper">Mesmos meses nos dois anos: @PeriodoTxt(ate, a1)</div>
+            <div class="vpm-anos2">
+                @foreach (var a in a2 is int b ? new[] { a1, b } : new[] { a1 })
+                {
+                    var v = Soma(a, ate); var n = Qtd(a, ate);
+                    <div class="vpm-ano @(a == a1 ? "pri" : "")" style="--ac:@(a == a1 ? CorPri : CorCmp)">
+                        <div class="vpm-ano-t">@a</div>
+                        <div class="vpm-ano-l"><span>Vendido</span><b title="@Reais(v)">@Mi(v)</b></div>
+                        <div class="vpm-ano-l"><span>Pedidos</span><b>@N0(n)</b></div>
+                        <div class="vpm-ano-l"><span>Valor médio</span><b>@(n > 0 ? Mi(v / n) : "—")</b></div>
+                        <div class="vpm-ano-l vpm-ano-tot"><span>Vendido no ano</span><b>@Mi(Soma(a, 12))</b><small>@(a == DateTime.Today.Year ? "ano em andamento" : "jan–dez")</small></div>
+                    </div>
+                }
+            </div>
+            @if (a2 is int c)
+            {
+                var v2 = Soma(c, ate); var n2 = Qtd(c, ate);
+                var dv = Var(v1, v2); var dn = Var(n1, n2);
+                <div class="vpm-rtit2">Variação @a1 × @c</div>
+                <div class="vpm-varl">
+                    <span>Vendido</span><b class="@Cls(dv)">@(dv is double x ? (x > 0 ? "▲ " : x < 0 ? "▼ " : "") + Pct(x) : "—")</b><em>@Mi(v1 - v2)</em>
+                    <span>Pedidos</span><b class="neu">@(dn is double y ? Pct(y) : "—")</b><em>@((n1 - n2).ToString("+#,##0;−#,##0;0", Br))</em>
+                </div>
+                <p class="vpm-rnota">Mesmos meses nos dois anos@(_meses.Count > 0 ? " (os do filtro Mês)" : "")@(a1 == DateTime.Today.Year ? $"; {NomeMes(DateTime.Today.Month).ToLowerInvariant()} de {a1} é parcial (pedidos até hoje)" : "").</p>
+            }
+        </aside>
+    };
+
+    private RenderFragment Tabela(List<int> anos, int principal) => __builder =>
+    {
+        <div class="vpm-det-wrap">
+            <table class="vpm-det">
+                <thead>
+                    <tr><th>Mês</th>@foreach (var a in anos) { <th>@a · vendido</th><th>@a · pedidos</th> }@if (anos.Count == 2) { <th>Diferença</th><th>Var.</th> }</tr>
+                </thead>
+                <tbody>
+                    @for (var m = 1; m <= 12; m++)
+                    {
+                        var mes = m;
+                        if (!MesNoFiltro(mes)) continue;
+                        <tr>
+                            <th>@NomeMes(mes)@(Parcial(principal, mes) ? " (parcial)" : "")</th>
+                            @foreach (var a in anos) { <td>@(Futuro(a, mes) ? "a apurar" : Reais(Mes(a, mes)))</td><td>@(Futuro(a, mes) ? "—" : N0(QtdMes(a, mes)))</td> }
+                            @if (anos.Count == 2)
+                            {
+                                var ok = !Futuro(anos[0], mes) && !Futuro(anos[1], mes);
+                                var x = Mes(anos[0], mes); var y = Mes(anos[1], mes);
+                                <td>@(ok ? Reais(x - y) : "—")</td><td>@(ok && Var(x, y) is double v ? Pct(v) : "—")</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th>Total</th>
+                        @foreach (var a in anos) { <td>@Reais(Soma(a, 12))</td><td>@N0(Qtd(a, 12))</td> }
+                        @if (anos.Count == 2) { <td>@Reais(Soma(anos[0], 12) - Soma(anos[1], 12))</td><td></td> }
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    };
+
+    /// <summary>Todos os anos: matriz ano × mês, com a cor mais forte onde o vendido é maior.</summary>
+    private RenderFragment Matriz(List<int> anos) => __builder =>
+    {
+        var max = Math.Max(1, anos.SelectMany(a => Enumerable.Range(1, 12).Select(m => Mes(a, m))).DefaultIfEmpty(1).Max());
+        <div class="vpm-mat-card">
+            <div class="vpm-gtit"><b>Valor vendido por ano e mês</b><span>R$ · data do pedido</span></div>
+            <div class="vpm-mat-wrap">
+                <table class="vpm-mat">
+                    <thead><tr><th>Ano</th>@for (var m = 1; m <= 12; m++) { <th>@MesesCurtos[m - 1]</th> }<th class="tot">Total</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in anos.OrderByDescending(x => x))
+                        {
+                            <tr class="@(a == _principal ? "foco" : "")">
+                                <th>@a</th>
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    var mes = m;
+                                    if (Futuro(a, mes) || !MesNoFiltro(mes)) { <td class="apurar">—</td> continue; }
+                                    var v = Mes(a, mes);
+                                    var pct = Math.Clamp(v / max, 0, 1) * 88 + 4;
+                                    <td class="@(Parcial(a, mes) ? "parc" : "")" style="background:color-mix(in srgb, #1f6f8b @F(pct)%, #f3f8fa);color:@(pct > 52 ? "#fff" : "#172B43")" title="@($"{NomeMes(mes)} {a}: {Reais(v)} · {QtdMes(a, mes)} pedido(s)")">@((v / 1e6).ToString("#,##0.0", Br))@(Parcial(a, mes) ? "*" : "")</td>
+                                }
+                                <td class="tot">@((Soma(a, 12) / 1e6).ToString("#,##0.0", Br))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cvx-note" style="margin-top:6px">R$ milhões · * = mês em andamento (parcial).</p>
+        </div>
+    };
+
+    private RenderFragment Ranking(int principal, int? comp, int ate) => __builder =>
+    {
+        var campo = CampoDim(_dim);
+        var atual = Filtrados.Where(p => p.Data.Year == principal && p.Data.Month <= ate).GroupBy(campo).ToDictionary(g => g.Key, g => g.Sum(p => p.Valor));
+        var antes = comp is int c ? Filtrados.Where(p => p.Data.Year == c && p.Data.Month <= ate).GroupBy(campo).ToDictionary(g => g.Key, g => g.Sum(p => p.Valor)) : new();
+        var top = atual.OrderByDescending(kv => kv.Value).Take(15).ToList();
+        var max = Math.Max(1, top.Select(kv => kv.Value).DefaultIfEmpty(1).Max());
+        var total = atual.Values.Sum();
+        if (top.Count == 0) { <div class="empty" style="padding:20px">Sem pedidos no recorte.</div> return; }
+        <div class="vd-rank">
+            <span class="cab">@NomeDim(_dim)</span><span class="cab">Vendido em @principal</span><span class="cab r">@principal</span><span class="cab r">@(comp is int c1 ? c1.ToString() : "")</span><span class="cab r">Var.</span>
+            @foreach (var kv in top)
+            {
+                var ant = antes.GetValueOrDefault(kv.Key);
+                var v = comp is null ? null : Var(kv.Value, ant);
+                <span class="nome" title="@kv.Key">@kv.Key</span>
+                <span class="barra" title="@($"{(kv.Value / Math.Max(total, 1) * 100).ToString("0.0", Br)}% do vendido")"><i style="width:@F(Math.Max(0, kv.Value) / max * 100)%"></i></span>
+                <span class="r" title="@Reais(kv.Value)">@Mi(kv.Value)</span>
+                <span class="r">@(comp is null ? "" : Mi(ant))</span>
+                <span class="r @Cls(v)">@(v is double x ? Pct(x) : comp is null ? "" : "—")</span>
+            }
+        </div>
+    };
+}
